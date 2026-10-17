@@ -211,11 +211,21 @@ ambiguous box in place of a guess. The diagram also lists what it could not
 see: files that import reflect or plugin, generated code, and Go files that did
 not parse.
 
+A route registered with a router verb and a path literal, such as
+mux.HandleFunc("GET /users", auth, list) or r.Post("/users", auth, create), is
+drawn as a green box whose arrows run to its handlers, numbered in the order
+they run, so a change to a handler shows the chain it sits in. Calls that write
+to the filesystem or reach a database package such as database/sql are pink.
+Because the graph has no types, a database-shaped method name like Query in a
+file that imports one is drawn as inferred. Middleware added with Use is
+attached to routes at run time, so the diagram lists it as a limit and does not
+draw it.
+
 The graph is built from Go source by name, without type checking. A call
 through an interface or a package-level table is not drawn, so a missing arrow
 does not prove there is no call. A diagram stops at 30 nodes and says so. It is
 off by default, appears even with `review.summary: false`, and covers Go only;
-HTTP framework adapters are not built yet.
+Routes are found by shape, not per framework.
 
 A language no probe reads is named in the report rather than left out of it.
 Six probes read Go today and nothing reads anything else, so a TypeScript tree

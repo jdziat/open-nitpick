@@ -57,7 +57,7 @@ func flowNotice(report *Report) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "\n<details>\n<summary>Flow around %s</summary>\n\n", flowHeadline(d.Changed))
 	b.WriteString("```mermaid\n" + d.Mermaid + "```\n\n")
-	b.WriteString("Solid arrows are calls by name or through an import. Dashed arrows labelled *inferred* match a method by name alone, so they can point at another type's method; those labelled *unresolved* match several methods and are not guessed.\n\n")
+	b.WriteString("Solid arrows are calls by name or through an import. Dashed arrows labelled *inferred* match a method by name alone, so they can point at another type's method; those labelled *unresolved* match several methods and are not guessed. A green box is a registered route; the numbers on its arrows are the order its handlers run in. Pink boxes are calls that write to a database or the filesystem.\n\n")
 	if len(d.Calls) > 0 {
 		b.WriteString("Calls:\n\n")
 		for _, c := range d.Calls {

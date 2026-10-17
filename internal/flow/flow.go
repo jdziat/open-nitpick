@@ -77,6 +77,9 @@ type Call struct {
 	Kind Kind   `json:"kind"`
 	Path string `json:"path"`
 	Line int    `json:"line"`
+	// Order is the position in a route's handler chain, counted from 1, and
+	// zero for an ordinary call.
+	Order int `json:"order,omitempty"`
 }
 
 type function struct {
@@ -84,15 +87,22 @@ type function struct {
 	file                 string
 	start, end           int
 	calls                map[string]site
-	external             map[string]int
+	external             map[string]site
 	ambiguous            map[string]int
 	reflects             bool
+	// usesMiddleware is true when the body calls Use, whose middleware is
+	// attached at run time and so is not drawn.
+	usesMiddleware bool
+	// route marks a stand-in for one registered route, whose calls are its
+	// handler chain in the order they run.
+	route bool
 }
 
 // site is a call the graph found: the line it is on and how sure it is.
 type site struct {
 	line     int
 	inferred bool
+	order    int
 }
 
 // call records a call to key. A call that is resolved anywhere in the
@@ -105,6 +115,9 @@ func (f *function) call(key string, line int, inferred bool) {
 }
 
 func (f *function) label() string {
+	if f.route {
+		return f.name
+	}
 	name := f.name
 	if f.recv != "" {
 		name = f.recv + "." + name
@@ -179,7 +192,7 @@ func parse(sources []standards.File) *graph {
 			}
 			fn := &function{dir: dir, name: decl.Name.Name, file: source.Path,
 				start: fset.Position(decl.Pos()).Line, end: fset.Position(decl.End()).Line,
-				calls: map[string]site{}, external: map[string]int{}, ambiguous: map[string]int{}}
+				calls: map[string]site{}, external: map[string]site{}, ambiguous: map[string]int{}}
 			fn.key = dir + "." + fn.name
 			if decl.Recv != nil && len(decl.Recv.List) > 0 {
 				fn.recv = receiverName(decl.Recv.List[0].Type)
@@ -218,6 +231,12 @@ func parse(sources []standards.File) *graph {
 			aliases[alias] = imported
 		}
 		reflects := aliases["reflect"] == "reflect" || aliases["plugin"] == "plugin"
+		persistence := ""
+		for _, imported := range aliases {
+			if persistent(imported+".") && (persistence == "" || imported < persistence) {
+				persistence = imported
+			}
+		}
 		for _, declaration := range p.file.Decls {
 			decl, ok := declaration.(*ast.FuncDecl)
 			if !ok || decl.Body == nil {
@@ -229,9 +248,81 @@ func parse(sources []standards.File) *graph {
 			}
 			fn.reflects = reflects
 			shadow := shadowed(decl)
+			candidatesFor := func(name string) []string {
+				candidates := slices.Clone(methods[fn.dir][name])
+				for _, imported := range aliases {
+					if dir, inRepo := repoDir(imported); inRepo && dir != fn.dir {
+						candidates = append(candidates, methods[dir][name]...)
+					}
+				}
+				return candidates
+			}
+			var resolve func(ast.Expr) (key string, inferred, ok bool)
+			resolve = func(expression ast.Expr) (string, bool, bool) {
+				switch e := expression.(type) {
+				case *ast.ParenExpr:
+					return resolve(e.X)
+				case *ast.CallExpr:
+					return resolve(e.Fun)
+				case *ast.Ident:
+					if keys := plain[fn.dir][e.Name]; !shadow[e.Name] && len(keys) == 1 {
+						return keys[0], false, true
+					}
+				case *ast.SelectorExpr:
+					if id, ok := e.X.(*ast.Ident); ok && !shadow[id.Name] {
+						if imported, ok := aliases[id.Name]; ok {
+							if dir, inRepo := repoDir(imported); inRepo {
+								if keys := plain[dir][e.Sel.Name]; len(keys) == 1 {
+									return keys[0], false, true
+								}
+							}
+							return "", false, false
+						}
+					}
+					if candidates := candidatesFor(e.Sel.Name); len(candidates) == 1 {
+						return candidates[0], true, true
+					}
+				}
+				return "", false, false
+			}
 			var visit func(ast.Node) bool
 			visit = func(node ast.Node) bool {
 				switch node := node.(type) {
+				case *ast.CallExpr:
+					sel, ok := node.Fun.(*ast.SelectorExpr)
+					if !ok {
+						break
+					}
+					if sel.Sel.Name == "Use" {
+						fn.usesMiddleware = true
+					}
+					label, ok := routeLabel(sel.Sel.Name, node.Args)
+					if !ok {
+						break
+					}
+					line := fset.Position(node.Pos()).Line
+					route := &function{key: fmt.Sprintf("route:%s:%d", fn.key, fset.Position(node.Pos()).Offset), dir: fn.dir, name: label,
+						file: fn.file, start: line, end: fset.Position(node.End()).Line, route: true,
+						calls: map[string]site{}, external: map[string]site{}, ambiguous: map[string]int{}}
+					var rest []ast.Expr
+					for _, arg := range node.Args[1:] {
+						key, inferred, ok := resolve(arg)
+						if _, dup := route.calls[key]; !ok || dup {
+							rest = append(rest, arg)
+							continue
+						}
+						route.calls[key] = site{line: line, inferred: inferred, order: len(route.calls) + 1}
+					}
+					if len(route.calls) == 0 {
+						break
+					}
+					g.funcs[route.key] = route
+					fn.call(route.key, line, false)
+					ast.Inspect(sel.X, visit)
+					for _, arg := range rest {
+						ast.Inspect(arg, visit)
+					}
+					return false
 				case *ast.SelectorExpr:
 					if id, ok := node.X.(*ast.Ident); ok && !shadow[id.Name] {
 						if imported, ok := aliases[id.Name]; ok {
@@ -242,24 +333,27 @@ func parse(sources []standards.File) *graph {
 							} else if effectful(imported) {
 								name := imported + "." + node.Sel.Name
 								if _, ok := fn.external[name]; !ok {
-									fn.external[name] = fset.Position(node.Pos()).Line
+									fn.external[name] = site{line: fset.Position(node.Pos()).Line}
 								}
 							}
 							return false
 						}
 					}
-					candidates := slices.Clone(methods[fn.dir][node.Sel.Name])
-					for _, imported := range aliases {
-						if dir, inRepo := repoDir(imported); inRepo && dir != fn.dir {
-							candidates = append(candidates, methods[dir][node.Sel.Name]...)
-						}
-					}
+					candidates := candidatesFor(node.Sel.Name)
 					switch {
 					case len(candidates) == 1:
 						fn.call(candidates[0], fset.Position(node.Pos()).Line, true)
 					case len(candidates) > 1:
 						if _, ok := fn.ambiguous[node.Sel.Name]; !ok {
 							fn.ambiguous[node.Sel.Name] = fset.Position(node.Pos()).Line
+						}
+					case persistenceMethods[node.Sel.Name] && persistence != "":
+						// No type information: a method with a database-shaped
+						// name in a file that imports a database package is
+						// taken to reach it, and drawn as inferred.
+						name := persistence + "." + node.Sel.Name
+						if _, ok := fn.external[name]; !ok {
+							fn.external[name] = site{line: fset.Position(node.Pos()).Line, inferred: true}
 						}
 					}
 					ast.Inspect(node.X, visit)
@@ -287,6 +381,67 @@ func parse(sources []standards.File) *graph {
 		slices.Sort(callers)
 	}
 	return g
+}
+
+var routeNames = map[string]bool{
+	"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true, "HEAD": true, "OPTIONS": true, "Any": true,
+	"Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "Head": true, "Options": true,
+	"Handle": true, "HandleFunc": true,
+}
+
+// routeLabel names the route a registration call declares: a router method
+// whose first argument is a path literal, followed by the handlers. The
+// standard library's pattern syntax already carries the method in the path.
+func routeLabel(method string, args []ast.Expr) (string, bool) {
+	if !routeNames[method] || len(args) < 2 {
+		return "", false
+	}
+	lit, ok := args[0].(*ast.BasicLit)
+	if !ok || lit.Kind != token.STRING {
+		return "", false
+	}
+	pattern, err := strconv.Unquote(lit.Value)
+	if err != nil {
+		return "", false
+	}
+	if method == "Handle" || method == "HandleFunc" {
+		if !strings.HasPrefix(pattern, "/") && !strings.Contains(pattern, " /") {
+			return "", false
+		}
+		return pattern, true
+	}
+	if !strings.HasPrefix(pattern, "/") {
+		return "", false
+	}
+	return strings.ToUpper(method) + " " + pattern, true
+}
+
+// persistenceMethods are method names that read or write a database through
+// the packages persistent recognises.
+var persistenceMethods = map[string]bool{
+	"Query": true, "QueryRow": true, "QueryContext": true, "QueryRowContext": true,
+	"Exec": true, "ExecContext": true, "Begin": true, "BeginTx": true,
+	"Prepare": true, "PrepareContext": true, "Commit": true, "Rollback": true,
+	"Create": true, "Save": true, "First": true, "Find": true, "Updates": true,
+}
+
+// persistent reports whether a call, written as import path and name, writes to
+// a database or the filesystem. These are drawn apart from other effects
+// because a change that reaches one is a change to stored state.
+func persistent(name string) bool {
+	switch name {
+	case "os.WriteFile", "os.Create", "os.OpenFile", "os.Remove", "os.RemoveAll", "os.Rename",
+		"os.Mkdir", "os.MkdirAll", "os.Truncate", "os.Chmod", "io/ioutil.WriteFile":
+		return true
+	}
+	for _, prefix := range []string{"database/sql.", "gorm.io/", "github.com/jackc/pgx", "github.com/jmoiron/sqlx",
+		"go.mongodb.org/", "github.com/redis/", "github.com/go-redis/", "go.etcd.io/bbolt", "github.com/dgraph-io/badger",
+		"github.com/mattn/go-sqlite3", "modernc.org/sqlite", "entgo.io/", "github.com/lib/pq"} {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func functionKey(dir string, decl *ast.FuncDecl) string {
@@ -396,8 +551,9 @@ func (g *graph) changedFunctions(changes diff.Files) []string {
 type edge struct{ from, to string }
 
 type edgeInfo struct {
-	kind Kind
-	line int
+	kind  Kind
+	line  int
+	order int
 }
 
 func (g *graph) draw(changed []string) *Diagram {
@@ -421,9 +577,15 @@ func (g *graph) draw(changed []string) *Diagram {
 	edges := map[edge]edgeInfo{}
 	infoOf := func(s site) edgeInfo {
 		if s.inferred {
-			return edgeInfo{Inferred, s.line}
+			return edgeInfo{Inferred, s.line, s.order}
 		}
-		return edgeInfo{Resolved, s.line}
+		return edgeInfo{Resolved, s.line, s.order}
+	}
+	classOf := func(key string) string {
+		if fn := g.funcs[key]; fn != nil && fn.route {
+			return "route"
+		}
+		return ""
 	}
 
 	for _, key := range changed {
@@ -436,7 +598,7 @@ func (g *graph) draw(changed []string) *Diagram {
 		var next []string
 		for _, callee := range frontier {
 			for _, caller := range g.callers[callee] {
-				if !add(caller, "") {
+				if !add(caller, classOf(caller)) {
 					continue
 				}
 				if _, seen := edges[edge{caller, callee}]; seen {
@@ -452,14 +614,6 @@ func (g *graph) draw(changed []string) *Diagram {
 		frontier = next
 	}
 
-	sortedKeys := func(m map[string]int) []string {
-		keys := make([]string, 0, len(m))
-		for key := range m {
-			keys = append(keys, key)
-		}
-		slices.Sort(keys)
-		return keys
-	}
 	frontier = slices.Clone(changed)
 	for depth := 1; depth <= maxDown && len(frontier) > 0; depth++ {
 		var next []string
@@ -471,7 +625,7 @@ func (g *graph) draw(changed []string) *Diagram {
 			}
 			slices.Sort(callees)
 			for _, callee := range callees {
-				if !add(callee, "") {
+				if !add(callee, classOf(callee)) {
 					continue
 				}
 				if _, seen := edges[edge{caller, callee}]; !seen {
@@ -481,18 +635,43 @@ func (g *graph) draw(changed []string) *Diagram {
 			}
 			for _, name := range sortedKeys(fn.external) {
 				key := "ext:" + name
-				if add(key, "external") {
-					edges[edge{caller, key}] = edgeInfo{Resolved, fn.external[name]}
+				class := "external"
+				if persistent(name) {
+					class = "persistence"
+				}
+				if add(key, class) {
+					edges[edge{caller, key}] = infoOf(fn.external[name])
 				}
 			}
 			for _, name := range sortedKeys(fn.ambiguous) {
 				key := "amb:" + name
 				if add(key, "unresolved") {
-					edges[edge{caller, key}] = edgeInfo{Unresolved, fn.ambiguous[name]}
+					edges[edge{caller, key}] = edgeInfo{Unresolved, fn.ambiguous[name], 0}
 				}
 			}
 		}
 		frontier = next
+	}
+
+	// A route is drawn whole: the handler that changed is one step in a chain,
+	// and the steps before and after it are what the reader came for.
+	for i := 0; i < len(order); i++ {
+		fn := g.funcs[order[i]]
+		if fn == nil || !fn.route {
+			continue
+		}
+		steps := make([]string, 0, len(fn.calls))
+		for step := range fn.calls {
+			steps = append(steps, step)
+		}
+		slices.SortFunc(steps, func(a, b string) int { return fn.calls[a].order - fn.calls[b].order })
+		for _, step := range steps {
+			if add(step, classOf(step)) {
+				if _, seen := edges[edge{order[i], step}]; !seen {
+					edges[edge{order[i], step}] = infoOf(fn.calls[step])
+				}
+			}
+		}
 	}
 
 	if len(edges) == 0 {
@@ -541,28 +720,40 @@ func (g *graph) draw(changed []string) *Diagram {
 	for _, e := range sorted {
 		info := edges[e]
 		arrow := "-->"
+		var text []string
 		if info.kind != Resolved {
-			arrow = "-.->|" + string(info.kind) + "|"
+			text = append(text, string(info.kind))
+		}
+		if info.order > 0 {
+			text = append(text, strconv.Itoa(info.order))
+		}
+		if info.kind != Resolved {
+			arrow = "-.->|" + strings.Join(text, " ") + "|"
+		} else if len(text) > 0 {
+			arrow = "-->|" + strings.Join(text, " ") + "|"
 		}
 		fmt.Fprintf(&b, "  %s %s %s\n", ids[e.from], arrow, ids[e.to])
-		d.Calls = append(d.Calls, Call{From: label(e.from), To: label(e.to), Kind: info.kind, Path: g.funcs[e.from].file, Line: info.line})
+		d.Calls = append(d.Calls, Call{From: label(e.from), To: label(e.to), Kind: info.kind, Path: g.funcs[e.from].file, Line: info.line, Order: info.order})
 	}
 	b.WriteString("  classDef changed fill:#fde68a,stroke:#b45309,color:#000\n")
 	b.WriteString("  classDef entry fill:#bfdbfe,stroke:#1d4ed8,color:#000\n")
 	b.WriteString("  classDef external fill:#e5e7eb,stroke:#6b7280,color:#000,stroke-dasharray:4 3\n")
+	b.WriteString("  classDef route fill:#d9f99d,stroke:#4d7c0f,color:#000\n")
+	b.WriteString("  classDef persistence fill:#fbcfe8,stroke:#be185d,color:#000\n")
 	b.WriteString("  classDef unresolved fill:#fecaca,stroke:#b91c1c,color:#000,stroke-dasharray:2 2\n")
 	d.Mermaid = b.String()
 	d.Nodes = len(order)
-	d.Limits = g.limits(order)
+	d.Limits = g.limits(order, edges)
 	return d
 }
 
 // limits reports what the graph could not see around the functions it drew.
 // Each is a claim about this drawing, so a file the drawing never touches
 // does not appear.
-func (g *graph) limits(drawn []string) []string {
-	var generated, reflecting []string
+func (g *graph) limits(drawn []string, edges map[edge]edgeInfo) []string {
+	var generated, reflecting, middleware []string
 	ambiguous := 0
+	dirs := map[string]bool{}
 	for _, key := range drawn {
 		fn := g.funcs[key]
 		if fn == nil {
@@ -574,7 +765,15 @@ func (g *graph) limits(drawn []string) []string {
 		if fn.reflects {
 			reflecting = append(reflecting, fn.label())
 		}
-		ambiguous += len(fn.ambiguous)
+		if fn.usesMiddleware {
+			middleware = append(middleware, fn.label())
+		}
+		dirs[fn.dir] = true
+		for name := range fn.ambiguous {
+			if _, drawn := edges[edge{key, "amb:" + name}]; drawn {
+				ambiguous++
+			}
+		}
 	}
 	var out []string
 	if ambiguous > 0 {
@@ -583,13 +782,31 @@ func (g *graph) limits(drawn []string) []string {
 	if len(reflecting) > 0 {
 		out = append(out, "Files that import reflect or plugin can call functions this graph cannot see: "+listSome(reflecting)+".")
 	}
+	if len(middleware) > 0 {
+		out = append(out, "Middleware added with Use runs on routes at run time and is not drawn: "+listSome(middleware)+".")
+	}
 	if len(generated) > 0 {
 		out = append(out, "Generated code is drawn like any other, but its source of truth is elsewhere: "+listSome(generated)+".")
 	}
-	if len(g.unparsed) > 0 {
-		out = append(out, fmt.Sprintf("%d Go file(s) did not parse and are missing from the graph: %s.", len(g.unparsed), listSome(g.unparsed)))
+	var unparsed []string
+	for _, name := range g.unparsed {
+		if dirs[path.Dir(name)] {
+			unparsed = append(unparsed, name)
+		}
+	}
+	if len(unparsed) > 0 {
+		out = append(out, fmt.Sprintf("%d Go file(s) beside the drawn functions did not parse and are missing from the graph: %s.", len(unparsed), listSome(unparsed)))
 	}
 	return out
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	return keys
 }
 
 func listSome(names []string) string {
@@ -609,7 +826,7 @@ func clean(s string) string {
 		switch {
 		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
 			return r
-		case r == '_', r == '.', r == '/', r == '-':
+		case r == '_', r == '.', r == '/', r == '-', r == ' ', r == ':', r == '{', r == '}', r == '*':
 			return r
 		}
 		return '_'

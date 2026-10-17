@@ -2,6 +2,7 @@ package flow
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -42,7 +43,7 @@ func TestBuildShowsTheCommandThatReachesAChangedFunction(t *testing.T) {
 	if len(d.Entries) != 1 || d.Entries[0] != "cmd/app.main" {
 		t.Fatalf("entries = %v, want the main function that starts the chain", d.Entries)
 	}
-	for _, want := range []string{"flowchart LR", "internal/run.Dispatch", "internal/analyze.write", "os.WriteFile", ":::changed", ":::entry", ":::external"} {
+	for _, want := range []string{"flowchart LR", "internal/run.Dispatch", "internal/analyze.write", "os.WriteFile", ":::changed", ":::entry", ":::persistence"} {
 		if !strings.Contains(d.Mermaid, want) {
 			t.Errorf("diagram lacks %q:\n%s", want, d.Mermaid)
 		}
@@ -194,5 +195,128 @@ func TestBuildReportsNoLimitsForAPlainGraph(t *testing.T) {
 	d := Build(chain(), edit("internal/analyze/analyze.go", 5, 5))
 	if d == nil || len(d.Limits) != 0 {
 		t.Fatalf("a graph with nothing hidden reported limits: %+v", d)
+	}
+}
+
+func web() []standards.File {
+	return []standards.File{
+		src("go.mod", "module example.com/web\n"),
+		src("cmd/web/main.go", "package main\n\nimport (\n\t\"net/http\"\n\n\t\"example.com/web/internal/api\"\n)\n\nfunc main() {\n\tmux := http.NewServeMux()\n\tapi.Register(mux)\n}\n"),
+		src("internal/api/api.go", "package api\n\nimport (\n\t\"database/sql\"\n\t\"net/http\"\n)\n\nfunc Register(mux *http.ServeMux) {\n\tmux.Use(logging)\n\tmux.HandleFunc(\"GET /users\", auth, list)\n}\n\nfunc auth(next http.HandlerFunc) http.HandlerFunc { return next }\n\nfunc logging() {}\n\nfunc list(w http.ResponseWriter, r *http.Request) {\n\tvar db *sql.DB\n\tdb.Query(\"select 1\")\n}\n"),
+	}
+}
+
+func TestBuildDrawsARouteWithItsHandlersInOrderAndTheDatabaseItReaches(t *testing.T) {
+	d := Build(web(), edit("internal/api/api.go", 20, 20))
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	for _, want := range []string{"GET /users", ":::route", "|1|", ":::persistence", "database/sql.Query"} {
+		if !strings.Contains(d.Mermaid, want) {
+			t.Errorf("diagram lacks %q:\n%s", want, d.Mermaid)
+		}
+	}
+	var chain []int
+	for _, c := range d.Calls {
+		if c.From == "GET /users" {
+			chain = append(chain, c.Order)
+		}
+	}
+	slices.Sort(chain)
+	if !slices.Equal(chain, []int{1, 2}) {
+		t.Fatalf("route handler orders = %v, want 1 and 2", chain)
+	}
+}
+
+func TestBuildNumbersEveryHandlerInARoutesChain(t *testing.T) {
+	d := Build(web(), edit("internal/api/api.go", 13, 13))
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	orders := map[string]int{}
+	for _, c := range d.Calls {
+		if c.From == "GET /users" {
+			orders[c.To] = c.Order
+		}
+	}
+	if orders["internal/api.auth"] != 1 || orders["internal/api.list"] != 2 {
+		t.Fatalf("handler order = %v, want auth then list", orders)
+	}
+}
+
+func TestBuildSaysThatMiddlewareAddedWithUseIsNotDrawn(t *testing.T) {
+	d := Build(web(), edit("internal/api/api.go", 13, 13))
+	if d == nil || !strings.Contains(strings.Join(d.Limits, " "), "Middleware added with Use") {
+		t.Fatalf("limits = %+v, want the Use limit", d)
+	}
+}
+
+func TestBuildDoesNotTakeAPlainMethodCallForARoute(t *testing.T) {
+	files := []standards.File{
+		src("go.mod", "module example.com/web\n"),
+		src("p/p.go", "package p\n\nfunc Top(c Client) { c.Get(\"x\", Leaf) }\n\nfunc Leaf() {}\n"),
+	}
+	d := Build(files, edit("p/p.go", 5, 5))
+	if d != nil && strings.Contains(d.Mermaid, ":::route") {
+		t.Fatalf("a client call with a string argument was drawn as a route:\n%s", d.Mermaid)
+	}
+}
+
+func TestBuildTreatsADatabaseShapedMethodAsInferred(t *testing.T) {
+	d := Build(web(), edit("internal/api/api.go", 20, 20))
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	if _, ok := hasCall(d, "internal/api.list", "database/sql.Query", Inferred); !ok {
+		t.Fatalf("calls = %+v, want an inferred list to database/sql.Query", d.Calls)
+	}
+}
+
+func TestBuildOnlyTreatsRouterVerbsAsRouteRegistrations(t *testing.T) {
+	files := []standards.File{
+		src("go.mod", "module example.com/web\n"),
+		src("p/p.go", "package p\n\nfunc Top(r Router) { r.Mount(\"/x\", Leaf) }\n\nfunc Leaf() {}\n"),
+	}
+	d := Build(files, edit("p/p.go", 5, 5))
+	if d != nil && strings.Contains(d.Mermaid, ":::route") {
+		t.Fatalf("a method that is not a router verb was drawn as a route:\n%s", d.Mermaid)
+	}
+}
+
+func TestBuildLeavesOutUnparsedFilesInPackagesItDidNotDraw(t *testing.T) {
+	files := []standards.File{
+		src("go.mod", "module example.com/app\n"),
+		src("p/p.go", "package p\n\nfunc Top() { Leaf() }\n\nfunc Leaf() {}\n"),
+		src("elsewhere/broken.go", "package q\n\nfunc {"),
+	}
+	d := Build(files, edit("p/p.go", 5, 5))
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	if strings.Contains(strings.Join(d.Limits, " "), "did not parse") {
+		t.Fatalf("a file in a package the drawing never touches was reported: %v", d.Limits)
+	}
+}
+
+func TestBuildCountsOnlyAmbiguousCallsItDrew(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("package p\n\ntype A struct{}\n\nfunc (A) Save() {}\n\ntype B struct{}\n\nfunc (B) Save() {}\n\nfunc Top(a A) {\n")
+	for i := range maxNodes + 5 {
+		fmt.Fprintf(&b, "\tLeaf%d()\n\ta.Save()\n", i)
+	}
+	b.WriteString("}\n")
+	for i := range maxNodes + 5 {
+		fmt.Fprintf(&b, "\nfunc Leaf%d() {}\n", i)
+	}
+	files := []standards.File{src("go.mod", "module example.com/app\n"), src("p/p.go", b.String())}
+	d := Build(files, edit("p/p.go", 11, 11))
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	if _, drew := hasCall(d, "p.Top", "ambiguous.Save", Unresolved); drew {
+		t.Skip("the node ceiling did not cut the ambiguous call; the test cannot tell")
+	}
+	if strings.Contains(strings.Join(d.Limits, " "), "match several methods") {
+		t.Fatalf("an ambiguous call that was cut from the diagram was reported as drawn: %v", d.Limits)
 	}
 }
