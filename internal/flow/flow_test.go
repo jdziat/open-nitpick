@@ -320,3 +320,32 @@ func TestBuildCountsOnlyAmbiguousCallsItDrew(t *testing.T) {
 		t.Fatalf("an ambiguous call that was cut from the diagram was reported as drawn: %v", d.Limits)
 	}
 }
+
+// The registering function is the edit; the route it declares is not a
+// function and must not be reported as one, or lose its own colour.
+func TestBuildKeepsARouteOutOfTheEditedFunctions(t *testing.T) {
+	d := Build(web(), edit("internal/api/api.go", 10, 10))
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	if !slices.Equal(d.Changed, []string{"internal/api.Register"}) {
+		t.Fatalf("changed = %v, want only the registering function", d.Changed)
+	}
+	if strings.Contains(d.Mermaid, "GET /users\"]:::changed") || !strings.Contains(d.Mermaid, "GET /users\"]:::route") {
+		t.Fatalf("the route box lost its class:\n%s", d.Mermaid)
+	}
+}
+
+func TestBuildCannotLetARoutePathCloseTheFence(t *testing.T) {
+	files := []standards.File{
+		src("go.mod", "module example.com/web\n"),
+		src("p/p.go", "package p\n\nfunc Top(r Router) { r.Get(\"/a\u0060\u0060\u0060b\", Leaf) }\n\nfunc Leaf() {}\n"),
+	}
+	d := Build(files, edit("p/p.go", 5, 5))
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	if strings.Contains(d.Mermaid, "\u0060") {
+		t.Fatalf("a backtick from a route path reached the diagram:\n%s", d.Mermaid)
+	}
+}

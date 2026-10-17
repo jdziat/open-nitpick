@@ -993,11 +993,6 @@ func applyRouteFile(cfg *config.Config, path string) error {
 		return fmt.Errorf("%s: models.default.model is required", path)
 	}
 	for _, spec := range []*config.ModelSpec{rf.Models.Review, rf.Models.Triage, rf.Models.Validate, rf.Models.Router} {
-		if spec != nil && spec.Provider == "" && spec.Model == "" {
-			continue
-		}
-	}
-	for _, spec := range []*config.ModelSpec{rf.Models.Review, rf.Models.Triage, rf.Models.Validate, rf.Models.Router} {
 		if spec != nil {
 			fill(spec)
 		}

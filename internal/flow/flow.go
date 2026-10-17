@@ -537,6 +537,9 @@ func (g *graph) changedFunctions(changes diff.Files) []string {
 	}
 	var out []string
 	for key, fn := range g.funcs {
+		if fn.route {
+			continue
+		}
 		for _, line := range added[fn.file] {
 			if line >= fn.start && line <= fn.end {
 				out = append(out, key)
