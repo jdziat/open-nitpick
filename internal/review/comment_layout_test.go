@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
@@ -85,5 +86,28 @@ func TestATitleCannotStartMarkupOfItsOwn(t *testing.T) {
 	body := composeComment(Finding{Severity: "info", Title: "x\n\n# injected <b>"}, true, nil, true)
 	if strings.Contains(body, "\n# injected") || strings.Contains(body, "<b>") {
 		t.Errorf("the title escaped its line:\n%s", body)
+	}
+}
+
+func TestTurningRepliesOffRemovesTheInvitation(t *testing.T) {
+	files, err := parseDiff("diff --git a/a.go b/a.go\n--- a/a.go\n+++ b/a.go\n@@ -1,2 +1,3 @@\n one\n+two\n three\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	report := &Report{Findings: []Finding{{Path: "a.go", Line: 2, Severity: "warning", Title: "x"}}}
+
+	off := config.Defaults()
+	no := false
+	off.Review.Respond.Replies = &no
+	on, disabled := Render(report, files, config.Defaults()), Render(report, files, off)
+
+	if len(on.Comments) != 1 || len(disabled.Comments) != 1 {
+		t.Fatalf("comments on=%d off=%d, want one each", len(on.Comments), len(disabled.Comments))
+	}
+	if !strings.Contains(on.Comments[0].Body, ReplyInvitation) {
+		t.Errorf("replies are on and the invitation is missing:\n%s", on.Comments[0].Body)
+	}
+	if strings.Contains(disabled.Comments[0].Body, ReplyInvitation) {
+		t.Errorf("replies are off and the comment still invites one:\n%s", disabled.Comments[0].Body)
 	}
 }

@@ -807,6 +807,10 @@ func (g *GitHub) postDraftsAlone(ctx context.Context, ref Ref, head string, draf
 		}
 		if _, _, err := g.client.PullRequests.CreateComment(ctx, ref.Owner, ref.Repo, ref.Number, c); err == nil {
 			posted++
+		} else if ctx.Err() != nil {
+			// A cancelled run has nothing left to post, and every further
+			// attempt would wait out the abuse-retry sleeps for nothing.
+			break
 		}
 	}
 	return posted

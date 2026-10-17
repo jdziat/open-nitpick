@@ -102,10 +102,12 @@ shows the problem.
 Replies pass through the same gates as a mention: `review.respond.from` and
 `max_per_pull_request`. To start a run on a reply, the workflow's `if:` also
 accepts any comment with `in_reply_to_id` from an account that is not a bot;
-the run stops before spending anything when the thread was not started by the
-reviewer. `review.respond.replies: false` makes `nitpick respond` ignore replies,
-and removing the `in_reply_to_id` clause from the `if:` stops the runner
-starting for them at all.
+the run stops before spending any model credit when the thread was not started
+by the reviewer. A runner still starts for each such reply, because an `if:`
+expression cannot see who began the thread, so a busy pull request costs a
+short run per reply. `review.respond.replies: false` makes `nitpick respond`
+ignore replies and drops the invitation from new comments; removing the
+`in_reply_to_id` clause from the `if:` stops the runner starting for them.
 
 ### Superseded comments
 

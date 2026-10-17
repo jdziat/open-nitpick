@@ -29,9 +29,11 @@ var severityMarks = map[config.Severity]string{
 func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 	emoji := true
 	agent := false
+	invite := true
 	if cfg != nil {
 		emoji = cfg.Persona.EmojiEnabled()
 		agent = cfg.Review.AgentPrompt
+		invite = cfg.Review.Respond.RepliesEnabled()
 	}
 
 	var agentPrompt map[string][]string
@@ -74,7 +76,7 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 			Path:        f.Path,
 			Line:        f.Line,
 			Side:        side,
-			Body:        composeComment(f, emoji, agentPrompt, true),
+			Body:        composeComment(f, emoji, agentPrompt, invite),
 			Fingerprint: Fingerprint(f),
 			Class:       f.Class,
 		}
