@@ -202,11 +202,20 @@ main function, and callees down two hops, ending at calls into the operating
 system, the network or a third-party package. Edited functions, entry points
 and external effects are coloured apart.
 
+Every arrow and declaration is listed beneath the diagram with a link to its
+line at the reviewed revision, when the forge supplies a browse URL. A solid
+arrow is a call by name or through an import. A dashed arrow labelled
+*inferred* is a method matched by name alone, because one method in scope has
+that name. One labelled *unresolved* matches several methods and is drawn as an
+ambiguous box in place of a guess. The diagram also lists what it could not
+see: files that import reflect or plugin, generated code, and Go files that did
+not parse.
+
 The graph is built from Go source by name, without type checking. A call
 through an interface or a package-level table is not drawn, so a missing arrow
 does not prove there is no call. A diagram stops at 30 nodes and says so. It is
 off by default, appears even with `review.summary: false`, and covers Go only;
-HTTP framework adapters and links to source lines are not built yet.
+HTTP framework adapters are not built yet.
 
 A language no probe reads is named in the report rather than left out of it.
 Six probes read Go today and nothing reads anything else, so a TypeScript tree

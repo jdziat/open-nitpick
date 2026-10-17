@@ -95,3 +95,35 @@ func TestFlowIsPublishedWithTheSummaryOff(t *testing.T) {
 		t.Fatalf("summary drew a diagram nobody asked for:\n%s", got)
 	}
 }
+
+func TestFlowLinksCallsAndDeclarationsToTheReviewedRevision(t *testing.T) {
+	d := &flow.Diagram{
+		Mermaid: "flowchart LR\n", Changed: []string{"p.Get"}, Nodes: 2,
+		Calls:     []flow.Call{{From: "p.Run", To: "p.Get", Kind: flow.Inferred, Path: "p/run.go", Line: 12}},
+		Locations: []flow.Location{{Label: "p.Get", Path: "p/get.go", Line: 30}},
+		Limits:    []string{"1 Go file(s) did not parse and are missing from the graph: p/x.go."},
+	}
+	report := &Report{Flow: d, PullRequest: &vcs.PullRequest{SourceBaseURL: "https://github.com/o/r/blob/abc123"}}
+	got := flowNotice(report)
+	for _, want := range []string{
+		"https://github.com/o/r/blob/abc123/p/run.go#L12",
+		"https://github.com/o/r/blob/abc123/p/get.go#L30",
+		"p.Run to p.Get (inferred)",
+		"did not parse",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("notice lacks %q:\n%s", want, got)
+		}
+	}
+
+	report.PullRequest = nil
+	if got := flowNotice(report); strings.Contains(got, "href") || !strings.Contains(got, "p/run.go:12") {
+		t.Fatalf("without a browse URL the location must be plain text:\n%s", got)
+	}
+
+	d.Calls[0].Path = "../../etc/passwd"
+	report.PullRequest = &vcs.PullRequest{SourceBaseURL: "https://github.com/o/r/blob/abc123"}
+	if got := flowNotice(report); strings.Contains(got, "etc/passwd#") {
+		t.Fatalf("a path that leaves the tree was linked:\n%s", got)
+	}
+}

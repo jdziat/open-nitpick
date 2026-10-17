@@ -1194,7 +1194,13 @@ func citedNote(r Overruled) string {
 }
 
 func designEvidenceLocation(report *Report, finding Finding) string {
-	label := fmt.Sprintf("<code>%s:%d</code>", inline(finding.Path), finding.Line)
+	return sourceLink(report, finding.Path, finding.Line, fmt.Sprintf("%s:%d", finding.Path, finding.Line))
+}
+
+// sourceLink links a line of the reviewed revision, or returns the label alone
+// when the forge gave no browse URL or the path or URL is not one to trust.
+func sourceLink(report *Report, file string, line int, text string) string {
+	label := fmt.Sprintf("<code>%s</code>", inline(text))
 	if report.PullRequest == nil || report.PullRequest.SourceBaseURL == "" {
 		return label
 	}
@@ -1202,11 +1208,11 @@ func designEvidenceLocation(report *Report, finding Finding) string {
 	if err != nil || (base.Scheme != "https" && base.Scheme != "http") || base.Host == "" || base.User != nil {
 		return label
 	}
-	if finding.Line < 1 || path.Clean(finding.Path) != finding.Path || strings.HasPrefix(finding.Path, "/") || strings.HasPrefix(finding.Path, "../") || strings.ContainsAny(finding.Path, "\\\x00") {
+	if line < 1 || path.Clean(file) != file || strings.HasPrefix(file, "/") || strings.HasPrefix(file, "../") || strings.ContainsAny(file, "\\\x00") {
 		return label
 	}
-	base.Path = strings.TrimSuffix(base.Path, "/") + "/" + finding.Path
+	base.Path = strings.TrimSuffix(base.Path, "/") + "/" + file
 	base.RawPath, base.RawQuery = "", ""
-	base.Fragment = fmt.Sprintf("L%d", finding.Line)
+	base.Fragment = fmt.Sprintf("L%d", line)
 	return fmt.Sprintf("<a href=\"%s\">%s</a>", html.EscapeString(base.String()), label)
 }
