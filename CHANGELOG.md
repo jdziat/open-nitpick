@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.0](https://github.com/jdziat/open-nitpick/compare/v2.4.0...v2.5.0) (2026-10-17)
+
+
+### Features
+
+* **review:** invite replies to findings and resolve on a good one ([#182](https://github.com/jdziat/open-nitpick/issues/182)) ([0103921](https://github.com/jdziat/open-nitpick/commit/01039219d025a75dcc9e2a31ab757ed24ad61e04))
+
 ## [2.4.0](https://github.com/jdziat/open-nitpick/compare/v2.3.0...v2.4.0) (2026-10-16)
 
 
