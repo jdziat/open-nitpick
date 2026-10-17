@@ -49,7 +49,7 @@ func TestMergeQueueActionReviewsTheEventRange(t *testing.T) {
 		cmd := exec.Command("bash", "-c", script)
 		cmd.Env = append([]string{"PATH=" + dir + ":" + os.Getenv("PATH"), "EVENT_NAME=merge_group", "MERGE_BASE=beef0001", "MERGE_HEAD=" + head,
 			"CAPTURE=" + capture, "GITHUB_WORKSPACE=" + dir, "GITHUB_OUTPUT=" + filepath.Join(dir, "output")},
-			"NITPICK_CONFIG=", "NITPICK_FAIL_ON=", "NITPICK_INSTRUCTION=", "NITPICK_DRY_RUN=false", "NITPICK_SKIP_DRAFTS=false", "NITPICK_COMMAND=review", "PR_NUMBER=", "IS_FORK=false", "NITPICK_ARGS=")
+			"NITPICK_CONFIG=", "NITPICK_FAIL_ON=", "NITPICK_INSTRUCTION=", "NITPICK_DRY_RUN=false", "NITPICK_SKIP_DRAFTS=false", "NITPICK_ALLOW_DEGRADED_TRIAGE=false", "NITPICK_COMMAND=review", "PR_NUMBER=", "IS_FORK=false", "NITPICK_ARGS=")
 		output, err := cmd.CombinedOutput()
 		if head == "" {
 			if err == nil {

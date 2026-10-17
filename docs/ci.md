@@ -185,6 +185,7 @@ than the repository root.
 | `pr-number` | triggering pull request | set for `workflow_dispatch` and comment events |
 | `dry-run` | `false` | writes to log and job summary without publishing |
 | `skip-drafts` | `false` | skips draft pull requests |
+| `allow-degraded-triage` | `false` | when only triage failed, publishes the findings, applies `fail-on` and reports `result: degraded` instead of exiting 2 |
 | `version` | `latest` | release tag or `latest`; falls back to building the Action checkout when its release is unavailable |
 | `analyzers` | empty | catalog names to install, comma separated; `auto` selects ones for changed languages; empty uses runner tools |
 | `command` | `review` | `review`, `fast-review`, or `respond` |
@@ -202,7 +203,7 @@ step sets outputs a later step can read:
 
 | output | value |
 |---|---|
-| `result` | `clean`, `findings`, `skipped`, or `error`. A completeness failure is `error`, not a clean review. |
+| `result` | `clean`, `findings`, `skipped`, `degraded` or `error`. A completeness failure is `error`, not a clean review; `degraded` appears only with `allow-degraded-triage`. |
 | `findings` | number of findings published |
 | `practice_findings` | practice-report findings, including advisory findings and accepted exceptions; may overlap inline findings |
 | `practice_blocking` | engineering-policy violations without an accepted exception or unresolved uncertainty |

@@ -46,6 +46,7 @@ The normal change review. With no `-base`, it reviews uncommitted changes; with
 | `-owner`, `-repo-name`, `-pr` | GitHub repository and pull request to review. |
 | `-dry-run` | Print the review instead of publishing it. |
 | `-skip-draft` | Exit without work for a draft pull request. |
+| `-allow-degraded-triage` | When only triage failed, publish the findings and apply the gate to them; `result` is `degraded` and the exit status is 0 or 1. Any other failed stage still exits 2. |
 | `-no-linters` | Skip configured linters. |
 | `-full` | Review the whole change, even when a prior run would narrow it incrementally. |
 | `-log-format` | Log format: `text` (default) or `json`. |

@@ -32,8 +32,28 @@ const (
 	resultClean    actionResult = "clean"    // no findings at or above the gate
 	resultFindings actionResult = "findings" // the gate was tripped
 	resultSkipped  actionResult = "skipped"  // nothing was reviewed on purpose (a draft)
+	resultDegraded actionResult = "degraded" // findings published, triage did not run, and the caller allowed that
 	resultError    actionResult = "error"    // the review could not run
 )
+
+// allowDegradedTriage reclassifies the one failure a caller can choose to
+// live with. It applies only when triage is the sole stage that failed and no
+// file went unreviewed: the findings are real and merely unranked, and the
+// result says so ("degraded") instead of calling the run clean. Any other
+// failed stage, or an engineering report that owns its own completeness, stays
+// an error.
+func allowDegradedTriage(report *review.Report, gate config.Severity) actionResult {
+	if report == nil || report.Practices != nil || !report.Complete() {
+		return resultError
+	}
+	if len(report.Stages) != 1 || report.Stages[0].Stage != "triage" {
+		return resultError
+	}
+	if report.Failed(gate) {
+		return resultFindings
+	}
+	return resultDegraded
+}
 
 // actionsEnv reads the two files, when Actions provides them.
 type actionsEnv struct {

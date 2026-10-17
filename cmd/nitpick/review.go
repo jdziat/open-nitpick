@@ -25,19 +25,20 @@ import (
 
 // reviewFlags holds the review command's options.
 type reviewFlags struct {
-	profile     string
-	repo        string
-	configPath  string
-	base        string
-	head        string
-	instruction string
-	failOn      string
-	dryRun      bool
-	skipDraft   bool
-	verbose     bool
-	logFormat   string
-	noLinters   bool
-	full        bool
+	profile             string
+	repo                string
+	configPath          string
+	base                string
+	head                string
+	instruction         string
+	failOn              string
+	dryRun              bool
+	skipDraft           bool
+	allowDegradedTriage bool
+	verbose             bool
+	logFormat           string
+	noLinters           bool
+	full                bool
 
 	// Pull request selection. When unset, these are read from the GitHub
 	// Actions environment.
@@ -69,6 +70,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	fs.IntVar(&f.pr, "pr", 0, "pull request number to review and comment on")
 	fs.BoolVar(&f.dryRun, "dry-run", false, "print the review instead of publishing it")
 	fs.BoolVar(&f.skipDraft, "skip-draft", false, "do nothing when the pull request is a draft")
+	fs.BoolVar(&f.allowDegradedTriage, "allow-degraded-triage", false, "publish and gate on the findings when only triage failed, reporting result=degraded instead of exiting 2")
 	fs.BoolVar(&f.noLinters, "no-linters", false, "skip linters even when configured")
 	fs.BoolVar(&f.full, "full", false, "review the whole change even if an earlier run reviewed part of it (no incremental narrowing)")
 	fs.BoolVar(&f.verbose, "v", false, "verbose logging")
@@ -266,7 +268,11 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	printLinters(report)
 	printOverruled(report)
 
-	result := resultFor(report, gate(report, f.failOn, cfg))
+	failGate := gate(report, f.failOn, cfg)
+	result := resultFor(report, failGate)
+	if result == resultError && f.allowDegradedTriage {
+		result = allowDegradedTriage(report, failGate)
+	}
 	rendered := review.Render(report, report.Files, cfg)
 	actions.setOutputs(result, report)
 	actions.writeSummary(result, report, &rendered, ref, note)

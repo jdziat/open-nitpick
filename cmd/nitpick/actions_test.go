@@ -165,3 +165,41 @@ func TestActionsExposePracticeViolationsWithoutInlineFindings(t *testing.T) {
 		t.Fatalf("practice violation missing from summary: %s %v", summary, err)
 	}
 }
+
+// -allow-degraded-triage exists for the run whose review finished and whose
+// triage did not (#125). It must stay narrow: a second failed stage, an
+// unreviewed file or an engineering report is still an error, and the gate
+// still applies to the findings that were published.
+func TestAllowDegradedTriageForgivesOnlyAFailedTriage(t *testing.T) {
+	finding := review.Finding{Path: "a.go", Line: 1, Severity: "info", Title: "minor"}
+	triage := review.StageStatus{Stage: "triage", Reason: "rate-limited"}
+
+	for _, tc := range []struct {
+		name   string
+		report *review.Report
+		gate   config.Severity
+		want   actionResult
+	}{
+		{"triage alone, below the gate", &review.Report{Findings: []review.Finding{finding}, Stages: []review.StageStatus{triage}}, config.SeverityError, resultDegraded},
+		{"triage alone, at the gate", &review.Report{Findings: []review.Finding{finding}, Stages: []review.StageStatus{triage}}, config.SeverityInfo, resultFindings},
+		{"triage and another stage", &review.Report{Stages: []review.StageStatus{triage, {Stage: "style", Reason: "timeout"}}}, config.SeverityError, resultError},
+		{"a stage other than triage", &review.Report{Stages: []review.StageStatus{{Stage: "analyzers", Reason: "failed"}}}, config.SeverityError, resultError},
+		{"a file left unreviewed", &review.Report{Incomplete: []string{"b.go"}, Stages: []review.StageStatus{triage}}, config.SeverityError, resultError},
+		{"no report", nil, config.SeverityError, resultError},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := allowDegradedTriage(tc.report, tc.gate); got != tc.want {
+				t.Errorf("allowDegradedTriage = %q, want %q", got, tc.want)
+			}
+		})
+	}
+
+	// The reason the new result may exit 0: the findings were published and the
+	// output says triage did not run, so nothing downstream reads it as clean.
+	if err := exitFor(resultDegraded); err != nil {
+		t.Errorf("exitFor(degraded) = %v, want nil", err)
+	}
+	if resultDegraded == resultClean {
+		t.Error("degraded must be a result of its own")
+	}
+}

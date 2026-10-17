@@ -81,6 +81,15 @@ inputs:
     required: false
     default: "false"
 
+  allow-degraded-triage:
+    description: >-
+      When the review finished and only triage failed, publish the findings,
+      apply fail-on to them, and set result to "degraded" instead of exiting
+      2. Any other failed stage, or a file that went unreviewed, is still an
+      error.
+    required: false
+    default: "false"
+
   version:
     description: >-
       Version of open-nitpick to install: a release tag such as v1.0.0, or
@@ -117,8 +126,9 @@ outputs:
   result:
     description: >-
       One of "clean" (no findings at or above fail-on), "findings" (the gate
-      was tripped), "skipped" (a draft, with skip-drafts), or "error" (the
-      review could not run). Distinguishing the last is the point: a broken
+      was tripped), "skipped" (a draft, with skip-drafts), "degraded"
+      (findings published but triage did not run, with allow-degraded-triage),
+      or "error" (the review could not run). Distinguishing the last is the point: a broken
       reviewer must not read as a passing one.
     value: ${{ steps.review.outputs.result }}
 
@@ -387,6 +397,7 @@ runs:
         NITPICK_INSTRUCTION: ${{ inputs.instruction }}
         NITPICK_DRY_RUN: ${{ inputs.dry-run }}
         NITPICK_SKIP_DRAFTS: ${{ inputs.skip-drafts }}
+        NITPICK_ALLOW_DEGRADED_TRIAGE: ${{ inputs.allow-degraded-triage }}
         NITPICK_ARGS: ${{ inputs.args }}
         EVENT_NAME: ${{ github.event_name }}
         NITPICK_COMMAND: ${{ inputs.command }}
@@ -414,6 +425,9 @@ runs:
         fi
         if [ "$NITPICK_SKIP_DRAFTS" = "true" ]; then
           flags+=(-skip-draft)
+        fi
+        if [ "$NITPICK_ALLOW_DEGRADED_TRIAGE" = "true" ]; then
+          flags+=(-allow-degraded-triage)
         fi
 
         if [ "$NITPICK_COMMAND" = "respond" ]; then
