@@ -1,5 +1,36 @@
 # Changelog
 
+## [2.6.0](https://github.com/jdziat/open-nitpick/compare/v2.5.0...v2.6.0) (2026-10-17)
+
+
+### Features
+
+* **review:** draw call flow around edited Go functions ([#195](https://github.com/jdziat/open-nitpick/issues/195)) ([bebc511](https://github.com/jdziat/open-nitpick/commit/bebc511092fe69e4871342807c34482fea75bee4))
+* **review:** draw Use middleware and route groups in the flow diagram ([#199](https://github.com/jdziat/open-nitpick/issues/199)) ([4330856](https://github.com/jdziat/open-nitpick/commit/43308568e9b5bcefa2977b2cc471440594cce40f))
+* **review:** let a run whose only failure is triage finish ([#193](https://github.com/jdziat/open-nitpick/issues/193)) ([1f57474](https://github.com/jdziat/open-nitpick/commit/1f574741e104ff5ad00b3b8d53aea920905e63f7))
+* **review:** link flow diagram to source, show routes and storage ([#197](https://github.com/jdziat/open-nitpick/issues/197)) ([34caa3a](https://github.com/jdziat/open-nitpick/commit/34caa3acb261dc94254515cf0abd7f35c785e8da))
+
+
+### Fixes
+
+* **practices:** trim interaction task context instead of skipping it ([#196](https://github.com/jdziat/open-nitpick/issues/196)) ([47d2f05](https://github.com/jdziat/open-nitpick/commit/47d2f05f2b246ef1c188c02dece761d825242ced))
+* **review:** do not require boundaries for a dependency bump ([#191](https://github.com/jdziat/open-nitpick/issues/191)) ([4bf2e7a](https://github.com/jdziat/open-nitpick/commit/4bf2e7a02b9d98d3b456ce9de1bd6be3a8783865))
+* **review:** keep both callers and effects in a full flow diagram ([#198](https://github.com/jdziat/open-nitpick/issues/198)) ([b9da292](https://github.com/jdziat/open-nitpick/commit/b9da2923e8f5a42525558b5ce977fa1de060bc03))
+* **review:** leave go.sum out of what the reviewer reads ([#190](https://github.com/jdziat/open-nitpick/issues/190)) ([8a8dbc6](https://github.com/jdziat/open-nitpick/commit/8a8dbc61b7afaf452f0f14f015750fa18c98b91e))
+* **review:** prefix group routes with the group path in flow diagrams ([#200](https://github.com/jdziat/open-nitpick/issues/200)) ([37a9b93](https://github.com/jdziat/open-nitpick/commit/37a9b93b7a01dd738bcff345d577411f5dafb72c))
+* **review:** skip design planning for requirement-only go.mod edits ([#184](https://github.com/jdziat/open-nitpick/issues/184)) ([b3bd39e](https://github.com/jdziat/open-nitpick/commit/b3bd39ef8e66b43a880709e881cb906cb1e09d0a))
+
+
+### Performance
+
+* **review:** build each file anchor set once per filter pass ([#187](https://github.com/jdziat/open-nitpick/issues/187)) ([a0f9c11](https://github.com/jdziat/open-nitpick/commit/a0f9c118b8fffc406f320aa7afc26e3c6b0ae928))
+
+
+### Documentation
+
+* finish the comment prose pass across the Go tree ([#194](https://github.com/jdziat/open-nitpick/issues/194)) ([288bf6b](https://github.com/jdziat/open-nitpick/commit/288bf6b0ff1498f3b3591138ac7b3223521a8424))
+* plain website cards and block YAML, add heading and blurb slop rules ([#186](https://github.com/jdziat/open-nitpick/issues/186)) ([cf40296](https://github.com/jdziat/open-nitpick/commit/cf402963219a7eb70de244b6da789a4354b1ca40))
+
 ## [2.5.0](https://github.com/jdziat/open-nitpick/compare/v2.4.0...v2.5.0) (2026-10-17)
 
 
