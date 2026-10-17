@@ -1101,7 +1101,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// again. Kept apart from AlreadyReported, which holds recurrences that are
 	// still standing on the pull request and so block an approval: a dismissed
 	// finding has no thread left to stand.
-	findings, report.Dismissed = dropDismissed(findings, prior)
+	findings, report.Dismissed = dropDismissed(findings, e.dismissals(ctx, ref, prior))
 	// The bound applies to what this run would publish, so a finding an earlier
 	// run already posted must not consume one of the bounded slots. Applied the
 	// other way around, an incremental re-review of a file whose findings did
@@ -1627,22 +1627,44 @@ func short(sha string) string {
 
 // dropDismissed removes the findings whose thread was closed by an accepted
 // reply, returning what is left and what was removed.
-func dropDismissed(findings []Finding, prior *vcs.PriorReview) (publish, dismissed []Finding) {
-	if prior == nil || len(prior.Dismissed) == 0 {
+func dropDismissed(findings []Finding, answered []string) (publish, dismissed []Finding) {
+	if len(answered) == 0 {
 		return findings, nil
 	}
-	answered := make(map[string]bool, len(prior.Dismissed))
-	for _, fp := range prior.Dismissed {
-		answered[fp] = true
+	closed := make(map[string]bool, len(answered))
+	for _, fp := range answered {
+		closed[fp] = true
 	}
 	for _, f := range findings {
-		if answered[Fingerprint(f)] {
+		if closed[Fingerprint(f)] {
 			dismissed = append(dismissed, f)
 			continue
 		}
 		publish = append(publish, f)
 	}
 	return publish, dismissed
+}
+
+// dismissals names the findings a person's reply already settled.
+//
+// Read apart from the incremental prior because a full review, which is what
+// restart-review asks for, does not load one, and that is the run most likely
+// to produce the same finding again. A read that fails leaves the finding
+// postable: the cost is one repeated comment, which the person can answer
+// again.
+func (e *Engine) dismissals(ctx context.Context, ref vcs.Ref, prior *vcs.PriorReview) []string {
+	if prior != nil {
+		return prior.Dismissed
+	}
+	reader, ok := e.Provider.(vcs.PriorReviewer)
+	if !ok {
+		return nil
+	}
+	read, err := reader.PriorReview(ctx, ref)
+	if err != nil || read == nil {
+		return nil
+	}
+	return read.Dismissed
 }
 
 func withholdAlreadyReported(findings []Finding, prior *vcs.PriorReview) (publish, withheld []Finding) {

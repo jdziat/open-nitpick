@@ -86,6 +86,9 @@ func runRespond(ctx context.Context, args []string) error {
 			return nil
 		}
 		kind, text = converse.KindReply, ev.Body
+		// A reply carries no command, so there is nothing to parse again
+		// against the resolved mention below.
+		fromFile = false
 	}
 	ref, err := refForEvent(&f, ev)
 	if err != nil {
@@ -115,7 +118,7 @@ func runRespond(ctx context.Context, args []string) error {
 	// repository. The first parse above is a pre-filter that may over-match
 	// and now cannot over-act, and this costs no forge call, since the policy
 	// is already in hand.
-	if fromFile && kind != converse.KindReply && policy.Review.Mention != mention {
+	if fromFile && policy.Review.Mention != mention {
 		kind, text, ok = converse.Command(ev.Body, policy.Review.Mention)
 		if !ok {
 			log.Info("the comment addresses the mention this change names, not the accepted one; nothing to do",

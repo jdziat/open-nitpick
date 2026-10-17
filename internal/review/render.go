@@ -270,14 +270,14 @@ func composeComment(f Finding, emoji bool, read map[string][]string, invite bool
 	// whether the code even does what it says.
 	//
 	//
-	// Two small paragraphs, source first and the invitation under it. Joined
-	// with a line break inside one <sub> they overprint each other, and a rule
-	// above them weighed more than a one-line nit.
+	// Plain paragraphs, source first and the invitation under it. <sub> is out:
+	// GitHub gives it a zero line height, so a source line that wraps on a
+	// narrow screen prints over itself.
 	if footer := attribution(f); footer != "" {
-		fmt.Fprintf(&b, "\n<sub>%s</sub>\n", footer)
+		fmt.Fprintf(&b, "\n%s\n", footer)
 	}
 	if invite {
-		fmt.Fprintf(&b, "\n<sub>💬 %s</sub>\n", ReplyInvitation)
+		fmt.Fprintf(&b, "\n💬 %s\n", ReplyInvitation)
 	}
 
 	return b.String()

@@ -1,6 +1,7 @@
 package review
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -10,9 +11,7 @@ import (
 func TestADismissedFindingIsNotPostedAgain(t *testing.T) {
 	again := Finding{Path: "a.go", Class: "correctness", Title: "Guard removed"}
 	other := Finding{Path: "b.go", Class: "correctness", Title: "Something else"}
-	prior := &vcs.PriorReview{Dismissed: []string{Fingerprint(again)}}
-
-	publish, dismissed := dropDismissed([]Finding{again, other}, prior)
+	publish, dismissed := dropDismissed([]Finding{again, other}, []string{Fingerprint(again)})
 	if len(publish) != 1 || publish[0].Path != "b.go" {
 		t.Errorf("publish = %+v, want only the finding nobody answered", publish)
 	}
@@ -23,11 +22,37 @@ func TestADismissedFindingIsNotPostedAgain(t *testing.T) {
 
 func TestNothingIsDroppedWithoutADismissal(t *testing.T) {
 	f := []Finding{{Path: "a.go", Title: "x"}}
-	for name, prior := range map[string]*vcs.PriorReview{"no prior": nil, "empty": {}} {
-		publish, dismissed := dropDismissed(f, prior)
+	for name, answered := range map[string][]string{"nil": nil, "empty": {}} {
+		publish, dismissed := dropDismissed(f, answered)
 		if len(publish) != 1 || len(dismissed) != 0 {
 			t.Errorf("%s: publish=%d dismissed=%d", name, len(publish), len(dismissed))
 		}
+	}
+}
+
+type priorOnly struct {
+	vcs.Provider
+	prior *vcs.PriorReview
+	reads int
+}
+
+func (p *priorOnly) PriorReview(context.Context, vcs.Ref) (*vcs.PriorReview, error) {
+	p.reads++
+	return p.prior, nil
+}
+
+func TestAFullReviewStillSeesWhatWasDismissed(t *testing.T) {
+	provider := &priorOnly{prior: &vcs.PriorReview{Dismissed: []string{"aa11"}}}
+	e := &Engine{Provider: provider}
+
+	if got := e.dismissals(context.Background(), vcs.Ref{}, nil); len(got) != 1 || got[0] != "aa11" {
+		t.Fatalf("a run with no prior read lost the dismissals: %v", got)
+	}
+	// A run that already holds the prior reads nothing a second time.
+	provider.reads = 0
+	held := &vcs.PriorReview{Dismissed: []string{"bb22"}}
+	if got := e.dismissals(context.Background(), vcs.Ref{}, held); len(got) != 1 || got[0] != "bb22" || provider.reads != 0 {
+		t.Fatalf("dismissals = %v after %d extra reads", got, provider.reads)
 	}
 }
 
