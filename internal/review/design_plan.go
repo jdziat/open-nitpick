@@ -113,7 +113,25 @@ func (e *Engine) assembleDesign(ctx context.Context, ref vcs.Ref, files diff.Fil
 		inventory.Limitations = append(inventory.Limitations, fmt.Sprintf("%s excluded: %s", skip.Path, skip.Reason))
 	}
 	inventory.Limitations = append(inventory.Limitations, "source inventory is bounded to 4096 paths and 32 MiB; only Go source has a dependency graph")
-	plan := practices.PlanDesignInteractions(ctx, inventory, source, changed)
+	// A manifest edit that cannot move a package edge, such as a dependency
+	// bump, stays out of the planning scope; it is still read above so its
+	// module boundary is known.
+	scope := slices.DeleteFunc(slices.Clone(changed), func(name string) bool {
+		if path.Base(name) != "go.mod" {
+			return false
+		}
+		for _, file := range files {
+			if file.Path == name {
+				if practices.ManifestChangesPackages(file) {
+					return false
+				}
+				inventory.Limitations = append(inventory.Limitations, name+" changed only its requirements; package design was not reassessed for it")
+				return true
+			}
+		}
+		return false
+	})
+	plan := practices.PlanDesignInteractions(ctx, inventory, source, scope)
 	packed := practices.PackDesign(ctx, e.Config, plan, source, files, reserve)
 	packed.Plan.Skipped = append(packed.Plan.Skipped, view.Excluded...)
 	return DesignExecution{DesignPacking: packed, Sources: source, Excluded: view.Excluded, Omitted: view.Omitted}
