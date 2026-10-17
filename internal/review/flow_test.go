@@ -127,3 +127,14 @@ func TestFlowLinksCallsAndDeclarationsToTheReviewedRevision(t *testing.T) {
 		t.Fatalf("a path that leaves the tree was linked:\n%s", got)
 	}
 }
+
+func TestFlowListsStopBeforeTheyCrowdOutTheReview(t *testing.T) {
+	d := &flow.Diagram{Mermaid: "flowchart LR\n", Changed: []string{"p.Get"}, Nodes: 2}
+	for i := range flowListMax + 7 {
+		d.Calls = append(d.Calls, flow.Call{From: "a", To: "b", Kind: flow.Resolved, Path: "p/p.go", Line: i + 1})
+	}
+	got := flowNotice(&Report{Flow: d})
+	if strings.Count(got, "- a to b") != flowListMax || !strings.Contains(got, "- and 7 more") {
+		t.Fatalf("call list was not capped at %d:\n%s", flowListMax, got)
+	}
+}

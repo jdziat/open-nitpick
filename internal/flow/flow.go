@@ -93,6 +93,9 @@ type function struct {
 	// usesMiddleware is true when the body calls Use, whose middleware is
 	// attached at run time and so is not drawn.
 	usesMiddleware bool
+	// unresolvedRoutes counts route registrations in the body whose handlers
+	// could not be named, so they are missing from the graph.
+	unresolvedRoutes int
 	// route marks a stand-in for one registered route, whose calls are its
 	// handler chain in the order they run.
 	route bool
@@ -262,8 +265,6 @@ func parse(sources []standards.File) *graph {
 				switch e := expression.(type) {
 				case *ast.ParenExpr:
 					return resolve(e.X)
-				case *ast.CallExpr:
-					return resolve(e.Fun)
 				case *ast.Ident:
 					if keys := plain[fn.dir][e.Name]; !shadow[e.Name] && len(keys) == 1 {
 						return keys[0], false, true
@@ -305,13 +306,33 @@ func parse(sources []standards.File) *graph {
 						file: fn.file, start: line, end: fset.Position(node.End()).Line, route: true,
 						calls: map[string]site{}, external: map[string]site{}, ambiguous: map[string]int{}}
 					var rest []ast.Expr
-					for _, arg := range node.Args[1:] {
-						key, inferred, ok := resolve(arg)
-						if _, dup := route.calls[key]; !ok || dup {
-							rest = append(rest, arg)
-							continue
+					unnamed := false
+					// A wrapper such as auth(list) runs the wrapper and then
+					// the handler it wraps, so both join the chain, in that order.
+					var chain func(ast.Expr)
+					chain = func(arg ast.Expr) {
+						if wrapped, ok := arg.(*ast.CallExpr); ok {
+							chain(wrapped.Fun)
+							for _, inner := range wrapped.Args {
+								chain(inner)
+							}
+							return
 						}
-						route.calls[key] = site{line: line, inferred: inferred, order: len(route.calls) + 1}
+						key, inferred, ok := resolve(arg)
+						if _, dup := route.calls[key]; ok && !dup {
+							route.calls[key] = site{line: line, inferred: inferred, order: len(route.calls) + 1}
+							return
+						}
+						if _, isLit := arg.(*ast.FuncLit); !isLit && !ok {
+							unnamed = true
+						}
+						rest = append(rest, arg)
+					}
+					for _, arg := range node.Args[1:] {
+						chain(arg)
+					}
+					if unnamed || len(route.calls) == 0 {
+						fn.unresolvedRoutes++
 					}
 					if len(route.calls) == 0 {
 						break
@@ -755,6 +776,7 @@ func (g *graph) draw(changed []string) *Diagram {
 // does not appear.
 func (g *graph) limits(drawn []string, edges map[edge]edgeInfo) []string {
 	var generated, reflecting, middleware []string
+	unresolvedRoutes := 0
 	ambiguous, shown := 0, 0
 	dirs := map[string]bool{}
 	for _, key := range drawn {
@@ -768,6 +790,7 @@ func (g *graph) limits(drawn []string, edges map[edge]edgeInfo) []string {
 		if fn.reflects {
 			reflecting = append(reflecting, fn.label())
 		}
+		unresolvedRoutes += fn.unresolvedRoutes
 		if fn.usesMiddleware {
 			middleware = append(middleware, fn.label())
 		}
@@ -785,6 +808,9 @@ func (g *graph) limits(drawn []string, edges map[edge]edgeInfo) []string {
 	}
 	if len(reflecting) > 0 {
 		out = append(out, "Files that import reflect or plugin can call functions this graph cannot see: "+listSome(reflecting)+".")
+	}
+	if unresolvedRoutes > 0 {
+		out = append(out, fmt.Sprintf("%d route registration(s) in the drawn functions have handlers the graph could not name, so those handlers are missing from their chains.", unresolvedRoutes))
 	}
 	if len(middleware) > 0 {
 		out = append(out, "Middleware added with Use runs on routes at run time and is not drawn: "+listSome(middleware)+".")

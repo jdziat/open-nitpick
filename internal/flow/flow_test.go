@@ -350,3 +350,37 @@ func TestBuildCannotLetARoutePathCloseTheFence(t *testing.T) {
 		t.Fatalf("a backtick from a route path reached the diagram:\n%s", d.Mermaid)
 	}
 }
+
+func TestBuildPutsAWrapperAndTheHandlerItWrapsIntoTheChain(t *testing.T) {
+	files := []standards.File{
+		src("go.mod", "module example.com/web\n"),
+		src("p/p.go", "package p\n\nfunc Register(r Router) { r.Get(\"/x\", auth(list)) }\n\nfunc auth(h func()) func() { return h }\n\nfunc list() {}\n"),
+	}
+	d := Build(files, edit("p/p.go", 7, 7))
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	orders := map[string]int{}
+	for _, c := range d.Calls {
+		if c.From == "GET /x" {
+			orders[c.To] = c.Order
+		}
+	}
+	if orders["p.auth"] != 1 || orders["p.list"] != 2 {
+		t.Fatalf("chain = %v, want auth then the handler it wraps", orders)
+	}
+}
+
+func TestBuildReportsARouteWhoseHandlersItCouldNotName(t *testing.T) {
+	files := []standards.File{
+		src("go.mod", "module example.com/web\n"),
+		src("p/p.go", "package p\n\nfunc Register(r Router, h func()) { r.Get(\"/x\", h); Leaf() }\n\nfunc Leaf() {}\n"),
+	}
+	d := Build(files, edit("p/p.go", 3, 3))
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	if !strings.Contains(strings.Join(d.Limits, " "), "could not name") {
+		t.Fatalf("limits = %v, want the unnamed handler reported", d.Limits)
+	}
+}
