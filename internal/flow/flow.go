@@ -295,6 +295,8 @@ func parse(sources []standards.File) *graph {
 			// order. A route registered on x runs it first. A group made from
 			// x starts with a copy, so it inherits what x had at that point.
 			middleware := map[string][]string{}
+			// prefix[x] is the path a group variable adds to its routes.
+			prefix := map[string]string{}
 			var visit func(ast.Node) bool
 			visit = func(node ast.Node) bool {
 				switch node := node.(type) {
@@ -306,6 +308,14 @@ func parse(sources []standards.File) *graph {
 							if sel, ok := call.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Group" {
 								if parent, ok := sel.X.(*ast.Ident); ok {
 									middleware[target.Name] = slices.Clone(middleware[parent.Name])
+									prefix[target.Name] = prefix[parent.Name]
+									if len(call.Args) > 0 {
+										if lit, ok := call.Args[0].(*ast.BasicLit); ok && lit.Kind == token.STRING {
+											if path, err := strconv.Unquote(lit.Value); err == nil {
+												prefix[target.Name] += path
+											}
+										}
+									}
 								}
 							}
 						}
@@ -328,6 +338,13 @@ func parse(sources []standards.File) *graph {
 					label, ok := routeLabel(sel.Sel.Name, node.Args)
 					if !ok {
 						break
+					}
+					if receiver != nil && prefix[receiver.Name] != "" {
+						verb, route, found := strings.Cut(label, " ")
+						if !found {
+							verb, route = "", label
+						}
+						label = strings.TrimSpace(verb + " " + prefix[receiver.Name] + route)
 					}
 					line := fset.Position(node.Pos()).Line
 					route := &function{key: fmt.Sprintf("route:%s:%d", fn.key, fset.Position(node.Pos()).Offset), dir: fn.dir, name: label,

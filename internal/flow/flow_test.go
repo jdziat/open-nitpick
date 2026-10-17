@@ -285,7 +285,7 @@ func TestBuildGivesAGroupItsParentsMiddlewareAndItsOwn(t *testing.T) {
 	if d == nil {
 		t.Fatal("no diagram")
 	}
-	got := routeOrders(d, "GET /stats")
+	got := routeOrders(d, "GET /admin/stats")
 	if got["p.logging"] != 1 || got["p.admin"] != 2 || got["p.stats"] != 3 {
 		t.Fatalf("group route chain = %v, want parent middleware, group middleware, handler", got)
 	}
@@ -486,5 +486,15 @@ func TestBuildKeepsACallerWhenCalleesFillTheDiagram(t *testing.T) {
 	}
 	if !slices.Equal(d.Entries, []string{"p.Entry"}) {
 		t.Fatalf("entries = %v, want p.Entry kept despite %d callees", d.Entries, maxNodes*2)
+	}
+}
+
+func TestBuildPrefixesAGroupRouteWithTheGroupsPath(t *testing.T) {
+	d := Build(groups("\tg := r.Group(\"/admin\")\n\tg.Get(\"/stats\", stats)\n"), edit("p/p.go", 14, 14))
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	if len(routeOrders(d, "GET /admin/stats")) == 0 {
+		t.Fatalf("route label lost its group prefix:\n%s", d.Mermaid)
 	}
 }
