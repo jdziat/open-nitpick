@@ -22,10 +22,16 @@ concurrency:
   #
   # Replies get a group of their own. They are far more frequent than
   # mentions, and sharing one would let people talking to each other cancel a
-  # pending question to the reviewer.
+  # pending question to the reviewer. The price is that a mention and a reply
+  # can run together, and the answer cap is counted at the start of each, so
+  # it can be exceeded by one answer.
   group: >-
-    nitpick-respond-${{ github.event.issue.number || github.event.pull_request.number }}-${{
-      contains(github.event.comment.body, '@open-nitpick') && 'mention' || 'reply' }}
+    nitpick-respond-${{
+      github.event.issue.number || github.event.pull_request.number
+    }}-${{
+      contains(github.event.comment.body, '@open-nitpick')
+      && 'mention' || 'reply'
+    }}
 
 jobs:
   respond:
