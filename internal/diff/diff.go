@@ -234,9 +234,16 @@ func (f *File) Position(newLine int) (int, bool) {
 // Ties prefer the earlier line, which reads as the start of the construct being
 // discussed. It returns false when nothing is close enough.
 func (f *File) NearestCommentableLine(newLine, maxDistance int) (int, bool) {
+	return NearestLine(f.CommentableLines(), newLine, maxDistance)
+}
+
+// NearestLine is NearestCommentableLine over an anchor set the caller already
+// holds. CommentableLines walks, sorts and compacts every hunk, so a caller
+// snapping many findings in one file computes it once and passes it here.
+func NearestLine(anchors []int, newLine, maxDistance int) (int, bool) {
 	best, bestDist := 0, maxDistance+1
 
-	for _, line := range f.CommentableLines() {
+	for _, line := range anchors {
 		dist := line - newLine
 		if dist < 0 {
 			dist = -dist

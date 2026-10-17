@@ -556,3 +556,13 @@ func TestParseQuotedPath(t *testing.T) {
 		t.Errorf("Path = %q, want the unquoted path", files[0].Path)
 	}
 }
+
+func TestNearestLinePrefersTheEarlierOfATie(t *testing.T) {
+	anchors := []int{10, 14}
+	if got, ok := NearestLine(anchors, 12, 3); !ok || got != 10 {
+		t.Errorf("NearestLine = %d, %v; want 10, true", got, ok)
+	}
+	if _, ok := NearestLine(nil, 12, 3); ok {
+		t.Error("an empty anchor set matched a line")
+	}
+}

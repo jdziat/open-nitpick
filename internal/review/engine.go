@@ -2124,6 +2124,19 @@ func (e *Engine) filterAnchors(findings []Finding, files diff.Files) ([]Finding,
 		})
 	}
 
+	// One anchor set per file, built on first need. This loop is sequential, so
+	// a plain map is safe; memoising on diff.File would race with the batch
+	// goroutines that read diff.Files.
+	anchorSets := map[*diff.File][]int{}
+	anchorsOf := func(file *diff.File) []int {
+		set, ok := anchorSets[file]
+		if !ok {
+			set = file.CommentableLines()
+			anchorSets[file] = set
+		}
+		return set
+	}
+
 	for _, f := range findings {
 		file := files.Find(f.Path)
 		if file == nil {
@@ -2137,7 +2150,7 @@ func (e *Engine) filterAnchors(findings []Finding, files diff.Files) ([]Finding,
 			continue
 		}
 
-		snapped, ok := file.NearestCommentableLine(f.Line, snapDistance)
+		snapped, ok := diff.NearestLine(anchorsOf(file), f.Line, snapDistance)
 		if !ok {
 			e.log().Debug("dropped finding outside the diff",
 				"path", f.Path, "line", f.Line, "title", f.Title)
