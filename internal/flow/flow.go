@@ -25,6 +25,11 @@ const (
 	maxUp    = 4  // caller hops above a changed function
 	maxDown  = 2  // callee hops below it
 	maxNodes = 30 // nodes in one diagram
+	// downShare is the part of the ceiling the callee pass may fill before the
+	// caller pass starts. A function with many callers would otherwise use
+	// every node on them and leave out the effects it has, which are what the
+	// reader asked about.
+	downShare = maxNodes / 2
 )
 
 // Diagram is the flow around the functions a change edited.
@@ -585,11 +590,12 @@ func (g *graph) draw(changed []string) *Diagram {
 	ids := map[string]string{}
 	var order []string
 	classes := map[string]string{}
+	limit := downShare
 	add := func(key, class string) bool {
 		if _, ok := ids[key]; ok {
 			return true
 		}
-		if len(order) >= maxNodes {
+		if len(order) >= limit {
 			d.Truncated = true
 			return false
 		}
@@ -618,27 +624,6 @@ func (g *graph) draw(changed []string) *Diagram {
 	}
 
 	frontier := slices.Clone(changed)
-	for depth := 1; depth <= maxUp && len(frontier) > 0; depth++ {
-		var next []string
-		for _, callee := range frontier {
-			for _, caller := range g.callers[callee] {
-				if !add(caller, classOf(caller)) {
-					continue
-				}
-				if _, seen := edges[edge{caller, callee}]; seen {
-					continue
-				}
-				edges[edge{caller, callee}] = infoOf(g.funcs[caller].calls[callee])
-				next = append(next, caller)
-			}
-		}
-		if depth == maxUp && len(next) > 0 {
-			d.Truncated = true
-		}
-		frontier = next
-	}
-
-	frontier = slices.Clone(changed)
 	for depth := 1; depth <= maxDown && len(frontier) > 0; depth++ {
 		var next []string
 		for _, caller := range frontier {
@@ -673,6 +658,28 @@ func (g *graph) draw(changed []string) *Diagram {
 					edges[edge{caller, key}] = edgeInfo{Unresolved, fn.ambiguous[name], 0}
 				}
 			}
+		}
+		frontier = next
+	}
+
+	limit = maxNodes
+	frontier = slices.Clone(changed)
+	for depth := 1; depth <= maxUp && len(frontier) > 0; depth++ {
+		var next []string
+		for _, callee := range frontier {
+			for _, caller := range g.callers[callee] {
+				if !add(caller, classOf(caller)) {
+					continue
+				}
+				if _, seen := edges[edge{caller, callee}]; seen {
+					continue
+				}
+				edges[edge{caller, callee}] = infoOf(g.funcs[caller].calls[callee])
+				next = append(next, caller)
+			}
+		}
+		if depth == maxUp && len(next) > 0 {
+			d.Truncated = true
 		}
 		frontier = next
 	}

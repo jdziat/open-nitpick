@@ -384,3 +384,46 @@ func TestBuildReportsARouteWhoseHandlersItCouldNotName(t *testing.T) {
 		t.Fatalf("limits = %v, want the unnamed handler reported", d.Limits)
 	}
 }
+
+// A function with more callers than the diagram has room for must still show
+// the effect it has: the callee pass runs first and keeps its share.
+func TestBuildKeepsADownstreamEffectWhenCallersFillTheDiagram(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("package p\n\nimport \"os\"\n\nfunc Target() { os.WriteFile(\"x\", nil, 0o600) }\n")
+	for i := range maxNodes * 2 {
+		fmt.Fprintf(&b, "\nfunc Caller%d() { Target() }\n", i)
+	}
+	files := []standards.File{src("go.mod", "module example.com/app\n"), src("p/p.go", b.String())}
+	d := Build(files, edit("p/p.go", 5, 5))
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	if !strings.Contains(d.Mermaid, "os.WriteFile") || !strings.Contains(d.Mermaid, ":::persistence") {
+		t.Fatalf("callers crowded out the file write:\n%s", d.Mermaid)
+	}
+	if d.Nodes != maxNodes || !d.Truncated {
+		t.Fatalf("nodes = %d truncated = %v, want the full ceiling and a truncation notice", d.Nodes, d.Truncated)
+	}
+}
+
+// The reverse: a function that calls more than the diagram holds must still
+// show who reaches it, because "which command gets here" is the first question.
+func TestBuildKeepsACallerWhenCalleesFillTheDiagram(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("package p\n\nfunc Entry() { Target() }\n\nfunc Target() {\n")
+	for i := range maxNodes * 2 {
+		fmt.Fprintf(&b, "\tLeaf%d()\n", i)
+	}
+	b.WriteString("}\n")
+	for i := range maxNodes * 2 {
+		fmt.Fprintf(&b, "\nfunc Leaf%d() {}\n", i)
+	}
+	files := []standards.File{src("go.mod", "module example.com/app\n"), src("p/p.go", b.String())}
+	d := Build(files, edit("p/p.go", 5, 5))
+	if d == nil {
+		t.Fatal("no diagram")
+	}
+	if !slices.Equal(d.Entries, []string{"p.Entry"}) {
+		t.Fatalf("entries = %v, want p.Entry kept despite %d callees", d.Entries, maxNodes*2)
+	}
+}
