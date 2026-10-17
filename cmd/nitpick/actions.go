@@ -46,6 +46,11 @@ func allowDegradedTriage(report *review.Report, gate config.Severity) actionResu
 	if report == nil || report.Practices != nil || !report.Complete() {
 		return resultError
 	}
+	// A bounded fast review that left a changed file unread is an error on its
+	// own account; forgiving triage must not launder it.
+	if report.FastReview && fastReviewSkippedFiles(report) {
+		return resultError
+	}
 	if len(report.Stages) != 1 || report.Stages[0].Stage != "triage" {
 		return resultError
 	}

@@ -128,8 +128,8 @@ outputs:
       One of "clean" (no findings at or above fail-on), "findings" (the gate
       was tripped), "skipped" (a draft, with skip-drafts), "degraded"
       (findings published but triage did not run, with allow-degraded-triage),
-      or "error" (the review could not run). Distinguishing the last is the point: a broken
-      reviewer must not read as a passing one.
+      or "error" (the review could not run). Distinguishing the last is the
+      point: a broken reviewer must not read as a passing one.
     value: ${{ steps.review.outputs.result }}
 
   findings:

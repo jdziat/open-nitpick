@@ -185,6 +185,7 @@ func TestAllowDegradedTriageForgivesOnlyAFailedTriage(t *testing.T) {
 		{"triage and another stage", &review.Report{Stages: []review.StageStatus{triage, {Stage: "style", Reason: "timeout"}}}, config.SeverityError, resultError},
 		{"a stage other than triage", &review.Report{Stages: []review.StageStatus{{Stage: "analyzers", Reason: "failed"}}}, config.SeverityError, resultError},
 		{"a file left unreviewed", &review.Report{Incomplete: []string{"b.go"}, Stages: []review.StageStatus{triage}}, config.SeverityError, resultError},
+		{"fast review that skipped a file", &review.Report{FastReview: true, Plan: &bundle.Plan{Skipped: []bundle.Skip{{Path: "later.go", Reason: bundle.ReasonFileLimit}}}, Stages: []review.StageStatus{triage}}, config.SeverityError, resultError},
 		{"no report", nil, config.SeverityError, resultError},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
