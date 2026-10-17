@@ -1,6 +1,6 @@
 ---
 name: ai-slop
-description: Find code that reads as generated and left unread, under nine rules a reader can check, using the nitpick MCP server's ai_slop tool. Use when asked whether code is AI slop, model-written, generated, or vibe-coded, to clean up code a model wrote, or to check your own generated code before committing it. Each finding names the rule it broke.
+description: Find code that reads as generated and left unread, under twelve rules a reader can check, using the nitpick MCP server's ai_slop tool. Use when asked whether code is AI slop, model-written, generated, or vibe-coded, to clean up code a model wrote, or to check your own generated code before committing it. Each finding names the rule it broke.
 ---
 
 # AI slop
@@ -12,7 +12,7 @@ model and come back first: em dashes, en dashes as separators, arrows in
 prose, filler qualifiers, chat prose, comments that restate their line,
 doc comments longer than what they document, three adjectives of praise
 in a row; each with its fix, counted per thousand lines. Then the model's
-nine rules below, through the review engine, filtered to the slop class.
+twelve rules below, through the review engine, filtered to the slop class.
 Pass `no_model: true` for the tells alone, which is free and instant; the
 model's pass costs a full review of the paths, so name the paths rather
 than the tree. To check work you produced in this session, pass the files
@@ -34,6 +34,11 @@ finding names one of these:
 8. Chat prose in a comment ("Sure! Here's", "Note that this function
    will").
 9. A test that asserts nothing, or asserts what it set up.
+10. A heading or card title that sells instead of naming ("Linters as
+    evidence, not noise").
+11. Marketing words where a fact, number or command would do (`seamless`,
+    `robust`, "not just X but Y", "Overall,").
+12. A blurb that retells the page it links to.
 
 The controls matter: a doc comment that adds a reason, a guard the
 constructor does not already make, a comment that says why rather than

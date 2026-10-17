@@ -43,33 +43,33 @@ nitpick review          # reviews your uncommitted changes
 <div class="np-grid" markdown>
 
 <div class="np-card" markdown>
-<p class="np-card-title">Any model, different models per job</p>
-Eighteen providers, with Synthetic and OpenRouter built in, plus any OpenAI-compatible endpoint, Ollama and llama.cpp. A cheap model triages and a strong one reviews. An expert pass can overrule either. [Configuration&nbsp;→](docs/configuration.md)
+<p class="np-card-title">Bring your own models</p>
+Eighteen providers, any OpenAI-compatible endpoint, and local models through Ollama and llama.cpp. Use a cheap model to triage and a stronger one to review. [Configuration&nbsp;→](docs/configuration.md)
 </div>
 
 <div class="np-card" markdown>
-<p class="np-card-title">Prompts you can print before you pay</p>
-Path-scoped instructions live next to the code they describe. `nitpick explain-config` shows the exact prompt a file would get. [Instructions&nbsp;→](docs/configuration.md#personality-and-how-much-it-nitpicks)
+<p class="np-card-title">Inspectable prompts</p>
+Instructions live next to the code they describe. `nitpick explain-config` prints the exact prompt a file would get. [Instructions&nbsp;→](docs/configuration.md#personality-and-how-much-it-nitpicks)
 </div>
 
 <div class="np-card" markdown>
-<p class="np-card-title">Context in both directions</p>
-Reviews include the functions and types used by changed code. You can also enable caller context to check code that depends on your changes. [Related context&nbsp;→](docs/configuration.md#related-context)
+<p class="np-card-title">Related context</p>
+Each review includes the functions and types that the changed code uses. You can also turn on caller context to include the code that depends on the change. [Related context&nbsp;→](docs/configuration.md#related-context)
 </div>
 
 <div class="np-card" markdown>
-<p class="np-card-title">A trust model, written down</p>
-The reviewer reads policy from the base revision and uses trusted linter settings. By default, pull-request configuration cannot override provider endpoints or credentials. [Trust model&nbsp;→](docs/trust-model.md)
+<p class="np-card-title">Trust model</p>
+Policy is read from the base revision. By default, a pull request cannot change provider endpoints or credentials. [Trust model&nbsp;→](docs/trust-model.md)
 </div>
 
 <div class="np-card" markdown>
-<p class="np-card-title">Linters as evidence, not noise</p>
-Thirty-three, configured from outside the tree they read. golangci-lint and ruff ship enabled, twenty-four more run whenever they are installed, and eslint, semgrep and five others wait until you name them. Their output goes to the model for triage instead of into the pull request. [Analyzers&nbsp;→](docs/analyzers.md)
+<p class="np-card-title">Integrated tools as extra evidence</p>
+Linters and scanners such as golangci-lint, ruff, eslint and semgrep run alongside the model, and their output goes to it as evidence. [Analyzers&nbsp;→](docs/analyzers.md)
 </div>
 
 <div class="np-card" markdown>
-<p class="np-card-title">Measured, mistakes included</p>
-Five corpora and a judge-free harness. The findings document records the instrument bugs found along the way, including the one that forced a retraction. [Findings&nbsp;→](docs/findings.md)
+<p class="np-card-title">Published measurements</p>
+Five corpora and a harness with no model judge. The findings page records each instrument bug we found, including the one that forced a retraction. [Findings&nbsp;→](docs/findings.md)
 </div>
 
 </div>

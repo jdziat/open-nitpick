@@ -305,10 +305,15 @@ much each would remove. The tells need no model and run first.
 | `shouting-emphasis` | capitals doing a sentence's work: NOT, MUST, WHOLE |
 | `changelog-comment` | a comment narrating what the code used to do |
 | `prose-cadence` | a file written in one rhythm, measured over the file |
+| `contrast-heading` | a heading or card title that names what it is not |
+| `slogan-heading` | a heading that sells: "written down", "done right" |
+| `stock-word` | `seamless`, `robust`, `leverage`, `comprehensive` |
+| `summary-opener` | a sentence opened with "Overall," or "In summary," |
+| `not-just-but` | "not just X but Y" |
 
 Prose files are scanned whole. Source files are scanned in their comments only,
 so a string literal is never a tell. Then,
-unless `-no-model`, the model's nine slop rules run through the review
+unless `-no-model`, the model's twelve slop rules run through the review
 engine over the same paths, filtered to the slop class, with the
 suggestions the model gave; findings it made outside that class are
 listed rather than dropped, since they were paid for. `-fail-over N`
@@ -337,14 +342,16 @@ same engine; absolute `repo` paths are trusted-operator-only. See
 
 `review.slop: true` asks the model for, and publishes, findings in a tenth
 class, `slop`: code that reads as generated and left unread, where the cost
-to the next reader can be named. It is nine rules a reader can check on the
+to the next reader can be named. It is twelve rules a reader can check on the
 line, each with the lookalike it excludes: a comment that restates the line
 below it; a comment describing behaviour the code lacks; dead code beside
 its replacement; a check against a condition the types exclude; an error
 swallowed and carried on from; generic naming where the file has a specific
 word; boilerplate repeated three times where the language has the
 abstraction; prose that addresses the reader as a chat reply; a test that
-asserts nothing. The rules are the prompt layer `prompt.SlopGuidance`, and
+asserts nothing; a heading that sells instead of naming; marketing words where
+a fact would do; a blurb that retells the page it links to. The rules are the
+prompt layer `prompt.SlopGuidance`, and
 `nitpick explain-config` prints them when the switch is on.
 
 It is off by default in a review, whatever the nitpick level, and on in

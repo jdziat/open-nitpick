@@ -22,7 +22,7 @@ import (
 // runSlop scores a tree for AI slop and says how to fix it. Two instruments:
 // the tells, which need no model (em dashes, filler, chat prose, comments
 // that restate their line, doc comments longer than what they document),
-// and the model's nine slop rules through the review engine, filtered to
+// and the model's twelve slop rules through the review engine, filtered to
 // the slop class. The score is each per thousand lines.
 func runSlop(ctx context.Context, args []string) error {
 	var (
@@ -44,7 +44,7 @@ func runSlop(ctx context.Context, args []string) error {
 	fs.BoolVar(&f.verbose, "v", false, "verbose logging")
 	fs.StringVar(&f.logFormat, "log-format", "text", "log format: text or json")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: nitpick slop [flags] [path...]\n\nScores the working tree, or the paths given, for AI slop and says how to fix it:\nthe tells (em dashes, filler, chat prose, restating and oversized comments) without a model,\nand the model's nine slop rules through the review engine unless -no-model.\n\nFlags:")
+		fmt.Fprintln(os.Stderr, "Usage: nitpick slop [flags] [path...]\n\nScores the working tree, or the paths given, for AI slop and says how to fix it:\nthe tells (em dashes, filler, chat prose, restating and oversized comments) without a model,\nand the model's twelve slop rules through the review engine unless -no-model.\n\nFlags:")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
@@ -258,7 +258,7 @@ func (r *SlopResult) Text() string {
 			}
 		}
 	} else {
-		b.WriteString("\nModel pass not run (-no-model); the nine slop rules need it.\n")
+		b.WriteString("\nModel pass not run (-no-model); the twelve slop rules need it.\n")
 	}
 	if len(r.Skipped) > 0 {
 		fmt.Fprintf(&b, "\nLeft out (%d): %s\n", len(r.Skipped), strings.Join(r.Skipped, "; "))

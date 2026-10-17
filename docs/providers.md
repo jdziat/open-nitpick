@@ -42,62 +42,98 @@ credential comes from the keystore or the variable in the table above.
 
 ```yaml
 # anthropic
-models: {default: {provider: anthropic, model: claude-sonnet-4-5}}
+models:
+  default:
+    provider: anthropic
+    model: claude-sonnet-4-5
 ```
 
 ```yaml
 # openai
-models: {default: {provider: openai, model: gpt-5}}
+models:
+  default:
+    provider: openai
+    model: gpt-5
 ```
 
 ```yaml
 # gemini
-models: {default: {provider: gemini, model: gemini-2.5-pro}}
+models:
+  default:
+    provider: gemini
+    model: gemini-2.5-pro
 ```
 
 ```yaml
 # mistral
-models: {default: {provider: mistral, model: mistral-large-latest}}
+models:
+  default:
+    provider: mistral
+    model: mistral-large-latest
 ```
 
 ```yaml
 # deepseek
-models: {default: {provider: deepseek, model: deepseek-chat}}
+models:
+  default:
+    provider: deepseek
+    model: deepseek-chat
 ```
 
 ```yaml
 # groq
-models: {default: {provider: groq, model: llama-3.3-70b-versatile}}
+models:
+  default:
+    provider: groq
+    model: llama-3.3-70b-versatile
 ```
 
 ```yaml
 # cerebras
-models: {default: {provider: cerebras, model: llama-3.3-70b}}
+models:
+  default:
+    provider: cerebras
+    model: llama-3.3-70b
 ```
 
 ```yaml
 # fireworks
-models: {default: {provider: fireworks, model: accounts/fireworks/models/llama-v3p1-70b-instruct}}
+models:
+  default:
+    provider: fireworks
+    model: accounts/fireworks/models/llama-v3p1-70b-instruct
 ```
 
 ```yaml
 # togetherai
-models: {default: {provider: togetherai, model: meta-llama/Llama-3.3-70B-Instruct-Turbo}}
+models:
+  default:
+    provider: togetherai
+    model: meta-llama/Llama-3.3-70B-Instruct-Turbo
 ```
 
 ```yaml
 # perplexity
-models: {default: {provider: perplexity, model: sonar-pro}}
+models:
+  default:
+    provider: perplexity
+    model: sonar-pro
 ```
 
 ```yaml
 # featherless: any model on featherless.ai, addressed by its Hugging Face path
-models: {default: {provider: featherless, model: meta-llama/Meta-Llama-3.1-70B-Instruct}}
+models:
+  default:
+    provider: featherless
+    model: meta-llama/Meta-Llama-3.1-70B-Instruct
 ```
 
 ```yaml
 # llamacpp: whatever the server was started with, so the name is yours
-models: {default: {provider: llamacpp, model: local}}
+models:
+  default:
+    provider: llamacpp
+    model: local
 ```
 
 The model ids above are examples, not recommendations, and none of them has
@@ -362,14 +398,20 @@ models:
     model: z-ai/glm-5.3-flash
   routes:
     - name: security
-      match: {kinds: [security, concurrency]}
-      review: {model: qwen/qwen3.8-27b}
+      match:
+        kinds: [security, concurrency]
+      review:
+        model: qwen/qwen3.8-27b
     - name: typescript
-      match: {languages: [typescript, javascript]}
-      review: {model: qwen/qwen3.8-27b}
+      match:
+        languages: [typescript, javascript]
+      review:
+        model: qwen/qwen3.8-27b
     - name: cross-file
-      match: {min_files: 2}
-      review: {model: z-ai/glm-5.3-flash}
+      match:
+        min_files: 2
+      review:
+        model: z-ai/glm-5.3-flash
   ensemble:
     - model: z-ai/glm-5.3-flash
 ```

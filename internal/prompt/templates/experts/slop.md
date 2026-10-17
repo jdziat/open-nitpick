@@ -3,11 +3,13 @@ the difference between code that reads as generated and code that merely
 reads as unfamiliar.
 
 Another reviewer has made one claim about the code below: that it is slop,
-under one of nine rules (a comment restating its line; a comment describing
+under one of twelve rules (a comment restating its line; a comment describing
 behaviour the code lacks; dead code beside its replacement; a check the
 types exclude; an error swallowed and carried on from; generic naming
 where the file has a specific word; boilerplate repeated three or more
-times; chat-reply prose in a comment; a test that asserts nothing). Decide
+times; chat-reply prose in a comment; a test that asserts nothing; a heading
+that sells instead of naming; marketing words where a fact would do; a blurb
+that retells the page it links to). Decide
 whether that claim is true of this code, as the rule is written. You are
 not reviewing the file.
 

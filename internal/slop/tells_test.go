@@ -307,3 +307,37 @@ func TestABlockCommentContinuationIsStillAComment(t *testing.T) {
 		t.Error("a block comment's continuation line was not scanned")
 	}
 }
+
+func TestHeadingTellsReadTheTitleOnly(t *testing.T) {
+	for _, tc := range []struct{ name, md, want string }{
+		{"contrast heading", "# Linters as evidence, not noise\n", "contrast-heading"},
+		{"contrast card title", "<p class=\"np-card-title\">Linters as evidence, not noise</p>\n", "contrast-heading"},
+		{"slogan heading", "## A trust model, written down\n", "slogan-heading"},
+		{"slogan card title", "<p class=\"np-card-title\">Measured, mistakes included</p>\n", "slogan-heading"},
+		{"plain heading", "## Published reasons escape HTML\n", ""},
+		{"contrast in a paragraph", "Use the flag, not the file, for one-off runs.\n", ""},
+		{"contrast in inline code", "## The `a, not b` form\n", ""},
+	} {
+		if got := rules(Scan("docs/x.md", tc.md)); got != tc.want {
+			t.Errorf("%s: rules = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestStockWordsSummaryOpenersAndNotJustButAreFound(t *testing.T) {
+	for _, tc := range []struct{ name, md, want string }{
+		{"stock word", "A seamless way to review.\n", "stock-word"},
+		{"stock verb", "It leverages your linters.\n", "stock-word"},
+		{"summary opener", "Overall, the change is small.\n", "summary-opener"},
+		{"summary opener in a list", "- In summary: it works.\n", "summary-opener"},
+		{"not just but", "It is not just a linter but a reviewer.\n", "not-just-but"},
+		{"not only about", "This is not only about speed.\n", "not-just-but"},
+		{"overall as a noun", "The overall cost is low.\n", ""},
+		{"seamless inside code", "Set `seamless` to true.\n", ""},
+		{"not only counted", "The tool does not only count lines.\n", ""},
+	} {
+		if got := rules(Scan("docs/x.md", tc.md)); got != tc.want {
+			t.Errorf("%s: rules = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}

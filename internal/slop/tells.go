@@ -1,6 +1,6 @@
 // Package slop finds the tells of generated prose without a model: the
 // habits a reader can check on the page, each with a fix. It is the
-// deterministic half of `nitpick slop`; the model's nine slop rules are the
+// deterministic half of `nitpick slop`; the model's twelve slop rules are the
 // other half and run through the review engine.
 package slop
 
@@ -44,6 +44,11 @@ var Rules = []Rule{
 	{"shouting-emphasis", "capitals used for emphasis in a comment (NOT, WHOLE, MUST)", "the sentence should carry the emphasis; if it cannot, the sentence is the problem"},
 	{"changelog-comment", "a comment narrating what the code used to do or which bug it fixed", "say what the code does now; the history belongs in the commit that changed it"},
 	{"prose-cadence", "a whole file written in one rhythm: appositive tails, colon expansions and three-part lists, above 10 per 100 lines", "vary the sentences. Split the longest into two, and let some of them end where the fact ends"},
+	{"contrast-heading", "a heading or card title that names what it is not (\"Linters as evidence, not noise\")", "title the thing by what it is; the rejected alternative was never on the page"},
+	{"slogan-heading", "a heading that sells instead of naming (written down, done right, made simple, mistakes included)", "name the feature in plain words and put the claim, with its number, in the sentence below"},
+	{"stock-word", "a word generated text reaches for (seamless, robust, leverage, comprehensive, holistic, tapestry, streamline)", "say what the thing does: the specific verb or measurement"},
+	{"summary-opener", "a sentence that announces a summary (In summary, Overall, Ultimately, Simply put)", "delete the opener; the sentence after it is the point"},
+	{"not-just-but", "the shape \"not just X but Y\", or \"is not only about X\"", "state Y; X was set up to be knocked down"},
 }
 
 var (
@@ -53,6 +58,20 @@ var (
 	filler  = regexp.MustCompile(`(?i)\b(genuinely|honestly|actually|truly|simply|crucially|importantly|it'?s worth noting( that)?)\b`)
 	chat    = regexp.MustCompile(`(?i)\bsure!|\b(here'?s (the|a|an|your)|note that this|hope this helps|let me know if|as an ai|i hope this|great question)\b`)
 	triplet = regexp.MustCompile(`(?i)\b(\w+), (\w+),? and (\w+)\b`)
+
+	// A heading is a line a reader scans first, so the two heading shapes are
+	// matched on the title only. The same words in a paragraph are ordinary.
+	headingStart    = `^\s*(#{1,6}\s|<p class="np-card-title">)`
+	contrastHeading = regexp.MustCompile(headingStart + `.*,\s+not\s+\w+`)
+	sloganHeading   = regexp.MustCompile(`(?i)` + headingStart + `.*\b(written down|done right|made (simple|easy)|you can trust|mistakes included)\b`)
+
+	// stockWord is a short list of words that read as generated when they
+	// carry a claim, and this tree's own prose uses none of them. It stays
+	// short: a long list turns a style tell into a dictionary.
+	stockWord = regexp.MustCompile(`(?i)\b(delve[sd]?|tapestry|testament to|cutting-edge|state-of-the-art|game-chang\w+|seamless(ly)?|leverag(e|es|ed|ing)|holistic(ally)?|ever-evolving|best-in-class|battle-tested|blazing(ly)?|effortless(ly)?|robust|comprehensive|streamlin(e|es|ed|ing)|empower(s|ed|ing)?|elevat(e|es|ed|ing))\b`)
+
+	summaryOpener = regexp.MustCompile(`(?i)^\s*([-*]\s+)?(in (summary|conclusion|short)|to summarize|overall|ultimately|bottom line|at the end of the day|put simply|simply put)\s*[,:]`)
+	notJustBut    = regexp.MustCompile(`(?i)\bnot (just|only|merely)\b[^.;]{2,60}\bbut\b|\b(is|are|was|were)(n't| not) (just|only|merely) (a|an|about)\b`)
 
 	// antithesis is the shape "it is not X, it is Y" and "not a X, but a Y".
 	// It reads as decisive and carries only the second half, since the first
@@ -298,6 +317,11 @@ func lineRules(p string, n int, text string) []Tell {
 	add("essay-comment", essay.FindStringIndex(text))
 	add("changelog-comment", changelog.FindStringIndex(text))
 	add("shouting-emphasis", shouting.FindStringIndex(text))
+	add("contrast-heading", contrastHeading.FindStringIndex(text))
+	add("slogan-heading", sloganHeading.FindStringIndex(text))
+	add("stock-word", stockWord.FindStringIndex(text))
+	add("summary-opener", summaryOpener.FindStringIndex(text))
+	add("not-just-but", notJustBut.FindStringIndex(text))
 	if m := triplet.FindStringSubmatchIndex(text); m != nil {
 		a, b, c := strings.ToLower(text[m[2]:m[3]]), strings.ToLower(text[m[4]:m[5]]), strings.ToLower(text[m[6]:m[7]])
 		// A list of three nouns (tools, files, names) is a list; the tell

@@ -55,9 +55,14 @@ A comment on the pull request that starts with
 ```yaml
 name: Respond
 on:
-  issue_comment: {types: [created]}
-  pull_request_review_comment: {types: [created]}
-permissions: {contents: read, pull-requests: write, issues: write}
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
 jobs:
   respond:
     if: >-
@@ -67,7 +72,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: {fetch-depth: 0}
+        with:
+          fetch-depth: 0
       - uses: jdziat/open-nitpick@v1
         with:
           command: respond

@@ -39,7 +39,7 @@ Each writes `{"mcpServers": {"nitpick": {"command": "nitpick", "args":
 | `full_review` | the whole tree or the paths given: bugs, security risks, known advisories, slop, a remediation plan, and what was not covered | the model on every batch; bound it with `paths` or `budget` |
 | `repo_score` | `full_review` plus findings per thousand lines by language | the same |
 | `code_smell` | `full_review` filtered to maintainability, style and slop | the same; pass `paths` |
-| `ai_slop` | the tells (em dashes, filler, chat prose, restating and oversized comments) without a model, then the model's nine slop rules, both per thousand lines, with fixes ordered by count | free with `no_model`; otherwise the same; pass `paths` |
+| `ai_slop` | the tells (em dashes, filler, chat prose, restating and oversized comments) without a model, then the model's twelve slop rules, both per thousand lines, with fixes ordered by count | free with `no_model`; otherwise the same; pass `paths` |
 | `explain_config` | the resolved configuration for a repository | none |
 
 Every tool returns text for reading and structured content (`findings`

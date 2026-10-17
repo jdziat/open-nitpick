@@ -80,8 +80,9 @@ with a prompt you cannot read. This one is built the other way round.
 - **Prompts as configuration.** Path-scoped instructions live in your repository
   next to the code they describe. `nitpick explain-config` prints the exact
   prompt that will be sent, before you spend a token on it.
-- **Linters as evidence.** Findings from golangci-lint, ruff, eslint and semgrep
-  go to the model for triage. Your pull request never receives the raw output.
+- **Integrated tools as extra evidence.** Linters and scanners such as
+  golangci-lint, ruff, eslint and semgrep run alongside the model. Their output
+  goes to it as evidence, and your pull request never receives the raw text.
 - **Runs offline.** The whole engine works against a local git checkout with no
   credentials and no network beyond the model call.
 

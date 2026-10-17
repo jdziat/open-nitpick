@@ -98,7 +98,7 @@ func newMCPServer(root string, log *slog.Logger) *mcp.Server {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "ai_slop",
 		Description: "AI slop for the paths given (or the whole tree), with a score and fixes. Two instruments: the tells, which need no model (em dashes, en dashes as separators, arrows in prose, filler qualifiers, chat prose, comments that restate their line, doc comments longer than what they document), each with its fix; " +
-			"and, unless no_model is set, the model's nine slop rules through the review engine (a docstring that describes behaviour the code does not have, a swallowed error, a tautological guard, generic names, and so on). " +
+			"and, unless no_model is set, the model's twelve slop rules through the review engine (a docstring that describes behaviour the code does not have, a swallowed error, a tautological guard, generic names, and so on). " +
 			"Returns tells by rule, the model's findings with suggestions, both per thousand lines, findings outside the slop class the review made (hidden), and recommendations ordered by count. Pass paths to keep the model's pass cheap; no_model is free.",
 	}, t.aiSlop)
 	mcp.AddTool(server, &mcp.Tool{

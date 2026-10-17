@@ -888,14 +888,20 @@ models:
     model: z-ai/glm-5.3-flash
   routes:
     - name: security
-      match: {kinds: [security, concurrency]}
-      review: {model: qwen/qwen3.8-27b}
+      match:
+        kinds: [security, concurrency]
+      review:
+        model: qwen/qwen3.8-27b
     - name: typescript
-      match: {languages: [typescript, javascript]}
-      review: {model: qwen/qwen3.8-27b}
+      match:
+        languages: [typescript, javascript]
+      review:
+        model: qwen/qwen3.8-27b
     - name: cross-file
-      match: {min_files: 2}
-      review: {model: z-ai/glm-5.3-flash}
+      match:
+        min_files: 2
+      review:
+        model: z-ai/glm-5.3-flash
 ```
 
 A match takes `languages` (the batch matches when any file is in one of them),
