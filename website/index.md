@@ -44,32 +44,32 @@ nitpick review          # reviews your uncommitted changes
 
 <div class="np-card" markdown>
 <p class="np-card-title">Bring your own models</p>
-Eighteen providers, any OpenAI-compatible endpoint, and local models through Ollama and llama.cpp. Use a cheap model to triage and a stronger one to review. [Configuration&nbsp;→](docs/configuration.md)
+18 providers, any OpenAI-compatible endpoint, Ollama and llama.cpp. A cheap model triages, a strong one reviews. [Configuration&nbsp;→](docs/configuration.md)
 </div>
 
 <div class="np-card" markdown>
 <p class="np-card-title">Inspectable prompts</p>
-Instructions live next to the code they describe. `nitpick explain-config` prints the exact prompt a file would get. [Instructions&nbsp;→](docs/configuration.md#personality-and-how-much-it-nitpicks)
+Path-scoped instructions in your repo. `nitpick explain-config` prints the exact prompt. [Instructions&nbsp;→](docs/configuration.md#personality-and-how-much-it-nitpicks)
 </div>
 
 <div class="np-card" markdown>
 <p class="np-card-title">Related context</p>
-Each review includes the functions and types that the changed code uses. You can also turn on caller context to include the code that depends on the change. [Related context&nbsp;→](docs/configuration.md#related-context)
+Definitions the change uses, attached by default. Callers of what it redefines, opt-in. [Related context&nbsp;→](docs/configuration.md#related-context)
 </div>
 
 <div class="np-card" markdown>
 <p class="np-card-title">Trust model</p>
-Policy is read from the base revision. By default, a pull request cannot change provider endpoints or credentials. [Trust model&nbsp;→](docs/trust-model.md)
+Policy from the base revision. A PR cannot change endpoints or credentials. [Trust model&nbsp;→](docs/trust-model.md)
 </div>
 
 <div class="np-card" markdown>
 <p class="np-card-title">Integrated tools as extra evidence</p>
-Linters and scanners such as golangci-lint, ruff, eslint and semgrep run alongside the model, and their output goes to it as evidence. [Analyzers&nbsp;→](docs/analyzers.md)
+golangci-lint, ruff, eslint, semgrep and more. Their output is evidence for the model. [Analyzers&nbsp;→](docs/analyzers.md)
 </div>
 
 <div class="np-card" markdown>
 <p class="np-card-title">Published measurements</p>
-Five corpora and a harness with no model judge. The findings page records each instrument bug we found, including the one that forced a retraction. [Findings&nbsp;→](docs/findings.md)
+Five corpora, no model judge. Every instrument bug logged, one retraction included. [Findings&nbsp;→](docs/findings.md)
 </div>
 
 </div>
