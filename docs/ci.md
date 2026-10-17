@@ -61,8 +61,9 @@ permissions: {contents: read, pull-requests: write, issues: write}
 jobs:
   respond:
     if: >-
-      contains(github.event.comment.body, '@open-nitpick') ||
-      github.event.comment.in_reply_to_id != null
+      (contains(github.event.comment.body, '@open-nitpick') ||
+       github.event.comment.in_reply_to_id != null) &&
+      github.event.comment.user.type != 'Bot'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -100,9 +101,11 @@ shows the problem.
 
 Replies pass through the same gates as a mention: `review.respond.from` and
 `max_per_pull_request`. To start a run on a reply, the workflow's `if:` also
-accepts any comment with `in_reply_to_id`; the run stops before spending
-anything when the thread was not started by the reviewer. `review.respond.replies:
-false` turns this off.
+accepts any comment with `in_reply_to_id` from an account that is not a bot;
+the run stops before spending anything when the thread was not started by the
+reviewer. `review.respond.replies: false` makes `nitpick respond` ignore replies,
+and removing the `in_reply_to_id` clause from the `if:` stops the runner
+starting for them at all.
 
 ### Superseded comments
 

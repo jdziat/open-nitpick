@@ -54,6 +54,7 @@ jobs:
         contains(github.event.comment.body, '@open-nitpick') ||
         github.event.comment.in_reply_to_id != null
       ) &&
+      github.event.comment.user.type != 'Bot' &&
       !contains(github.event.comment.body, '@open-nitpick fix') &&
       (github.event_name == 'pull_request_review_comment' || github.event.issue.pull_request != null) &&
       contains(

@@ -14,15 +14,15 @@ import (
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
-// severityLabels give each severity a short visual marker. Emoji are used
+// severityMarks give each severity a short visual marker. Emoji are used
 // sparingly and only here: a reviewer scanning twenty comments needs to sort
 // them at a glance.
-var severityLabels = map[config.Severity]string{
-	config.SeverityCritical: "🔴 critical",
-	config.SeverityError:    "🟠 error",
-	config.SeverityWarning:  "🟡 warning",
-	config.SeverityInfo:     "🔵 info",
-	config.SeverityNit:      "⚪ nit",
+var severityMarks = map[config.Severity]string{
+	config.SeverityCritical: "🔴",
+	config.SeverityError:    "🟠",
+	config.SeverityWarning:  "🟡",
+	config.SeverityInfo:     "🔵",
+	config.SeverityNit:      "⚪",
 }
 
 // Render turns a report into a publishable review.
@@ -293,10 +293,8 @@ func severityChip(s config.Severity, emoji bool) string {
 	if !emoji {
 		return name
 	}
-	if l, ok := severityLabels[s]; ok {
-		if mark, _, ok := strings.Cut(l, " "); ok {
-			return mark + " " + name
-		}
+	if mark, ok := severityMarks[s]; ok {
+		return mark + " " + name
 	}
 	return name
 }

@@ -451,9 +451,7 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	// fallback runs after GitHub has already refused the whole review, so an
 	// oversize summary cost the inline comments it was posted beside. The
 	// room left is for the markers appended below.
-	if limit := maxSummaryBytes - reservedMarkerBytes; len(body) > limit {
-		body = truncateBytes(body, limit) + "\n\n_(summary truncated)_"
-	}
+	body = boundSummary(body, maxSummaryBytes-reservedMarkerBytes)
 	if body == "" && len(review.Progress) > 0 {
 		body = defaultReviewBody(len(comments), "")
 	}
@@ -820,10 +818,7 @@ func summaryFallbackFor(body string, cause error) string {
 	if cause != nil {
 		return summaryFallback(body, cause)
 	}
-	if len(body) > maxSummaryBytes {
-		body = truncateBytes(body, maxSummaryBytes-30) + "\n\n_(summary truncated)_"
-	}
-	return body
+	return boundSummary(body, maxSummaryBytes)
 }
 
 // summaryFallback explains why inline comments were dropped, so a silent
@@ -835,10 +830,18 @@ func summaryFallback(body string, cause error) string {
 
 	note := fmt.Sprintf("\n\n_Inline comments could not be posted (%v)._", truncateBytes(cause.Error(), 500))
 
-	if len(body)+len(note) > maxSummaryBytes {
-		body = truncateBytes(body, maxSummaryBytes-len(note)) + "\n\n_(summary truncated)_"
+	return boundSummary(body, maxSummaryBytes-len(note)) + note
+}
+
+// summaryTruncated ends a summary that was cut to fit.
+const summaryTruncated = "\n\n_(summary truncated)_"
+
+// boundSummary returns body within limit bytes, the truncation note included.
+func boundSummary(body string, limit int) string {
+	if len(body) <= limit {
+		return body
 	}
-	return body + note
+	return truncateBytes(body, limit-len(summaryTruncated)) + summaryTruncated
 }
 
 // truncateBytes trims a string to at most n bytes on a rune boundary.
