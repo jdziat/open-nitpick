@@ -88,37 +88,33 @@ func runImprove(ctx context.Context, gh *vcs.GitHub, repo string, cfg *config.Co
 	std, stdStatus := review.BuildStandards(ctx, &icfg, gh.Checkout,
 		baseRevisionFor(ctx, gh, ref, log), log)
 
-	engine := &review.Engine{
-		Standards:       std,
-		StandardsStatus: stdStatus,
-
-		Config:    &icfg,
-		Roles:     roles,
-		Provider:  held,
-		Log:       log,
-		Knowledge: k,
-
-		// Both fields, as newEngine wires them. Policy alone would record a
-		// substitution and then review under the change's own models, because
-		// withPolicy rebuilds the roles through Models and leaves the engine
-		// untouched when it is nil.
-		//
-		// This pass is the widest of the three a mention can start. It is a
-		// whole review, so review.ignore, min_severity, validation, the budgets
-		// and instructions[].prompt all reach it, and no permission gate stands
-		// in front of it.
-		//
-		// The scope is applied by the resolver rather than here, because
-		// withPolicy replaces Config wholesale with whatever the resolver
-		// returned. Scoping only the roles would leave a substituted policy
-		// reviewing at the ordinary scope, which is a pass that says it was
-		// pedantic and was not.
-		Policy: improveScoped{&config.BasePolicy{RepoRoot: repo, Loaded: &icfg, Provider: gh}},
-		Models: llm.BuildRoles,
-		// Linters stays nil. The analyzers are deterministic and the ordinary
-		// review already ran them; a second run would spend time to publish
-		// what is already on the pull request.
-	}
+	// Policy and Models are arguments to NewEngine, not fields set after it: a
+	// review without them means something other than a review.
+	//
+	// Both, as newEngine wires them. Policy alone would record a substitution
+	// and then review under the change's own models, because withPolicy
+	// rebuilds the roles through Models and leaves the engine untouched when it
+	// is nil.
+	//
+	// This pass is the widest of the three a mention can start. It is a whole
+	// review, so review.ignore, min_severity, validation, the budgets and
+	// instructions[].prompt all reach it, and no permission gate stands in front
+	// of it.
+	//
+	// The scope is applied by the resolver rather than here, because withPolicy
+	// replaces Config wholesale with whatever the resolver returned. Scoping
+	// only the roles would leave a substituted policy reviewing at the ordinary
+	// scope, which is a pass that says it was pedantic and was not.
+	engine := review.NewEngine(&icfg, held,
+		improveScoped{&config.BasePolicy{RepoRoot: repo, Loaded: &icfg, Provider: gh}},
+		llm.BuildRoles, log)
+	engine.Roles = roles
+	engine.Knowledge = k
+	engine.Standards = std
+	engine.StandardsStatus = stdStatus
+	// Linters stays nil. The analyzers are deterministic and the ordinary
+	// review already ran them; a second run would spend time to publish what is
+	// already on the pull request.
 
 	// Before Review: fail-closed must not discard a completed pass.
 	prior, err := gh.PriorReview(ctx, ref)

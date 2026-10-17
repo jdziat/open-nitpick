@@ -41,6 +41,16 @@ belongs in the commit that made it. `nitpick slop` will tell you when a comment
 restates its line, narrates a changelog, or runs longer than the declaration it
 documents.
 
+## Constructors
+
+A type whose zero value cannot do its job is built by a package-level
+function, so a struct literal that omits a field is a compile error instead of
+a review that quietly means something else. The builder is `New<T>`, or
+`Build<T>` where construction can fail on configuration rather than on
+arguments. Today that is `review.NewEngine`, `llm.Build` and
+`llm.BuildEmbedder`; production code does not write an `Engine` literal.
+Plain values such as `evals.Price` need no builder.
+
 <!-- nitpick:standards:begin -->
 
 ## Conventions, measured
