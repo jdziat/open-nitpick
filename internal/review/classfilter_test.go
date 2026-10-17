@@ -144,8 +144,8 @@ func TestTestsClassRespectsLevel(t *testing.T) {
 	}
 }
 
-// TestGenerationPromptIsLevelIndependent checks the engine, not just the
-// prompt package: a level-dependent branch here would defeat the design.
+// TestGenerationPromptIsLevelIndependent checks the engine as well as the
+// prompt package.
 func TestGenerationPromptIsLevelIndependent(t *testing.T) {
 	var prompts []string
 

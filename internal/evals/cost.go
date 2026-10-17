@@ -93,10 +93,9 @@ func (c CallUsage) Total() int { return c.Prompt + c.Completion + c.CacheRead + 
 type TokenUsage struct {
 	PerCall []CallUsage
 
-	// Unreported is how many calls returned a response carrying no usage, the
-	// state that has to stay visible, because a cost column that is sometimes
-	// measured and sometimes guessed with no way to tell which is worse than no
-	// cost column.
+	// Unreported is how many calls returned a response carrying no usage. It
+	// stays visible so a cost column is never part measured and part guessed
+	// without saying which.
 	Unreported int
 
 	// Failed is how many calls returned an error, and it is a stated BLIND SPOT
@@ -1641,12 +1640,10 @@ func (r CostRow) coverageReason() string {
 			r.Model, r.Covered, r.PeerCoverage, strings.Join(r.Missing, ", "))
 
 	case len(r.Shallow) > 0:
-		// Deliberately worded as SELECTION rather than as thin sampling. Fewer
-		// priced runs on a fixture its peers completed is not merely a smaller
-		// sample: the runs that dropped out are the ones whose usage went
-		// unreported, and nothing here can rule out that they are also the ones
-		// that found nothing. Read as "n=2 instead of n=3" a reader shrugs; read
-		// as "priced on the runs that went well" they do not.
+		// Worded as selection, not thin sampling. The runs that dropped out are
+		// the ones whose usage went unreported, and nothing here rules out that
+		// they are also the ones that found nothing. "n=2 instead of n=3" gets a
+		// shrug; "priced on the runs that went well" does not.
 		//
 		// Rendered by ShallowSampleWarning, which the judged tables now print
 		// too. The wording was right and was reachable from one table only.

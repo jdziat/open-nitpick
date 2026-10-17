@@ -264,11 +264,10 @@ func (l *Local) ListDir(ctx context.Context, ref Ref, dir string) ([]string, err
 // readContained reads a repository-relative path, refusing anything that
 // escapes the repository root.
 //
-// os.Root confines traversal to the root for us, including `..` segments and
-// symlinks that point outside. The explicit Lstat is belt-and-braces: an
-// in-repo symlink to an in-repo file would be permitted by os.Root, but there
-// is no reason for a reviewer to follow links at all, and refusing them keeps
-// the rule easy to state.
+// os.Root confines traversal to the root, including `..` segments and symlinks
+// that point outside. The explicit Lstat also refuses an in-repo symlink to an
+// in-repo file, which os.Root would allow, because a reviewer has no reason to
+// follow links and the rule is easier to state without them.
 func (l *Local) readContained(path string) ([]byte, error) {
 	return l.readContainedLimit(path, 0)
 }

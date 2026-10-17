@@ -107,10 +107,8 @@ type source struct {
 	// pkg is what the file's whole package declares, for a probe whose
 	// question is not answerable from one file.
 	//
-	// A constructor lives beside its type far more often than in the same
-	// file, so a per-file reading of "does this type have one" reported this
-	// repository at 27% against a true 75%. A probe about a package has to be
-	// given the package.
+	// A constructor usually lives beside its type, not in the same file, so a
+	// per-file reading of "does this type have one" undercounts.
 	pkg *packageIndex
 }
 

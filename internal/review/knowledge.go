@@ -15,25 +15,11 @@ import (
 	"github.com/jdziat/open-nitpick/internal/knowledge"
 )
 
-// Retrieved knowledge, attached to a batch.
-//
-// Per batch rather than per file: the entries are about the change, and
-// repeating the same five under every file in a batch would spend the token
-// budget on duplication and teach the model that the section is boilerplate.
-
-// knowledgeSection renders the entries a batch should be judged against.
-//
-// The heading says what these are and what they are not. A model handed
-// reference material beside a diff will otherwise report the reference as a
-// finding, which is the failure this feature has to avoid to be worth having:
-// a reviewer that invents defects out of a style guide is worse than one that
-// misses them.
 // knowledgeTokens estimates what a rendered section costs, with its framing.
 //
-// The heading and the disclaimer are counted, not just the entries: they are
-// most of a one-entry section, and a budget that ignored them would let a
-// section overrun the number an operator wrote by the size of the words that
-// make it safe to read.
+// The heading and the disclaimer are counted along with the entries: they are
+// most of a one-entry section, and ignoring them would let a section overrun
+// the operator's budget.
 func knowledgeTokens(section string) int {
 	if section == "" {
 		return 0
@@ -61,6 +47,9 @@ func fitKnowledge(hits []knowledge.Hit, budget int) []knowledge.Hit {
 	return nil
 }
 
+// knowledgeSection renders the entries a batch is judged against, once per
+// batch. Its heading says they are reference material, so the model does not
+// report them as findings.
 func knowledgeSection(hits []knowledge.Hit) string {
 	if len(hits) == 0 {
 		return ""
@@ -341,9 +330,8 @@ func ids(hits []knowledge.Hit) []string {
 // knowledgeClasses names the entries a pass can act on.
 //
 // The defect pass takes everything the review taxonomy calls a defect, plus
-// contract and tests. It does NOT take style: a style rule handed to the
-// defect reviewer is the dilution config.GenerationLevel exists to prevent,
-// arriving as reference material instead of as a prompt.
+// contract and tests. It does not take style: a style rule handed to the
+// defect reviewer dilutes the pass config.GenerationLevel keeps narrow.
 //
 // Slop rides with the defect pass and only when review.slop is on, because
 // that is when slop is a class the reviewer may publish. Retrieving entries

@@ -42,14 +42,9 @@ type Docs map[string]string
 // Enums maps a named string type to the values its constants declare, in the
 // order the source declares them.
 //
-// A key whose type is one of these accepts those values and nothing else, and
-// the reference used to say so for two of the twenty-one: `linters.mode` and
-// the nine `structured_output` rows, whose field comments happen to spell the
-// values out, against ten keys that named none of them. `persona.confidence`
-// printed "Confidence controls hedging." beside a default of `direct` and left
-// `hedged` findable only by setting a bad value and reading the rejection. The
-// values are on the type, never on the field, so the field comment was the
-// wrong place to look for them.
+// A key whose type is one of these accepts those values and nothing else. The
+// values are declared on the type, not the field, so the reference reads them
+// here.
 type Enums map[string][]string
 
 // ReadDocs parses every non-test file in dir and collects struct field

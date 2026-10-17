@@ -230,9 +230,9 @@ func decodePracticeBlocks(raw []byte, result *PracticePolicy) error {
 			}
 		}
 		// security configures the tree scan, not PracticePolicy. It must stay
-		// out of known so it cannot land in Other, but it is still a Config
-		// key that a shared .nitpick.yaml may carry — skip it without error
-		// and without IgnoredUnknown (which would churn the digest).
+		// out of known so it cannot land in Other, but a shared .nitpick.yaml
+		// may still carry it: skip it without error and without IgnoredUnknown,
+		// which would churn the digest.
 		delete(known, "security")
 		configOwnedSkip := map[string]bool{"security": true}
 		seen := map[string]bool{}

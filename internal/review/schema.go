@@ -8,21 +8,10 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 )
 
-// The findings schema is hand-authored rather than derived from the Result
-// struct by reflection.
-//
-// The SDK's SchemaFrom marks every exported field as required, with no way to
-// opt out short of `json:"-"`. Applied to Finding that makes `suggestion`
-// mandatory on every finding, while the review prompt tells the model
-// suggestion is optional and should only be supplied when it can give exact
-// replacement code. The wire contract wins that argument silently, so the
-// model invents a suggestion for findings it has no fix for, and those get
-// rendered as one-click ```suggestion blocks that replace real code with
-// prose.
-//
-// Authoring the schema here also lets severity be a closed enum, which stops
-// the model inventing severities that later degrade to info or, worse, to the
-// "none" sentinel.
+// The findings schema is written by hand. The SDK's SchemaFrom marks every
+// exported field required, which would make `suggestion` mandatory and have
+// the model invent one for findings it has no fix for. Writing it here also
+// lets severity be a closed enum.
 const (
 	findingsSchemaName   = "review_findings"
 	triageSchemaName     = "triage_result"
@@ -167,13 +156,11 @@ func triageSchema(classes []string) (json.RawMessage, error) {
 						"duplicate_of": map[string]any{"type": "integer", "description": "The number of the finding this one was merged into. Required for a duplicate merge."},
 						"reason":       map[string]any{"type": "string", "description": "Why it duplicates a finding you kept. Unsupported or uncertain claims must be retained."},
 					},
-					// duplicate_of is NOT required, so a drop with no merge
-					// target stays legal and rule 2 restores that finding. It
-					// was absent from this schema entirely, under strict
-					// enforcement, so the model could not emit it and every
-					// Drop decoded with DuplicateOf zero: merging has never
-					// run. Every test of it constructed the reply in Go and
-					// skipped the schema.
+					// duplicate_of is not required, so a drop with no merge
+					// target stays legal and rule 2 restores that finding.
+					// Strict enforcement rejects a field the schema omits, so
+					// duplicate_of has to be listed here for the model to
+					// emit it.
 					"required":             []string{"number", "reason"},
 					"additionalProperties": false,
 				},

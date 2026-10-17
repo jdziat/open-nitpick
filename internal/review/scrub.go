@@ -16,8 +16,8 @@ import (
 var (
 	// An em dash, or an en dash between spaces, standing in for a comma.
 	dashSeparator = regexp.MustCompile(`\s*[—]\s*|\s+–\s+`)
-	// Filler that says nothing. The optional leading comma is captured so
-	// "slow, actually fragile" becomes "slow, fragile" rather than "slow,fragile".
+	// Filler that says nothing. The optional leading comma is captured so a
+	// removed word leaves "slow, fragile" and not "slow,fragile".
 	fillerWord = regexp.MustCompile(`(?i)(,?)\s*\b(genuinely|honestly|actually|truly|simply|crucially|importantly|very|quite|somewhat)\b`)
 	fillerLead = regexp.MustCompile(`(?i)^\s*(it'?s worth noting( that)?|note that|it should be noted( that)?)[,:]?\s*`)
 	// The chat wrapper: an opener at the start, an offer at the end.

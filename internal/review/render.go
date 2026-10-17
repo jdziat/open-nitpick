@@ -752,11 +752,6 @@ func discardNotice(report *Report) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "\n<details>\n<summary>%s</summary>\n\n", discardHeadline(report.Discarded))
-	// It used to say "removed before triage, so nothing judged them", which
-	// stopped being true when the anchor filter downstream of triage began
-	// reporting its own drops. The distinction the sentence was making (these
-	// were not weighed and rejected, they were never weighed), survives the
-	// correction; where in the pipeline that happened does not change it.
 	b.WriteString("A deterministic analyzer reported these and this review did not publish them. " +
 		"They were removed by anchoring, not by judgement: nothing weighed them and decided against them.\n\n")
 
@@ -794,25 +789,15 @@ func discardNotice(report *Report) string {
 	return b.String()
 }
 
-// discardHeadline is the one line a reader sees collapsed.
+// discardHeadline is the line a reader sees while the block is collapsed. It
+// leads with the total, and names the not-in-checkout count separately because
+// that is the one reason that means something went wrong.
 //
-// It leads with the total rather than the breakdown, because the number that
-// matters to somebody scrolling past is how many deterministic findings did
-// not make it, and it names the not-in-checkout count separately whenever
-// there is one. That reason is the only one here that means something went
-// wrong.
-//
-// WHAT THE TOTAL COUNTS, stated because it was wrong once and read as
-// complete. It is every analyzer finding removed by ANCHORING: the analyzer
-// set's normalize step and both of Engine.filterAnchors' passes. It was the
-// first of those alone until filterAnchors was found dropping analyzer
-// findings on a diff context line at Debug level, after this number had
-// already been computed. It is still not "every analyzer finding that did not
-// reach the pull request": triage sits between the two anchor passes and may
-// merge one finding into another or drop it as noise, which is the job it is
-// there to do and is a judgement, not silence, but nothing enumerates those
-// either, so a reader comparing this total against a count of published
-// findings will not balance the books.
+// The total counts findings removed by anchoring: the analyzer set's normalize
+// step and both of Engine.filterAnchors' passes. Triage sits between the two
+// anchor passes and may merge or drop a finding as noise, which nothing
+// enumerates, so this total will not balance against a count of published
+// findings.
 func discardHeadline(discarded []LinterDiscard) string {
 	forged := 0
 	for _, d := range discarded {
@@ -828,35 +813,9 @@ func discardHeadline(discarded []LinterDiscard) string {
 	return headline
 }
 
-// uncoveredNotice states, ON THE PULL REQUEST, which parts of the change a
-// deterministic analyzer ran over and did not fully cover.
-//
-// THE BUG IT ANSWERS: the roster said "golangci-lint, ran", and that was true
-// and was read as "the Go analyzer looked at this change". It had not. A build
-// constraint on the changed file with one unconstrained sibling beside it
-// leaves the package loading perfectly while the changed file is never read,
-// and a //nolint attached to the package clause has the analyzer read it and
-// say nothing. Both produced zero findings, a nil error and a roster line
-// saying the analyzer ran, the byte-identical shape of a clean Go review, and
-// the silencing that reaches this state without an attack is the commoner one:
-// an ordinary `foo_windows.go` reviewed on a Linux runner.
-//
-// It sits between the roster and the discard block because that is the order the
-// three facts are read in: whether the analyzer ran, what it did not look at,
-// and what it reported that this review then dropped.
-//
-// It is NOT gated on review.summary, for linterNotice's reason: a reader turning
-// the walkthrough off is asking for less narration, not for the report to stop
-// saying which parts of their change were never analyzed.
-//
-// Files are named individually and suppressions are listed with their line,
-// because both are things a reviewer has to go and look at. A two-line count
-// would leave nobody able to find them. Individually up to a bound: see
-// maxUncoveredPerReason. The path is inline-escaped for the reason every other
-// path in this file is: it comes from the diff, and a filename can carry
-// markdown. callerWalkNotice says when the search for callers of what the
-// change redefines stopped short, so a file with no callers attached is not
-// read as a file with no callers.
+// callerWalkNotice says when the search for callers of what the change
+// redefines stopped short, so a file with no callers attached is not read as a
+// file with no callers.
 func callerWalkNotice(report *Report) string {
 	if report.Plan == nil || !report.Plan.CallerWalkTruncated {
 		return ""
@@ -864,7 +823,16 @@ func callerWalkNotice(report *Report) string {
 	return "\nThe search for callers of what this change redefines stopped at its ceiling of candidate files, so some callers in this repository were not read and any break in them is not reported.\n"
 }
 
+// uncoveredNotice states on the pull request which changed files an analyzer
+// ran over without fully covering, such as a file excluded by a build
+// constraint or one silenced by a //nolint on its package clause. The roster
+// alone would read "ran" for these. It is not gated on review.summary: turning
+// the walkthrough off asks for less narration, not for coverage gaps to go
+// unreported. Paths are inline-escaped because a filename can carry markdown.
 func uncoveredNotice(report *Report) string {
+	// Placed between the roster and the discard block, the order the three facts
+	// are read in: whether the analyzer ran, what it did not look at, and what
+	// it reported that this review then dropped.
 	if len(report.Uncovered) == 0 {
 		return ""
 	}
@@ -910,37 +878,19 @@ func uncoveredNotice(report *Report) string {
 }
 
 // maxUncoveredPerReason bounds how many entries one reason lists before the
-// remainder is counted instead.
-//
-// A BODY THIS TOOL CANNOT PUBLISH IS WORSE THAN A SHORTER LIST, and every
-// reason here can arrive in bulk from an ordinary pull request: `go mod
-// vendor` adds hundreds of Go files that review.ignore withholds, and a port
-// adds a directory of _windows.go. GitHub caps a review body at 65536 bytes
-// (summaryFallback already exists because "a PR deleting thousands of files
-// produces an enormous skipped-files section"), so an unbounded list here
-// would trade a coverage notice for the whole review.
-//
-// PER REASON rather than overall, so one bulk route cannot push the others off
-// the end: the vendored files and the one platform-specific file in the same
-// change are different facts, and the second is the one nobody would find alone.
-// The headline still counts every file, so the total is never the truncated one.
+// remainder is counted. Every reason can arrive in bulk (`go mod vendor`, a
+// directory of _windows.go files) and GitHub caps a review body at 65536
+// bytes, so an unbounded list could cost the whole review. The bound is per
+// reason, so a bulk route cannot push a lone platform-specific file off the
+// end, and the headline still counts every file.
 const maxUncoveredPerReason = 20
 
-// uncoveredHeadline is the one line a reader sees collapsed.
-//
-// It counts FILES rather than entries, because a file with three added //nolint
-// comments is one file the analyzer said nothing about and "3 uncovered" would
-// overstate it. It never says "all covered": this block is absent when there is
-// nothing to report, and a headline claiming full coverage would be a promise
-// about every analyzer that has no Uncovered implementation, and about whatever
-// coverage gap nobody has measured yet.
-//
-// It says "did not fully cover" rather than "reported nothing about", which is
-// what it used to say. That was accurate while every entry meant the file went
-// unread, and became false when UncoveredLanguageVersion arrived: there the file
-// IS read and a version-gated part of the ruleset is not applied. A headline
-// that overstates the gap teaches a reader to discount the block, which costs
-// the entries that do mean the file went unread.
+// uncoveredHeadline is the line a reader sees while the block is collapsed. It
+// counts files, since three //nolint comments in one file are one file the
+// analyzer said nothing about, and it never claims full coverage: the block is
+// absent when there is nothing to report. "Did not fully cover" is deliberate,
+// because a language-version gap reads the file and skips only part of the
+// ruleset.
 func uncoveredHeadline(uncovered []LinterUncovered) string {
 	files := map[string]struct{}{}
 	for _, u := range uncovered {
@@ -950,17 +900,10 @@ func uncoveredHeadline(uncovered []LinterUncovered) string {
 	return fmt.Sprintf("Analyzed less than it ran over: %d file(s) the analyzers did not fully cover", len(files))
 }
 
-// policyFailureNotice explains, on the pull request, why no review ran at all.
-//
-// It is published in place of a review, never alongside one: the run has no
-// findings to report and no clean bill of health to give, and the maintainer
-// whose configuration change triggered it would otherwise learn nothing except
-// that a job went red.
-//
-// The wording claims only what is true on every path that reaches it. A resolver
-// that errored has not said whether the change edits the configuration, so
-// asserting that it does would be a guess printed as a fact on somebody's pull
-// request.
+// policyFailureNotice explains on the pull request why no review ran. It is
+// published in place of a review, never alongside one. The wording claims only
+// what holds on every path that reaches it: a resolver that errored has not
+// said whether the change edits the configuration.
 func policyFailureNotice(cause error) string {
 	return blockquote(fmt.Sprintf(
 		"**This change was not reviewed.**\n"+
@@ -994,9 +937,8 @@ func blockquote(s string) string {
 func walkthrough(report *Report, cfg *config.Config) string {
 	var b strings.Builder
 
-	// The receipt is counted from the report; the prose was written by a model
-	// that never saw the change. Which one appears is review.summary_style,
-	// and the receipt is the default.
+	// review.summary_style picks between the receipt, counted from the report,
+	// and prose a model wrote; the receipt is the default.
 	if cfg != nil && cfg.Review.EffectiveSummaryStyle() == config.SummaryReceipt {
 		b.WriteString(receipt(report))
 	} else if s := strings.TrimSpace(report.Summary); s != "" {
@@ -1039,11 +981,9 @@ func walkthrough(report *Report, cfg *config.Config) string {
 		b.WriteString("\n</details>\n")
 	}
 
-	// Distinct from both of the above: these files WERE reviewed and DID carry
-	// file context, just not all of it. The heading has to say that precisely,
-	// because a reader who concludes "not reviewed" from this list will
-	// re-review the file by hand, and one who concludes "fully reviewed" will
-	// trust an absence of findings in the part that was elided.
+	// Distinct from both above: these files were reviewed with some, not all,
+	// of their context. The heading must say so, since "not reviewed" sends a
+	// reader to redo the file and "fully reviewed" trusts the elided part.
 	if notes := windowedNotes(report); notes != "" {
 		b.WriteString("\n<details>\n<summary>Reviewed with reduced file context</summary>\n\n")
 		b.WriteString(notes)
@@ -1071,14 +1011,10 @@ func overruledNotes(report *Report) string {
 		fmt.Fprintf(&b, "- `%s:%d` — %s\n", r.Finding.Path, r.Finding.Line, inline(r.Finding.Title))
 
 		if r.Revised != "" {
-			// The FROM level is the finding's own, which the operator's ceiling
-			// may have already reduced. It is quoted rather than re-capped on
-			// purpose: this line explains why a finding is absent, and quoting a
-			// level the reader never saw published would make the explanation
-			// harder to follow, not easier. What must not happen is the reverse
-			// (a ceiling of warning rendering "re-rated this from critical" as
-			// though critical had been published), so the level printed here is
-			// the one that WAS published for this finding.
+			// The "from" level is the one published for this finding, after the
+			// operator's ceiling. Quoting an unpublished level ("from critical"
+			// under a warning ceiling) would explain an absence with a level the
+			// reader never saw.
 			fmt.Fprintf(&b, "  - %s re-rated this from %s to %s, below this repository's minimum severity: %s%s\n",
 				inline(r.Expert), r.Finding.Sev(), r.Revised, inline(r.Reason), citedNote(r))
 			continue
@@ -1094,24 +1030,14 @@ func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 
 // inline prepares untrusted text for a bullet: one line, and no raw HTML.
 //
-// IT DOES NOT NEUTRALIZE MARKDOWN, and the comment here used to say it made
-// text "unable to leave the element it is rendered inside", which is false in a
-// forge comment where markdown IS the rendering language. `<b>` is escaped;
-// `[text](https://example)` is not, and renders as a live link.
-//
-// That matters because some of what reaches here is written by the change
-// under review, not by a model: an analyzer's failure reason quotes the tree,
-// and a Go compile error quotes source verbatim, `var X int =
-// "[CLICK](https://...)"` puts that string in golangci-lint's message,
-// measured against 2.8.0. The result is a link the change authored, rendered
-// inside a comment posted under this bot's name.
-//
-// Not fixed here because the fix is not this function: two call sites already
-// wrap it in a code span, where backslash escapes would render literally and
-// corrupt the paths they show. Neutralizing markdown means deciding per call
-// site whether the text is prose or a code span, and giving the code-span cases
-// a backtick-safe fence like fenceFor does for blocks. Recorded in the README's
-// security section rather than half-done.
+// It does not neutralize markdown: "<b>" is escaped, but "[text](https://x)"
+// still renders as a live link. Some of this text is written by the change
+// under review (a Go compile error quotes source verbatim, so a string literal
+// reaches golangci-lint's message), which makes that a link the change authored
+// inside a comment under this bot's name. Two call sites wrap it in a code
+// span, where backslash escapes would render literally, so escaping belongs at
+// each call site by whether the text is prose or code. The README's security
+// section records the gap.
 func inline(s string) string { return html.EscapeString(oneLine(s)) }
 
 // skipNotes lists files that were not reviewed, grouped by reason.
@@ -1134,12 +1060,9 @@ func degradedNotes(report *Report) string {
 
 // windowedNotes lists files reviewed with only a window around their changes.
 //
-// A file too large for its full content used to be refused outright and land
-// in Degraded, which is printed. Windowing such a file instead is a clear
-// improvement (a window beats a bare diff), but it moved the file onto a list
-// nothing rendered, so a reader who was previously told "this was reviewed
-// from the diff alone" is now told nothing at all, even where most of the file
-// was elided. Better context must not be paid for with worse disclosure.
+// A file too large for its full content is windowed rather than refused, and
+// windowed files are listed so a reader is still told when most of a file was
+// elided.
 func windowedNotes(report *Report) string {
 	if report.Plan == nil {
 		return ""

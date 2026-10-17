@@ -77,7 +77,7 @@ func contains(ss []string, s string) bool {
 	return false
 }
 
-// EVERY committed index covers the committed corpus.
+// Every committed index covers the committed corpus.
 //
 // An entry added without regenerating an index is unreachable through it:
 // retrieval works, returns the others, and nothing says the new one was

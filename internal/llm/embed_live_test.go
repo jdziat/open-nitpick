@@ -10,7 +10,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/config"
 )
 
-// A live check that a provider can actually embed, run by hand.
+// A live check that a provider can embed, run by hand.
 func TestLiveEmbedReturnsProviderVectors(t *testing.T) {
 	provider, model := os.Getenv("EMBED_PROVIDER"), os.Getenv("EMBED_MODEL")
 	if provider == "" || model == "" {

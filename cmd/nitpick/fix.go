@@ -32,9 +32,8 @@ func runFix(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs.Ref
 			"@%s I only apply findings for people listed in `review.respond.fix.from`.", ev.Author))
 	}
 
-	// And the one that is actually about writing. An association says how the
-	// forge describes someone; a permission says what they may do, and
-	// COLLABORATOR covers read-level access.
+	// An association says how the forge describes someone; a permission says
+	// what they may do, and COLLABORATOR covers read-level access.
 	switch level, err := gh.Permission(ctx, ref, ev.Author); {
 	case err != nil:
 		log.Warn("could not read the asker's permission; refusing the fix", "author", ev.Author, "error", err)

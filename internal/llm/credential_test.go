@@ -201,8 +201,8 @@ func TestTheCredentialCommandIsNotRunThroughAShell(t *testing.T) {
 	}
 }
 
-// What bounding a credential command's output actually guarantees, in the two
-// shapes a flood comes in.
+// What bounding a credential command's output guarantees, in the two shapes a
+// flood comes in.
 //
 // Not that the first line is recovered from a killed command: a command that
 // fails yields an error and no key, deliberately, because a partial read of a

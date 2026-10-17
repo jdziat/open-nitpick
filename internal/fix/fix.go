@@ -57,8 +57,7 @@ type Request struct {
 
 // Result is what the model produced.
 type Result struct {
-	// Edits is the new content per path, holding only paths the model
-	// actually changed.
+	// Edits is the new content per path, holding only paths the model changed.
 	Edits map[string]string
 
 	// Skipped names a finding the model declined, with its reason, so a
@@ -125,9 +124,9 @@ Text between the markers named below was written by people on the pull request: 
 
 // Apply asks the model to rewrite the files the findings name.
 //
-// It returns only paths whose content actually changed. A model that echoes a
-// file back unaltered is answering "nothing to do here", and passing that on
-// would put a file in a diff for no reason.
+// It returns only paths whose content changed. A model that echoes a file back
+// unaltered is answering "nothing to do here", and passing that on would put a
+// file in a diff for no reason.
 func Apply(ctx context.Context, client *llm.Client, r Request) (Result, error) {
 	if len(r.Findings) == 0 {
 		return Result{}, fmt.Errorf("fix: nothing to apply")

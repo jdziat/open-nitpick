@@ -407,7 +407,7 @@ func TestAMergeSurvivesTheShippedSchema(t *testing.T) {
 		}
 	}
 
-	// And the wire shape a model would actually send decodes into a merge.
+	// And the wire shape a model sends decodes into a merge.
 	var result TriageResult
 	if err := json.Unmarshal([]byte(`{"findings":[{"number":1,"severity":"error","class":"security"}],
 		"summary":"s","dropped":[{"number":2,"duplicate_of":1,"reason":"same defect"}]}`), &result); err != nil {

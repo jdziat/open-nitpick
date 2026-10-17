@@ -7,13 +7,10 @@ import (
 
 // What retrieval did on a run, and why.
 //
-// Retrieval used to report itself by returning a nil retriever and writing a
-// line to the log. That is enough for an operator reading a terminal and not
-// enough for an evaluation: a run whose embedding provider refused every
-// request reviewed without retrieval, and scoring it as a retrieval-on
-// treatment measures the control twice and calls the difference noise. The
-// status is carried on the report so a measurement can separate the arms it
-// actually ran.
+// The retrieval status is carried on the report so a measurement can separate
+// the arms it ran: a run whose embedding provider refused every request
+// reviewed without retrieval, and scoring it as retrieval-on would measure the
+// control twice.
 
 // KnowledgeState is the four things retrieval can have done.
 type KnowledgeState string

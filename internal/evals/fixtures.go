@@ -218,12 +218,9 @@ func HeldOutFixtures() []Fixture {
 
 // AllFixtures is every fixture in both corpora.
 //
-// It exists so the NITPICK_EVAL_FIXTURES filter can name a held-out fixture
-// without Fixtures(), the default run, and therefore every tuning loop,
-// changing what it returns. Ground-truth tests iterate GroundTruthFixtures:
-// a corpus that is not validated is worse than no corpus, and "held out" is
-// not an excuse to skip the check that caught four wrong line numbers in the
-// first eight.
+// It lets the NITPICK_EVAL_FIXTURES filter name a held-out fixture without
+// changing what Fixtures(), the default run, returns. Ground-truth tests
+// iterate GroundTruthFixtures, so held-out fixtures are validated too.
 func AllFixtures() []Fixture {
 	all := Fixtures()
 	return append(all, HeldOutFixtures()...)
