@@ -59,7 +59,7 @@ Definitions the change uses, attached by default. Callers of what it redefines, 
 
 <div class="np-card" markdown>
 <p class="np-card-title">Trust model</p>
-Policy from the base revision. A PR cannot change endpoints or credentials. [Trust model&nbsp;→](docs/trust-model.md)
+Policy from the base revision. By default, a PR cannot change endpoints or credentials. [Trust model&nbsp;→](docs/trust-model.md)
 </div>
 
 <div class="np-card" markdown>
