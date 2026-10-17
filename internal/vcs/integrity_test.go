@@ -185,6 +185,11 @@ func TestRejectedInlineFindingsCannotEstablishCoverage(t *testing.T) {
 	posts := 0
 	var captured capturedReview
 	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/comments") {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			_, _ = w.Write([]byte(`{"message":"invalid line"}`))
+			return
+		}
 		posts++
 		_ = json.NewDecoder(r.Body).Decode(&captured)
 		if posts == 1 {

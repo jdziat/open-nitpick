@@ -1107,7 +1107,7 @@ func TestAnUnresolvedReasonIsFlattenedIntoItsLine(t *testing.T) {
 			t.Fatalf("the reason opened a line of its own:\n%s", got)
 		}
 	}
-	if !strings.Contains(got, "could not be resolved by expert: cannot tell") {
+	if !strings.Contains(got, "The expert check could not decide: cannot tell") {
 		t.Errorf("the doubt was not rendered:\n%s", got)
 	}
 }

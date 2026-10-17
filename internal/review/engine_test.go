@@ -630,7 +630,7 @@ func TestRenderCommentIncludesSuggestionBlock(t *testing.T) {
 	if !strings.Contains(body, "```suggestion\n") {
 		t.Errorf("a single-line code suggestion should render as an applicable block:\n%s", body)
 	}
-	if !strings.Contains(body, "warning") {
+	if !strings.Contains(body, "Warning") {
 		t.Errorf("severity should be visible:\n%s", body)
 	}
 }

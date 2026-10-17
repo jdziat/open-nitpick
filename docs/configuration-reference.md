@@ -1407,6 +1407,11 @@ From lists the associations allowed to command the reviewer. Empty means Default
 integer, default `0`.
 MaxPerPullRequest caps how many comments the reviewer answers on one pull request, counting its own replies as the record of how many it has answered, and zero, the default, is no cap at all.
 
+### `review.respond.replies`
+
+boolean, default `none`.
+Replies lets the reviewer read a reply left under one of its own findings without being mentioned, and resolve the thread when the reply settles it. Unset means on: a finding that cannot be answered has to be dismissed by hand, and the same association list and cap that bound a mention bound a reply.
+
 ### `review.skip_generated`
 
 boolean, default `true`.

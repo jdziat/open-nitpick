@@ -132,6 +132,10 @@ const (
 	// measured worse at both, so the wider scope is reachable only by asking
 	// for it, and only here.
 	KindImprove Kind = "improve"
+	// KindReply is a reply under one of the reviewer's own findings that did
+	// not mention it. Command never returns it: it is decided from where the
+	// comment sits, not from what it says.
+	KindReply Kind = "reply"
 )
 
 // Command reads the mention out of a comment: the kind, and for a question

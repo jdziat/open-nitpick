@@ -665,6 +665,7 @@ review:
   respond:
     from: [owner, member, collaborator]   # the default
     max_per_pull_request: 0               # 0 is no cap
+    replies: true                         # read replies under a finding
 ```
 
 `contributor` is **not** in the default set. It means "has a merged commit",

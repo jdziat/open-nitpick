@@ -447,6 +447,13 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	}
 
 	body := stripMarkers(review.Summary)
+	// Bounded before the first send. Only the fallback was bounded, and the
+	// fallback runs after GitHub has already refused the whole review, so an
+	// oversize summary cost the inline comments it was posted beside. The
+	// room left is for the markers appended below.
+	if limit := maxSummaryBytes - reservedMarkerBytes; len(body) > limit {
+		body = truncateBytes(body, limit) + "\n\n_(summary truncated)_"
+	}
 	if body == "" && len(review.Progress) > 0 {
 		body = defaultReviewBody(len(comments), "")
 	}
@@ -535,13 +542,27 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	// GitHub computed. Rather than lose the whole review, fall back to posting
 	// the summary alone: a reviewer gets the walkthrough and can act on it.
 	if len(drafts) > 0 && isUnprocessable(err) {
-		// Missing inline findings must be retried before this head is reusable.
-		body = strings.ReplaceAll(body, completionMarker(review.Head), "")
+		// One at a time, because the review is refused as a whole when any
+		// single comment cannot be anchored, and the rest were fine. A comment
+		// that still fails is counted in the summary rather than dropped
+		// silently.
+		posted := g.postDraftsAlone(ctx, ref, review.Head, drafts)
+		if posted < len(drafts) {
+			// Missing inline findings must be retried before this head is reusable.
+			body = strings.ReplaceAll(body, completionMarker(review.Head), "")
+		}
+		if posted > 0 {
+			body += fmt.Sprintf("\n\n_%d of %d inline comment(s) were posted on their own because GitHub refused the review as a whole._", posted, len(drafts))
+		}
+		cause := err
+		if posted == len(drafts) {
+			cause = nil
+		}
 		if _, _, fallbackErr := g.client.PullRequests.CreateReview(ctx, ref.Owner, ref.Repo, ref.Number,
 			&github.PullRequestReviewRequest{
 				CommitID: request.CommitID,
 				Event:    github.Ptr(string(EventComment)),
-				Body:     github.Ptr(summaryFallback(body, err)),
+				Body:     github.Ptr(summaryFallbackFor(body, cause)),
 			}); fallbackErr == nil {
 			return nil
 		}
@@ -623,6 +644,10 @@ func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error)
 		opts.Page = resp.NextPage
 	}
 
+	// Threads this tool closed because a person's reply held. A reply carrying
+	// DismissedMarker is the record, so it survives a new runner and needs no
+	// store of its own.
+	dismissedRoots := map[int64]bool{}
 	copts := &github.PullRequestListCommentsOptions{ListOptions: github.ListOptions{PerPage: 100}}
 	for {
 		comments, resp, err := g.client.PullRequests.ListComments(ctx, ref.Owner, ref.Repo, ref.Number, copts)
@@ -633,6 +658,9 @@ func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error)
 			body := c.GetBody()
 			if c.GetUser().GetID() != actor || !strings.Contains(body, g.Bot) {
 				continue
+			}
+			if c.GetInReplyTo() != 0 && strings.Contains(body, DismissedMarker) {
+				dismissedRoots[c.GetInReplyTo()] = true
 			}
 			fp, class, ok := parseFingerprint(body)
 			if !ok {
@@ -659,7 +687,11 @@ func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error)
 		if threads, err := g.reviewThreads(ctx, ref); err == nil {
 			standing := out.Comments[:0]
 			for _, c := range out.Comments {
-				if th, known := threads[c.ID]; !known || !th.resolved {
+				th, known := threads[c.ID]
+				if known && th.resolved && dismissedRoots[c.ID] {
+					out.Dismissed = append(out.Dismissed, c.Fingerprint)
+				}
+				if !known || !th.resolved {
 					standing = append(standing, c)
 				}
 			}
@@ -754,6 +786,45 @@ func defaultReviewBody(comments int, marker string) string {
 // thousands of files produces an enormous skipped-files section, so resending
 // it verbatim would fail identically and lose the review entirely.
 const maxSummaryBytes = 60000
+
+// reservedMarkerBytes is the room kept under maxSummaryBytes for the bot,
+// head, completion and spend markers a body gets after it is bounded.
+const reservedMarkerBytes = 1000
+
+// postDraftsAlone posts each draft as its own review comment and returns how
+// many the forge accepted.
+func (g *GitHub) postDraftsAlone(ctx context.Context, ref Ref, head string, drafts []*github.DraftReviewComment) int {
+	posted := 0
+	for _, d := range drafts {
+		c := &github.PullRequestComment{
+			Path:      d.Path,
+			Line:      d.Line,
+			Side:      d.Side,
+			StartLine: d.StartLine,
+			StartSide: d.StartSide,
+			Body:      d.Body,
+		}
+		if head != "" {
+			c.CommitID = github.Ptr(head)
+		}
+		if _, _, err := g.client.PullRequests.CreateComment(ctx, ref.Owner, ref.Repo, ref.Number, c); err == nil {
+			posted++
+		}
+	}
+	return posted
+}
+
+// summaryFallbackFor is summaryFallback when something is still missing, and
+// the body alone, bounded, when every comment was posted after all.
+func summaryFallbackFor(body string, cause error) string {
+	if cause != nil {
+		return summaryFallback(body, cause)
+	}
+	if len(body) > maxSummaryBytes {
+		body = truncateBytes(body, maxSummaryBytes-30) + "\n\n_(summary truncated)_"
+	}
+	return body
+}
 
 // summaryFallback explains why inline comments were dropped, so a silent
 // degradation does not look like a clean review.
@@ -895,6 +966,20 @@ func (g *GitHub) ResolveThreads(ctx context.Context, ref Ref, commentIDs []int64
 type reviewThread struct {
 	id       string
 	resolved bool
+}
+
+// ThreadResolved reports whether the thread opened by rootID is resolved. A
+// thread this tool cannot find reports false with no error, so a caller that
+// asks before spending a model call errs toward answering.
+func (g *GitHub) ThreadResolved(ctx context.Context, ref Ref, rootID int64) (bool, error) {
+	if err := validateRef(ref); err != nil {
+		return false, err
+	}
+	threads, err := g.reviewThreads(ctx, ref)
+	if err != nil {
+		return false, err
+	}
+	return threads[rootID].resolved, nil
 }
 
 // reviewThreads maps each thread's first comment (by REST id) to the thread.
@@ -1049,6 +1134,11 @@ func (g *GitHub) ThreadComments(ctx context.Context, ref Ref, rootID int64) ([]T
 // exhaust a five-answer cap and refuse the first question anybody asked. The
 // cap bounds how often the reviewer is addressed, and only these comments are.
 const AnswerMarker = "<!-- nitpick:answer -->"
+
+// DismissedMarker is on the reply that closes a finding's thread because the
+// reply under it held. Read back by PriorReview, and honoured only on a
+// comment authenticated as this reviewer, so nobody else can write one.
+const DismissedMarker = "<!-- nitpick:dismissed -->"
 
 // CountAnswers counts the replies the reviewer has posted to mentions on a
 // pull request, conversation comments and inline ones alike.

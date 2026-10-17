@@ -559,6 +559,11 @@ type Report struct {
 	// does not read as a push that introduced none.
 	AlreadyReported []Finding
 
+	// Dismissed lists findings this run produced that a person had already
+	// answered, and the reviewer had accepted the answer by closing the
+	// thread. They are not posted again.
+	Dismissed []Finding
+
 	// ResidualApprove is set when the residual judge allows APPROVE despite
 	// published low-severity findings. reviewEvent reads it; it never calls
 	// the model.
@@ -1092,6 +1097,11 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// After the gate, so what is counted as "already posted" is what would
 	// otherwise have been posted, and nothing below min_severity is.
 	findings, report.AlreadyReported = withholdAlreadyReported(findings, prior)
+	// A finding a person answered and the reviewer accepted is not posted
+	// again. Kept apart from AlreadyReported, which holds recurrences that are
+	// still standing on the pull request and so block an approval: a dismissed
+	// finding has no thread left to stand.
+	findings, report.Dismissed = dropDismissed(findings, prior)
 	// The bound applies to what this run would publish, so a finding an earlier
 	// run already posted must not consume one of the bounded slots. Applied the
 	// other way around, an incremental re-review of a file whose findings did
@@ -1613,6 +1623,26 @@ func short(sha string) string {
 		return sha[:12]
 	}
 	return sha
+}
+
+// dropDismissed removes the findings whose thread was closed by an accepted
+// reply, returning what is left and what was removed.
+func dropDismissed(findings []Finding, prior *vcs.PriorReview) (publish, dismissed []Finding) {
+	if prior == nil || len(prior.Dismissed) == 0 {
+		return findings, nil
+	}
+	answered := make(map[string]bool, len(prior.Dismissed))
+	for _, fp := range prior.Dismissed {
+		answered[fp] = true
+	}
+	for _, f := range findings {
+		if answered[Fingerprint(f)] {
+			dismissed = append(dismissed, f)
+			continue
+		}
+		publish = append(publish, f)
+	}
+	return publish, dismissed
 }
 
 func withholdAlreadyReported(findings []Finding, prior *vcs.PriorReview) (publish, withheld []Finding) {

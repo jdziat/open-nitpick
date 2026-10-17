@@ -51,10 +51,20 @@ type Respond struct {
 	// automation acting as one, in a loop.
 	MaxPerPullRequest int `yaml:"max_per_pull_request"`
 
+	// Replies lets the reviewer read a reply left under one of its own
+	// findings without being mentioned, and resolve the thread when the reply
+	// settles it. Unset means on: a finding that cannot be answered has to be
+	// dismissed by hand, and the same association list and cap that bound a
+	// mention bound a reply.
+	Replies *bool `yaml:"replies"`
+
 	// Fix bounds who may ask for a finding to be APPLIED, which is a write to
 	// the repository rather than an answer in a thread.
 	Fix FixRespond `yaml:"fix"`
 }
+
+// RepliesEnabled reports whether a reply under a finding is read.
+func (r Respond) RepliesEnabled() bool { return r.Replies == nil || *r.Replies }
 
 // FixRespond bounds who may make the reviewer change code.
 //

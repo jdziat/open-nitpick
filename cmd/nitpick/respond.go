@@ -77,8 +77,15 @@ func runRespond(ctx context.Context, args []string) error {
 
 	kind, text, ok := converse.Command(ev.Body, mention)
 	if !ok {
-		log.Info("comment does not address the reviewer; nothing to do", "comment", ev.CommentID)
-		return nil
+		// A reply inside a thread is read without a mention, because the
+		// finding it sits under is the address. Whether that thread is one of
+		// the reviewer's own is settled below, from the forge, before anything
+		// is spent.
+		if !ev.Inline || ev.RootID == ev.CommentID || !cfg.Review.Respond.RepliesEnabled() {
+			log.Info("comment does not address the reviewer; nothing to do", "comment", ev.CommentID)
+			return nil
+		}
+		kind, text = converse.KindReply, ev.Body
 	}
 	ref, err := refForEvent(&f, ev)
 	if err != nil {
@@ -108,7 +115,7 @@ func runRespond(ctx context.Context, args []string) error {
 	// repository. The first parse above is a pre-filter that may over-match
 	// and now cannot over-act, and this costs no forge call, since the policy
 	// is already in hand.
-	if fromFile && policy.Review.Mention != mention {
+	if fromFile && kind != converse.KindReply && policy.Review.Mention != mention {
 		kind, text, ok = converse.Command(ev.Body, policy.Review.Mention)
 		if !ok {
 			log.Info("the comment addresses the mention this change names, not the accepted one; nothing to do",
@@ -148,12 +155,33 @@ func runRespond(ctx context.Context, args []string) error {
 		}
 	}
 
-	log.Info("answering a mention", "kind", kind, "pr", ref.Number, "comment", ev.CommentID, "author", ev.Author)
+	// Before the acknowledgement, for the reason the association check is:
+	// most replies under a finding are people talking to each other, and a
+	// reaction on every one would be the reviewer listening in.
+	var finding *replyTarget
+	if kind == converse.KindReply {
+		if !policy.Review.Respond.RepliesEnabled() {
+			return nil
+		}
+		finding, err = findingBeingAnswered(ctx, gh, ref, ev, log)
+		if err != nil || finding == nil {
+			return err
+		}
+	}
+
+	log.Info("answering a comment", "kind", kind, "pr", ref.Number, "comment", ev.CommentID, "author", ev.Author)
 	if err := gh.React(ctx, ref, ev.CommentID, ev.Inline, "eyes"); err != nil {
 		log.Warn("could not acknowledge the comment", "error", err)
 	}
 
 	switch kind {
+	case converse.KindReply:
+		if err := runReply(ctx, gh, policy, ref, ev, finding, diffBytes, log); err != nil {
+			_ = gh.React(ctx, ref, ev.CommentID, ev.Inline, "confused")
+			return err
+		}
+		return gh.React(ctx, ref, ev.CommentID, ev.Inline, "+1")
+
 	case converse.KindReview, converse.KindRestartReview:
 		reviewArgs := mentionReviewArgs(f, ref, kind)
 		err := runReview(ctx, reviewArgs)

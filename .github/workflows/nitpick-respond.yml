@@ -19,12 +19,24 @@ concurrency:
   # twenty. The trade is real and worth naming, because it is a dropped answer
   # rather than a delayed one: two questions asked seconds apart may leave one
   # unanswered, and the person has to ask again.
-  group: nitpick-respond-${{ github.event.issue.number || github.event.pull_request.number }}
+  #
+  # Replies get a group of their own. They are far more frequent than
+  # mentions, and sharing one would let people talking to each other cancel a
+  # pending question to the reviewer.
+  group: >-
+    nitpick-respond-${{ github.event.issue.number || github.event.pull_request.number }}-${{
+      contains(github.event.comment.body, '@open-nitpick') && 'mention' || 'reply' }}
 
 jobs:
   respond:
     runs-on: ubuntu-latest
     # Three conditions, and the third is the one that matters for money.
+    #
+    # A reply inside an inline thread starts a run too, mentioned or not, so
+    # the reviewer can read an answer to one of its findings. Most replies are
+    # people talking to each other: `nitpick respond` looks at who started
+    # the thread and stops before spending anything when it was not the
+    # reviewer.
     #
     # A comment event runs HERE, in the base repository, with this
     # repository's secrets, whoever wrote the comment. Without the
@@ -38,7 +50,10 @@ jobs:
     # a fork test this workflow does not need. Excluded here so one ask does
     # not start two runs that both try to create the same branch.
     if: >-
-      contains(github.event.comment.body, '@open-nitpick') &&
+      (
+        contains(github.event.comment.body, '@open-nitpick') ||
+        github.event.comment.in_reply_to_id != null
+      ) &&
       !contains(github.event.comment.body, '@open-nitpick fix') &&
       (github.event_name == 'pull_request_review_comment' || github.event.issue.pull_request != null) &&
       contains(

@@ -294,6 +294,12 @@ func TestGitHubPublishReviewFallsBackToSummary(t *testing.T) {
 	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
 		var payload capturedReview
 		_ = json.NewDecoder(r.Body).Decode(&payload)
+		// Every anchor is refused, whether sent with the review or alone.
+		if strings.HasSuffix(r.URL.Path, "/comments") {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			_, _ = io.WriteString(w, `{"message":"line must be part of the diff"}`)
+			return
+		}
 		bodies = append(bodies, payload.Body)
 
 		if len(payload.Comments) > 0 {

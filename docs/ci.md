@@ -60,7 +60,9 @@ on:
 permissions: {contents: read, pull-requests: write, issues: write}
 jobs:
   respond:
-    if: contains(github.event.comment.body, '@open-nitpick')
+    if: >-
+      contains(github.event.comment.body, '@open-nitpick') ||
+      github.event.comment.in_reply_to_id != null
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -85,6 +87,22 @@ comment cannot instruct the model. The comment gets an eyes reaction when
 the run starts and a thumbs-up when it has answered. The handle is
 `review.mention` in `.nitpick.yaml`. This repository's own is
 [.github/workflows/nitpick-respond.yml](https://github.com/jdziat/open-nitpick/blob/main/.github/workflows/nitpick-respond.yml).
+
+### Replying to a finding
+
+Every inline finding ends with an invitation to reply. A reply under it needs
+no mention: the reviewer reads it with the finding, the diff and the lines
+around the thread, and either resolves the thread with a short reason or says
+what would settle it. A reply that only asserts, or that asks it to approve,
+leaves the thread open. A finding it resolved this way is not posted again on
+later pushes; a thread someone resolved by hand can come back if the code still
+shows the problem.
+
+Replies pass through the same gates as a mention: `review.respond.from` and
+`max_per_pull_request`. To start a run on a reply, the workflow's `if:` also
+accepts any comment with `in_reply_to_id`; the run stops before spending
+anything when the thread was not started by the reviewer. `review.respond.replies:
+false` turns this off.
 
 ### Superseded comments
 

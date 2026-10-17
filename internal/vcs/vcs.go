@@ -229,6 +229,12 @@ type PriorReview struct {
 	// tool can recognise as its own.
 	Comments []PriorComment
 
+	// Dismissed lists the fingerprints of findings whose thread this tool closed
+	// because a person's reply held. They are absent from Comments, as any
+	// resolved thread is, and named here so a later run can tell a finding that
+	// was answered from one that was merely resolved by hand.
+	Dismissed []string
+
 	// Spend totals what every earlier run recorded spending on this pull
 	// request, in US dollars. It is a sum rather than the latest value: the
 	// question a pull-request ceiling asks is what the branch has cost so far,

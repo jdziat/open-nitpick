@@ -25,17 +25,6 @@ var severityLabels = map[config.Severity]string{
 	config.SeverityNit:      "⚪ nit",
 }
 
-// label renders a severity for display.
-func label(s config.Severity, emoji bool) string {
-	if !emoji {
-		return string(s)
-	}
-	if l, ok := severityLabels[s]; ok {
-		return l
-	}
-	return string(s)
-}
-
 // Render turns a report into a publishable review.
 func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 	emoji := true
@@ -85,7 +74,7 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 			Path:        f.Path,
 			Line:        f.Line,
 			Side:        side,
-			Body:        renderComment(f, emoji, agentPrompt),
+			Body:        composeComment(f, emoji, agentPrompt, true),
 			Fingerprint: Fingerprint(f),
 			Class:       f.Class,
 		}
@@ -187,46 +176,65 @@ func span(path string, line, end int) string {
 // the reviewer had in front of it for each path's batch, or is nil when no
 // agent prompt was asked for.
 func renderComment(f Finding, emoji bool, read map[string][]string) string {
+	return composeComment(f, emoji, read, false)
+}
+
+// ReplyInvitation is the line under a published finding that tells its reader
+// the thread is a conversation. The reviewer reads a reply under its own
+// comment without being mentioned, so the invitation has to say so.
+const ReplyInvitation = "**Reply to explain or disagree.** I read replies here and resolve the thread if the reason holds."
+
+// composeComment lays a finding out in the order a reader acts on it: how
+// serious and what kind, what is wrong, why, the change that fixes it, and
+// only then who found it. invite adds the reply line, which belongs on an
+// inline comment and not on a finding quoted inside the summary.
+func composeComment(f Finding, emoji bool, read map[string][]string, invite bool) string {
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "**%s", label(f.Sev(), emoji))
+	b.WriteString("**" + severityChip(f.Sev(), emoji) + "**")
 	if f.Category != "" {
-		fmt.Fprintf(&b, " · %s", f.Category)
+		fmt.Fprintf(&b, " &nbsp;·&nbsp; %s", inline(f.Category))
 	}
-	b.WriteString("**\n\n")
+	b.WriteString("\n\n")
 
-	fmt.Fprintf(&b, "%s\n", strings.TrimSpace(f.Title))
+	fmt.Fprintf(&b, "**%s**\n", inline(strings.TrimSpace(f.Title)))
 
 	if r := strings.TrimSpace(f.Rationale); r != "" {
 		fmt.Fprintf(&b, "\n%s\n", r)
 	}
 
-	// Provenance. A reader deciding whether to act on a comment wants to know
-	// whether a deterministic analyzer found it or a model inferred it, those
-	// warrant different levels of trust, and only one of them can be wrong about
-	// whether the code even does what it says.
-	if attribution := attribution(f); attribution != "" {
-		fmt.Fprintf(&b, "\n<sub>%s</sub>\n", attribution)
-	}
-
-	// Stated doubt, on the same footing as the attribution above it and for the
-	// same reason: a reader deciding whether to act wants to know that the
-	// expert check ran and came back undecided, which is otherwise
-	// indistinguishable from the check having agreed.
+	// Stated doubt, kept where it cannot be missed: a reader deciding whether
+	// to act wants to know that the expert check ran and came back undecided,
+	// which is otherwise indistinguishable from the check having agreed.
 	//
 	// Flattened and escaped, because the expert wrote it after reading a diff
-	// the change's author controls. A newline puts what follows at column 0,
-	// outside the <sub> meant to hold it; a `</sub>` closes the element and
-	// whatever follows renders as live HTML in a comment posted under this
-	// tool's name. Same call every other model-authored string here makes.
+	// the change's author controls. A newline would put what follows outside
+	// the alert, and markup would render live in a comment posted under this
+	// tool's name.
 	if u := inline(strings.TrimSpace(f.Unresolved)); u != "" {
 		// The expert's name is set beside the reason on every path that writes
 		// one, so an empty one is a caller that built the finding by hand. It
 		// still must not render "resolved by : ".
 		if by := inline(strings.TrimSpace(f.UnresolvedBy)); by != "" {
-			fmt.Fprintf(&b, "\n<sub>could not be resolved by %s: %s</sub>\n", by, u)
+			fmt.Fprintf(&b, "\n> [!NOTE]\n> Not settled. The %s check could not decide: %s\n", by, u)
 		} else {
-			fmt.Fprintf(&b, "\n<sub>could not be resolved: %s</sub>\n", u)
+			fmt.Fprintf(&b, "\n> [!NOTE]\n> Not settled. A check could not decide: %s\n", u)
+		}
+	}
+
+	// A GitHub suggestion block is one click to apply. Which makes it the most
+	// valuable thing a review bot offers and the most damaging thing it can get
+	// wrong. A suggestion is only rendered as applicable code when it plausibly
+	// IS code for a single line; anything else is shown as an ordinary quote so a
+	// reader can act on it deliberately.
+	if s := strings.TrimRight(f.Suggestion, "\n"); strings.TrimSpace(s) != "" {
+		if f.FixValidated || suggestionIsApplicable(s) {
+			fence := fenceFor(s)
+			fmt.Fprintf(&b, "\n%ssuggestion\n%s\n%s\n", fence, s, fence)
+		} else {
+			b.WriteString("\n**Suggested change**\n\n")
+			fence := fenceFor(s)
+			fmt.Fprintf(&b, "%s\n%s\n%s\n", fence, s, fence)
 		}
 	}
 
@@ -242,37 +250,55 @@ func renderComment(f Finding, emoji bool, read map[string][]string) string {
 	// neither write the field nor name an entry that is not in it. See
 	// TestEvidenceIsOnlyEverCorpusIDs.
 	if len(f.Evidence) > 0 {
-		read := make([]string, 0, len(f.Evidence))
+		ids := make([]string, 0, len(f.Evidence))
 		for _, id := range f.Evidence {
-			read = append(read, "`"+inline(id)+"`")
+			ids = append(ids, "`"+inline(id)+"`")
 		}
-		fmt.Fprintf(&b, "\n<sub>reference read: %s</sub>\n", strings.Join(read, ", "))
+		fmt.Fprintf(&b, "\n<details><summary>Reference read</summary>\n\nreference read: %s\n\n</details>\n", strings.Join(ids, ", "))
 	}
 
-	// A GitHub suggestion block is one click to apply. Which makes it the most
-	// valuable thing a review bot offers and the most damaging thing it can get
-	// wrong. A suggestion is only rendered as applicable code when it plausibly
-	// IS code for a single line; anything else is shown as an ordinary quote so a
-	// reader can act on it deliberately.
-	if s := strings.TrimRight(f.Suggestion, "\n"); strings.TrimSpace(s) != "" {
-		if f.FixValidated || suggestionIsApplicable(s) {
-			fence := fenceFor(s)
-			fmt.Fprintf(&b, "\n%ssuggestion\n%s\n%s\n", fence, s, fence)
-		} else {
-			b.WriteString("\nSuggested change:\n\n")
-			fence := fenceFor(s)
-			fmt.Fprintf(&b, "%s\n%s\n%s\n", fence, s, fence)
-		}
-	}
-
-	// Last, and folded. A finding whose suggestion GitHub can apply in one
-	// click still gets one: the block says where else the finding reaches and
-	// what the reviewer read, which the suggestion does not.
+	// Folded: a coding agent needs it and a person scrolls past it. A finding
+	// whose suggestion GitHub can apply in one click still gets one, since the
+	// block says where else the finding reaches and what the reviewer read.
 	if read != nil {
 		b.WriteString(agentPromptBlock(f, read))
 	}
 
+	// Provenance. A reader deciding whether to act on a comment wants to know
+	// whether a deterministic analyzer found it or a model inferred it, those
+	// warrant different levels of trust, and only one of them can be wrong about
+	// whether the code even does what it says.
+	//
+	//
+	// Two small paragraphs, source first and the invitation under it. Joined
+	// with a line break inside one <sub> they overprint each other, and a rule
+	// above them weighed more than a one-line nit.
+	if footer := attribution(f); footer != "" {
+		fmt.Fprintf(&b, "\n<sub>%s</sub>\n", footer)
+	}
+	if invite {
+		fmt.Fprintf(&b, "\n<sub>💬 %s</sub>\n", ReplyInvitation)
+	}
+
 	return b.String()
+}
+
+// severityChip is the severity as the first word of a comment: capitalised,
+// beside its marker when markers are on.
+func severityChip(s config.Severity, emoji bool) string {
+	name := string(s)
+	if name != "" {
+		name = strings.ToUpper(name[:1]) + name[1:]
+	}
+	if !emoji {
+		return name
+	}
+	if l, ok := severityLabels[s]; ok {
+		if mark, _, ok := strings.Cut(l, " "); ok {
+			return mark + " " + name
+		}
+	}
+	return name
 }
 
 // attribution renders where a finding came from and who triaged it.
@@ -1121,6 +1147,12 @@ func windowedNotes(report *Report) string {
 	return groupByReason(report.Plan.Windowed, "")
 }
 
+// maxPathsPerReason bounds how many paths one skip reason lists before the
+// rest are counted. A change touching go.mod made every whole-module task too
+// big and listed 447 paths, which pushed a review body past GitHub's limit and
+// lost the review's inline comments with it.
+const maxPathsPerReason = 8
+
 // groupByReason renders "- reason: path, path" lines, omitting one reason.
 func groupByReason(skips []bundle.Skip, omit string) string {
 	byReason := map[string][]string{}
@@ -1138,11 +1170,20 @@ func groupByReason(skips []bundle.Skip, omit string) string {
 
 	var b strings.Builder
 	for _, reason := range order {
-		paths := make([]string, len(byReason[reason]))
-		for i, p := range byReason[reason] {
+		all := byReason[reason]
+		shown := all
+		if len(shown) > maxPathsPerReason {
+			shown = shown[:maxPathsPerReason]
+		}
+		paths := make([]string, len(shown))
+		for i, p := range shown {
 			paths[i] = inline(p)
 		}
-		fmt.Fprintf(&b, "- %s: %s\n", inline(reason), strings.Join(paths, ", "))
+		line := strings.Join(paths, ", ")
+		if more := len(all) - len(shown); more > 0 {
+			line += fmt.Sprintf(", and %d more (%d in all)", more, len(all))
+		}
+		fmt.Fprintf(&b, "- %s: %s\n", inline(reason), line)
 	}
 	return b.String()
 }
