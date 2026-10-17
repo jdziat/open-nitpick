@@ -90,8 +90,20 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 		}
 		ranges, _ := task.contextRanges()
 		batch := bundle.Batch{DesignTask: task.ID}
+		// A caller obligation names its callee, and the report rejects a task
+		// that declares one without carrying it. Those files cannot be trimmed;
+		// everything else in the context can.
+		required := map[string]bool{}
+		for _, relation := range task.Interactions {
+			if relation.Callee.Kind == FileTarget {
+				required[relation.Callee.ID] = true
+			}
+		}
+		for _, source := range task.Sources {
+			delete(required, source.ID)
+		}
 		if len(task.Sources) > cfg.Review.MaxFilesPerRequest ||
-			(len(task.Interactions) > 0 && len(task.Sources)+len(task.Context) > cfg.Review.MaxFilesPerRequest) {
+			len(task.Sources)+len(required) > cfg.Review.MaxFilesPerRequest {
 			reason := "complete design task exceeds review.max_files_per_request"
 			task.Omitted = append(task.Omitted, Omission{Target: Target{Kind: UnitTarget, ID: task.ID}, Reason: reason})
 			out.Plan.Skipped = append(out.Plan.Skipped, bundle.Skip{Path: task.Source.ID, Reason: fmt.Sprintf("%s: %s", task.ID, reason)})
@@ -101,6 +113,12 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 			budget := cfg.Review.MaxFilesPerRequest - len(task.Sources)
 			context := slices.Clone(task.Context)
 			slices.SortStableFunc(context, func(a, b Target) int {
+				if required[a.ID] != required[b.ID] {
+					if required[a.ID] {
+						return -1
+					}
+					return 1
+				}
 				aChanged, bChanged := changed[a.ID] != nil, changed[b.ID] != nil
 				if aChanged != bChanged {
 					if aChanged {
