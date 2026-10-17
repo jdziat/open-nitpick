@@ -44,7 +44,7 @@ var Rules = []Rule{
 	{"shouting-emphasis", "capitals used for emphasis in a comment (NOT, WHOLE, MUST)", "the sentence should carry the emphasis; if it cannot, the sentence is the problem"},
 	{"changelog-comment", "a comment narrating what the code used to do or which bug it fixed", "say what the code does now; the history belongs in the commit that changed it"},
 	{"prose-cadence", "a whole file written in one rhythm: appositive tails, colon expansions and three-part lists, above 10 per 100 lines", "vary the sentences. Split the longest into two, and let some of them end where the fact ends"},
-	{"contrast-heading", "a heading or card title that names what it is not (\"Linters as evidence, not noise\")", "title the thing by what it is; the rejected alternative was never on the page"},
+	{"contrast-heading", "a heading or card title that names what it is not (\"Linters as evidence, not noise\"); a candidate, since the pattern cannot tell a slogan from a stated limit", "title the thing by what it is. Keep the contrast when the negated half is a limit the reader would otherwise assume away (\"covers symlinks, not hard links\")"},
 	{"slogan-heading", "a heading that sells instead of naming (written down, done right, made simple, mistakes included)", "name the feature in plain words and put the claim, with its number, in the sentence below"},
 	{"stock-word", "a word generated text reaches for (seamless, robust, leverage, comprehensive, holistic, tapestry, streamline)", "say what the thing does: the specific verb or measurement"},
 	{"summary-opener", "a sentence that announces a summary (In summary, Overall, Ultimately, Simply put)", "delete the opener; the sentence after it is the point"},
