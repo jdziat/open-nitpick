@@ -298,7 +298,7 @@ func TestBuildLeavesOutUnparsedFilesInPackagesItDidNotDraw(t *testing.T) {
 	}
 }
 
-func TestBuildCountsOnlyAmbiguousCallsItDrew(t *testing.T) {
+func TestBuildCountsAmbiguousCallsButClaimsOnlyTheOnesItDrew(t *testing.T) {
 	var b strings.Builder
 	b.WriteString("package p\n\ntype A struct{}\n\nfunc (A) Save() {}\n\ntype B struct{}\n\nfunc (B) Save() {}\n\nfunc Top(a A) {\n")
 	for i := range maxNodes + 5 {
@@ -316,8 +316,9 @@ func TestBuildCountsOnlyAmbiguousCallsItDrew(t *testing.T) {
 	if _, drew := hasCall(d, "p.Top", "ambiguous.Save", Unresolved); drew {
 		t.Skip("the node ceiling did not cut the ambiguous call; the test cannot tell")
 	}
-	if strings.Contains(strings.Join(d.Limits, " "), "match several methods") {
-		t.Fatalf("an ambiguous call that was cut from the diagram was reported as drawn: %v", d.Limits)
+	limits := strings.Join(d.Limits, " ")
+	if !strings.Contains(limits, "match several methods") || !strings.Contains(limits, "0 of them appear") {
+		t.Fatalf("an ambiguous call that was cut from the diagram must be counted but not claimed as drawn: %v", d.Limits)
 	}
 }
 

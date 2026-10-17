@@ -755,7 +755,7 @@ func (g *graph) draw(changed []string) *Diagram {
 // does not appear.
 func (g *graph) limits(drawn []string, edges map[edge]edgeInfo) []string {
 	var generated, reflecting, middleware []string
-	ambiguous := 0
+	ambiguous, shown := 0, 0
 	dirs := map[string]bool{}
 	for _, key := range drawn {
 		fn := g.funcs[key]
@@ -773,14 +773,15 @@ func (g *graph) limits(drawn []string, edges map[edge]edgeInfo) []string {
 		}
 		dirs[fn.dir] = true
 		for name := range fn.ambiguous {
+			ambiguous++
 			if _, drawn := edges[edge{key, "amb:" + name}]; drawn {
-				ambiguous++
+				shown++
 			}
 		}
 	}
 	var out []string
 	if ambiguous > 0 {
-		out = append(out, fmt.Sprintf("%d method call(s) match several methods by name and are drawn as ambiguous, not guessed.", ambiguous))
+		out = append(out, fmt.Sprintf("%d method call(s) in the drawn functions match several methods by name and are not guessed; %d of them appear as ambiguous boxes, and the rest sit outside the drawing.", ambiguous, shown))
 	}
 	if len(reflecting) > 0 {
 		out = append(out, "Files that import reflect or plugin can call functions this graph cannot see: "+listSome(reflecting)+".")
