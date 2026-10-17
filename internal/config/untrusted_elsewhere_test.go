@@ -117,3 +117,27 @@ func TestASemgrepRegistryReferenceHasAShape(t *testing.T) {
 		}
 	}
 }
+
+// docs/trust-model.md says a merge-keyed analyzer path is validated like any
+// other because the check runs on the decoded config, not the document. That
+// sentence was an argument; this makes it a measurement. Each path reaches its
+// field through a YAML merge key and must still be refused when relative.
+func TestAMergedAnalyzerPathIsValidatedLikeAWrittenOne(t *testing.T) {
+	for _, key := range []string{"golangci_config", "ruff_config", "eslint_config", "semgrep_config"} {
+		t.Run(key, func(t *testing.T) {
+			doc := "models:\n  default: {provider: openai, model: gpt-4o}\n" +
+				"x_paths: &paths\n  " + key + ": ./in-repo.yml\n" +
+				"linters:\n  <<: *paths\n"
+			t.Setenv(EnvIgnoreUnknownKeys, "1")
+			root := writeConfig(t, doc)
+
+			cfg, err := Load(root)
+			if err == nil {
+				t.Fatalf("loaded a merge-keyed relative %s: %+v", key, cfg.Linters)
+			}
+			if !strings.Contains(err.Error(), "absolute path") {
+				t.Errorf("refused, but not for the path:\n%v", err)
+			}
+		})
+	}
+}
