@@ -72,3 +72,21 @@ func TestBuildRolesContextCancelsCredentialCommands(t *testing.T) {
 		t.Fatalf("error = %v, want cancellation", err)
 	}
 }
+
+func TestBuildRolesContextKeepsCancellationForDeferredRoutes(t *testing.T) {
+	clearModelEnv(t)
+	t.Setenv(envOpenRouterAPIKey, "test-key")
+	cfg := &config.Config{Models: config.Models{Default: config.ModelSpec{Provider: ProviderOpenRouter, Model: "test"}}}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	roles, err := BuildRolesContext(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	deferred := config.ModelSpec{Provider: ProviderOpenRouter, Model: "route", CredentialCommand: printer(t, "route-key", "", 0)}
+	client, err := roles.Build(deferred)
+	if !errors.Is(err, context.Canceled) || client != nil {
+		t.Fatalf("cancelled route returned client=%v err=%v", client, err)
+	}
+}

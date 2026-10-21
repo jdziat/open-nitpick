@@ -191,6 +191,9 @@ func TestMCPReviewStopsAnOutstandingModelRequest(t *testing.T) {
 				if !errors.Is(err, want) {
 					t.Fatalf("error = %v, want %v", err, want)
 				}
+				if callerCancel && strings.Contains(err.Error(), "increase timeout_seconds") {
+					t.Fatalf("cancellation suggested increasing deadline: %v", err)
+				}
 			case <-time.After(5 * time.Second):
 				t.Fatal("review did not stop")
 			}
@@ -200,5 +203,44 @@ func TestMCPReviewStopsAnOutstandingModelRequest(t *testing.T) {
 				t.Fatal("model request was not cancelled")
 			}
 		})
+	}
+}
+
+func TestMCPProgressDoesNotBlockReviewOnSlowClients(t *testing.T) {
+	parent, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	started := make(chan struct{})
+	var once sync.Once
+	notify := func(ctx context.Context, _ float64, _ string) error {
+		once.Do(func() { close(started) })
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	_, log, finish := startMCPProgress(parent, slog.New(slog.NewTextHandler(io.Discard, nil)), 5*time.Second, time.Millisecond, notify)
+	defer finish()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("progress writer did not start")
+	}
+	logged := make(chan struct{})
+	go func() {
+		defer close(logged)
+		for i := range 1000 {
+			log.Info("reviewing batch", "batch", i)
+		}
+	}()
+	select {
+	case <-logged:
+	case <-time.After(time.Second):
+		t.Fatal("slow client blocked review logging")
+	}
+	cancel()
+	finished := make(chan struct{})
+	go func() { finish(); close(finished) }()
+	select {
+	case <-finished:
+	case <-time.After(time.Second):
+		t.Fatal("cancelled progress writer did not stop")
 	}
 }

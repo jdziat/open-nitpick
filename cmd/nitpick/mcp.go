@@ -258,8 +258,11 @@ func (t *mcpTools) review(ctx context.Context, req *mcp.CallToolRequest, in Revi
 		return nil, ReviewOut{}, err
 	}
 	report, err := engine.Review(ctx, ref)
-	if ctx.Err() != nil {
-		return nil, ReviewOut{}, fmt.Errorf("review stopped: %w; total deadline %s, inspect server logs or increase timeout_seconds", ctx.Err(), limit)
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return nil, ReviewOut{}, fmt.Errorf("review cancelled by caller: %w", ctx.Err())
+	}
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return nil, ReviewOut{}, fmt.Errorf("review exceeded total deadline %s: %w; inspect server logs or increase timeout_seconds", limit, ctx.Err())
 	}
 	if err != nil && (!errors.Is(err, review.ErrPublish) || report == nil) {
 		return nil, ReviewOut{}, err
