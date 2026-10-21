@@ -233,6 +233,13 @@ func modelCheckResults(checks []practices.Check, report *review.Report) []practi
 			checks[i].Decisions = append(checks[i].Decisions, practices.Decision{Finding: practiceModelFinding(decision.Finding), Expert: decision.Expert, Reason: decision.Reason})
 		}
 		if report.Plan != nil {
+			if checks[i].ID == "slop" {
+				for _, target := range slopSupportingEvidence(report) {
+					if !slices.Contains(checks[i].Examined, target) && !slices.Contains(checks[i].Context, target) {
+						checks[i].Context = append(checks[i].Context, target)
+					}
+				}
+			}
 			for _, name := range report.Plan.RelatedFiles {
 				target := practices.Target{Kind: practices.FileTarget, ID: name}
 				if !slices.Contains(checks[i].Context, target) {
@@ -269,6 +276,55 @@ func modelCheckResults(checks []practices.Check, report *review.Report) []practi
 		}
 	}
 	return checks
+}
+
+// slopSupportingEvidence binds findings to the exact source supplied in successful calls.
+func slopSupportingEvidence(report *review.Report) []practices.Target {
+	valid := map[string]bool{}
+	findings := append(slices.Clone(report.Findings), report.AlreadyReported...)
+	for _, decision := range report.Overruled {
+		findings = append(findings, decision.Finding)
+	}
+	for _, finding := range findings {
+		if finding.FromAnalyzer || finding.Class != string(config.ClassSlop) {
+			continue
+		}
+		covered := false
+		for _, batch := range report.Plan.Batches {
+			if report.DesignExecution != nil && !batch.DesignAssessed(report.AssessedDesignTasks) {
+				continue
+			}
+			for _, entry := range batch.Entries {
+				if entry.File.Path != finding.Path || entry.Truncated {
+					continue
+				}
+				if entry.HasContent() && !slices.Contains(report.Incomplete, finding.Path) {
+					covered = true
+				}
+				for _, span := range entry.SourceSpans {
+					if finding.Line >= span.Start && finding.Line <= span.End {
+						covered = true
+					}
+				}
+			}
+		}
+		if previous, seen := valid[finding.Path]; seen {
+			covered = covered && previous
+		}
+		valid[finding.Path] = covered
+	}
+	var paths []string
+	for path, covered := range valid {
+		if covered {
+			paths = append(paths, path)
+		}
+	}
+	slices.Sort(paths)
+	var evidence []practices.Target
+	for _, path := range paths {
+		evidence = append(evidence, practices.Target{Kind: practices.FileTarget, ID: path})
+	}
+	return evidence
 }
 
 func practiceModelFinding(finding review.Finding) practices.Finding {

@@ -771,3 +771,56 @@ func TestEngineeringReviewPolicySurvivesNilSourceAndLoaded(t *testing.T) {
 		t.Fatalf("got cfg=%v modified=%v err=%v, want nil/false/nil", cfg, modified, err)
 	}
 }
+
+func TestSlopFindingsRetainOnlyAssessedSupportingSourceEvidence(t *testing.T) {
+	for _, scenario := range []struct {
+		name      string
+		assessed  bool
+		lines     []int
+		valid     bool
+		decision  bool
+		truncated bool
+	}{
+		{name: "assessed excerpt", assessed: true, lines: []int{3}, valid: true},
+		{name: "assessed decision", assessed: true, lines: []int{3}, valid: true, decision: true},
+		{name: "unassessed excerpt", lines: []int{3}},
+		{name: "outside excerpt", assessed: true, lines: []int{7}},
+		{name: "mixed supported and unsupported lines", assessed: true, lines: []int{3, 7}},
+		{name: "truncated excerpt", assessed: true, lines: []int{3}, truncated: true},
+		{name: "no findings", assessed: true, valid: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			changed := practices.Target{Kind: practices.FileTarget, ID: "app.go"}
+			report := &review.Report{
+				DesignExecution:     &review.DesignExecution{},
+				AssessedDesignTasks: []string{"slop"},
+				Plan: &bundle.Plan{Batches: []bundle.Batch{
+					{DesignTask: "slop", Entries: []bundle.Entry{{File: &diff.File{Path: "app.go"}, Content: "package app\n"}}},
+					{DesignTask: "focus", Entries: []bundle.Entry{{SourceOnly: true, File: &diff.File{Path: "helper.go"}, Content: "func helper() {}", SourceSpans: []bundle.SourceSpan{{Start: 2, End: 4}}}}},
+				}},
+			}
+			report.Plan.Batches[1].Entries[0].Truncated = scenario.truncated
+			if scenario.assessed {
+				report.AssessedDesignTasks = append(report.AssessedDesignTasks, "focus")
+			}
+			for _, line := range scenario.lines {
+				report.Findings = append(report.Findings, review.Finding{Path: "helper.go", Line: line, Class: string(config.ClassSlop), Title: "supporting-source finding"})
+			}
+			if scenario.decision {
+				for _, finding := range report.Findings {
+					report.Overruled = append(report.Overruled, review.Overruled{Finding: finding, Expert: "maintainer", Reason: "intentional"})
+				}
+				report.Findings = nil
+			}
+			checks := modelCheckResults([]practices.Check{{ID: "slop", Version: "1", Instrument: practices.Model, Planned: []practices.Target{changed}}}, report)
+			evidence := slices.Contains(checks[0].Context, practices.Target{Kind: practices.FileTarget, ID: "helper.go"})
+			if evidence != (scenario.valid && len(scenario.lines) > 0) {
+				t.Fatalf("unexpected evidence: %+v", checks[0].Context)
+			}
+			r := practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: "head", PolicySource: "operator", PolicyDigest: "digest", Checks: checks}
+			if problems := r.Problems(); (len(problems) == 0) != scenario.valid {
+				t.Fatalf("problems=%v, valid=%v", problems, scenario.valid)
+			}
+		})
+	}
+}
