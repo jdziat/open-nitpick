@@ -321,25 +321,31 @@ func (r *Roles) Validator() *Client {
 // front means a misconfigured triage or validation model fails immediately
 // rather than after the expensive review calls have already been paid for.
 func BuildRoles(cfg *config.Config) (*Roles, error) {
-	review, err := Build(cfg.Models.ResolveModel(config.RoleReview))
+	return BuildRolesContext(context.Background(), cfg)
+}
+
+// BuildRolesContext bounds credential resolution for every role by ctx.
+func BuildRolesContext(ctx context.Context, cfg *config.Config) (*Roles, error) {
+	build := func(spec config.ModelSpec) (*Client, error) { return BuildContext(ctx, spec) }
+	review, err := build(cfg.Models.ResolveModel(config.RoleReview))
 	if err != nil {
 		return nil, fmt.Errorf("review model: %w", err)
 	}
 
-	triage, err := Build(cfg.Models.ResolveModel(config.RoleTriage))
+	triage, err := build(cfg.Models.ResolveModel(config.RoleTriage))
 	if err != nil {
 		return nil, fmt.Errorf("triage model: %w", err)
 	}
 
-	validate, err := Build(cfg.Models.ResolveModel(config.RoleValidate))
+	validate, err := build(cfg.Models.ResolveModel(config.RoleValidate))
 	if err != nil {
 		return nil, fmt.Errorf("validation model: %w", err)
 	}
 
-	roles := &Roles{Review: review, Triage: triage, Validate: validate, Build: Build}
+	roles := &Roles{Review: review, Triage: triage, Validate: validate, Build: build}
 
 	if spec, ok := cfg.Models.ResolveRouter(); ok && cfg.Models.NeedsRouter() {
-		if roles.Router, err = Build(spec); err != nil {
+		if roles.Router, err = build(spec); err != nil {
 			return nil, fmt.Errorf("router model: %w", err)
 		}
 	}

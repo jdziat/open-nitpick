@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -184,12 +185,13 @@ type TreeOut struct {
 
 // ReviewIn selects the change.
 type ReviewIn struct {
-	Repo        string `json:"repo,omitempty" jsonschema:"repository root; the server's default when omitted"`
-	Base        string `json:"base,omitempty" jsonschema:"base revision; omitted reviews the uncommitted working tree"`
-	Head        string `json:"head,omitempty" jsonschema:"head revision; omitted is the working tree"`
-	Instruction string `json:"instruction,omitempty" jsonschema:"an extra instruction for this review only"`
-	FailOn      string `json:"fail_on,omitempty" jsonschema:"override review.fail_on: nit, info, warning, error, critical or none"`
-	NoLinters   bool   `json:"no_linters,omitempty" jsonschema:"skip the deterministic analyzers"`
+	Repo           string `json:"repo,omitempty" jsonschema:"repository root; the server's default when omitted"`
+	Base           string `json:"base,omitempty" jsonschema:"base revision; omitted reviews the uncommitted working tree"`
+	Head           string `json:"head,omitempty" jsonschema:"head revision; omitted is the working tree"`
+	Instruction    string `json:"instruction,omitempty" jsonschema:"an extra instruction for this review only"`
+	FailOn         string `json:"fail_on,omitempty" jsonschema:"override review.fail_on: nit, info, warning, error, critical or none"`
+	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"total review deadline in seconds; 0 uses 1800 (30 minutes)"`
+	NoLinters      bool   `json:"no_linters,omitempty" jsonschema:"skip the deterministic analyzers"`
 }
 
 // TreeIn selects the tree.
@@ -224,7 +226,16 @@ func (t *mcpTools) repoFor(repo string) string {
 	return filepath.Join(t.root, repo)
 }
 
-func (t *mcpTools) review(ctx context.Context, _ *mcp.CallToolRequest, in ReviewIn) (*mcp.CallToolResult, ReviewOut, error) {
+func (t *mcpTools) review(ctx context.Context, req *mcp.CallToolRequest, in ReviewIn) (*mcp.CallToolResult, ReviewOut, error) {
+	if in.TimeoutSeconds < 0 || in.TimeoutSeconds > 86400 {
+		return nil, ReviewOut{}, fmt.Errorf("timeout_seconds must be between 0 and 86400")
+	}
+	limit := time.Duration(in.TimeoutSeconds) * time.Second
+	if limit == 0 {
+		limit = 30 * time.Minute
+	}
+	ctx, log, finish := startMCPReview(ctx, req, t.log, limit, 30*time.Second)
+	defer finish()
 	f := &reviewFlags{repo: t.repoFor(in.Repo), base: in.Base, head: in.Head, instruction: in.Instruction, noLinters: in.NoLinters, failOn: in.FailOn}
 	if f.failOn != "" && !config.Severity(f.failOn).Valid() {
 		return nil, ReviewOut{}, fmt.Errorf("invalid fail_on %q", f.failOn)
@@ -242,11 +253,14 @@ func (t *mcpTools) review(ctx context.Context, _ *mcp.CallToolRequest, in Review
 	}
 	provider := vcs.NewLocal(repo, io.Discard)
 	ref := vcs.Ref{Base: f.base, Head: f.head}
-	engine, err := newEngine(ctx, f, repo, cfg, provider, ref, t.log)
+	engine, err := newEngine(ctx, f, repo, cfg, provider, ref, log)
 	if err != nil {
 		return nil, ReviewOut{}, err
 	}
 	report, err := engine.Review(ctx, ref)
+	if ctx.Err() != nil {
+		return nil, ReviewOut{}, fmt.Errorf("review stopped: %w; total deadline %s, inspect server logs or increase timeout_seconds", ctx.Err(), limit)
+	}
 	if err != nil && (!errors.Is(err, review.ErrPublish) || report == nil) {
 		return nil, ReviewOut{}, err
 	}

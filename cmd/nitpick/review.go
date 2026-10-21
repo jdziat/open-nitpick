@@ -338,7 +338,7 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 	// because a review without them means something other than a review.
 	engine := review.NewEngine(cfg, provider,
 		&config.BasePolicy{RepoRoot: repo, Loaded: cfg, Provider: provider},
-		llm.BuildRoles,
+		func(policy *config.Config) (*llm.Roles, error) { return llm.BuildRolesContext(ctx, policy) },
 		log)
 	var usage engineeringUsage
 	buildModels := engine.Models

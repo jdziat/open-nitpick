@@ -47,6 +47,15 @@ each model request, and a review can make several requests. Increase the client
 timeout for longer reviews, or run `nitpick review -dry-run` in a tracked local
 process to avoid the MCP wait limit.
 
+A `review` call has a total server deadline of 30 minutes. Set
+`timeout_seconds` to 1–86400 to change it (0 uses the default), and keep the
+client timeout longer than that deadline. Clients that supply an MCP progress
+token receive stage messages and a heartbeat every 30 seconds, including elapsed
+time. A heartbeat says the request is still pending; it does not prove model
+progress. Clients without a progress token still receive the result or error.
+Cancellation and the total deadline propagate to model requests and credential
+commands. A deadline error is a failed review, not a clean result.
+
 ## Tools and returned data
 
 The server exposes `review`, `full_review`, `repo_score`, `code_smell`,
