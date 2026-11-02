@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/alecthomas/chroma/v2 v2.27.0
-	github.com/bmatcuk/doublestar/v4 v4.10.3
+	github.com/bmatcuk/doublestar/v4 v4.10.4
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
 	github.com/google/go-github/v74 v74.0.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
