@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.1](https://github.com/jdziat/open-nitpick/compare/v2.6.0...v2.6.1) (2026-11-11)
+
+
+### Documentation
+
+* replace slogans, arrows and dashes with plain statements ([#208](https://github.com/jdziat/open-nitpick/issues/208)) ([0607ee5](https://github.com/jdziat/open-nitpick/commit/0607ee5f6d80c2720fc4656cdc10eb12770989ea))
+
 ## [2.6.0](https://github.com/jdziat/open-nitpick/compare/v2.5.0...v2.6.0) (2026-10-21)
 
 
