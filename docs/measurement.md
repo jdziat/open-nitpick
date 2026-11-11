@@ -2,9 +2,8 @@
 
 What has to hold before a number out of `internal/evals` is worth acting on.
 
-These are not style preferences. Every rule below was written because the runner
-produced a confident wrong number and something downstream believed it. The
-provenance is in [Findings](findings.md); this file is the checklist.
+The checklist a number from `internal/evals` passes before it is published.
+[Findings](findings.md) records the failure each rule came from.
 
 ## The two kinds of column, and why it matters
 

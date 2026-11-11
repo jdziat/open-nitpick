@@ -196,8 +196,7 @@ does a timeout, a refused credential or a cancelled context, since a second
 model fails those the same way and spends a second budget doing it.
 
 Retrying the same model is the wrong move for the first of those. Runaway
-generation is the model looping on the input, and the endpoint has not truncated
-early, so the same weights on another host reproduce it. Shrinking
+generation is the model looping on the input. The endpoint is not truncating it early, so the same weights on another host reproduce it. Shrinking
 `token_budget_per_request` is not the lever either: a batch that looped at
 37,118 tokens was under a 40,000 budget and far under a 262,144 context.
 
@@ -559,7 +558,7 @@ pre-registered in [Evaluating retrieved knowledge](knowledge-evaluation.md).
 
 It ships off. On its own corpus it took recall from 0.75 to 1.00 with noise
 falling from 0.50 to 0.33 per review
-([Findings](findings.md#retrieved-knowledge-and-a-pre-registration-i-got-wrong-2026-09-08)),
+([Findings](findings.md#retrieved-knowledge-and-a-pre-registered-threshold-the-corpus-could-not-meet-2026-09-08)),
 and that corpus is twelve fixtures written by the same author as the entries
 they retrieve, so it measures retrieval working rather than the corpus covering
 what a repository has.

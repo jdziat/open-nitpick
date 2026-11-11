@@ -345,7 +345,7 @@ much each would remove. The tells need no model and run first.
 | `slogan-heading` | a heading that sells: "written down", "done right" |
 | `stock-word` | `seamless`, `robust`, `leverage`, `comprehensive` |
 | `summary-opener` | a sentence opened with "Overall," or "In summary," |
-| `not-just-but` | "not just X but Y" | <!-- copy-scan:ignore -->
+| `not-just-but` | a contrast with something nobody claimed |
 
 Prose files are scanned whole. Source files are scanned in their comments only,
 so a string literal is never a tell. Then,

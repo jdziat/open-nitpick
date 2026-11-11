@@ -25,7 +25,7 @@ const EnvTrustConfigEndpoints = "NITPICK_TRUST_CONFIG_ENDPOINTS"
 // not have, recording them instead of refusing to start.
 //
 // Off by default: a key from a newer nitpick and a typo are the same bytes
-// from in here. See docs/configuration.md, "A key this nitpick does not have".
+// from in here. See docs/configuration.md, "Keys this version does not recognise".
 const EnvIgnoreUnknownKeys = "NITPICK_IGNORE_UNKNOWN_KEYS"
 
 // The settings pruneUntrusted deletes, base_url, api_key_env, extra and

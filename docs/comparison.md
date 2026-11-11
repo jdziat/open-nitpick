@@ -385,7 +385,7 @@ after column is two runs each with related context on. Recall is over the
 
 Per corpus, related context on, two runs each:
 
-| corpus | glm before to base rules only to with GLM note | qwen before to base rules only to with Qwen note | sonnet before to after |
+| corpus | glm: before, base rules only, with GLM note | qwen: before, base rules only, with Qwen note | sonnet: before, after |
 |---|---|---|---|
 | tuning | 0.81/0.31 to 0.78/0.25 to 0.77/0.23 | 0.69/0.19 to 0.72/0.00 to 0.81/0.03 | 0.81/0.25 to 0.88/0.16 |
 | multi-file | 0.92/0.64 to 0.96/0.19 to 1.00/0.30 | 1.00/0.07 to 0.92/0.07 to 0.96/0.07 | 1.00/0.43 to 1.00/0.18 |

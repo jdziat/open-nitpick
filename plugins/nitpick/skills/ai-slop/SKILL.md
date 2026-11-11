@@ -31,13 +31,13 @@ finding names one of these:
 6. Generic naming (`data`, `result`, `helper`, `utils2`) where the file's
    own vocabulary has a specific word.
 7. A tautological condition or a guard that guards nothing.
-8. Chat prose in a comment ("Sure! Here's", "Note that this function <!-- copy-scan:ignore -->
+8. Chat prose in a comment ("Sure, here's", "Note that this function
    will").
 9. A test that asserts nothing, or asserts what it set up.
 10. A heading or card title that sells instead of naming ("Linters as
     evidence, not noise").
 11. Marketing words where a fact, number or command would do (`seamless`,
-    `robust`, "not just X but Y", "Overall,"). <!-- copy-scan:ignore -->
+    `robust`, a contrast with something nobody claimed, "Overall,").
 12. A blurb that retells the page it links to.
 
 The controls matter: a doc comment that adds a reason, a guard the

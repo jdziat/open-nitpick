@@ -68,8 +68,8 @@ golangci-lint, ruff, eslint, semgrep and more. Their output is evidence for the 
 </div>
 
 <div class="np-card" markdown>
-<p class="np-card-title">How we measure, and what the controls are</p>
-Detection is counted against planted defects, not scored by a model. Tuning fixtures are kept apart from a held-out set, and reviewers nobody would ship (silence, one comment per line, every comment critical) are scored to check that no published metric rewards them. Fifteen rules govern what may be published, and twenty bugs found in the measuring code are tabled. [Measurement](docs/measurement.md) and [Findings](docs/findings.md)
+<p class="np-card-title">Measured against planted defects</p>
+Detection is counted against defects planted in fixtures, with no model judging it. Tuning fixtures and a held-out set are kept separate. Each model-free metric is run against reviewers nobody would ship (silence, one comment per line, every comment critical), and a metric one of them scores as well as a correct reviewer is printed only beside the column that exposes it. [Measurement](docs/measurement.md) and [Findings](docs/findings.md)
 </div>
 
 </div>

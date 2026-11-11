@@ -4,8 +4,8 @@ What has been measured, and what it does and does not support.
 
 Numbers here are dated and provisional. Read
 [Measurement](measurement.md) first: several of the results below were
-produced by an instrument that was itself wrong, and the corrections matter more
-than the original figures.
+produced by an instrument with known bugs, listed under
+[What the instrument got wrong](#what-the-instrument-got-wrong).
 
 ## The headline
 
@@ -65,9 +65,8 @@ from the tree. Our own side is a live measurement and does not.
 
 Twenty measurement bugs have been found, listed below. Six of them scored
 against Incumbent and seven flattered whichever behaviour this project would
-rather see (silence, selective reporting, or the author's own argument), which
-is why this section exists at all: none were bugs in open-nitpick, and every one
-would have produced a confident wrong number.
+rather see (silence, selective reporting, or the author's own argument), none
+were bugs in open-nitpick.
 
 The count is the number of rows in the table, so it moves when the table does.
 It said "nine" against fourteen rows for two rounds, which is the same failure
@@ -1585,7 +1584,7 @@ the walkthrough is now counted from the report instead; see
 Rule 15 applies. One model, one run, six fixtures, and the headline number is
 a proxy the section above says cannot separate paraphrase from invention.
 
-## Retrieved knowledge, and a pre-registration I got wrong (2026-09-08)
+## Retrieved knowledge, and a pre-registered threshold the corpus could not meet (2026-09-08)
 
 The knowledge corpus is twelve fixtures under Rule 15: six plants whose defect
 needs one specific fact, each paired with a control whose code attracts the same
@@ -1620,7 +1619,7 @@ reference material beside a diff is a standing invitation to report the
 reference, and the section's heading says three times over that none of it was
 written about the change under review.
 
-### The pre-registration does not fit the corpus, and that is my error
+### The pre-registered threshold assumed 12 plants; the corpus has 6
 
 The plan fixed the threshold before the corpus existed, at *"at least 3 of 12
 plants"*. The corpus as built has **six** plants and six controls, so the
@@ -2074,7 +2073,7 @@ red.
 One thing worth recording as a cost rather than a feature. Reading a whole tree
 to measure it is affordable over a clone and is thousands of requests over an
 API, so this needs the checkout the Action always has. A reviewer running
-against a forge with no clone gets a skip and a reason, which is accurate and is
+against a forge with no clone gets a skip and a reason, which says what happened and is
 also less than the feature promises.
 
 ### The analyzers become the instrument (2026-09-10)
@@ -2568,7 +2567,7 @@ no-ctx is already perfect and silent on deep; extreme adds noise without
 recall. Call: keep shipped depth at deep; do not promote extreme.
 
 
-## Review wall clock: reasoning effort, not batch size (2026-10-04)
+## Review wall clock by reasoning effort and batch size (2026-10-04)
 
 Issue #161 asked why a 2-file change took 14 to 35 minutes. Most of the time was
 the model thinking. glm-5.3-flash reasons by default, and OpenRouter rejects

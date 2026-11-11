@@ -40,7 +40,7 @@ as a diff and a committable suggestion.
 
 ## Workstreams, in the order to do them
 
-### 0. Stop the benchmark lying to both reviewers
+### 0. Remove fixture tells from the benchmark pull requests
 
 **Answers:** rust-crate-for-one-call, sorted-for-min-nit, and an unknown
 share of every other result, on both sides. Incumbent's retry comment
@@ -188,7 +188,7 @@ one (98% agreement on "is this claim true").
 **Pass.** Fixes are correct in ≥ 90% of judged cases; a fix is never
 rendered as committable when validation fails. Effort: three days.
 
-### 5. Anchor tolerance is a scoring question, not a reviewer one
+### 5. Report findings located outside the anchor tolerance
 
 **Answers:** nothing of ours; Incumbent was scored 2 of 3 on multi-defect
 for anchoring the descriptor leak at the `return` rather than the
@@ -313,7 +313,7 @@ now says the reviewer is capable (sonnet 11–13 of 20) and these four
 particular plants stay hard: two runs of the tuning corpus since the change
 located `go-package-singleton` once.
 
-**The noise is mostly the analyzers, and the analyzers report it accurately.** Of the twelve
+**The noise is mostly the analyzers, and the analyzers publish it through `min_severity: nit`.** Of the twelve
 extra noise findings, nine are analyzer output that `min_severity: nit`
 publishes: biome's "template literals are preferred" on three TypeScript
 lines, sqlfluff's capitalisation rule and an "unparsable SQL" on a valid

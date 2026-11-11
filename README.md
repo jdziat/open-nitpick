@@ -105,21 +105,17 @@ For OpenRouter, an OpenAI-compatible endpoint or a local model, see
 This project makes empirical claims about review quality. These pages say how the numbers are produced.
 
 - [Measurement](docs/measurement.md): the fifteen rules a number from the
-  benchmark code has to satisfy before it is worth acting on. Each rule was
-  written after that code produced a confident wrong number that something
-  believed.
+  benchmark code has to satisfy before it is published, including separate
+  tuning and held-out fixtures and a check against reviewers nobody would ship.
+  The LLM judge runs at temperature 0 and still scores byte-identical input
+  anywhere from 3.66 to 3.98, so prefer the judge-free columns.
 - [Against Incumbent](docs/comparison.md): capabilities and measured results
   by language, with what each iteration changed.
 - [Remediation](docs/remediation.md): every miss on the benchmark
   repository, its cause read from the pull request, and the plan.
 - [Findings](docs/findings.md): every measurement taken and what it
-  supports. It also tables the measurement bugs found so far. Some of those bugs
-  flattered one side of a comparison, and one put a claim on this page that had
-  to be retracted.
-
-
-Prefer the judge-free columns. The LLM judge runs at temperature 0 and still
-scores byte-identical input anywhere from 3.66 to 3.98.
+  supports, with a table of the measurement bugs found so far and which
+  reviewer each one favoured or counted against.
 
 ## Status
 
