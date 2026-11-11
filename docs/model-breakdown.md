@@ -286,9 +286,9 @@ deepseek's 1.00 recall was one-run luck; the 2-run figure is 0.90, still
 the recall leader. The context collapse is confirmed: +ctx drops recall
 from 0.90 to 0.77 and doubles noise. Turn related context off for deepseek.
 
-laguna-s-2.1 stabilizes at 0.87 recall and 0.09 noise per review — the
+laguna-s-2.1 stabilizes at 0.87 recall and 0.09 noise per review: the
 cleanest noise floor of any model ever run on this corpus. Context helps
-slightly (0.87 → 0.83) but the no-ctx arm is already strong enough to use
+slightly (0.87 to 0.83) but the no-ctx arm is already strong enough to use
 without it.
 
 qwen3.8-flash holds its 0.87 recall but confirms the noise penalty: 0.75
@@ -317,7 +317,7 @@ recall cost.
 
 ## Why +ctx hurts recall: what the data actually shows
 
-The +ctx recall drops are not harness failures or context-length truncation.
+The +ctx recall drops are not runner failures or context-length truncation.
 Every "silent" +ctx record has silent=True in the dump, meaning the model
 returned {"findings":[]} -- a deliberate empty response, not an error. The
 fixtures are tiny (under 500 tokens of content); no model is hitting a budget

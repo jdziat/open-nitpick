@@ -34,7 +34,7 @@ because it could not be run here.
 | Learnings from human feedback | yes | no |
 | Multi-line committable suggestions | yes | yes, up to 40 lines within one hunk, and only when the lines it would replace match the diff; a range that fails either check is published as a described change rather than a wrong one-click apply |
 | Sequence diagrams, docstring generation, issue creation | yes | no |
-| Measurement | vendor benchmark | a corpus, a judge-free harness, and a findings document that records its own mistakes |
+| Measurement | vendor benchmark | a corpus, a judge-free runner, and a findings document that records its own mistakes |
 
 ## Measured
 
@@ -129,7 +129,7 @@ The corpora were materialised into a private repository
 all) and reviewed by the shipped GitHub Action (release install, incremental
 review, the job summary, the lot) with `anthropic/claude-sonnet-4.6`, related
 context on, and `min_severity: nit`. `cmd/benchrepo score` reads the posted
-review comments back and scores them with the harness's own scorer.
+review comments back and scores them with the runner's own scorer.
 
 | | |
 |---|---|
@@ -145,7 +145,7 @@ sorted-for-min-nit), cross-file-sort-nit, and retry-no-backoff, where the one
 noise finding landed. Every `critical`, `error` and `warning` plant in the
 three corpora was located on the real pull request.
 
-This is the number a user of the Action gets, not a harness number: it went
+This is the number a user of the Action gets, not a runner number: it went
 through GitHub's diff, the review API, the comment cap, and the fingerprint
 markers. It is also a single run, on fixtures this project wrote, against no
 incumbent: the private repository is where Incumbent's hosted app can be
@@ -158,7 +158,7 @@ the same 44 pull requests as they opened. This is the comparison the CLI
 cache could not give: the hosted product, with the repository to index, its
 own analyzers, and no free-allowance caveat. Both reviewers saw identical
 diffs at identical times. `cmd/benchrepo score` scores each reviewer's
-inline comments with the harness's scorer; a review with no inline comment
+inline comments with the runner's scorer; a review with no inline comment
 counts as located nothing, which is what it is.
 
 | language | open-nitpick | Incumbent (hosted) |
@@ -551,7 +551,7 @@ configuration measured, above sonnet.
 
 **The two composite `$/review` cells were re-measured on 2026-09-07.** The
 figures this section shipped with (ensemble-cheap $0.010 – $0.011, routed
-$0.005 – $0.011) came from a harness that keyed its per-model meters by
+$0.005 – $0.011) came from a runner that keyed its per-model meters by
 model id, so where two roles resolved to one model the second meter replaced
 the first and that model's spend left the total (issue 45). Neither route
 file names a `validate` model, so the validation client, built from
@@ -577,7 +577,7 @@ What that says:
   the ordering reverses: ensemble 1.00 recall at 0.00 noise against routed's
   0.88 at 0.14. On info the two tie at 0.70.
 - **The claim that the qwen triage pass carried most of routed's cost is
-  withdrawn.** It came from the same defect, and the harness prints no
+  withdrawn.** It came from the same defect, and the runner prints no
   per-model split, so nothing here measured it.
 - **The ensemble buys recall with noise.** Weighted recall 0.84 is the
   best measured, and its info recall (0.70) is the best of any

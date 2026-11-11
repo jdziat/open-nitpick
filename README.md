@@ -64,27 +64,23 @@ send without sending it, and `LLM_PROVIDER=ollama` runs against a local model.
 For OpenRouter, an OpenAI-compatible endpoint or a local model, see
 [Providers](docs/providers.md).
 
-## Why this exists
+## What it does
 
-Most review bots wrap one vendor's model in a hosted service, priced per seat,
-with a prompt you cannot read. This one is built the other way round.
-
-- **Any model.** 16 providers via [llm-go-sdk][sdk], plus built-in
+- **Model choice.** 16 providers via [llm-go-sdk][sdk], plus built-in
   `synthetic` (open-weight models on a subscription) and `openrouter` (the rest
   of the catalogue on one key) for 18 in all, plus any OpenAI-compatible
   endpoint through `base_url`, plus local models via `ollama` and `llamacpp`.
   `nitpick providers` prints the list.
-- **Different models for different jobs.** A cheap model triages and
-  deduplicates while an expensive one reviews. Most of the available cost
-  saving comes from that split.
-- **Prompts as configuration.** Path-scoped instructions live in your repository
-  next to the code they describe. `nitpick explain-config` prints the exact
+- **Separate models per job.** A cheap model triages and
+  deduplicates while an expensive one reviews.
+- **Prompts in your repository.** Path-scoped instructions sit next to the code
+  they describe. `nitpick explain-config` prints the exact
   prompt that will be sent, before you spend a token on it.
-- **Integrated tools as extra evidence.** golangci-lint, ruff, eslint, semgrep
+- **Analyzer output as evidence.** golangci-lint, ruff, eslint, semgrep
   and more. Their output is evidence for the model, and your pull request
   never receives the raw text.
-- **Runs offline.** The whole engine works against a local git checkout with no
-  credentials and no network beyond the model call.
+- **Runs on a local checkout.** No credentials and no network beyond the
+  model call. With `ollama` or `llamacpp`, no network at all.
 
 [sdk]: https://github.com/nocturnium/llm-go-sdk
 
@@ -106,12 +102,11 @@ with a prompt you cannot read. This one is built the other way round.
 
 ## Measurement
 
-This project makes empirical claims about review quality, so how those numbers are
-produced is part of the product.
+This project makes empirical claims about review quality. These pages say how the numbers are produced.
 
-- [Measurement](docs/measurement.md): the fifteen rules a number out of
-  the eval harness has to satisfy before it is worth acting on. Each rule was
-  written after the harness produced a confident wrong number that something
+- [Measurement](docs/measurement.md): the fifteen rules a number from the
+  benchmark code has to satisfy before it is worth acting on. Each rule was
+  written after that code produced a confident wrong number that something
   believed.
 - [Against Incumbent](docs/comparison.md): capabilities and measured results
   by language, with what each iteration changed.
@@ -135,7 +130,7 @@ defects against 30 of 41 across 44 real pull requests, and 10 of 13 against
 4 of 13 on the held-out fixtures. Noise is the open question: a later run took
 detection to 36 of 41 and noise findings from 1 to 17.
 [Findings](docs/findings.md) has both comparisons, what they do not
-support, and the twenty instrument bugs found along the way.
+support, and the twenty measurement bugs found along the way.
 [Against Incumbent](docs/comparison.md) has the costs: about two cents a
 review on the default reviewer, under a fifth of a cent on the cheap one.
 

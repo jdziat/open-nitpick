@@ -2,7 +2,7 @@
 
 What has to hold before a number out of `internal/evals` is worth acting on.
 
-These are not style preferences. Every rule below was written because the harness
+These are not style preferences. Every rule below was written because the runner
 produced a confident wrong number and something downstream believed it. The
 provenance is in [Findings](findings.md); this file is the checklist.
 
@@ -293,7 +293,7 @@ definitions, and no fixture's value rises under the union: the change was
 measured against the competitor before it was adopted, because a scoring change
 that only ever moves numbers our way is one nobody should believe.
 
-`NOISE` asks whether a finding is **near** the defect it names, not only whether
+`NOISE` asks whether a finding is **near** the defect it names, as well as whether
 it names one. Ignoring position, 36 boilerplate one-liners on a grid, each
 titled "check nil, race and secret handling", were credited against every plant
 in their file and counted as noise for none: `NOISE` 0, the value a perfect
@@ -406,7 +406,7 @@ the degenerate case: one file, one batch, one call.
 ## Trusting a test
 
 **Rule 9: a guard test must fail under mutation.** Break the thing it guards and
-watch it go red; if it stays green it is decoration. This harness has shipped
+watch it go red; if it stays green it is decoration. This runner has shipped
 three tests that passed against the bug they named:
 
 - a severity-voice test that compared text from *before* the section it was

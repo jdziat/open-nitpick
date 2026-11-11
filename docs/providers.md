@@ -298,7 +298,7 @@ different host. The endpoint is compiled into the binary rather than read from
 provider would work only for whoever had exported
 `NITPICK_TRUST_CONFIG_ENDPOINTS`.
 
-The eval harness reaches Synthetic with a `synthetic:` prefix on the model id
+The eval runner reaches Synthetic with a `synthetic:` prefix on the model id
 (`MODELS=synthetic:hf:Qwen/Qwen3.8-27B`), which keeps the same weights on two
 hosts as two rows. Cost per review is priced at Synthetic's usage-based rates,
 transcribed into `internal/evals/testdata/pricing.yaml` from the vendor's
@@ -327,7 +327,7 @@ export OPENROUTER_API_KEY=sk-or-...
 ```
 
 Like `synthetic`, its endpoint is compiled into the binary, so a committed
-config can name it. The eval harness reaches every model in the sweep through
+config can name it. The eval runner reaches every model in the sweep through
 it. This repository uses GLM-5.3-Flash for review and Qwen3.8-27B for triage through
 OpenRouter; its current policy is
 [.nitpick.yaml](https://github.com/jdziat/open-nitpick/blob/main/.nitpick.yaml).
@@ -354,16 +354,16 @@ a single run, so gaps under about 0.10 are inside the noise.
 
 | tier | model | weighted recall | $/review | trade |
 |---|---|---|---|---|
-| best value overall | routed: gemma pinned, qwen3.8-27b for security and TypeScript, glm-5.3-flash router, qwen triage (`internal/evals/testdata/routes/routed.yaml`) | 0.81 | $0.005 – $0.011 | qwen's recall and near its noise at a third of the price; three models to configure |
-| highest recall | ensemble: gemma pinned + glm-5.3-flash on every batch, qwen triage (`ensemble-cheap.yaml`) | 0.84 | $0.010 – $0.011 | best info-corpus recall measured; noisiest configuration in this table |
+| best value overall | routed: gemma pinned, qwen3.8-27b for security and TypeScript, glm-5.3-flash router, qwen triage (`internal/evals/testdata/routes/routed.yaml`) | 0.81 | $0.005 - $0.011 | qwen's recall and near its noise at a third of the price; three models to configure |
+| highest recall | ensemble: gemma pinned + glm-5.3-flash on every batch, qwen triage (`ensemble-cheap.yaml`) | 0.84 | $0.010 - $0.011 | best info-corpus recall measured; noisiest configuration in this table |
 | cheapest of all | `google/gemma-4-31b-it` pinned to `deepinfra/turbo` | 0.75 | $0.0003 | needs `providers: [deepinfra/turbo]`; weak on the info corpus; best on multi-file diffs |
-| cheapest without a pin | `openai/gpt-5.6-luna` | 0.76 | $0.0005 – $0.0023 | quiet on multi-file diffs (0.04 noise); weak on the info corpus |
+| cheapest without a pin | `openai/gpt-5.6-luna` | 0.76 | $0.0005 - $0.0023 | quiet on multi-file diffs (0.04 noise); weak on the info corpus |
 | cheapest with no surprises | `z-ai/glm-5.3-flash` | 0.82 | $0.0017 | noisy on multi-file diffs; never lost a review |
 | best quality per dollar | `qwen/qwen3.8-27b` | 0.82 | $0.017 | above the default on every corpus with lower noise |
 | quietest | `x-ai/grok-4.6` | 0.74 | $0.020 | zero noise on two corpora, pays in recall |
 | shipped default | `anthropic/claude-sonnet-4.6` | 0.79 | $0.021 | the only model measured on the held-out corpus |
 | frontier | `openai/gpt-5.6-sol` | 0.85 | $0.027 | `z-ai/glm-5.3` edges it on recall at double the noise |
-| skip | `qwen/qwen3.8-max`, `deepseek/deepseek-v4-pro-0813` | 0.63 – 0.78 | $0.013 – $0.044 | most expensive, and both dropped reviews |
+| skip | `qwen/qwen3.8-max`, `deepseek/deepseek-v4-pro-0813` | 0.63 - 0.78 | $0.013 - $0.044 | most expensive, and both dropped reviews |
 
 Incumbent's on-demand price on the same corpora is $0.25 to $0.36 a review.
 
@@ -458,7 +458,7 @@ https://openrouter.ai/api/v1/models/<model>/endpoints` lists a model's
 upstreams with their tags and which support structured output. It is also a
 trust decision: a pull request that edits `.nitpick.yaml` can change it,
 which chooses which third party reads the code, exactly as `model` already
-can. Rates differ by upstream, so the eval harness prices a pinned run only
+can. Rates differ by upstream, so the eval runner prices a pinned run only
 when the pin is the endpoint the price table recorded.
 
 ## When a request never finishes

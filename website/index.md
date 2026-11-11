@@ -6,9 +6,9 @@ hide:
 
 <div class="np-hero" markdown>
 
-# Pull request review you can read the source of.
+# Pull request review with the model you choose and prompts that live in your repository.
 
-<p class="np-lede">open-nitpick reviews pull requests with the model provider you choose and can post inline comments. Run it as a GitHub Action, in any CI system, from an agent, or against local changes before a pull request exists. The reviewer is self-hosted; review input is sent to the model provider you configure. Choose a local provider to keep review input on your machine.</p>
+<p class="np-lede">open-nitpick reads a pull request, reviews it with the model provider you choose, and can post inline comments. Run it as a GitHub Action, in any CI system, from an agent, or against local changes before a pull request exists. The reviewer is self-hosted; review input is sent to the model provider you configure. Choose a local provider to keep review input on your machine.</p>
 
 <div class="np-actions" markdown>
 [Get started](docs/getting-started.md){ .md-button .md-button--primary }
@@ -43,33 +43,33 @@ nitpick review          # reviews your uncommitted changes
 <div class="np-grid" markdown>
 
 <div class="np-card" markdown>
-<p class="np-card-title">Bring your own models</p>
-18 providers, any OpenAI-compatible endpoint, Ollama and llama.cpp. A cheap model triages, a strong one reviews. [Configuration&nbsp;→](docs/configuration.md)
+<p class="np-card-title">18 providers and local models</p>
+Any OpenAI-compatible endpoint, Ollama and llama.cpp. A cheap model triages, a strong one reviews. [Configuration](docs/configuration.md)
 </div>
 
 <div class="np-card" markdown>
 <p class="np-card-title">Inspectable prompts</p>
-Path-scoped instructions in your repo. `nitpick explain-config` prints the exact prompt. [Instructions&nbsp;→](docs/configuration.md#personality-and-how-much-it-nitpicks)
+Path-scoped instructions in your repo. `nitpick explain-config` prints the exact prompt. [Instructions](docs/configuration.md#personality-and-how-much-it-nitpicks)
 </div>
 
 <div class="np-card" markdown>
 <p class="np-card-title">Related context</p>
-Definitions the change uses, attached by default. Callers of what it redefines, opt-in. [Related context&nbsp;→](docs/configuration.md#related-context)
+Definitions the change uses, attached by default. Callers of what it redefines, opt-in. [Related context](docs/configuration.md#related-context)
 </div>
 
 <div class="np-card" markdown>
 <p class="np-card-title">Trust model</p>
-Policy from the base revision. By default, a PR cannot change endpoints or credentials. [Trust model&nbsp;→](docs/trust-model.md)
+Policy from the base revision. By default, a PR cannot change endpoints or credentials. [Trust model](docs/trust-model.md)
 </div>
 
 <div class="np-card" markdown>
-<p class="np-card-title">Integrated tools as extra evidence</p>
-golangci-lint, ruff, eslint, semgrep and more. Their output is evidence for the model. [Analyzers&nbsp;→](docs/analyzers.md)
+<p class="np-card-title">Analyzer output as evidence</p>
+golangci-lint, ruff, eslint, semgrep and more. Their output is evidence for the model. [Analyzers](docs/analyzers.md)
 </div>
 
 <div class="np-card" markdown>
-<p class="np-card-title">Published measurements</p>
-Five corpora, no model judge. Every instrument bug logged, one retraction included. [Findings&nbsp;→](docs/findings.md)
+<p class="np-card-title">Measurements and the bugs found in them</p>
+Five benchmark sets, no model judge. Twenty bugs in the measuring code are tabled, and one published claim was retracted. [Findings](docs/findings.md)
 </div>
 
 </div>
@@ -84,8 +84,8 @@ Five corpora, no model judge. Every instrument bug logged, one retraction includ
 4. Each batch is reviewed by the model the route selects. A triage model merges and filters. An optional expert pass refutes.
 5. The review is posted as inline comments, with a summary that lists every file not reviewed, every analyzer that did not run, and every finding that was discarded and why.
 
-[The full walkthrough&nbsp;→](docs/how-a-review-runs.md)
+[Read the full walkthrough](docs/how-a-review-runs.md)
 
-<p class="np-fine" markdown>The quickstart uses OpenRouter with GLM-5.3-Flash, the reviewer this repository uses in CI. You can spend nothing first: `nitpick explain-config` prints what a review would send without sending it, and `LLM_PROVIDER=ollama` runs against a local model. [Why, and the alternatives&nbsp;→](docs/providers.md#openrouter-recommended)</p>
+<p class="np-fine" markdown>The quickstart uses OpenRouter with GLM-5.3-Flash, the reviewer this repository uses in CI. You can spend nothing first: `nitpick explain-config` prints what a review would send without sending it, and `LLM_PROVIDER=ollama` runs against a local model. [Why, and the alternatives](docs/providers.md#openrouter-recommended)</p>
 
 </div>

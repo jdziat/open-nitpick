@@ -1,7 +1,7 @@
 # Analyzers
 
 Thirty-three deterministic analyzers, covering the languages the hosted reviewers
-list. Two are enabled by name out of the box; twenty-four more run whenever they
+list. Two are enabled by name by default; twenty-four more run whenever they
 are installed and the change contains files they read; the remaining seven run
 only when named, and most of those also need a configuration or an explicit
 grant. `nitpick linters` prints this table from
@@ -115,7 +115,7 @@ Setting `golangci_config` replaces our file wholly: golangci-lint reads one
 config, not two, so `exclusions.generated` becomes yours again. Set it to
 `disable` unless you want a generated-file header in the diff to skip the file.
 
-The cost is real and it applies to every pull request, not only the ones that
+The cost is real and it applies to every pull request, including those that
 edit these files: **your `.golangci.yml` and your `[tool.ruff]` settings do not
 apply.** Your enabled linter set, your exclusions, your `per-file-ignores`:
 none of it. Isolated ruff in particular reports things your configuration was
@@ -132,7 +132,7 @@ CI with `GITHUB_TOKEN` and your model API key in the environment. But a config
 outside the tree cannot resolve its own plugin imports, because Node resolves
 them relative to the config file's own directory. Enabling eslint therefore means
 provisioning a config *directory* with its own `node_modules` holding every
-plugin, parser and shared config it imports, not just a file. And an external
+plugin, parser and shared config it imports, as well as the file. And an external
 config that imports back into the repository (`import "./eslint-rules/index.js"`)
 re-opens the hole completely: the config is a loader, and substituting the loader
 does not substitute what it loads.
@@ -156,7 +156,7 @@ something did not run. A review that quietly ran less than you think looks like
 a clean one. `skipped` is kept separate from `did not run` so the line that
 means something is not buried among the ones that never do.
 
-`did not run` is not only about missing binaries. golangci-lint reports a failure
+`did not run` also covers more than missing binaries. golangci-lint reports a failure
 to load your packages *inside the same JSON it reports issues in*, and a pull
 request can trigger one from the tree: a `go.work` that does not list the module,
 a `//go:build ignore` on the file it wants unread. Those runs are reported as

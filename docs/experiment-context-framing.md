@@ -6,11 +6,11 @@ What we measured, what we changed, and what a result would mean.
 
 Two effects are confounded in the +ctx arm of the tuning corpus:
 
-1. **Framing** — the sentence above attached definitions tells the model to
+1. **Framing**: the sentence above attached definitions tells the model to
    treat them as "context only". Deepseek and the qwen models suppress a
    valid nit on cross-file-copy-nit under that framing, and the suppression
    is defensible: the Snapshot contract they read is explicitly permissive.
-2. **Relevance** — the related collector attaches every definition the
+2. **Relevance**: the related collector attaches every definition the
    changed lines name, up to 12 per file and 80 lines per definition. It has
    no signal for whether a definition actually decides a finding. A memo key
    contract next to an unrelated helper is equally "related" to it.
@@ -45,7 +45,7 @@ result. Re-run any pair that differs by fewer than 2 plants.
 - D beats C: relevance ranking helps beyond framing. Add a relevance score
   to the related collector.
 - C and D both miss cross-file-copy-nit: the plant itself is ambiguous, and
-  the fixture needs redesign, not the harness.
+  the fixture needs redesign, not the runner.
 - C and D both match B: framing was not the problem; the +ctx drop is pure
   attention dilution, and no phrasing fix will recover it.
 
@@ -210,7 +210,7 @@ Guards: `TestRelatedRerankPrefersSnippetOverlapOverUseCount` and
 
 ### Results: arm D, 1 run (multifile-tuning-20260917T134837Z)
 
-Same harness as C: deepseek-v4.1-flash, 16 tuning fixtures, alternate
+Same runner as C: deepseek-v4.1-flash, 16 tuning fixtures, alternate
 preamble, callers on with +ctx. One run.
 
 | arm | recall | noise/rev |
