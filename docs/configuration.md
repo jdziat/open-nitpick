@@ -363,7 +363,7 @@ functions reached through `import`, resolved from the importing file's own
 package declaration; C and C++ declarations reached through a quoted
 `#include`. For the four languages most changes are written in it goes one
 hop further: a Go method called on a value of an imported type is attached
-with its doc comment, not just the type; a TypeScript import through a
+with its doc comment as well as the type; a TypeScript import through a
 `tsconfig.json` path alias or a barrel `index.ts` is followed to the file
 that defines the name; a Python name re-exported by a package `__init__.py`
 is followed to its module; a Ruby constant that a Rails autoloader would

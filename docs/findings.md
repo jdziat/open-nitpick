@@ -324,7 +324,7 @@ Documented in [Measurement](measurement.md#the-two-kinds-of-column-and-why-it-ma
 four runs over byte-identical cached findings gave grades from 3.66 to 3.98 and
 `MISSED` from 0.12 to 0.62, at `Temperature: 0`.
 
-This bounds what the harness can ever claim. A competitor whose own score wanders
+This bounds what the runner can ever claim. A competitor whose own score wanders
 by 0.32 grade points on unchanged input cannot be beaten by a margin smaller than
 that, and most differences being chased are smaller.
 
@@ -497,7 +497,7 @@ the client, which both variants flag. An earlier spend of this corpus had two
 more (a `render` stub that discarded its rows and a doc comment claiming a
 tip was "recorded"), which were repaired, and the corpus re-run whole so the
 table above is one run. Every stub in a ten-file repository is a finding
-waiting to happen, and the honest reading of the NOISE column on this corpus
+waiting to happen, and the reading of the NOISE column on this corpus
 is that most of it is the corpus.
 
 **The incumbent.** Incumbent's CLI, which indexes the repository, located 1
@@ -596,11 +596,11 @@ Two limits, stacked. glm-5.3-flash is a reasoning model, and on OpenRouter its
 thinking counts against `max_tokens`; at the shipped 8,192 the schema-path
 answer came back cut off into prose. The JSON fallback then re-asked and died
 on the per-call HTTP timeout (two minutes in the shipped defaults, three in
-the harness) while the model was still generating. Neither is a property of
+the runner) while the model was still generating. Neither is a property of
 the model; both were defaults chosen before a reasoning model was in the
 battery. `max_tokens` is now unset by default so the model's own output
 maximum applies (the direct Anthropic path, whose SDK would substitute 4,096,
-is sent 32,768 as a floor), the call timeout is ten minutes, the harness
+is sent 32,768 as a floor), the call timeout is ten minutes, the runner
 matches, and a re-probe of the five fixtures that lost reviews, three
 runs each with related context on, completed 15 of 15. The rates in the tables
 above were computed over completed reviews and stand; the LOST columns are
@@ -936,7 +936,7 @@ Read the run dumps first; most of the noise was ours.
 ## Routing and ensembles (2026-09-05)
 
 - **Per-batch routing ships.** Routes match on language, file count and
-  router-assigned kinds; the report records every decision; the harness
+  router-assigned kinds; the report records every decision; the runner
   prices a composite run per model. Routed cheap models match qwen3.8-27b's
   recall and near its noise at a third of its cost.
 - **An ensemble of two cheap reviewers with a mid-model rerank has the
@@ -1039,7 +1039,7 @@ on the Python clean control.
   0.40 – 0.45; $0.011 – $0.014 a review. Ten times glm alone, and still
   under the cheapest metered competitor.
 - **Cost reporting checks out.** One fixture on an isolated OpenRouter key:
-  the harness said $0.0658, the dashboard showed $0.06 for Kimi and $0.01
+  the runner said $0.0658, the dashboard showed $0.06 for Kimi and $0.01
   for GLM. Rates are priced at the captured endpoint, a point estimate, so
   the figure is a floor if the router sends a request elsewhere.
 
@@ -1088,7 +1088,7 @@ it reads only files the change points at, and the sweep was priced with
 it on. `review.related_context_callers` (the walk) is off by default, not
 for want of evidence but because it reads up to 150 files the change never
 named and sends excerpts to a third party, which an operator should choose
-knowing both that and the numbers above. The harness turns both on for
+knowing both that and the numbers above. The runner turns both on for
 its `+ctx` arm and both off otherwise, whatever the defaults are.
 
 ## The slop class (2026-09-05, evening)
@@ -1533,7 +1533,7 @@ infers the rest, and with no findings at all it describes nothing: the message
 is the title plus "No findings were reported. Write the walkthrough only."
 
 Two arms, the diff withheld from triage and attached to it, six fixtures,
-glm-5.3-flash, one run. The switch that selected the arms and the harness
+glm-5.3-flash, one run. The switch that selected the arms and the runner
 that ran them are both removed: the walkthrough is no longer generated at
 all, so there is nothing left to ground. The numbers are the record of why. Groundedness is the share of a walkthrough's content words that appear in
 its own diff, stopwords removed.
@@ -2609,7 +2609,7 @@ replaced request size as the limit. The design pass still sends whole packages
 for each changed file; trimming that remains open.
 
 Limits: one change, one model. The recall table is two runs per fixture and uses
-the harness's deterministic columns; no judge was used.
+the runner's deterministic columns; no judge was used.
 
 Confirmed in CI after the config merged (the review job, one run each):
 

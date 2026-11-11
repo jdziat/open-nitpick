@@ -79,10 +79,10 @@ in `.nitpick-concurrency.yaml`) closed the hole.
 Rerun with laguna: 2 failed batches. Both published error findings were
 false positives:
 
-- `internal/geminiapi/client.go:415` — `WrapError(operation, err)` takes the
+- `internal/geminiapi/client.go:415`: `WrapError(operation, err)` takes the
   formatted string as the operation name and wraps `llms.ErrInvalidParameters`;
   `errors.Is` matches.
-- `pkg/providers/runpod/models.go:179` — `return &m` under Go 1.25, where the
+- `pkg/providers/runpod/models.go:179`: `return &m` under Go 1.25, where the
   range variable is per-iteration, so each pointer is distinct.
 
 The two failed batches (12 files) returned

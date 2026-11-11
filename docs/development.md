@@ -1,7 +1,7 @@
 # Development
 
 Working on the tool itself: the tests, which need no network or credentials, the
-commit and release conventions CI enforces, and the eval harness that measures a
+commit and release conventions CI enforces, and the eval runner that measures a
 prompt or analyzer change against real models before it ships.
 
 ```bash
@@ -65,13 +65,13 @@ make eval CAPTURE=testdata/responses          # save raw model output
 ```
 
 It is the same `OPENROUTER_API_KEY` the default config uses, but only the eval
-harness reads `.env`; `nitpick review` does not, so export it (`set -a; . ./.env;
+runner reads `.env`; `nitpick review` does not, so export it (`set -a; . ./.env;
 set +a`) or keep it in your shell profile.
 
 Each fixture is a synthetic pull request with bugs planted at known lines,
 built into a real git repository and reviewed through the real engine, so the
 diff parsing, batching, structured output, anchoring, and rendering are all
-exercised, not just the prompt.
+exercised along with the prompt.
 
 The report separates three things that are easy to confuse:
 

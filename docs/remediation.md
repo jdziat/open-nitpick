@@ -175,7 +175,7 @@ suggestion and ours carries a sentence.
   the finding is published without it; nothing corrupts a file.
 - Rendering uses GitHub's `start_line`/`line` pair with a `suggestion` fence,
   which is the committable form; the local renderer prints it as a diff.
-- The eval harness's invariant that "no suggestion is published as
+- The eval runner's invariant that "no suggestion is published as
   one-click-applicable unless it is a single line" becomes "unless it
   passes the validation above", and a fixture with a planted multi-line fix
   is added so the invariant is exercised.

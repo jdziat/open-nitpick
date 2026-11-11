@@ -22,7 +22,7 @@ reviewer at an endpoint they control and exfiltrate `GITHUB_TOKEN` or your
 model key in one line of YAML. `api_key_keyring` chooses which stored secret
 is read. `credential_command` is a program this process runs to fetch one, in
 the job holding both those credentials, so a repository trusted with it would
-have arbitrary command execution and not merely a redirected request; it is
+have arbitrary command execution and more than a redirected request; it is
 the most dangerous key on the list and the reason the list is not four names
 long.
 
@@ -380,7 +380,7 @@ one file using `reflect.PtrTo` (deprecated in 1.22) and `cipher.NewCFBEncrypter`
 (deprecated in 1.24): `go 1.22` publishes the first, `go 1.24` publishes both,
 and `go 1.21` publishes neither while the coverage list stays empty. As an
 attack that is a diff editing `go.mod` from `go 1.25` to `go 1.21` and adding
-the file, and `go 1.21`–`1.23` are ordinary directives in live repositories.
+the file, and `go 1.21`-`1.23` are ordinary directives in live repositories.
 The sentence that had made the floor look safe was false at the floor: the
 compiler does gate language *features* on this directive: generics under
 `go 1.15` fail with `type parameter requires go1.18 or later`, reported as
