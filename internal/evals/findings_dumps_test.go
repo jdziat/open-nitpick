@@ -121,7 +121,7 @@ func TestCallersSectionMatchesItsDumps(t *testing.T) {
 		}
 	}
 	sort.Float64s(diffNoiseRates)
-	if row := fmt.Sprintf("| glm, diff only | 0.00 (0/%d) | %.2f – %.2f |", callerPlants*2, diffNoiseRates[0], diffNoiseRates[len(diffNoiseRates)-1]); !strings.Contains(prose, row) {
+	if row := fmt.Sprintf("| glm, diff only | 0.00 (0/%d) | %.2f to %.2f |", callerPlants*2, diffNoiseRates[0], diffNoiseRates[len(diffNoiseRates)-1]); !strings.Contains(prose, row) {
 		t.Errorf("prose lacks the diff-only callers row the dumps give: %q", row)
 	}
 

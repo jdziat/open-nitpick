@@ -117,12 +117,12 @@ is one the fixture's own author lists as a reasonable objection. Measurement
 .md's rules say a gap inside the corpus's resolution is not a result in
 either direction, so the iteration stops here rather than tuning a prompt to
 suppress an objection the corpus itself calls defensible. What would move it
-is a larger TypeScript corpus, not a narrower reviewer.
+is a larger TypeScript corpus.
 
 Nothing above is a claim about the hosted product with a learned codebase,
 about Contender, or about a corpus anyone else wrote.
 
-### End to end, on GitHub (2026-09-03)
+### Run through GitHub (2026-09-03)
 
 The corpora were materialised into a private repository
 (`jdziat/nitpick-bench`, one branch and one pull request per fixture, 44 in
@@ -259,9 +259,9 @@ above.
 
 | reviewer | $ per review on these corpora | ratio |
 |---|---|---|
-| Incumbent, on demand | $0.25 – $0.36 | 1× |
-| open-nitpick, sonnet-4.6 with related context | $0.019 – $0.022 | 12 – 19× cheaper |
-| open-nitpick, glm-5.3-flash with related context | $0.0011 – $0.0018 | 140 – 330× cheaper |
+| Incumbent, on demand | $0.25 to $0.36 | 1× |
+| open-nitpick, sonnet-4.6 with related context | $0.019 to $0.022 | 12 to 19× cheaper |
+| open-nitpick, glm-5.3-flash with related context | $0.0011 to $0.0018 | 140 to 330× cheaper |
 
 The seat-priced plan is a different arithmetic and depends on how many pull
 requests a seat reviews a month; at $24 a seat and one review a day it is
@@ -298,7 +298,7 @@ pass. The three models marked `×2` ran twice.
 | qwen/qwen3.8-max | 0.71 / 0.36 | 1.00 / 0.33 | 0.78 / 0.00 | ~0.78 | $0.044 |
 | openrouter/auto ×2 | 0.81 / 0.19 | 1.00 / 0.79 | 0.75 / 0.21 | 0.87 | unknown |
 | moonshotai/kimi-k3 (earlier sweep) | ties sonnet | ties sonnet | n/a | n/a | 1.5 to 2× sonnet |
-| Incumbent CLI | 0.62 / 0.19 | 0.17 / 0.21 | 0.40 / 0.00 | 0.42 | $0.25 – $0.36 on demand |
+| Incumbent CLI | 0.62 / 0.19 | 0.17 / 0.21 | 0.40 / 0.00 | 0.42 | $0.25 to $0.36 on demand |
 
 Not measured:
 
@@ -385,11 +385,11 @@ after column is two runs each with related context on. Recall is over the
 
 Per corpus, related context on, two runs each:
 
-| corpus | glm before → base rules only → with GLM note | qwen before → base rules only → with Qwen note | sonnet before → after |
+| corpus | glm: before, base rules only, with GLM note | qwen: before, base rules only, with Qwen note | sonnet: before, after |
 |---|---|---|---|
-| tuning | 0.81/0.31 → 0.78/0.25 → 0.77/0.23 | 0.69/0.19 → 0.72/0.00 → 0.81/0.03 | 0.81/0.25 → 0.88/0.16 |
-| multi-file | 0.92/0.64 → 0.96/0.19 → 1.00/0.30 | 1.00/0.07 → 0.92/0.07 → 0.96/0.07 | 1.00/0.43 → 1.00/0.18 |
-| info | 0.70/0.33 → 0.65/0.12 → 0.65/0.00 | 0.80/0.17 → 0.60/0.12 → 0.65/0.00 | 0.50/0.33 → 0.55/0.21 |
+| tuning | 0.81/0.31 to 0.78/0.25 to 0.77/0.23 | 0.69/0.19 to 0.72/0.00 to 0.81/0.03 | 0.81/0.25 to 0.88/0.16 |
+| multi-file | 0.92/0.64 to 0.96/0.19 to 1.00/0.30 | 1.00/0.07 to 0.92/0.07 to 0.96/0.07 | 1.00/0.43 to 1.00/0.18 |
+| info | 0.70/0.33 to 0.65/0.12 to 0.65/0.00 | 0.80/0.17 to 0.60/0.12 to 0.65/0.00 | 0.50/0.33 to 0.55/0.21 |
 
 What that says:
 
@@ -423,8 +423,8 @@ paying per token.
 | model on Synthetic | tuning R / N | multi-file R / N | info R / N | $/review | lost |
 |---|---|---|---|---|---|
 | hf:zai-org/GLM-5.3-Flash, run 1 | 0.88 / 0.12 | 0.92 / 0.14 | 0.70 / 0.00 | n/a | 0 |
-| hf:zai-org/GLM-5.3-Flash, run 2 | 0.69 / 0.19 | 0.92 / 0.21 | 0.78 / 0.09 | $0.0025 – $0.0031 | 1 of 42 |
-| hf:Qwen/Qwen3.8-27B | 0.75 / 0.00 | 0.83 / 0.14 | 0.60 / 0.08 | $0.010 – $0.023 | 0 |
+| hf:zai-org/GLM-5.3-Flash, run 2 | 0.69 / 0.19 | 0.92 / 0.21 | 0.78 / 0.09 | $0.0025 to $0.0031 | 1 of 42 |
+| hf:Qwen/Qwen3.8-27B | 0.75 / 0.00 | 0.83 / 0.14 | 0.60 / 0.08 | $0.010 to $0.023 | 0 |
 
 GLM's two sequential runs differ by 0.19 on the tuning corpus, which is
 three plants and a reminder of what one run is worth. Taken together the
@@ -443,8 +443,8 @@ for the 26b.
 
 | model | tuning R / N | multi-file R / N | info R / N | $/review | lost |
 |---|---|---|---|---|---|
-| google/gemma-4-31b-it | 0.70 / 0.22 | 0.89 / 0.05 | 0.50 / 0.32 | $0.0003 – $0.0011 | 21 of 168 |
-| google/gemma-4-26b-a4b-it | 0.47 / 0.07 | 0.67 / 0.07 | 0.30 / 0.08 | $0.0004 – $0.0006 | 1 of 42 |
+| google/gemma-4-31b-it | 0.70 / 0.22 | 0.89 / 0.05 | 0.50 / 0.32 | $0.0003 to $0.0011 | 21 of 168 |
+| google/gemma-4-26b-a4b-it | 0.47 / 0.07 | 0.67 / 0.07 | 0.30 / 0.08 | $0.0004 to $0.0006 | 1 of 42 |
 
 The 31b is the cheapest model in these tables to reach qwen3.8-27b's
 multi-file recall, and its multi-file noise (0.05) is the lowest of any
@@ -471,9 +471,9 @@ endpoint with no fallback. Two runs per corpus, engine log kept:
 
 | gemma-4-31b-it | tuning R / N | multi-file R / N | info R / N | $/review | lost | stalls | wall clock per corpus |
 |---|---|---|---|---|---|---|---|
-| default routing, 4 attempts, capped and re-sampled retries | 0.72 / 0.12 | 0.92 / 0.11 | 0.50 / 0.38 | $0.0003 – $0.0019 | 0 of 168 | 41 | 1 – 3 hours |
-| pinned to deepinfra/turbo, related context on | 0.78 / 0.19 | 0.88 / 0.04 | 0.55 / 0.17 | $0.0003 – $0.0004 | 0 of 168 | 0 | about 3 minutes |
-| pinned, related context off | 0.84 / 0.09 | 0.62 / 0.18 | 0.60 / 0.08 | $0.0003 – $0.0004 | 0 | 0 | about 3 minutes |
+| default routing, 4 attempts, capped and re-sampled retries | 0.72 / 0.12 | 0.92 / 0.11 | 0.50 / 0.38 | $0.0003 to $0.0019 | 0 of 168 | 41 | 1 to 3 hours |
+| pinned to deepinfra/turbo, related context on | 0.78 / 0.19 | 0.88 / 0.04 | 0.55 / 0.17 | $0.0003 to $0.0004 | 0 of 168 | 0 | about 3 minutes |
+| pinned, related context off | 0.84 / 0.09 | 0.62 / 0.18 | 0.60 / 0.08 | $0.0003 to $0.0004 | 0 | 0 | about 3 minutes |
 
 Getting there took three more fixes, each found by the pinned run failing
 in a new way and each general:
@@ -512,8 +512,8 @@ corpus, related context on, no stalls, no lost reviews:
 
 | gpt-5.6-luna | tuning R / N | multi-file R / N | info R / N | $/review |
 |---|---|---|---|---|
-| old prompt, one run | 0.81 / 0.50 | 0.83 / 0.21 | 0.70 / 0.17 | $0.0004 – $0.0007 |
-| current prompt, two runs | 0.81 / 0.28 | 0.92 / 0.04 | 0.50 / 0.04 | $0.0005 – $0.0023 |
+| old prompt, one run | 0.81 / 0.50 | 0.83 / 0.21 | 0.70 / 0.17 | $0.0004 to $0.0007 |
+| current prompt, two runs | 0.81 / 0.28 | 0.92 / 0.04 | 0.50 / 0.04 | $0.0005 to $0.0023 |
 
 Tuning noise roughly halved and multi-file noise fell to 0.04 with recall
 up, which is the same shape the base-prompt rules produced for every other
@@ -538,8 +538,8 @@ over every model the review reached for, each at its own rate.
 
 | config | tuning R / N | multi-file R / N | info R / N | weighted recall | $/review |
 |---|---|---|---|---|---|
-| ensemble-cheap: gemma pinned + glm-5.3-flash on every batch, qwen3.8-27b triages | 0.84 / 0.38 | 0.96 / 0.21 | 0.70 / 0.25 | 0.84 | $0.0065 – $0.0086 |
-| routed: glm-5.3-flash classifies; qwen3.8-27b for security, concurrency and TypeScript; gemma pinned otherwise; qwen triages | 0.84 / 0.12 | 0.92 / 0.04 | 0.65 / 0.00 | 0.81 | $0.0085 – $0.0155 |
+| ensemble-cheap: gemma pinned + glm-5.3-flash on every batch, qwen3.8-27b triages | 0.84 / 0.38 | 0.96 / 0.21 | 0.70 / 0.25 | 0.84 | $0.0065 to $0.0086 |
+| routed: glm-5.3-flash classifies; qwen3.8-27b for security, concurrency and TypeScript; gemma pinned otherwise; qwen triages | 0.84 / 0.12 | 0.92 / 0.04 | 0.65 / 0.00 | 0.81 | $0.0085 to $0.0155 |
 | qwen3.8-27b alone | 0.81 / 0.03 | 0.96 / 0.07 | 0.65 / 0.00 | 0.83 | $0.017 |
 | sonnet-4.6 alone | 0.88 / 0.16 | 1.00 / 0.18 | 0.55 / 0.21 | 0.83 | $0.021 |
 | glm-5.3-flash alone | 0.77 / 0.23 | 1.00 / 0.30 | 0.65 / 0.00 | 0.80 | $0.0015 |
@@ -550,15 +550,15 @@ Rows above are with related context on. Without it the ensemble reaches
 configuration measured, above sonnet.
 
 **The two composite `$/review` cells were re-measured on 2026-09-07.** The
-figures this section shipped with (ensemble-cheap $0.010 – $0.011, routed
-$0.005 – $0.011) came from a runner that keyed its per-model meters by
+figures this section shipped with (ensemble-cheap $0.010 to $0.011, routed
+$0.005 to $0.011) came from a runner that keyed its per-model meters by
 model id, so where two roles resolved to one model the second meter replaced
 the first and that model's spend left the total (issue 45). Neither route
 file names a `validate` model, so the validation client, built from
 `default`, carried the reviewer's model id and collided with it in both.
 The cells above span two fresh runs under the fix: same two route files,
 same three corpora, two runs each, related context on. The second run also
-measured `qwen3.8-27b` alone alongside them, at $0.0171 – $0.0209 per
+measured `qwen3.8-27b` alone alongside them, at $0.0171 to $0.0209 per
 review, which is the only same-day single-model baseline here. Every other
 cell in the table is unchanged and still from 2026-09-05, so read the two
 composite costs against each other and against that qwen figure rather than
@@ -589,7 +589,7 @@ What that says:
 - **The router works.** Its tally sends every security, concurrency and
   TypeScript batch to qwen and the rest to gemma, and the ordering of
   routes is visible in the report. Its per-batch cost was read off the same
-  broken accounting and is withdrawn, not re-measured.
+  broken accounting and is withdrawn without a re-measurement.
 - **The cross-file route never fired.** Batches hold one file each in these
   corpora (the cross-file signal travels as related context, not as batch
   size), so a `min_files: 2` match on batch size matched nothing. The

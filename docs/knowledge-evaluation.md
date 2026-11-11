@@ -4,11 +4,11 @@ The pre-registered protocol for issue #84, written before the run.
 
 What exists today is one corpus and one result: six seeded plants and six
 controls on `z-ai/glm-5.3-flash`, recall 0.75 to 1.00, noise 0.50 to 0.33 per
-review ([Findings](findings.md#retrieved-knowledge-and-a-pre-registration-i-got-wrong-2026-09-08)).
+review ([Findings](findings.md#retrieved-knowledge-and-a-pre-registered-threshold-the-corpus-could-not-meet-2026-09-08)).
 Every plant has a matching corpus entry by construction, and the entries were
 written by the same author as the fixtures that retrieve them. It establishes
 that retrieval works. It says nothing about whether the corpus covers defects a
-repository actually has, which is the only question that decides whether
+repository has, which is the only question that decides whether
 `review.knowledge` should ever default on.
 
 The registration is [`internal/evals/testdata/knowledge-eval/preregistration.yaml`](../internal/evals/testdata/knowledge-eval/preregistration.yaml)

@@ -33,7 +33,7 @@ of those paths costs; name the paths that matter rather than the tree.
    finding, the tool wins and the finding is noise; say so.
 3. A maintainability finding is a judgement, and the rationale is the
    argument. Quote it when you propose the change so the reader can
-   disagree with the reason, not the conclusion.
+   disagree with the reason.
 4. Do not turn a smell review into a rewrite. The plan's first items are
    the ones worth a change; the rest are worth a sentence.
 

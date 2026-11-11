@@ -196,8 +196,7 @@ does a timeout, a refused credential or a cancelled context, since a second
 model fails those the same way and spends a second budget doing it.
 
 Retrying the same model is the wrong move for the first of those. Runaway
-generation is the model looping on the input, not the endpoint truncating
-early, so the same weights on another host reproduce it. Shrinking
+generation is the model looping on the input. The endpoint is not truncating it early, so the same weights on another host reproduce it. Shrinking
 `token_budget_per_request` is not the lever either: a batch that looped at
 37,118 tokens was under a 40,000 budget and far under a 262,144 context.
 
@@ -411,7 +410,7 @@ the operator to weigh against that. Context is not free either way: the same
 definitions that let a model confirm a defect give it more to be confidently
 wrong about.
 
-## Knowledge the model may not carry
+## Knowledge corpus shipped with the binary
 
 Related context above retrieves code from this repository. This retrieves prose
 from a corpus that ships with the binary: antipatterns and standard-library
@@ -559,7 +558,7 @@ pre-registered in [Evaluating retrieved knowledge](knowledge-evaluation.md).
 
 It ships off. On its own corpus it took recall from 0.75 to 1.00 with noise
 falling from 0.50 to 0.33 per review
-([Findings](findings.md#retrieved-knowledge-and-a-pre-registration-i-got-wrong-2026-09-08)),
+([Findings](findings.md#retrieved-knowledge-and-a-pre-registered-threshold-the-corpus-could-not-meet-2026-09-08)),
 and that corpus is twelve fixtures written by the same author as the entries
 they retrieve, so it measures retrieval working rather than the corpus covering
 what a repository has.
@@ -591,7 +590,7 @@ persona:
     quiet about itself.
 
     It is therefore stripped unless `NITPICK_TRUST_CONFIG_ENDPOINTS=true` is
-    set in the environment, the same out-of-band switch that unlocks
+    set in the environment, the same out-of-band switch that enables
     `base_url` and `api_key_env`. Stripping is reported, not silent: the
     dropped key is named in the run's log and in `nitpick explain-config`. The
     enumerated axes above are always honored, because they are bounded and
@@ -650,7 +649,7 @@ layer so it can be read without spending tokens. `review.model_notes: false`
 removes it. The measurements are in
 [Against Incumbent](comparison.md#tuning-for-glm-53-flash-and-qwen38-27b-2026-09-04).
 
-## Who may make it spend
+## Who may trigger a review that spends
 
 A comment event runs in the **base** repository, holding the base repository's
 secrets, whoever wrote the comment. On a public repository that means every
@@ -745,7 +744,7 @@ style is set.
 
 Triage merges duplicates across batches, drops findings the reviewer could not
 support, and writes the walkthrough. It runs on a cheap model and it sees the
-findings, not the code.
+findings and never the code.
 
 Two guards bound it. Neither is on the walkthrough, which is a separate
 question tracked in [Findings](findings.md).
@@ -1003,7 +1002,7 @@ followed by a ruleset name, with no traversal, no scheme and no whitespace. It
 is the one analyzer setting that reaches a command line without a path check,
 because a registry reference is a network fetch rather than a file.
 
-## A key this nitpick does not have
+## Keys this version does not recognise
 
 An unrecognised key fails the run rather than being ignored, which is right for
 a typo and has a second consequence: a `.nitpick.yaml` written for a newer
@@ -1078,7 +1077,7 @@ help are removed, and code spans and fenced blocks are left exactly as the
 model wrote them. The same rules and the same scrub apply to an `@open-nitpick`
 answer, which is capped at 120 words.
 
-## The mention
+## The review.mention handle
 
 `review.mention` (default `@open-nitpick`) is the handle a pull request comment
 uses to talk to the reviewer; see the CI page for the workflow that

@@ -5,7 +5,7 @@ import (
 )
 
 // The failure this file exists to prevent, recorded at
-// docs/findings.md#the-pre-registration-does-not-fit-the-corpus: a threshold
+// docs/findings.md#the-pre-registered-threshold-assumed-12-plants-the-corpus-has-6: a threshold
 // fixed before the instrument was built, in units the instrument turned out
 // not to express. "At least 3 of 12 plants" was registered against a corpus
 // that holds six, so the condition as written could not be evaluated and had

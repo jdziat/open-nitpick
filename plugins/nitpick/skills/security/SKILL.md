@@ -25,7 +25,7 @@ The OpenRouter sample config pins `openai/gpt-5.6-luna` there from the
 
 ## Reading the answer
 
-- `complete` means required instruments finished, not that every language
+- `complete` means required instruments finished. It does not mean every language
   had a SAST. Python/JS have no required SAST unless Semgrep is configured.
 - `scanners` lists each required id with `ran`, `not_applicable`, or
   `failed`. Brakeman matching any `.rb` may force incompleteness on

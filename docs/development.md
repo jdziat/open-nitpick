@@ -111,7 +111,7 @@ The matrix spans providers and price tiers deliberately, including models with
 and without JSON-Schema support so the structured-output fallback is exercised.
 
 `CAPTURE` writes every raw model response to disk. Those become offline
-regression fixtures, the cheapest way to keep the extractor honest without
+regression fixtures, the cheapest way to keep the extractor tested without
 paying for tokens on every test run.
 
 The whole pipeline is tested against a scripted model and a stub GitHub API, so

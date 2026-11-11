@@ -160,7 +160,7 @@ means something is not buried among the ones that never do.
 to load your packages *inside the same JSON it reports issues in*, and a pull
 request can trigger one from the tree: a `go.work` that does not list the module,
 a `//go:build ignore` on the file it wants unread. Those runs are reported as
-failures, not as zero findings.
+failures.
 
 ## What `mode: strict` does, exactly
 

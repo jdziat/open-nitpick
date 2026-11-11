@@ -81,7 +81,7 @@ model call. The shipped workflow tests the same field in its `if:`, so a
 refused comment does not even start a runner. `contributor` is excluded from
 the default set on purpose: it is permanent, and one merged typo fix would
 otherwise buy unlimited calls. See
-[Configuration](configuration.md#who-may-make-it-spend).
+[Configuration](configuration.md#who-may-trigger-a-review-that-spends).
 
 ## A change that edits .nitpick.yaml is not reviewed under its own edit
 
@@ -329,7 +329,7 @@ the pull request under *Analyzed less than it ran over*, so `ran` can no longer
 be read as "the analyzer looked at this change". Exclusion is decided by
 `go/build`'s own matcher under the process's `GOOS`/`GOARCH`, which is the one
 golangci-lint inherits.
-## cgo is the same gap through a door the matcher cannot see
+## cgo files bypass the constraint matcher the same way
 
 cgo is the same gap through a door that matcher cannot see, and it is the
 common case rather than an exotic one. `CGO_ENABLED=0` is the default in most
@@ -448,7 +448,7 @@ quoting the file that failed rather than the one it was anchored to.
 Note the corollary: an ordinary work-in-progress pull request that does not
 compile gets **no Go analyzer findings at all**, and the roster says so rather
 than implying the code was clean.
-## Published reasons escape HTML, not markdown
+## Published reasons are HTML-escaped and left as markdown
 
 Published reasons escape HTML, not markdown. An analyzer's failure reason
 is quoted on the pull request, and it quotes the tree: a Go compile error
@@ -456,11 +456,11 @@ carries source text verbatim, so `var X int = "[CLICK](https://example)"`
 reaches the roster with that string in it. Raw HTML is escaped; markdown link
 syntax is not, so a change can put a live link into a comment posted under this
 bot's name. It reaches no model (the roster is rendered, never prompted), so
-this is a phishing surface in a trusted comment, not an injection into the
+this is a phishing surface in a trusted comment and cannot inject into the
 review itself. The same is true of every other untrusted string this tool
 renders, including the substituted-policy notice and the forged paths named in
 the discard block, which are by construction chosen by the change.
-## Containment covers symlinks, not hard links
+## Containment follows symlinks and does not cover hard links
 
 Containment covers symlinks, not hard links. An analyzer config path is
 refused if it resolves inside the repository, following symlinks on both sides.
