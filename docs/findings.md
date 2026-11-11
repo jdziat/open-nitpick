@@ -65,8 +65,8 @@ from the tree. Our own side is a live measurement and does not.
 
 Twenty measurement bugs have been found, listed below. Six of them scored
 against Incumbent and seven flattered whichever behaviour this project would
-rather see (silence, selective reporting, or the author's own argument), none
-were bugs in open-nitpick.
+rather see (silence, selective reporting, or the author's own argument).
+None were bugs in open-nitpick.
 
 The count is the number of rows in the table, so it moves when the table does.
 It said "nine" against fourteen rows for two rounds, which is the same failure
