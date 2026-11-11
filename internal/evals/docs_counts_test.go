@@ -63,11 +63,11 @@ func TestInstrumentBugCountIsTheTableRowCount(t *testing.T) {
 	// The README spells the figure out, in the sentence that sends a reader to
 	// findings.md. Matching the phrase rather than the word is what makes a
 	// stale number fail here instead of a missing sentence passing quietly.
-	r := regexp.MustCompile(`the ([a-z-]+) instrument bugs found along the way`).FindStringSubmatch(string(readme))
+	r := regexp.MustCompile(`the ([a-z-]+) measurement bugs found along the way`).FindStringSubmatch(string(readme))
 	if r == nil {
-		t.Fatal("README.md no longer states the instrument-bug count; drop this check or restore the sentence")
+		t.Fatal("README.md no longer states the measurement-bug count; drop this check or restore the sentence")
 	}
 	if !strings.EqualFold(r[1], word) {
-		t.Errorf("README.md says %q instrument bugs; the table has %d rows", r[1], rows)
+		t.Errorf("README.md says %q measurement bugs; the table has %d rows", r[1], rows)
 	}
 }
