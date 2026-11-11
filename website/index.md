@@ -44,7 +44,7 @@ nitpick review          # reviews your uncommitted changes
 
 <div class="np-card" markdown>
 <p class="np-card-title">18 providers and local models</p>
-Any OpenAI-compatible endpoint, Ollama and llama.cpp. A cheap model triages, a strong one reviews. [Configuration](docs/configuration.md)
+Any OpenAI-compatible endpoint, Ollama and llama.cpp. A cheap model filters findings and a strong one reviews. [Configuration](docs/configuration.md)
 </div>
 
 <div class="np-card" markdown>
@@ -59,7 +59,7 @@ Definitions the change uses, attached by default. Callers of what it redefines, 
 
 <div class="np-card" markdown>
 <p class="np-card-title">Trust model</p>
-Policy from the base revision. By default, a PR cannot change endpoints or credentials. [Trust model](docs/trust-model.md)
+Policy comes from the target branch. By default, a PR cannot change endpoints or credentials. [Trust model](docs/trust-model.md)
 </div>
 
 <div class="np-card" markdown>
@@ -69,7 +69,7 @@ golangci-lint, ruff, eslint, semgrep and more. Their output is evidence for the 
 
 <div class="np-card" markdown>
 <p class="np-card-title">Measurements and the bugs found in them</p>
-Five benchmark sets, no model judge. Twenty bugs in the measuring code are tabled, and one published claim was retracted. [Findings](docs/findings.md)
+Detection is counted against planted defects, not scored by a model. Twenty bugs in the measuring code are tabled, and one published claim was retracted. [Findings](docs/findings.md)
 </div>
 
 </div>
@@ -78,10 +78,10 @@ Five benchmark sets, no model judge. Twenty bugs in the measuring code are table
 
 ## How a review runs
 
-1. The change is read from GitHub or a local checkout, and the policy it is reviewed under comes from the base revision, not the branch.
+1. The change is read from GitHub or a local checkout, and the policy it is reviewed under comes from the target branch, not the pull request branch.
 2. Analyzers that are installed run against the changed lines, isolated from the tree, and their output becomes evidence.
 3. Files are bundled into batches under a token budget, with related context attached: what a changed line calls by default, and who calls what the change redefined when the caller walk is switched on.
-4. Each batch is reviewed by the model the route selects. A triage model merges and filters. An optional expert pass refutes.
+4. Each batch is reviewed by the model your configuration assigns to it. A cheaper model merges and filters the findings. An optional second pass tries to refute them.
 5. The review is posted as inline comments, with a summary that lists every file not reviewed, every analyzer that did not run, and every finding that was discarded and why.
 
 [Read the full walkthrough](docs/how-a-review-runs.md)
