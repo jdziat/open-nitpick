@@ -12,7 +12,7 @@ Two effects are confounded in the +ctx arm of the tuning corpus:
    is defensible: the Snapshot contract they read is explicitly permissive.
 2. **Relevance**: the related collector attaches every definition the
    changed lines name, up to 12 per file and 80 lines per definition. It has
-   no signal for whether a definition actually decides a finding. A memo key
+   no signal for whether a definition decides a finding. A memo key
    contract next to an unrelated helper is equally "related" to it.
 
 This experiment separates the two.
@@ -45,7 +45,7 @@ result. Re-run any pair that differs by fewer than 2 plants.
 - D beats C: relevance ranking helps beyond framing. Add a relevance score
   to the related collector.
 - C and D both miss cross-file-copy-nit: the plant itself is ambiguous, and
-  the fixture needs redesign, not the runner.
+  the fixture needs redesign.
 - C and D both match B: framing was not the problem; the +ctx drop is pure
   attention dilution, and no phrasing fix will recover it.
 
@@ -155,7 +155,7 @@ Both sit 0.06 below their same-run no-ctx floor. cross-file-copy-nit remains
 4. **Hard floor:** cross-file-copy-nit, sorted-for-min-nit, and
    kotlin-widened-input stay mostly missed under every preamble. Framing is
    not recovering the remaining gap to no-ctx; those plants need fixture or
-   collector work, not another sentence.
+   collector work.
 
 **Ship nothing.** Keep the shipped "Context only" sentence as the default.
 Keep `review.related_context_preamble` so an operator can set C0. Do not
@@ -173,7 +173,7 @@ The plant went dark under every preamble because two things stacked:
 1. A justifying comment above the caller's copy ("Keep our own copy so nothing
    the store does later can change…") gave models cover to call the copy
    intentional defensive programming once Snapshot's contract was visible.
-2. Keyword credit lagged the words models actually used (`re-copies`,
+2. Keyword credit lagged the words models used (`re-copies`,
    `caller-owned`, `duplicates the whole`), and one Why phrase was a known
    gap (`knownWhyGaps`).
 

@@ -8,7 +8,7 @@ review ([Findings](findings.md#retrieved-knowledge-and-a-pre-registration-i-got-
 Every plant has a matching corpus entry by construction, and the entries were
 written by the same author as the fixtures that retrieve them. It establishes
 that retrieval works. It says nothing about whether the corpus covers defects a
-repository actually has, which is the only question that decides whether
+repository has, which is the only question that decides whether
 `review.knowledge` should ever default on.
 
 The registration is [`internal/evals/testdata/knowledge-eval/preregistration.yaml`](../internal/evals/testdata/knowledge-eval/preregistration.yaml)

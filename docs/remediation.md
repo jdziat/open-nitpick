@@ -1,6 +1,6 @@
 # Remediation plan: the misses on the benchmark repository
 
-Written against the first end-to-end run on `jdziat/nitpick-bench`
+Written against the first run through GitHub on `jdziat/nitpick-bench`
 (2026-09-03): 44 pull requests, 33 of 41 plants located, one noise finding,
 beside Incumbent's hosted app at 30 of 41 and five. Every miss was read from
 the pull request it happened on (the walkthrough this tool posted, the
@@ -44,7 +44,7 @@ as a diff and a committable suggestion.
 
 **Answers:** rust-crate-for-one-call, sorted-for-min-nit, and an unknown
 share of every other result, on both sides. Incumbent's retry comment
-literally says "If this is only a fixture, keep it out of production request
+says "If this is only a fixture, keep it out of production request
 paths."
 
 **Change.** `cmd/benchrepo` lays fixtures out under a neutral root
@@ -235,7 +235,7 @@ two days.
 
 Steps 5, 3 and 6 have no dependencies and run beside 1. Nothing here
 re-spends the held-out corpus, and nothing here is tuned against the
-benchmark repository: it is re-run to confirm, not iterated against.
+benchmark repository: it is re-run to confirm.
 
 ## What this plan does not do
 
@@ -255,8 +255,8 @@ otherwise; one run per table, Rule 15 throughout.
 | step | done | measured |
 |---|---|---|
 | 0 benchmark layout | yes: `services/`, engineer-written titles, opaque branches, answer key on our side | re-run: ours 33/41 again; Incumbent's app throttled at 8 of 44 reviews after the earlier batch, so its column waits |
-| 1 triage keeps small findings | yes, on the second attempt (below) | tuning 0.88 → 0.88; multi-file 1.00 → 1.00 |
-| 2 noticed consequences become findings | yes | info corpus 0.20 → 0.55–0.65 (4 → 11–13 of 20) |
+| 1 triage keeps small findings | yes, on the second attempt (below) | tuning 0.88 to 0.88; multi-file 1.00 to 1.00 |
+| 2 noticed consequences become findings | yes | info corpus 0.20 to 0.55–0.65 (4 to 11–13 of 20) |
 | 3 Action installs analyzers | yes: `analyzers: auto` | not yet exercised on the benchmark repository |
 | 4 committable multi-line fixes | yes, validated against the diff | judged pass not run |
 | 5 near-miss column | yes | in every table above as NEAR |
@@ -313,7 +313,7 @@ now says the reviewer is capable (sonnet 11–13 of 20) and these four
 particular plants stay hard: two runs of the tuning corpus since the change
 located `go-package-singleton` once.
 
-**The noise is mostly the analyzers, and it is honest noise.** Of the twelve
+**The noise is mostly the analyzers, and the analyzers report it accurately.** Of the twelve
 extra noise findings, nine are analyzer output that `min_severity: nit`
 publishes: biome's "template literals are preferred" on three TypeScript
 lines, sqlfluff's capitalisation rule and an "unparsable SQL" on a valid

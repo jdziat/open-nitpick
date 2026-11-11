@@ -96,7 +96,7 @@ found from here on gets a row rather than an ordinal.
 | the severity withdrawal keyed on the reporter's NAME (`model != IncumbentModel`) | a contender added without anyone thinking about it was published at our resolution by default; `internal/linters` already folds four analyzers onto a codomain excluding `critical` and `nit` | latent |
 | the withdrawal applied to one of the metric's two renderings | `O-*` was gated on vocabulary and the `SEV a/i/u` cell was formatted inline, so "a foreign row prints `n/a`" held only because that table had no foreign row | latent |
 | `STABLE` returned `yes` for five silent runs | the column's best value went to a reviewer that never spoke; a wobbly correct one got `NO` | favoured silence |
-| the retraction's own figures (`10 of 10`, `0.62 → 0.88`, `O-ACC 0.63`) | none reproduced; each overstated the case it was making | favoured the author |
+| the retraction's own figures (`10 of 10`, `0.62 to 0.88`, `O-ACC 0.63`) | none reproduced; each overstated the case it was making | favoured the author |
 | two unplanted defects shipped in the tuning corpus | a 0600 to 0666 file mode and an error string written to an HTTP response were scored as noise against every model that reported them | against whichever reviewer read the code |
 | the grounding instrument counted tokens the template forbids the walkthrough to name | numerator and denominator were both zero, so six walkthroughs from two arms all scored a perfect 1.00 | favoured the arm that wrote less |
 
@@ -195,7 +195,7 @@ belongs: `warning` is its plurality landing, which is why `crSeverity` maps it
 there, and swapping the constant moves the published full-resolution triple from
 6/4/4 to 5/8/1. What the corpus cannot supply is a *single* level that is right
 for every plant the word lands on, which is the reason no cross-tool severity
-score is published, not an absence of evidence.
+score is published.
 
 The original mapping was not careless. It was written to stop Incumbent reading
 as *inflated*, since its `critical` spans what we split into `critical` and
@@ -397,7 +397,7 @@ of the alphabetically first file in the package rather than the file that failed
 Measured against 2.8.0: one broken file abandons the entire invocation, so a
 second healthy package in the same run reports nothing either, and under the
 default `only_changed_lines` the single issue is dropped by `normalize` because
-line 1 was not touched. End to end that was zero published findings, a nil error,
+line 1 was not touched. Through publication that was zero published findings, a nil error,
 and status `ran: isolated`, byte-identical to a clean review, in `strict` as
 well as `auto`. The sharpest form is a broken `_test.go`, which `go build ./...`
 does not catch, so CI stays green while the Go review of everything else in the
@@ -940,7 +940,7 @@ Read the run dumps first; most of the noise was ours.
   prices a composite run per model. Routed cheap models match qwen3.8-27b's
   recall and near its noise at a third of its cost.
 - **An ensemble of two cheap reviewers with a mid-model rerank has the
-  highest weighted recall measured (0.84)** and pays in noise (0.21 – 0.38).
+  highest weighted recall measured (0.84)** and pays in noise (0.21 to 0.38).
   The rerank merges duplicates; it does not yet discount what one reviewer
   said and the other did not. Next lever.
 - **A rule that matched nothing.** `min_files` matches the batch, batches
@@ -994,7 +994,7 @@ checkout that type-checks, which production has only in the Action.
 |---|---|---|---|
 | glm + callers, first cut | 0.62 (5/8) | 0.17 | $0.0007 |
 | glm + callers, constants attached | **0.88** (7/8) | 0.08 | $0.0005 |
-| glm, diff only | 0.00 (0/8) | 0.50 – 0.58 | $0.0007 – $0.0008 |
+| glm, diff only | 0.00 (0/8) | 0.50 to 0.58 | $0.0007 to $0.0008 |
 | incumbent/cli | 0.00 (0/4) | 0.33 | |
 
 Incumbent's one finding on `go-error-identity-changed` says the sentinel
@@ -1036,7 +1036,7 @@ on the Python clean control.
   configuration that moved the noise floor without paying recall. Tuning
   corpus, two runs, validation on: recall 0.78 / 0.75 (no context / with)
   against glm alone at 0.74 / 0.75 the day before; noise 0.22 against
-  0.40 – 0.45; $0.011 – $0.014 a review. Ten times glm alone, and still
+  0.40 to 0.45; $0.011 to $0.014 a review. Ten times glm alone, and still
   under the cheapest metered competitor.
 - **Cost reporting checks out.** One fixture on an isolated OpenRouter key:
   the runner said $0.0658, the dashboard showed $0.06 for Kimi and $0.01
@@ -1180,7 +1180,7 @@ sampled with a fixed seed from the Go and Python standard libraries on the
 generating machine. TypeScript has no human control: there is no
 human-written TypeScript on that machine that is not itself a dependency.
 Seventeen generations came back empty twice and were left out, so the
-corpus is 223 files, not 240.
+corpus is 223 files of the 240 planned.
 
 **The instrument.** Twenty-two features a reader could notice without
 reading for meaning: comment density and length, how often a comment
@@ -1265,7 +1265,7 @@ separate defect that a unit test now pins:
   (`TestAdvisoryRulesAreRecognizedQualifiedOrBare`).
 - **Triage rewords, and a rewording is a new finding.** Once recognized,
   the CVEs still went through triage, which reworded them (losing the
-  analyzer attribution, by design) in one run and merged all four into
+  analyzer attribution) in one run and merged all four into
   its own "has known CVEs" finding in the next. A CVE is deterministic
   evidence; it is now held out of triage and validation and rejoined
   before the ceiling and the gate (`TestKnownAdvisoriesAreNotTriaged`).
@@ -1373,8 +1373,8 @@ and `export default`; glm-5.3-flash writes `from __future__ import
 annotations` and JSDoc `* /`; gemma-4 and qwen3.8 leave almost no bigram
 above the threshold, which is consistent with their rows in the matrices.
 The human control's idioms after stripping are `internal /`, `unsafe .`,
-`bytes .`, `encoding .`: it is recognised as standard-library code, not as
-a person, and that is what it is. The corpus has no human control in
+`bytes .`, `encoding .`: it is recognised as standard-library code and
+not as a person, and that is what it is. The corpus has no human control in
 TypeScript and none in the second generation, so no number above says
 anything about telling a model from a person; it says which of six models
 a file is nearest to.
@@ -1538,7 +1538,7 @@ that ran them are both removed: the walkthrough is no longer generated at
 all, so there is nothing left to ground. The numbers are the record of why. Groundedness is the share of a walkthrough's content words that appear in
 its own diff, stopwords removed.
 
-| arm | groundedness | content words | walkthrough words | wrote nothing | recall | unmatched findings |
+| arm | groundedness | content words | walkthrough words | wrote nothing | recall | findings matching no defect |
 |---|---|---|---|---|---|---|
 | ungrounded | 0.22 | 76 | 183 | 2 of 6 | 1.00 (6/6) | 1 |
 | grounded | 0.34 | 105 | 226 | 0 of 6 | 1.00 (6/6) | 0 |
@@ -1546,7 +1546,7 @@ its own diff, stopwords removed.
 **Recall is at the ceiling in both arms, so this run cannot answer the question
 it was built for.** Six of six planted defects were found either way. A corpus
 where both arms score 1.00 has no room to show that grounding helps or harms
-detection, and the one unmatched finding that disappeared is a single event.
+detection, and the one finding matching no defect that disappeared is a single event.
 
 On the walkthrough the arms do separate. The right comparison is the four
 fixtures where both arms write, 0.22 against 0.32, because the two clean
@@ -1557,7 +1557,7 @@ flattered by those two empty walkthroughs. That was wrong about the
 arithmetic. The aggregate pools matched and total word counts, and an empty
 summary returns zero for both, so it contributes to neither the numerator nor
 the denominator and cannot move the pooled rate. The four-fixture figure is
-the honest one because it compares the same fixtures, not because it removes a
+the comparable one because it compares the same fixtures, not because it removes a
 depressing zero.
 
 **What the metric cannot do.** It counts vocabulary overlap, so it cannot tell
@@ -2074,7 +2074,7 @@ red.
 One thing worth recording as a cost rather than a feature. Reading a whole tree
 to measure it is affordable over a clone and is thousands of requests over an
 API, so this needs the checkout the Action always has. A reviewer running
-against a forge with no clone gets a skip and a reason, which is honest and is
+against a forge with no clone gets a skip and a reason, which is accurate and is
 also less than the feature promises.
 
 ### The analyzers become the instrument (2026-09-10)
@@ -2169,7 +2169,7 @@ committed with a number nobody believes.
 Planning required an added line, and finding placement snapped only to added
 lines. A change that deleted a guard without adding anything was skipped
 entirely. Three regression tests reproduced the failure: anchor resolution,
-planner admission, and an end-to-end scripted review through publication.
+planner admission, and a scripted review from diff through publication.
 
 `CommentableLines` now includes surviving context immediately beside a
 removal-only edit block. Added-line detection remains separate, and a
@@ -2184,7 +2184,7 @@ only the redundant guard was reviewed without findings in 4.20 seconds.
 GLM-5.3-Flash reviewed through OpenRouter Baseten fp8, Qwen3.8-27b triaged through
 Parasail fp8, with Voyage Code 4 retrieval, low reasoning, and linters off.
 The clean control recovered from two provider retries. This single bug/control
-check establishes coverage of that edit shape, not general recall.
+check establishes coverage of that edit shape only.
 
 `go test ./...` passed. A subsequent model review read all six implementation
 and test files and returned no findings; that is not proof of correctness.
@@ -2368,7 +2368,7 @@ swallowed serialization/write errors were retained as one slop finding (74.25 s,
 4,495 input / 3,622 output tokens). The good helper returned encoder errors through
 the caller and produced zero findings (23.68 s, 1,153 / 1,012 tokens). Findings can
 land in slop or design because the engine preserves the selected defect class;
-this pair demonstrates one lost-failure mechanism, not comprehensive design recall.
+this pair demonstrates one lost-failure mechanism and says nothing about design recall in general.
 
 
 Four further mutations were killed by the intended assertions: dropping expert
@@ -2383,8 +2383,8 @@ file targets and found zero violations. It examined 584 text targets, retained
 snapshot. The selected one-commit range conformed. Slop and design model checks
 were deliberately disabled and reported unavailable; no explicit import boundary
 was configured. The overall engineering profile therefore exited 2. These counts
-establish deterministic coverage for that worktree, not complete internal
-best-practice compliance or a clean semantic-slop assessment.
+establish deterministic coverage for that worktree and say nothing about internal
+best-practice compliance or semantic slop.
 
 That assessment identified its source as `worktree:sha256:4cefb4d6712de813395a8c6f073f4ae95a808a29d28332ac135f0329a078d3bd`
 and accepted policy as `70a43ac107f6bcb4a3e25bb6e6840adf0f3544af9244946cba1854efbeb25376`.
@@ -2444,7 +2444,7 @@ Which chat model should drive `nitpick security`'s optional model pass.
 same instruction the command injects (`internal/security.Instruction`). Corpus
 is seven security-class plants plus `clean-refactor` and `style-only` (Rule 10
 silence). Eight contenders, two runs each, with and without related context, one
-within-run table (Rule 2). Linters off so the score is the model. Harness limit:
+within-run table (Rule 2). Linters off so the score is the model. Runner limit:
 review and triage are the same weights (not the shipped luna+glm pairing).
 
 **Dump.** `internal/evals/.eval-runs/multifile-mixed-20260918T125032Z-2476545.jsonl`.
@@ -2539,7 +2539,7 @@ batteries.
 `multifile-security-20260919T011046Z-500927.jsonl` gives luna **9/10** (0.90),
 luna +ctx **10/10** (1.00). The old 0.75/0.83 was the unscoped denominator.
 
-**Live end-to-end with the layer (2026-09-19):**
+**Live run through publication with the layer (2026-09-19):**
 `make eval-security MODELS=openai/gpt-5.6-luna RUNS=1` gives RECALL **0.90** /
 **1.00** (+ctx); `multi-defect` **1/1** (not 1/3); severity error band **2/2**
 (not 2/4); header `SECURITY tuning`. Matches the dump re-score. With +ctx
@@ -2638,7 +2638,7 @@ most loaded runners, so the range is the number to keep; the baseline is the
 one pre-change run at 1m6s. Model batch time swings as
 widely, 4s to 2m7s over the same runs with a median near 1m25s, so it is still
 the larger part of a review. What is left to measure is the fixed pre-batch
-step as a whole, not this read alone.
+step as a whole.
 
 The read still cost one forge request per file and directory, about 490, plus
 two more per file because a read that named no revision fetched the pull
@@ -2660,6 +2660,6 @@ cannot fail it without a regression. Three siblings pin what the overlap must
 not change: the files kept under the path limit, the omission reasons, and one
 error per failed request. Each fails when the concurrency it guards is removed.
 
-The read is bounded, not just overlapped: the prefetch holds at most eight
+The read is bounded as well as overlapped: the prefetch holds at most eight
 answers, so a large path limit with a small byte budget no longer fetches the
 whole inventory before cutting it off.

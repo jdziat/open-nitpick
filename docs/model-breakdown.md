@@ -120,8 +120,7 @@ Zero noise, perfect severity, perfect class across both judges, in
 every row it ran. Also the smallest recall (0.75 without context, 0.56
 with, the only contender whose recall drops when context turns on).
 At $0.0184 per review it is 12× glm-5.3-flash and 37× luna, which makes
-it a reviewer you pay for the review you trust, not the review that
-finds the most.
+it a reviewer you pay for the review you trust rather than for the most findings.
 
 ## Per-role pairing
 
@@ -315,7 +314,7 @@ corpus. Turn it ON for laguna; it gives a small noise improvement with no
 recall cost.
 
 
-## Why +ctx hurts recall: what the data actually shows
+## Why +ctx hurts recall: what the data shows
 
 The +ctx recall drops are not runner failures or context-length truncation.
 Every "silent" +ctx record has silent=True in the dump, meaning the model
@@ -331,7 +330,7 @@ and the Snapshot doc comment explicitly says "The returned slice is a fresh one
 the caller owns." Deepseek, qwen3.8-flash, and qwen3.8-max all read that
 contract and conclude the copy in summary.go is intentional defensive
 programming -- and they are not entirely wrong. The +ctx arm is making the
-plant harder to find correctly, not easier.
+plant harder to find correctly.
 
 This is a real evaluation problem: the fixture was designed to test cross-file
 contract reading, but with the contract explicitly visible, the correct answer

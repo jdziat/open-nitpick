@@ -248,7 +248,7 @@ A reviewer that reports nothing except this corpus's `critical` plants, and call
 them `critical`, therefore scores `O-ACC` 1.000 with no inflation and no
 understatement: an exact tie with a perfectly calibrated reviewer, on 4 of 29
 plants. Selective silence is not calibration. `O-COV` is the share of planted
-defects the triple covers and is printed with it, never without.
+defects the triple covers and is always printed with it.
 
 The same strategy defeated the *description* too, and for the same reason. The
 vocabulary block omitted levels nobody located, so this reviewer's page was one
@@ -337,7 +337,7 @@ behaviour by being handed the number the column would print if it did. Running
 the real path also cost one row its justification: measured properly, a
 line-by-line spammer is *more* expensive than an explained reviewer, so `$/DEFECT`
 caught it and `NOISE` was not load-bearing at all. What is cheap is
-refusing to explain, not filing more.
+refusing to explain.
 
 **Rule 6d: ask what maximises every column, before publishing it.** The banded
 column shipped because nobody did. `PublishedMetrics` registers every model-free
@@ -529,7 +529,7 @@ rather than edited into the rule.**
   all of them inside the radius, renders NOISE 0.00, the value a perfectly
   calibrated reviewer earns. That is `radiusSpamReview` in the degenerate table,
   and it is caught by ANCHOR (which unions every finding claiming one defect) and
-  by L/DEF, not by NOISE.
+  by L/DEF, and NOISE does not see it.
 - *Condition 4 thresholds a MAXIMUM against another reviewer's maximum, and a
   maximum is not a bound on the behaviour the condition names.* The incumbent's
   ANCHOR is its single worst finding. Read as "no wider than theirs", that one

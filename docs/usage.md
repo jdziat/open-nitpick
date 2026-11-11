@@ -77,7 +77,7 @@ OpenRouter, needing `OPENROUTER_API_KEY`. It aims for feedback in under a minute
 through parallel diff-only requests, disabled reasoning, and a 4096-token
 output cap. There is no hard wall-clock ceiling; provider timeouts still apply.
 It skips related repository context, linters, validation and model triage,
-and refuses the engineering profile. Its receipt discloses omissions and
+and refuses the engineering profile. Its output lists omissions and
 lower-ranked findings withheld from the top ten. It never supplies an
 incremental baseline, closes earlier threads, or approves a pull request;
 use `nitpick review` for a complete review.
@@ -227,7 +227,7 @@ The graph is built from Go source by name, without type checking. A call
 through an interface or a package-level table is not drawn, so a missing arrow
 does not prove there is no call. A diagram stops at 30 nodes and says so. It is
 off by default, appears even with `review.summary: false`, and covers Go only;
-Routes are found by shape, not per framework.
+Routes are found by shape, with no per-framework code.
 
 A language no probe reads is named in the report rather than left out of it.
 Six probes read Go today and nothing reads anything else, so a TypeScript tree
@@ -345,7 +345,7 @@ much each would remove. The tells need no model and run first.
 | `slogan-heading` | a heading that sells: "written down", "done right" |
 | `stock-word` | `seamless`, `robust`, `leverage`, `comprehensive` |
 | `summary-opener` | a sentence opened with "Overall," or "In summary," |
-| `not-just-but` | "not just X but Y" |
+| `not-just-but` | "not just X but Y" | <!-- copy-scan:ignore -->
 
 Prose files are scanned whole. Source files are scanned in their comments only,
 so a string literal is never a tell. Then,
@@ -422,7 +422,7 @@ Repository configuration edits cannot weaken their own checks.
 Engineering JSON reports use schema version 2. Completed design tasks require
 source scope and a source digest; schema 1 reports predate that requirement and
 must be regenerated before validating them with this version. Digests are opaque
-bindings local to the task builder, not portable model-cache keys.
+bindings local to the task builder and are not portable model-cache keys.
 
 Each check reports what it planned, examined and omitted. Exit 0 means selected
 policy was satisfied, 1 means blocking findings, and 2 means incomplete required

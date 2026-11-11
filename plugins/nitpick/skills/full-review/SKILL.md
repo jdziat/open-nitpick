@@ -39,7 +39,7 @@ time or with another repository; a single number is not a judgement.
 1. Work the plan in its order. The first items are the ones a person
    would want fixed before anything else.
 2. Known advisories name a package, a version and an advisory id; the fix
-   is a version bump, and the plan counts files, not hours.
+   is a version bump, and the plan counts files.
 3. When the notice says files were left out, either review them in a
    second call with `paths` naming them, or say they were not reviewed.
 4. On a large repository, prefer several calls over several directories
