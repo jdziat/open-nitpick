@@ -113,7 +113,7 @@ This project makes empirical claims about review quality. These pages say how th
 - [Remediation](docs/remediation.md): every miss on the benchmark
   repository, its cause read from the pull request, and the plan.
 - [Findings](docs/findings.md): every measurement taken and what it
-  supports. It also tables the instrument bugs found so far. Some of those bugs
+  supports. It also tables the measurement bugs found so far. Some of those bugs
   flattered one side of a comparison, and one put a claim on this page that had
   to be retracted.
 
