@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -445,5 +446,28 @@ func TestDesignSourceCaptureReportsEachFailedRequestOnce(t *testing.T) {
 	}
 	if !slices.Equal(gone, []string{"pkg02/f01.go"}) {
 		t.Errorf("omitted %v, want only pkg02/f01.go", gone)
+	}
+}
+
+// stop must not return while a worker is still inside the caller's fetcher,
+// or the caller may tear down what the fetcher closes over.
+func TestFetchStreamStopWaitsForWorkersInsideTheFetcher(t *testing.T) {
+	var running atomic.Int32
+	entered := make(chan struct{}, 2)
+	release := make(chan struct{})
+	fetch := func(_ context.Context, name string) ([]byte, error) {
+		running.Add(1)
+		defer running.Add(-1)
+		entered <- struct{}{}
+		<-release
+		return nil, nil
+	}
+	s := newFetchStream(t.Context(), []string{"a", "b"}, 2, fetch)
+	<-entered
+	<-entered
+	go func() { time.Sleep(30 * time.Millisecond); close(release) }()
+	s.stop()
+	if n := running.Load(); n != 0 {
+		t.Errorf("%d fetches still running after stop returned", n)
 	}
 }

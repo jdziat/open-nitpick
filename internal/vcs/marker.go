@@ -26,6 +26,26 @@ func fingerprintMarker(fingerprint, class string) string {
 	return fmt.Sprintf("<!-- open-nitpick fp:%s class:%s -->", fingerprint, class)
 }
 
+// severityMarker records the severity of the finding a comment reports, so a
+// later run can tell whether a thread it did not re-read still stands at a
+// level that matters.
+//
+// A marker of its own rather than a field in the fingerprint marker: a
+// release that predates it parses that marker with an exact pattern, and a
+// workflow pinned to such a release would stop recognising every new thread.
+func severityMarker(severity string) string {
+	if severity == "" {
+		return ""
+	}
+	return fmt.Sprintf("<!-- open-nitpick sev:%s -->", severity)
+}
+
+// roundMarker records that a review came from a run whose pipeline finished,
+// which is what makes it a round of the series. It is separate from the
+// completion marker because that one also needs every file covered, and a pull
+// request with one oversized file would then never count a round.
+const roundMarker = "<!-- open-nitpick round -->"
+
 // headMarker records the revision a review looked at.
 func headMarker(sha string) string {
 	if strings.TrimSpace(sha) == "" {
@@ -50,6 +70,8 @@ func spendMarker(dollars float64) string {
 
 var (
 	fingerprintPattern = regexp.MustCompile(`<!-- open-nitpick fp:([0-9a-f]+) class:([a-z_-]*) -->`)
+	severityPattern    = regexp.MustCompile(`<!-- open-nitpick sev:([a-z]+) -->`)
+	roundPattern       = regexp.MustCompile(regexp.QuoteMeta(roundMarker))
 	headPattern        = regexp.MustCompile(`<!-- open-nitpick head:([0-9a-fA-F]+) -->`)
 	// Six decimal places, because that is what spendMarker writes. A looser
 	// pattern would read a hand-written "spend:1" out of a body somebody else
@@ -81,12 +103,33 @@ func FingerprintOf(body string) string {
 }
 
 // parseFingerprint reads a comment's fingerprint marker back.
+//
+// The last marker is the one read. Markers are appended after the comment's
+// text, so anything earlier in the body is text that survived stripping, and
+// reading it first would let that text speak for the comment.
 func parseFingerprint(body string) (fingerprint, class string, ok bool) {
-	m := fingerprintPattern.FindStringSubmatch(body)
+	m := lastMatch(fingerprintPattern, body)
 	if m == nil {
 		return "", "", false
 	}
 	return m[1], m[2], true
+}
+
+// parseSeverity reads a comment's severity marker back, or "" for a comment
+// published before comments carried one.
+func parseSeverity(body string) string {
+	if m := lastMatch(severityPattern, body); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+func lastMatch(re *regexp.Regexp, body string) []string {
+	all := re.FindAllStringSubmatch(body, -1)
+	if len(all) == 0 {
+		return nil
+	}
+	return all[len(all)-1]
 }
 
 // parseHead reads a review body's head marker back.
@@ -104,11 +147,21 @@ func completionMarker(sha string) string {
 }
 
 // stripMarkers keeps model-authored prose from supplying persisted review state.
+//
+// It repeats until nothing changes, because one pass can assemble a marker:
+// removing one nested inside another leaves the outer one whole.
 func stripMarkers(body string) string {
-	for _, pattern := range []*regexp.Regexp{headPattern, spendPattern, fingerprintPattern, completionPattern, progressPattern} {
-		body = pattern.ReplaceAllString(body, "")
+	patterns := []*regexp.Regexp{headPattern, spendPattern, fingerprintPattern, severityPattern,
+		roundPattern, completionPattern, progressPattern}
+	for {
+		before := body
+		for _, pattern := range patterns {
+			body = pattern.ReplaceAllString(body, "")
+		}
+		if body == before {
+			return body
+		}
 	}
-	return body
 }
 
 var completionPattern = regexp.MustCompile(`<!-- open-nitpick complete:([0-9a-fA-F]+) -->`)

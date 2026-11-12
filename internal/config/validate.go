@@ -153,7 +153,10 @@ func (s ModelSpec) validate(required bool) []error {
 		}
 	}
 
-	if s.Temperature != nil && (*s.Temperature < 0 || *s.Temperature > 2) {
+	// !(t >= 0 && t <= 2) rather than t < 0 || t > 2: NaN fails every
+	// comparison, so the second form admits it, and a NaN cannot be encoded
+	// into the request or into the client's cache key.
+	if s.Temperature != nil && !(*s.Temperature >= 0 && *s.Temperature <= 2) {
 		errs = append(errs, fmt.Errorf("temperature %.2f out of range [0, 2]", *s.Temperature))
 	}
 	if s.MaxTokens < 0 {
@@ -274,6 +277,15 @@ func (r Review) validate() []error {
 	}
 	if !r.FailOn.Valid() {
 		errs = append(errs, fmt.Errorf("review.fail_on %q is not a severity", r.FailOn))
+	}
+	if r.MaxRounds < 0 {
+		errs = append(errs, fmt.Errorf("review.max_rounds cannot be negative, got %d", r.MaxRounds))
+	}
+	// "none" is refused rather than read as "never settle": it is the fail_on
+	// spelling for "no threshold", and on this key it would silently do the
+	// opposite of what the same word does there.
+	if r.StopAt != "" && !r.StopAt.IsFinding() {
+		errs = append(errs, fmt.Errorf("review.stop_at %q is not a finding severity; leave it empty to never settle", r.StopAt))
 	}
 	if !r.MinSeverity.Valid() {
 		errs = append(errs, fmt.Errorf("review.min_severity %q is not a severity", r.MinSeverity))

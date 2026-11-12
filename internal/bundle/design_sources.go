@@ -357,6 +357,7 @@ type fetchStream struct {
 	cursor   int
 	stopped  bool
 	once     sync.Once
+	workers  sync.WaitGroup
 }
 
 func newFetchStream(ctx context.Context, want []string, window int, fetch ContentFetcher) *fetchStream {
@@ -378,8 +379,12 @@ func newFetchStream(ctx context.Context, want []string, window int, fetch Conten
 		s.todo <- i
 	}
 	close(s.todo)
+	s.workers.Add(window)
 	for w := 0; w < window; w++ {
-		go s.worker()
+		go func() {
+			defer s.workers.Done()
+			s.worker()
+		}()
 	}
 	return s
 }
@@ -429,11 +434,14 @@ func (s *fetchStream) discard() {
 	s.next()
 }
 
+// stop waits for workers so none is still inside the caller's fetcher when
+// CaptureDesignSources returns; a fetch already running finishes first.
 func (s *fetchStream) stop() {
 	s.once.Do(func() {
 		s.stopped = true
 		close(s.stopCh)
 	})
+	s.workers.Wait()
 }
 
 // invalidSourcePath reports a name that must not be read: not canonical, or

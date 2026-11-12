@@ -9,6 +9,7 @@ package llm
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -220,11 +221,13 @@ func (r *Roles) Each(fn func(*Client)) {
 }
 
 // For returns the client for a spec, building and caching it on first use.
-// The review client is returned for its own spec without a build, so a route
-// that names the default model shares its client.
+// The review client is returned for an identical spec without a build, so a
+// route that names the default model shares its client. Identical means every
+// setting: a client renders temperature, token and reasoning options from its
+// own Spec, so a route that differs only there needs a client of its own.
 func (r *Roles) For(spec config.ModelSpec) (*Client, error) {
-	key := spec.Key()
-	if r.Review != nil && r.Review.Spec.Key() == key {
+	key := specIdentity(spec)
+	if r.Review != nil && specIdentity(r.Review.Spec) == key {
 		return r.Review, nil
 	}
 
@@ -250,6 +253,21 @@ func (r *Roles) For(spec config.ModelSpec) (*Client, error) {
 	}
 	r.clients[key] = c
 	return c, nil
+}
+
+// specIdentity keys a client by the whole spec. ModelSpec.Key names only the
+// endpoint and weights, which would hand a route the review client's
+// generation settings.
+func specIdentity(spec config.ModelSpec) string {
+	b, err := json.Marshal(spec)
+	if err != nil {
+		// Validation keeps unencodable values out of a spec, so this is not
+		// expected. If it happens anyway, a key carrying the whole spec in Go
+		// syntax shares a client only between specs that are the same value,
+		// which is the safe direction.
+		return fmt.Sprintf("%#v", spec)
+	}
+	return string(b)
 }
 
 // WithLogger points every client at l and returns r, for the engine to call

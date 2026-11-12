@@ -3,6 +3,7 @@ package review
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -89,8 +90,33 @@ func TestSeverityIsAClosedEnumInTheSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(raw), `"enum"`) {
-		t.Error("severity should be a closed enum in the schema")
+	var schema struct {
+		Properties struct {
+			Findings struct {
+				Items struct {
+					Properties map[string]struct {
+						Enum []string `json:"enum"`
+					} `json:"properties"`
+				} `json:"items"`
+			} `json:"findings"`
+		} `json:"properties"`
+	}
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		t.Fatalf("unmarshal schema: %v", err)
+	}
+	// The class field is also an enum, so only the severity property's own
+	// list says whether severity is closed.
+	got := schema.Properties.Findings.Items.Properties["severity"].Enum
+	// Closed means exactly the severities a finding may carry: a value the
+	// gate does not handle would otherwise be offerable.
+	want := config.FindingSeverities()
+	if len(got) != len(want) {
+		t.Errorf("severity enum = %v, want exactly %v", got, want)
+	}
+	for _, w := range want {
+		if !slices.Contains(got, w) {
+			t.Errorf("severity enum %v is missing %q", got, w)
+		}
 	}
 	if strings.Contains(string(raw), `"none"`) {
 		t.Error("the none sentinel must not be offerable to the model")

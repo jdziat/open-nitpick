@@ -123,6 +123,12 @@ type Engine struct {
 	// Full bypasses result reuse on an explicit operator request.
 	Full bool
 
+	// Rounds carries the operator's -max-rounds and -stop-at. They are applied
+	// over the resolved policy rather than written into Config, because a
+	// change that edits .nitpick.yaml has its Config replaced by the base
+	// version and a flag written there would be lost with it.
+	Rounds RoundsOverride
+
 	// Resume reuses successful model requests while rerunning downstream checks.
 	Resume   bool
 	progress *reviewProgress
@@ -436,6 +442,10 @@ type Report struct {
 
 	// Skipped names the accepted policy decision that prevented a review.
 	Skipped string
+
+	// Rounds is where this run sits in the series of reviews of its pull
+	// request. Nil when neither review.max_rounds nor review.stop_at is set.
+	Rounds *RoundState
 
 	// Findings are the published findings, most severe first.
 	Findings []Finding
@@ -849,6 +859,11 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	report.prior = prior
 	if prior != nil {
 		report.PriorComments = len(prior.Comments)
+	}
+	// Before narrowing, linters and every model call: a run past the limit
+	// must cost nothing.
+	if err := e.checkRounds(ctx, ref, prior, report); err != nil {
+		return report, err
 	}
 	// Resume keeps the full plan for downstream checks; model requests reuse
 	// matching results later. A residual-only prior read must not shrink it.
@@ -1425,8 +1440,6 @@ func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.
 	return kept, note
 }
 
-// withholdAlreadyReported splits findings into those to publish and those an
-// earlier run already posted.
 // superseded resolves the earlier comments this run has outgrown: on an
 // incremental run, a comment whose lines changed since the earlier review
 // (its file was re-read, or the forge no longer places it on the diff) and
@@ -1673,6 +1686,8 @@ func (e *Engine) dismissals(ctx context.Context, ref vcs.Ref, prior *vcs.PriorRe
 	return read.Dismissed
 }
 
+// withholdAlreadyReported splits findings into those to publish and those an
+// earlier run already posted.
 func withholdAlreadyReported(findings []Finding, prior *vcs.PriorReview) (publish, withheld []Finding) {
 	if prior == nil || len(prior.Comments) == 0 {
 		return findings, nil
@@ -1886,6 +1901,9 @@ func (e *Engine) analyzeStyle(ctx context.Context, pr *vcs.PullRequest, plan *bu
 		return nil, fmt.Errorf("all %d style batches failed", failures)
 	}
 
+	// Batches finish in whatever order they finish; triage's prompt has to be
+	// the same on every run, as analyze()'s is.
+	sortFindings(out)
 	return out, nil
 }
 

@@ -743,3 +743,38 @@ func TestAbuseRetryGivesUpAfterThree(t *testing.T) {
 		t.Fatalf("served %d requests, want 3 attempts then give up", served)
 	}
 }
+
+type scriptedTripper struct {
+	bodies []string
+	status []int
+}
+
+func (s *scriptedTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	b, _ := io.ReadAll(req.Body)
+	_ = req.Body.Close()
+	s.bodies = append(s.bodies, string(b))
+	code := s.status[len(s.bodies)-1]
+	return &http.Response{StatusCode: code, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(""))}, nil
+}
+
+// The retry sends the request again, so it has to send the body again: the
+// first attempt drained it, and a 429 on a POST otherwise fails the publish.
+func TestTheAbuseRetryResendsTheRequestBody(t *testing.T) {
+	prev := timeSleep
+	timeSleep = func(time.Duration) {}
+	defer func() { timeSleep = prev }()
+
+	next := &scriptedTripper{status: []int{http.StatusTooManyRequests, http.StatusOK}}
+	req, err := http.NewRequest(http.MethodPost, "http://example.test/x", strings.NewReader(`{"body":"review"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := (&retryOnAbuse{next: next}).RoundTrip(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("RoundTrip = %v, %v", resp, err)
+	}
+	_ = resp.Body.Close()
+	if len(next.bodies) != 2 || next.bodies[1] != `{"body":"review"}` {
+		t.Errorf("bodies sent = %q, want the same payload twice", next.bodies)
+	}
+}

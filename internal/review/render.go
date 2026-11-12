@@ -47,6 +47,11 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 		Head:       report.Head,
 		Progress:   report.Progress,
 		Incomplete: !report.reusableCoverage(),
+		// A round is a finished run, not a fully covered one: gating it on
+		// reusableCoverage() would leave a pull request with one oversized file
+		// at round 1 forever. A fast review is a bounded look that may leave
+		// files unread, so it does not use up a round.
+		Round: report.PipelineComplete() && !report.FastReview,
 	}
 
 	// What this run was priced at, recorded with the review so a later run
@@ -79,6 +84,7 @@ func Render(report *Report, files diff.Files, cfg *config.Config) vcs.Review {
 			Body:        composeComment(f, emoji, agentPrompt, invite),
 			Fingerprint: Fingerprint(f),
 			Class:       f.Class,
+			Severity:    f.Sev().String(),
 		}
 		if f.FixValidated {
 			// A committable multi-line suggestion is a comment on the range

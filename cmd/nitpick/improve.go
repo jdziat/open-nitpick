@@ -112,6 +112,10 @@ func runImprove(ctx context.Context, gh *vcs.GitHub, repo string, cfg *config.Co
 	engine.Knowledge = k
 	engine.Standards = std
 	engine.StandardsStatus = stdStatus
+	// A person asked for this pass by name, and it suggests improvements
+	// rather than reviewing again, so the round limit does not apply to it.
+	noLimit := 0
+	engine.Rounds = review.RoundsOverride{MaxRounds: &noLimit}
 	// Linters stays nil. The analyzers are deterministic and the ordinary
 	// review already ran them; a second run would spend time to publish what is
 	// already on the pull request.

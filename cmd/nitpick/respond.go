@@ -170,6 +170,9 @@ func runRespond(ctx context.Context, args []string) error {
 		if err != nil || finding == nil {
 			return err
 		}
+		if ok, err := allowClose(ctx, gh, policy, ref, ev, converse.KindReply, log); !ok {
+			return err
+		}
 	}
 
 	log.Info("answering a comment", "kind", kind, "pr", ref.Number, "comment", ev.CommentID, "author", ev.Author)
@@ -188,6 +191,15 @@ func runRespond(ctx context.Context, args []string) error {
 	case converse.KindReview, converse.KindRestartReview:
 		reviewArgs := mentionReviewArgs(f, ref, kind)
 		err := runReview(ctx, reviewArgs)
+		if errors.Is(err, errRoundLimit) {
+			// Asked for a review the series has no rounds left for. Said in
+			// the conversation, because a confused reaction does not tell the
+			// person what to change.
+			return gh.CommentOnPullRequest(ctx, ref, fmt.Sprintf(
+				"@%s this pull request has had the review.max_rounds reviews it is allowed, so no model was called. "+
+					"Another review needs review.max_rounds raised in the base branch's configuration, "+
+					"or the workflow's max-rounds input changed.", ev.Author))
+		}
 		if err != nil && !errors.Is(err, errFindings) {
 			_ = gh.React(ctx, ref, ev.CommentID, ev.Inline, "confused")
 			return err
@@ -198,14 +210,7 @@ func runRespond(ctx context.Context, args []string) error {
 		if !ev.Inline {
 			return gh.CommentOnPullRequest(ctx, ref, fmt.Sprintf("@%s `%s resolve` works on an inline thread; on the conversation there is nothing to resolve.", ev.Author, mention))
 		}
-		resolved, err := gh.ResolveThreads(ctx, ref, []int64{ev.RootID}, fmt.Sprintf("Resolved on request by @%s.", ev.Author))
-		if err != nil {
-			return err
-		}
-		if len(resolved) == 0 {
-			return gh.ReplyToReviewComment(ctx, ref, ev.RootID, "This thread is already resolved, or it is not one I can resolve.")
-		}
-		return gh.React(ctx, ref, ev.CommentID, ev.Inline, "+1")
+		return resolveOnRequest(ctx, gh, policy, ref, ev, log)
 
 	case converse.KindFix:
 		return runFix(ctx, gh, policy, ref, ev, converse.FixesAll(text), log)

@@ -59,6 +59,21 @@ inputs:
       or none. Overrides review.fail_on.
     required: false
 
+  max-rounds:
+    description: >-
+      Stop after this many complete reviews of one pull request: a further run
+      calls no model, lists what is unresolved, sets result to "limit" and
+      exits 3. Overrides review.max_rounds. Empty uses the configuration; 0 is
+      no limit.
+    required: false
+
+  stop-at:
+    description: >-
+      Lowest severity that keeps a series of reviews going: nit, info, warning,
+      error or critical; none turns a configured stop_at off for this run. A run with nothing at or above it left standing sets
+      result to "settled" and exits 0. Overrides review.stop_at.
+    required: false
+
   instruction:
     description: An extra instruction applied to this run only.
     required: false
@@ -128,9 +143,17 @@ outputs:
       One of "clean" (no findings at or above fail-on), "findings" (the gate
       was tripped), "skipped" (a draft, with skip-drafts), "degraded"
       (findings published but triage did not run, with allow-degraded-triage),
-      or "error" (the review could not run). Distinguishing the last is the
-      point: a broken reviewer must not read as a passing one.
+      "settled" (findings remain, all below stop-at), "limit" (max-rounds
+      reached, no model called), or "error" (the review could not run).
+      Distinguishing the last is the point: a broken reviewer must not read
+      as a passing one.
     value: ${{ steps.review.outputs.result }}
+
+  round:
+    description: >-
+      This run's number in the series of reviews of the pull request. Set
+      only when max-rounds or stop-at is on.
+    value: ${{ steps.review.outputs.round }}
 
   findings:
     description: Number of findings published.
@@ -173,7 +196,9 @@ outputs:
       Whether the selected policy's required assessment completed. Ordinary
       reviews require every planned file and stage; the engineering profile
       uses practices.required and reports optional failures separately.
-      False sets result to "error" and exits 2 regardless of fail-on.
+      False sets result to "error" and exits 2 regardless of fail-on, except
+      for result "limit": a run stopped by max-rounds read nothing, so it is
+      not complete, and it exits 3.
     value: ${{ steps.review.outputs.complete }}
 
   failed_stages:
@@ -394,6 +419,8 @@ runs:
         PR_NUMBER: ${{ inputs.pr-number }}
         NITPICK_CONFIG: ${{ inputs.config }}
         NITPICK_FAIL_ON: ${{ inputs.fail-on }}
+        NITPICK_MAX_ROUNDS: ${{ inputs.max-rounds }}
+        NITPICK_STOP_AT: ${{ inputs.stop-at }}
         NITPICK_INSTRUCTION: ${{ inputs.instruction }}
         NITPICK_DRY_RUN: ${{ inputs.dry-run }}
         NITPICK_SKIP_DRAFTS: ${{ inputs.skip-drafts }}
@@ -416,6 +443,12 @@ runs:
         fi
         if [ -n "$NITPICK_FAIL_ON" ]; then
           flags+=(-fail-on "$NITPICK_FAIL_ON")
+        fi
+        if [ -n "$NITPICK_MAX_ROUNDS" ]; then
+          flags+=(-max-rounds "$NITPICK_MAX_ROUNDS")
+        fi
+        if [ -n "$NITPICK_STOP_AT" ]; then
+          flags+=(-stop-at "$NITPICK_STOP_AT")
         fi
         if [ -n "$NITPICK_INSTRUCTION" ]; then
           flags+=(-instruction "$NITPICK_INSTRUCTION")
@@ -511,9 +544,10 @@ runs:
         status=$?
         set -e
 
-        # Exit 1 indicates findings; other nonzero exits mean review failed.
+        # Exit 1 indicates findings and 3 that the round limit was reached;
+        # other nonzero exits mean review failed.
         case "$status" in
-          0|1) ;;
+          0|1|3) ;;
           *) echo "::error::open-nitpick failed to run (exit $status)"
              grep -q '^result=' "$GITHUB_OUTPUT" 2>/dev/null || echo "result=error" >> "$GITHUB_OUTPUT" ;;
         esac

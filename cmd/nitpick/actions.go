@@ -34,6 +34,8 @@ const (
 	resultSkipped  actionResult = "skipped"  // nothing was reviewed on purpose (a draft)
 	resultDegraded actionResult = "degraded" // findings published, triage did not run, and the caller allowed that
 	resultError    actionResult = "error"    // the review could not run
+	resultSettled  actionResult = "settled"  // findings remain, all below review.stop_at
+	resultLimit    actionResult = "limit"    // review.max_rounds reached; no model was called
 )
 
 // allowDegradedTriage reclassifies the one failure a caller can choose to
@@ -138,8 +140,13 @@ func (a actionsEnv) setOutputs(result actionResult, report *review.Report) {
 	// ranked. A nil report has neither, and reports itself incomplete.
 	complete, stages := false, ""
 	if report != nil {
-		complete = report.PipelineComplete()
+		// A limited run read nothing, which is not a finished review however
+		// empty its report looks.
+		complete = report.PipelineComplete() && result != resultLimit
 		stages = strings.Join(report.FailedStages(), ",")
+	}
+	if report != nil && report.Rounds != nil {
+		fmt.Fprintf(&b, "round=%d\n", report.Rounds.Round)
 	}
 	fmt.Fprintf(&b, "complete=%t\n", complete)
 	fmt.Fprintf(&b, "failed_stages=%s\n", stages)
@@ -273,4 +280,26 @@ func resultFor(report *review.Report, gate config.Severity) actionResult {
 		return resultFindings
 	}
 	return resultClean
+}
+
+// classify gives a finished review its result: the gate's answer, a failed
+// triage forgiven when the caller allowed it, and only then settled, so the
+// forgiven run is judged by the stop severity like a complete one.
+func classify(report *review.Report, gate config.Severity, allowDegraded bool) actionResult {
+	result := resultFor(report, gate)
+	if result == resultError && allowDegraded {
+		result = allowDegradedTriage(report, gate)
+	}
+	return settle(result, report)
+}
+
+// settle turns a findings result into settled when everything left sits below
+// the stop severity the engine resolved. Only findings convert: an error stays
+// an error however few findings the broken run produced, and Settled itself
+// refuses while a practices report has a blocking violation.
+func settle(result actionResult, report *review.Report) actionResult {
+	if result == resultFindings && report.Rounds != nil && report.Settled(report.Rounds.StopAt) {
+		return resultSettled
+	}
+	return result
 }

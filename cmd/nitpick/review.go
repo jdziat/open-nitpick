@@ -32,6 +32,8 @@ type reviewFlags struct {
 	head                string
 	instruction         string
 	failOn              string
+	maxRounds           int
+	stopAt              string
 	dryRun              bool
 	skipDraft           bool
 	allowDegradedTriage bool
@@ -65,6 +67,8 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	fs.StringVar(&f.head, "head", "", "head revision (default: the working tree)")
 	fs.StringVar(&f.instruction, "instruction", "", "extra instruction for this run only")
 	fs.StringVar(&f.failOn, "fail-on", "", "override review.fail_on (nit, info, warning, error, critical, none)")
+	fs.IntVar(&f.maxRounds, "max-rounds", -1, "override review.max_rounds: stop calling a model once this many complete reviews are on the pull request (0 is no limit)")
+	fs.StringVar(&f.stopAt, "stop-at", "", "override review.stop_at: report the series settled when nothing at or above this severity remains")
 	fs.StringVar(&f.owner, "owner", "", "GitHub repository owner")
 	fs.StringVar(&f.repoName, "repo-name", "", "GitHub repository name")
 	fs.IntVar(&f.pr, "pr", 0, "pull request number to review and comment on")
@@ -112,6 +116,19 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	// nothing, which is how -fail-on went missing in CI.
 	if fs.NArg() > 0 {
 		return fmt.Errorf("unexpected argument %q (flags must precede positional arguments)", fs.Arg(0))
+	}
+
+	// -1 is the flag's way of saying "absent"; any other negative was typed,
+	// and reading it as absent would quietly hand the decision to the config.
+	maxRoundsSet := false
+	fs.Visit(func(fl *flag.Flag) { maxRoundsSet = maxRoundsSet || fl.Name == "max-rounds" })
+	if maxRoundsSet && f.maxRounds < 0 {
+		return fmt.Errorf("invalid -max-rounds %d (0 lifts the limit)", f.maxRounds)
+	}
+	// "none" is accepted here, unlike in the configuration: it is how one run
+	// turns off a configured stop_at, as -max-rounds 0 does for the limit.
+	if sev := config.Severity(f.stopAt); f.stopAt != "" && !sev.IsFinding() && sev.String() != string(config.SeverityNone) {
+		return fmt.Errorf("invalid -stop-at %q (none, nit, info, warning, error, critical)", f.stopAt)
 	}
 
 	// Before the config is read, so a mistyped flag is answered as a mistyped
@@ -255,6 +272,13 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 			review.Render(report, report.Files, cfg)); perr != nil {
 			log.Warn("could not print the review either", "error", perr)
 		}
+	case errors.Is(err, review.ErrRoundLimit) && report != nil && report.Rounds != nil:
+		// No model ran. What is left to say is what still stands, so the
+		// caller can tell "stopped" from "clean" and see what was unresolved.
+		printRoundLimit(report)
+		actions.setOutputs(resultLimit, report)
+		actions.writeSummary(resultLimit, report, nil, ref, roundLimitNote(report.Rounds))
+		return errRoundLimit
 	default:
 		actions.setOutputs(resultError, nil)
 		return err
@@ -269,9 +293,9 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	printOverruled(report)
 
 	failGate := gate(report, f.failOn, cfg)
-	result := resultFor(report, failGate)
-	if result == resultError && f.allowDegradedTriage {
-		result = allowDegradedTriage(report, failGate)
+	result := classify(report, failGate, f.allowDegradedTriage)
+	if report.Rounds != nil {
+		fmt.Fprintln(os.Stderr, report.Rounds)
 	}
 	rendered := review.Render(report, report.Files, cfg)
 	actions.setOutputs(result, report)
@@ -367,6 +391,7 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 	}
 	engine.SkipDraft = f.skipDraft
 	engine.Full = f.full
+	engine.Rounds = roundsOverride(f)
 	engine.Resume = true
 
 	// Built per review from the resolved policy for the same reason. The
@@ -977,4 +1002,48 @@ func refusePublishing(f *reviewFlags, ref vcs.Ref) error {
 	}
 	return errors.New("improve does not post to a pull request: it prints locally, " +
 		`and "@open-nitpick improve" is how the same pass reaches one`)
+}
+
+// printRoundLimit lists what still stands when the limit stopped the series.
+func printRoundLimit(report *review.Report) {
+	st := report.Rounds
+	fmt.Fprintf(os.Stderr, "\nReview round limit reached; no model was called.\n%s\n", st)
+	for _, c := range st.Unresolved {
+		sev := c.Severity
+		if sev == "" {
+			sev = "unknown severity"
+		}
+		fmt.Fprintf(os.Stderr, "  unresolved: %s:%d (%s, %s)\n", c.Path, c.Line, sev, c.Class)
+	}
+}
+
+// roundsOverride carries the round flags to the engine. -max-rounds defaults
+// to -1 so that an explicit 0, which lifts the limit, is told apart from the
+// flag being absent.
+func roundsOverride(f *reviewFlags) review.RoundsOverride {
+	var o review.RoundsOverride
+	if f.maxRounds >= 0 {
+		n := f.maxRounds
+		o.MaxRounds = &n
+	}
+	if f.stopAt != "" {
+		o.StopAt = config.Severity(f.stopAt)
+	}
+	return o
+}
+
+// roundLimitNote is the job summary's account of a limited run: the round line
+// and every thread still open, since the summary has no findings table to
+// show them in.
+func roundLimitNote(st *review.RoundState) string {
+	var b strings.Builder
+	b.WriteString("Review round limit reached; no model was called. " + st.String())
+	for _, c := range st.Unresolved {
+		sev := c.Severity
+		if sev == "" {
+			sev = "unknown severity"
+		}
+		fmt.Fprintf(&b, "\n> - `%s:%d` (%s, %s)", c.Path, c.Line, sev, c.Class)
+	}
+	return b.String()
 }

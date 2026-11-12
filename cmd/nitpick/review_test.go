@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -550,5 +552,52 @@ func TestRefForEventUsesTheEventNumberAndTheRepositoryEnv(t *testing.T) {
 	t.Setenv("GITHUB_REPOSITORY", "o/r")
 	if _, err := refForEvent(&reviewFlags{}, &converse.Event{}); err == nil {
 		t.Error("an event with no pull request must be an error")
+	}
+}
+
+// The limit status must differ from findings and from error, or a loop cannot
+// tell "stop, the rounds are spent" from "keep fixing" and "the reviewer broke".
+func TestTheRoundLimitExitsWithItsOwnStatus(t *testing.T) {
+	got := map[string]int{
+		"limit":    exitStatus(fmt.Errorf("wrapped: %w", errRoundLimit)),
+		"findings": exitStatus(errFindings),
+		"error":    exitStatus(errors.New("boom")),
+		"clean":    exitStatus(nil),
+	}
+	if got["limit"] != exitLimit {
+		t.Errorf("limit exits %d, want %d", got["limit"], exitLimit)
+	}
+	seen := map[int]string{}
+	for name, status := range got {
+		if prev, dup := seen[status]; dup {
+			t.Errorf("%s and %s share exit status %d", name, prev, status)
+		}
+		seen[status] = name
+	}
+}
+
+// -1 stands for "flag absent", so any other negative was typed by someone and
+// must not be read as "use the configuration".
+func TestANegativeMaxRoundsIsRefused(t *testing.T) {
+	err := runReview(context.Background(), []string{"-repo", t.TempDir(), "-max-rounds", "-2"})
+	if err == nil || !strings.Contains(err.Error(), "invalid -max-rounds") {
+		t.Errorf("err = %v, want the flag refused", err)
+	}
+	err = runReview(context.Background(), []string{"-repo", t.TempDir(), "-stop-at", "sev3"})
+	if err == nil || !strings.Contains(err.Error(), "invalid -stop-at") {
+		t.Errorf("err = %v, want an unknown -stop-at refused", err)
+	}
+}
+
+// An explicit -max-rounds 0 lifts the limit for one run, and an absent flag
+// leaves the policy's value alone. The two differ only by the flag's default.
+func TestAnExplicitZeroMaxRoundsOverridesAndAnAbsentFlagDoesNot(t *testing.T) {
+	absent := roundsOverride(&reviewFlags{maxRounds: -1})
+	if absent.MaxRounds != nil || absent.StopAt != "" {
+		t.Errorf("absent flags produced an override: %+v", absent)
+	}
+	zero := roundsOverride(&reviewFlags{maxRounds: 0, stopAt: "warning"})
+	if zero.MaxRounds == nil || *zero.MaxRounds != 0 || zero.StopAt != config.SeverityWarning {
+		t.Errorf("explicit flags = %+v, want max 0 and stop-at warning", zero)
 	}
 }

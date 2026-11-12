@@ -417,3 +417,22 @@ func TestAMergeSurvivesTheShippedSchema(t *testing.T) {
 		t.Fatalf("dropped = %+v, want duplicate_of 1", result.Dropped)
 	}
 }
+
+// A replacement written for the line triage moved the finding to must not
+// replace the cleared suggestion: it would patch the relocated line with text
+// authored against the line the reviewer anchored.
+func TestARelocatedFindingDoesNotTakeTriagesReplacementSuggestion(t *testing.T) {
+	before := []Finding{{
+		Path: "app.go", Line: 4, EndLine: 4, Severity: "warning", Class: "correctness",
+		Title: "t", Rationale: "why", Suggestion: "orig", FixEndLine: 4,
+	}}
+	got, _ := triageWith(t, before, TriageResult{Verdicts: []Verdict{{
+		Number: 1, Severity: "warning", Class: "correctness", Line: 7, Suggestion: "replacement", FixEndLine: 7,
+	}}})
+	if got[0].Line != 7 {
+		t.Fatalf("line = %d, want the relocated 7", got[0].Line)
+	}
+	if got[0].Suggestion != "" || got[0].FixEndLine != 0 {
+		t.Errorf("relocated finding carries suggestion %q fixend %d, want none", got[0].Suggestion, got[0].FixEndLine)
+	}
+}

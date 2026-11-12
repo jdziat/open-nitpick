@@ -122,6 +122,16 @@ func (r *retryOnAbuse) RoundTrip(req *http.Request) (*http.Response, error) {
 			}
 		}
 		timeSleep(wait)
+		// The first attempt consumed req.Body, and sending it again would
+		// send ContentLength bytes of nothing on every POST.
+		if req.GetBody != nil {
+			body, err := req.GetBody()
+			if err != nil {
+				return nil, err
+			}
+			req = req.Clone(req.Context())
+			req.Body = body
+		}
 	}
 }
 
@@ -458,6 +468,12 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	if truncated > 0 {
 		body += fmt.Sprintf("\n\n_%d further finding(s) were omitted to keep this review readable._", truncated)
 	}
+	// A review with no summary still carries markers, and a review without the
+	// bot marker is invisible to PriorReview: its head, its round and its spend
+	// would never be read back. So the markers get a body to ride on.
+	if body == "" && (review.Head != "" || review.Round || review.Spend > 0) {
+		body = defaultReviewBody(len(comments), "")
+	}
 	if body != "" {
 		body += "\n" + g.Bot
 	}
@@ -469,6 +485,9 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 	}
 	if !review.Incomplete && review.Head != "" {
 		body += "\n" + completionMarker(review.Head)
+	}
+	if review.Round {
+		body += "\n" + roundMarker
 	}
 	if marker := spendMarker(review.Spend); marker != "" {
 		body += "\n" + marker
@@ -487,6 +506,9 @@ func (g *GitHub) PublishReview(ctx context.Context, ref Ref, review Review) erro
 
 		body := stripMarkers(c.Body) + "\n" + g.Bot
 		if marker := fingerprintMarker(c.Fingerprint, c.Class); marker != "" {
+			body += "\n" + marker
+		}
+		if marker := severityMarker(c.Severity); marker != "" && c.Fingerprint != "" {
 			body += "\n" + marker
 		}
 
@@ -624,6 +646,12 @@ func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error)
 			if spent, ok := parseSpend(body); ok {
 				out.Spend += spent
 			}
+			// Counted here for the same reason: every earlier finished run is
+			// a round, whichever one owns Head. A review from before round
+			// markers existed counts when it carries the completion marker.
+			if roundPattern.MatchString(body) || completionPattern.MatchString(body) {
+				out.Rounds++
+			}
 
 			head, ok := parseHead(body)
 			if r.GetID() < latestID {
@@ -670,6 +698,7 @@ func (g *GitHub) PriorReview(ctx context.Context, ref Ref) (*PriorReview, error)
 				Line:        c.GetLine(),
 				Fingerprint: fp,
 				Class:       class,
+				Severity:    parseSeverity(body),
 				Body:        body,
 			})
 		}
@@ -1216,4 +1245,22 @@ func (g *GitHub) React(ctx context.Context, ref Ref, commentID int64, inline boo
 		return fmt.Errorf("github: react on %s: %w", ref, err)
 	}
 	return nil
+}
+
+// IsTeamMember reports whether login is an active member of org's team.
+//
+// A 404 is "not a member", which is what the forge says for a person outside
+// the team, and also what it says to a token that may not read the
+// organisation. The two cannot be told apart, so a token without read:org sees
+// everyone as outside the team; the caller then refuses, which is the safe
+// direction. Any other failure is returned so the caller refuses and says why.
+func (g *GitHub) IsTeamMember(ctx context.Context, org, slug, login string) (bool, error) {
+	m, resp, err := g.client.Teams.GetTeamMembershipBySlug(ctx, org, slug, login)
+	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			return false, nil
+		}
+		return false, fmt.Errorf("github: read %s's membership of %s/%s: %w", login, org, slug, err)
+	}
+	return m.GetState() == "active", nil
 }
