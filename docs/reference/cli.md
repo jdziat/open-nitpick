@@ -10,7 +10,7 @@ description: Every open-nitpick command, its flags, and what it changes.
 the source of truth when a newer release adds an option.
 
 Commands that review a change exit non-zero when they find a result at or above
-their configured failure level. An operational failure (bad revision, missing
+their configured failure level, unless `-stop-at` settles the run, which exits 0. An operational failure (bad revision, missing
 credential, unavailable required tool) is also non-zero. `review` exits `3` when
 `review.max_rounds` is reached, so a loop can tell "stop" from "findings" (1) and
 from "could not run" (2). Use `-dry-run` with

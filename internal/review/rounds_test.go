@@ -160,6 +160,10 @@ func TestSettledNeedsNothingAtOrAboveTheStopSeverityToStand(t *testing.T) {
 		{"a blocking practices violation with only infos left", Report{Rounds: known(), Findings: []Finding{info},
 			Practices: &practices.Report{Profile: "engineering", Checks: []practices.Check{{ID: "commits", State: practices.Completed,
 				Findings: []practices.Finding{{Title: "invalid subject", Blocking: true}}}}}}, false},
+		{"a run that left a file unread", Report{Rounds: known(), Incomplete: []string{"big.go"}, Findings: []Finding{info}}, false},
+		{"a run whose style stage failed", Report{Rounds: known(), Stages: []StageStatus{{Stage: "style", Reason: "timeout"}}, Findings: []Finding{info}}, false},
+		{"a run whose triage alone failed", Report{Rounds: known(), Stages: []StageStatus{{Stage: "triage", Reason: "rate-limited"}}, Findings: []Finding{info}}, true},
+		{"a bounded fast review", Report{Rounds: known(), FastReview: true, Findings: []Finding{info}}, false},
 		{"the series could not be counted", Report{Rounds: &RoundState{}}, false},
 		{"no rounds at all", Report{}, false},
 	}
@@ -296,5 +300,18 @@ func TestStopAtNoneTurnsAConfiguredThresholdOffForOneRun(t *testing.T) {
 	}
 	if report.Settled(config.SeverityNone) {
 		t.Error("a series was settled by a threshold the run turned off")
+	}
+}
+
+// A provider that answers PriorReview with no value and no error is saying
+// nothing came before, which makes this the first round and a countable series.
+func TestAProviderReportingNoPriorReviewIsTheFirstRound(t *testing.T) {
+	e := roundsEngine(t, &spendProvider{prior: nil}, 3, config.SeverityWarning)
+	report := &Report{}
+	if err := e.checkRounds(context.Background(), vcs.Ref{Number: 1}, nil, report); err != nil {
+		t.Fatal(err)
+	}
+	if report.Rounds == nil || !report.Rounds.Known || report.Rounds.Round != 1 {
+		t.Errorf("state = %+v, want a known series at round 1", report.Rounds)
 	}
 }

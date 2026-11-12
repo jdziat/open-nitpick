@@ -117,10 +117,16 @@ func (e *Engine) checkRounds(ctx context.Context, ref vcs.Ref, prior *vcs.PriorR
 			return nil
 		}
 		loaded, err := reader.PriorReview(ctx, ref)
-		if err != nil || loaded == nil {
+		if err != nil {
 			state.Unknown = "earlier reviews could not be read from this pull request"
 			e.log().Warn("could not count earlier review rounds; the round limit is not enforced", "error", err)
 			return nil
+		}
+		// A provider that answers without error and without a value is saying
+		// there is nothing earlier: this is the first round, not an unreadable
+		// series.
+		if loaded == nil {
+			loaded = &vcs.PriorReview{}
 		}
 		prior = loaded
 	}
@@ -144,10 +150,22 @@ func (e *Engine) checkRounds(ctx context.Context, ref vcs.Ref, prior *vcs.PriorR
 // A thread whose severity is missing or unreadable counts as standing at every
 // level, because calling it settled would be claiming a review nobody read. A
 // run that could not count its rounds is never settled for the same reason; a
-// local run has no earlier rounds, so only its own findings decide.
+// local run has no earlier rounds, so only its own findings decide. A run that
+// left files unread, failed a stage or was a bounded fast review has not looked
+// at everything, so it settles nothing whatever it found. A failed triage is
+// the one stage failure that does not count: the findings are real and only
+// unranked, which is what -allow-degraded-triage forgives.
 func (r *Report) Settled(stop config.Severity) bool {
 	if stop == "" || r.Rounds == nil || (!r.Rounds.Known && !r.Rounds.Local) {
 		return false
+	}
+	if r.FastReview || !r.Complete() {
+		return false
+	}
+	for _, s := range r.Stages {
+		if s.Stage != "triage" {
+			return false
+		}
 	}
 	if r.Practices != nil && r.Practices.ExitCode() != 0 {
 		return false

@@ -69,9 +69,10 @@ inputs:
 
   stop-at:
     description: >-
-      Lowest severity that keeps a series of reviews going: nit, info, warning,
-      error or critical; none turns a configured stop_at off for this run. A run with nothing at or above it left standing sets
-      result to "settled" and exits 0. Overrides review.stop_at.
+      Lowest severity that keeps a series of reviews going: nit, info,
+      warning, error or critical; none turns a configured stop_at off for
+      this run. A run with nothing at or above it left standing sets result
+      to "settled" and exits 0. Overrides review.stop_at.
     required: false
 
   instruction:
