@@ -1,8 +1,11 @@
 package llm
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
@@ -138,7 +141,8 @@ func (e *emptyLLM) GenerateContent(_ context.Context, _ []llms.Message, opts ...
 	off := r["enabled"] == false
 	e.offSet = append(e.offSet, off)
 	if !off {
-		return &llms.Response{Content: "", FinishReason: llms.FinishReasonLength}, nil
+		return &llms.Response{Content: "", FinishReason: llms.FinishReasonLength,
+			Usage: llms.Usage{CompletionTokens: 16384, ReasoningTokens: 16384}}, nil
 	}
 	return &llms.Response{Content: `{"findings":[],"summary":"ok"}`, FinishReason: llms.FinishReasonStop}, nil
 }
@@ -164,5 +168,26 @@ func TestTheEmptyAnswerRetryTurnsReasoningOffTheWayOpenRouterReadsIt(t *testing.
 	}
 	if v.Summary != "ok" || len(inner.offSet) != 2 || inner.offSet[0] || !inner.offSet[1] {
 		t.Errorf("summary=%q reasoning-off per call=%v, want the first call on and the retry off", v.Summary, inner.offSet)
+	}
+}
+
+// A slow review is diagnosed from the log, so the line that says a call was cut
+// at the cap has to say what the call spent.
+func TestTheCapWarningSaysWhatTheCappedCallSpent(t *testing.T) {
+	var buf bytes.Buffer
+	inner := &emptyLLM{}
+	c := NewClientForTest(inner, config.ModelSpec{Provider: "openrouter", Model: "deepseek/deepseek-v4.1-flash"})
+	c.SetLogger(slog.New(slog.NewTextHandler(&buf, nil)))
+	type out struct {
+		Findings []struct{} `json:"findings"`
+		Summary  string     `json:"summary"`
+	}
+	if _, err := Extract[out](context.Background(), c, []llms.Message{{Role: llms.RoleUser, Content: "hi"}}); err != nil {
+		t.Fatalf("Extract: %v", err)
+	}
+	for _, want := range []string{"completion_tokens=16384", "reasoning_tokens=16384", "elapsed="} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("log lacks %q:\n%s", want, buf.String())
+		}
 	}
 }
