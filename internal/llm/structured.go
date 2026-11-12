@@ -225,10 +225,16 @@ func (c *Client) retryAfter(ctx context.Context, attempt int, started time.Time,
 			// the cap again: 78s of a second runaway on DeepSeek V4 Flash.
 			next = append(next, llms.WithExtraBodyParam("reasoning", map[string]any{"enabled": false}))
 		}
+		// What the capped call spent, so a later slow retry can be told from a
+		// slow first attempt: on DeepSeek V4 Flash the first attempt is the
+		// long one, 47s to 1m41s to emit 16384 reasoning tokens (issue #214).
 		c.logger().Warn("model hit the output cap with empty content; sending again with reasoning off",
 			"model", c.String(),
 			"attempt", attempt+1,
-			"retries_left", c.stallRetries-attempt)
+			"retries_left", c.stallRetries-attempt,
+			"elapsed", c.now().Sub(started).Round(time.Second),
+			"completion_tokens", resp.Usage.CompletionTokens,
+			"reasoning_tokens", resp.Usage.ReasoningTokens)
 		return next, true
 	case attempt > 0 && truncated(resp, err) && !hasTemperatureAbove(call, 0):
 		// Only after a retry: a first attempt cut at a cap the caller chose is

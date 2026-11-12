@@ -2714,9 +2714,18 @@ in about 100s instead of the timeout. The retry after an empty answer at the cap
 said "reasoning off" with a field OpenRouter does not route; it now sends
 `reasoning.enabled: false` as well. Through `llm.Extract` on the 330 KB prompt,
 unset reasoning finished in 204s and 265s with 5 findings each, where it had
-never finished in 300s. That is two runs, and 3 to 4 minutes is still slow: in
-both, the retry after the cap took 78s and 94s to return truncated JSON, while the
-same request body sent directly answered in 1 to 6s across 7 attempts. That gap
-is not explained. With `reasoning: off` set from the start, the same prompt
-took 4s twice.
+never finished in 300s. In both of those runs the retry after the cap took 78s
+and 94s and returned truncated JSON.
+
+That did not repeat. Six more runs through a logging proxy, same prompt and
+settings, took 50s, 1m9s, 1m38s, 54s, 58s and 1m43s end to end. The capped first
+attempt was the long part, 47s to 1m41s to emit 16384 reasoning tokens on
+whichever upstream OpenRouter picked (PrimeIntellect, River, DeepInfra,
+CoreWeave), and the retry with `reasoning.enabled: false` took 2s to 5s every
+time, on five different upstreams. The retry body sent directly, 7 times, took
+1s to 10s. So the slow retry is not a property of the request. Both slow runs
+fell in a window when other model runs from this machine were in flight, which
+this does not show was the cause, and the log line for a capped call now records
+its elapsed time and token counts so the next slow one can be told apart. With
+`reasoning: off` set from the start, the same prompt took 4s twice.
 
