@@ -169,7 +169,7 @@ MaxRetries bounds two loops, not one, and they multiply.
 ### `models.default.max_tokens`
 
 integer, default `0`.
-MaxTokens caps the response. Zero lets the provider decide, which is the shipped behaviour, and a cap too low truncates a finding rather than dropping it.
+MaxTokens caps the response. Zero lets the provider decide, with one exception: an OpenRouter request that leaves reasoning on is capped at 16384 tokens, because a reasoning model with no cap can think past the call timeout (docs/findings.md).
 
 ### `models.default.model`
 
@@ -254,7 +254,7 @@ MaxRetries bounds two loops, not one, and they multiply.
 ### `models.embed.max_tokens`
 
 integer, default `0`.
-MaxTokens caps the response. Zero lets the provider decide, which is the shipped behaviour, and a cap too low truncates a finding rather than dropping it.
+MaxTokens caps the response. Zero lets the provider decide, with one exception: an OpenRouter request that leaves reasoning on is capped at 16384 tokens, because a reasoning model with no cap can think past the call timeout (docs/findings.md).
 
 ### `models.embed.model`
 
@@ -339,7 +339,7 @@ MaxRetries bounds two loops, not one, and they multiply.
 ### `models.ensemble[].max_tokens`
 
 integer, default `0`.
-MaxTokens caps the response. Zero lets the provider decide, which is the shipped behaviour, and a cap too low truncates a finding rather than dropping it.
+MaxTokens caps the response. Zero lets the provider decide, with one exception: an OpenRouter request that leaves reasoning on is capped at 16384 tokens, because a reasoning model with no cap can think past the call timeout (docs/findings.md).
 
 ### `models.ensemble[].model`
 
@@ -424,7 +424,7 @@ MaxRetries bounds two loops, not one, and they multiply.
 ### `models.fix.max_tokens`
 
 integer, default `0`.
-MaxTokens caps the response. Zero lets the provider decide, which is the shipped behaviour, and a cap too low truncates a finding rather than dropping it.
+MaxTokens caps the response. Zero lets the provider decide, with one exception: an OpenRouter request that leaves reasoning on is capped at 16384 tokens, because a reasoning model with no cap can think past the call timeout (docs/findings.md).
 
 ### `models.fix.model`
 
@@ -509,7 +509,7 @@ MaxRetries bounds two loops, not one, and they multiply.
 ### `models.review.max_tokens`
 
 integer, default `0`.
-MaxTokens caps the response. Zero lets the provider decide, which is the shipped behaviour, and a cap too low truncates a finding rather than dropping it.
+MaxTokens caps the response. Zero lets the provider decide, with one exception: an OpenRouter request that leaves reasoning on is capped at 16384 tokens, because a reasoning model with no cap can think past the call timeout (docs/findings.md).
 
 ### `models.review.model`
 
@@ -594,7 +594,7 @@ MaxRetries bounds two loops, not one, and they multiply.
 ### `models.router.max_tokens`
 
 integer, default `0`.
-MaxTokens caps the response. Zero lets the provider decide, which is the shipped behaviour, and a cap too low truncates a finding rather than dropping it.
+MaxTokens caps the response. Zero lets the provider decide, with one exception: an OpenRouter request that leaves reasoning on is capped at 16384 tokens, because a reasoning model with no cap can think past the call timeout (docs/findings.md).
 
 ### `models.router.model`
 
@@ -679,7 +679,7 @@ MaxRetries bounds two loops, not one, and they multiply.
 ### `models.routes[].ensemble[].max_tokens`
 
 integer, default `0`.
-MaxTokens caps the response. Zero lets the provider decide, which is the shipped behaviour, and a cap too low truncates a finding rather than dropping it.
+MaxTokens caps the response. Zero lets the provider decide, with one exception: an OpenRouter request that leaves reasoning on is capped at 16384 tokens, because a reasoning model with no cap can think past the call timeout (docs/findings.md).
 
 ### `models.routes[].ensemble[].model`
 
@@ -789,7 +789,7 @@ MaxRetries bounds two loops, not one, and they multiply.
 ### `models.routes[].review.max_tokens`
 
 integer, default `0`.
-MaxTokens caps the response. Zero lets the provider decide, which is the shipped behaviour, and a cap too low truncates a finding rather than dropping it.
+MaxTokens caps the response. Zero lets the provider decide, with one exception: an OpenRouter request that leaves reasoning on is capped at 16384 tokens, because a reasoning model with no cap can think past the call timeout (docs/findings.md).
 
 ### `models.routes[].review.model`
 
@@ -874,7 +874,7 @@ MaxRetries bounds two loops, not one, and they multiply.
 ### `models.security.max_tokens`
 
 integer, default `0`.
-MaxTokens caps the response. Zero lets the provider decide, which is the shipped behaviour, and a cap too low truncates a finding rather than dropping it.
+MaxTokens caps the response. Zero lets the provider decide, with one exception: an OpenRouter request that leaves reasoning on is capped at 16384 tokens, because a reasoning model with no cap can think past the call timeout (docs/findings.md).
 
 ### `models.security.model`
 
@@ -959,7 +959,7 @@ MaxRetries bounds two loops, not one, and they multiply.
 ### `models.triage.max_tokens`
 
 integer, default `0`.
-MaxTokens caps the response. Zero lets the provider decide, which is the shipped behaviour, and a cap too low truncates a finding rather than dropping it.
+MaxTokens caps the response. Zero lets the provider decide, with one exception: an OpenRouter request that leaves reasoning on is capped at 16384 tokens, because a reasoning model with no cap can think past the call timeout (docs/findings.md).
 
 ### `models.triage.model`
 
@@ -1044,7 +1044,7 @@ MaxRetries bounds two loops, not one, and they multiply.
 ### `models.validate.max_tokens`
 
 integer, default `0`.
-MaxTokens caps the response. Zero lets the provider decide, which is the shipped behaviour, and a cap too low truncates a finding rather than dropping it.
+MaxTokens caps the response. Zero lets the provider decide, with one exception: an OpenRouter request that leaves reasoning on is capped at 16384 tokens, because a reasoning model with no cap can think past the call timeout (docs/findings.md).
 
 ### `models.validate.model`
 

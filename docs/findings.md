@@ -2662,3 +2662,61 @@ error per failed request. Each fails when the concurrency it guards is removed.
 The read is bounded as well as overlapped: the prefetch holds at most eight
 answers, so a large path limit with a small byte budget no longer fetches the
 whole inventory before cutting it off.
+
+## DeepSeek V4 Flash on OpenRouter thinks past the timeout (2026-11-12)
+
+Issue #214. A full review of this repository on `deepseek/deepseek-v4.1-flash`
+logged 554 "still waiting on the model" lines, the longest at 19m30s, 12 empty
+answers at the output cap and 10 escalations to the fallback.
+
+Direct requests to OpenRouter, one prompt of about 330 KB of Go source asking
+for JSON findings, not streamed:
+
+| reasoning setting | result |
+|---|---|
+| unset | no answer in 300s, twice |
+| `effort: minimal` | no answer in 300s |
+| `max_tokens: 2000` inside `reasoning` | no answer in 300s |
+| `effort: low` | 157s and 182s, 29,943 and 41,591 reasoning tokens |
+| `enabled: false` | 6.2s and 3.4s, no reasoning tokens |
+| `max_tokens: 8000` on the request, effort high | 37s, cut at the cap with empty content |
+
+A one-word prompt answers in under a second under every setting. Each request
+was served by a different upstream (Cohere, Wafer, InferenceNet, PrimeIntellect,
+Alibaba), and the effort and reasoning budget fields did not hold on the ones
+that thought. OpenRouter answers a request that is not streamed with HTTP 200 and
+the headers at once, then whitespace until the JSON exists, so no header or
+first-byte timeout can fire; the total timeout is the only bound. The retries do
+not compound: a server that never answers, behind `llm.Build` with a 2s timeout,
+returns in 2s after one connection at `max_retries` 0 and 3.
+
+Planted-defect fixtures, 16 fixtures with 2 runs each, 32 reviews per row, the
+review role only (the other roles at their defaults):
+
+| reasoning | planted found | unexplained findings | mean seconds | longest |
+|---|---:|---:|---:|---:|
+| off | 22/32 | 15 | 22.3 | 10m2.6s |
+| low | 28/32 | 5 | 10.1 | 26s |
+| default | 26/32 | 5 | 13.2 | 38s |
+
+Three limits. The fixtures are a few hundred lines, so they do not reach the
+prompt size that hangs; none of the 64 reviews at `low` or the default was slow.
+`off` lost 4 to 6 planted defects out of 32 and tripled the unexplained
+findings, which is more than the one-defect resolution of 2 runs per fixture, so
+`off` is not free. The 10m2.6s run at `off` was the triage call, whose model was
+left at the default, hitting the 10 minute timeout: the hang is not limited to
+the review role.
+
+What changed. An OpenRouter request that sets no `max_tokens` and leaves reasoning
+on now carries a 16384 token ceiling, the size the stall and credit retries
+already used. `max_tokens` counts reasoning tokens, so the ceiling ends a runaway
+in about 100s instead of the timeout. The retry after an empty answer at the cap
+said "reasoning off" with a field OpenRouter does not route; it now sends
+`reasoning.enabled: false` as well. Through `llm.Extract` on the 330 KB prompt,
+unset reasoning finished in 204s and 265s with 5 findings each, where it had
+never finished in 300s. That is two runs, and 3 to 4 minutes is still slow: in
+both, the retry after the cap took 78s and 94s to return truncated JSON, while the
+same request body sent directly answered in 1 to 6s across 7 attempts. That gap
+is not explained. With `reasoning: off` set from the start, the same prompt
+took 4s twice.
+
