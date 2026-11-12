@@ -441,6 +441,15 @@ func (c *Client) CallOptions() []llms.CallOption {
 	switch {
 	case c.Spec.MaxTokens > 0:
 		opts = append(opts, llms.WithMaxTokens(c.Spec.MaxTokens))
+	case strings.EqualFold(strings.TrimSpace(c.Spec.Provider), "openrouter") && c.Spec.Reasoning != config.ReasoningOff:
+		// A reasoning model with no cap can think for the whole call timeout.
+		// DeepSeek V4 Flash on a 330 KB prompt gave no answer in 300s at the
+		// default and at effort minimal, and took 157s and 182s at effort low
+		// (tens of thousands of reasoning tokens), because upstreams accept
+		// the effort and ignore it. max_tokens counts reasoning tokens, so a
+		// cap ends the runaway in tens of seconds, and the empty answer at the
+		// cap is already retried once with reasoning off. See issue #214.
+		opts = append(opts, llms.WithMaxTokens(firstAttemptMaxTokens))
 	case strings.EqualFold(strings.TrimSpace(c.Spec.Provider), "anthropic"):
 		// Anthropic's API requires max_tokens, and the SDK fills an unset
 		// one with 4,096, a cap a reasoning model's thinking exhausts on
@@ -455,6 +464,11 @@ func (c *Client) CallOptions() []llms.CallOption {
 	}
 	return opts
 }
+
+// firstAttemptMaxTokens caps an OpenRouter request that set no max_tokens and
+// did not turn reasoning off. It is the size the stall and credit retries
+// already use, which is large enough for any review this tool asks for.
+const firstAttemptMaxTokens = creditCappedMaxTokens
 
 // anthropicUnsetMaxTokens is sent to the direct Anthropic provider when no
 // max_tokens is configured, in place of the SDK's 4,096. It is below the

@@ -141,9 +141,11 @@ type ModelSpec struct {
 	// same diff is one nobody can hold to a measurement.
 	Temperature *float64 `yaml:"temperature"`
 
-	// MaxTokens caps the response. Zero lets the provider decide, which is the
-	// shipped behaviour, and a cap too low truncates a finding rather than
-	// dropping it.
+	// MaxTokens caps the response. Zero lets the provider decide, with one
+	// exception: an OpenRouter request that leaves reasoning on is capped at
+	// 16384 tokens, because a reasoning model with no cap can think past the
+	// call timeout (docs/findings.md). A cap too low truncates a finding rather
+	// than dropping it.
 	MaxTokens int `yaml:"max_tokens"`
 
 	// Timeout bounds one call, retries excluded.

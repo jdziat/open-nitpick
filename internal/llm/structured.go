@@ -218,6 +218,13 @@ func (c *Client) retryAfter(ctx context.Context, attempt int, started time.Time,
 			return nil, false
 		}
 		next := emptyAnswerRetryOptions(call)
+		if strings.EqualFold(strings.TrimSpace(c.Spec.Provider), "openrouter") {
+			// The neutral switch above emits thinking.type, which OpenRouter
+			// does not route to the upstream; its own reasoning.enabled does.
+			// Without this the "reasoning off" retry kept reasoning on and hit
+			// the cap again: 78s of a second runaway on DeepSeek V4 Flash.
+			next = append(next, llms.WithExtraBodyParam("reasoning", map[string]any{"enabled": false}))
+		}
 		c.logger().Warn("model hit the output cap with empty content; sending again with reasoning off",
 			"model", c.String(),
 			"attempt", attempt+1,
