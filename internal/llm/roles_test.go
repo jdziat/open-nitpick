@@ -90,3 +90,29 @@ func TestBuildRolesContextKeepsCancellationForDeferredRoutes(t *testing.T) {
 		t.Fatalf("cancelled route returned client=%v err=%v", client, err)
 	}
 }
+
+// A route that names the review model's endpoint but sets its own generation
+// options must get a client carrying them, not the review client.
+func TestRolesForKeepsARouteThatOnlyChangesGenerationSettings(t *testing.T) {
+	clearModelEnv(t)
+	t.Setenv(envOpenRouterAPIKey, "or_test")
+	base := config.ModelSpec{Provider: ProviderOpenRouter, Model: "qwen/qwen3.8-27b"}
+	roles, err := BuildRoles(&config.Config{Models: config.Models{Default: base}})
+	if err != nil {
+		t.Fatalf("BuildRoles: %v", err)
+	}
+	same, err := roles.For(base)
+	if err != nil || same != roles.Review {
+		t.Fatalf("identical spec: client %p err %v, want the review client %p", same, err, roles.Review)
+	}
+	hot := base
+	temp := 0.9
+	hot.Temperature = &temp
+	got, err := roles.For(hot)
+	if err != nil {
+		t.Fatalf("For: %v", err)
+	}
+	if got == roles.Review || got.Spec.Temperature == nil || *got.Spec.Temperature != 0.9 {
+		t.Errorf("route with temperature 0.9 was served the review client's settings")
+	}
+}

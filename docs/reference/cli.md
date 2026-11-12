@@ -10,8 +10,10 @@ description: Every open-nitpick command, its flags, and what it changes.
 the source of truth when a newer release adds an option.
 
 Commands that review a change exit non-zero when they find a result at or above
-their configured failure level. An operational failure (bad revision, missing
-credential, unavailable required tool) is also non-zero. Use `-dry-run` with
+their configured failure level, unless `-stop-at` settles the run, which exits 0. An operational failure (bad revision, missing
+credential, unavailable required tool) is also non-zero. `review` exits `3` when
+`review.max_rounds` is reached, so a loop can tell "stop" from "findings" (1) and
+from "could not run" (2). Use `-dry-run` with
 `review` or `fast-review` before connecting a run to a pull request.
 
 ## Choose a command
@@ -43,6 +45,8 @@ The normal change review. With no `-base`, it reviews uncommitted changes; with
 | `-profile` | Opt in to an engineering assessment profile. |
 | `-instruction` | One extra instruction for this invocation. |
 | `-fail-on` | Override `review.fail_on`: `nit`, `info`, `warning`, `error`, `critical`, or `none`. |
+| `-max-rounds` | Override `review.max_rounds`. Once that many complete reviews are on the pull request, the run calls no model, lists what is unresolved and exits 3. `0` lifts the limit. |
+| `-stop-at` | Override `review.stop_at`: `nit`, `info`, `warning`, `error` or `critical`; `none` turns a configured value off for this run. When nothing at or above it remains, `result` is `settled` and the exit status is 0. |
 | `-owner`, `-repo-name`, `-pr` | GitHub repository and pull request to review. |
 | `-dry-run` | Print the review instead of publishing it. |
 | `-skip-draft` | Exit without work for a draft pull request. |

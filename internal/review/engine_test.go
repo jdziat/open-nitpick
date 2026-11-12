@@ -392,11 +392,11 @@ func TestNearMissFindingsAreSnapped(t *testing.T) {
 	// Models routinely anchor a line or two off; discarding those loses real
 	// issues, so they are snapped onto the nearest changed line.
 	reviewOut := mustJSON(t, Result{Findings: []Finding{
-		{Path: "app.go", Line: 7, Severity: "warning", Title: "Close may panic"},
+		{Path: "app.go", Line: 9, Severity: "warning", Title: "Close may panic"},
 	}})
 
 	model := &scriptedLLM{byPrompt: map[string]string{
-		"triaging findings":            mustJSON(t, TriageResult{Summary: "s", Verdicts: verdictsFor([]Finding{{Path: "app.go", Line: 6, Severity: "warning", Title: "Close may panic"}})}),
+		"triaging findings":            mustJSON(t, TriageResult{Summary: "s", Verdicts: verdictsFor([]Finding{{Path: "app.go", Line: 9, Severity: "warning", Title: "Close may panic"}})}),
 		"Review the following changes": reviewOut,
 	}}
 	engine := newEngine(t, model, &stubProvider{diff: engineDiff}, nil)
@@ -407,6 +407,11 @@ func TestNearMissFindingsAreSnapped(t *testing.T) {
 	}
 	if len(report.Findings) != 1 {
 		t.Fatalf("findings = %d, want the near miss to be recovered", len(report.Findings))
+	}
+	// Line 9 is past the last diff line; the nearest changed line is 7. Asserting
+	// the line is what proves snapping ran rather than the anchor passing as is.
+	if got := report.Findings[0].Line; got != 7 {
+		t.Errorf("snapped line = %d, want 7", got)
 	}
 }
 

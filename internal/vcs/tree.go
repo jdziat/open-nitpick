@@ -144,6 +144,11 @@ func (t *Tree) Name() string { return "tree" }
 func (t *Tree) PullRequest(ctx context.Context, ref Ref) (*PullRequest, error) {
 	pr, err := t.Local.PullRequest(ctx, ref)
 	if err != nil {
+		// A cancelled context fails the HEAD probe too, and that is not an
+		// unborn repository.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
 		// A tree review reads files, not history: a repository with no
 		// commits yet still lists its files, and the review never needs
 		// a SHA.

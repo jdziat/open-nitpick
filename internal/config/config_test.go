@@ -1,6 +1,7 @@
 package config
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -581,26 +582,42 @@ func TestSecurityModelRequiresAName(t *testing.T) {
 // the validator, and silently dropped: models.fix lost its credential keys that
 // way for a release. Keep this literal list in step with ModelSpec.
 func TestOverlayCarriesEveryRequestShapingField(t *testing.T) {
-	base := ModelSpec{Provider: "p", Model: "m"}
+	base := ModelSpec{Provider: "p", Model: "m", Extra: map[string]string{"kept": "1"}}
 	over := ModelSpec{
-		Model:            "other",
-		Temperature:      ptrTo(0.7),
-		MaxTokens:        4096,
-		Timeout:          31 * time.Second,
-		StructuredOutput: StructuredJSON,
-		MaxRetries:       ptrTo(9),
-		Reasoning:        ReasoningHigh,
+		Model:                "other",
+		BaseURL:              "https://example.test/v1",
+		APIKeyEnv:            "ROLE_KEY",
+		APIKeyKeyring:        "role-entry",
+		CredentialCommand:    []string{"role-cred", "get"},
+		ServiceTier:          "flex",
+		Providers:            []string{"upstream"},
+		Extra:                map[string]string{"added": "2"},
+		AllowPrivateEndpoint: true,
+		Temperature:          ptrTo(0.7),
+		MaxTokens:            4096,
+		Timeout:              31 * time.Second,
+		StructuredOutput:     StructuredJSON,
+		MaxRetries:           ptrTo(9),
+		Reasoning:            ReasoningHigh,
 	}
 
 	got := base.overlay(over)
 	for name, ok := range map[string]bool{
-		"Model":            got.Model == "other",
-		"Temperature":      got.Temperature != nil && *got.Temperature == 0.7,
-		"MaxTokens":        got.MaxTokens == 4096,
-		"Timeout":          got.Timeout == 31*time.Second,
-		"StructuredOutput": got.StructuredOutput == StructuredJSON,
-		"MaxRetries":       got.MaxRetries != nil && *got.MaxRetries == 9,
-		"Reasoning":        got.Reasoning == ReasoningHigh,
+		"Model":                got.Model == "other",
+		"Temperature":          got.Temperature != nil && *got.Temperature == 0.7,
+		"MaxTokens":            got.MaxTokens == 4096,
+		"Timeout":              got.Timeout == 31*time.Second,
+		"StructuredOutput":     got.StructuredOutput == StructuredJSON,
+		"MaxRetries":           got.MaxRetries != nil && *got.MaxRetries == 9,
+		"Reasoning":            got.Reasoning == ReasoningHigh,
+		"BaseURL":              got.BaseURL == "https://example.test/v1",
+		"APIKeyEnv":            got.APIKeyEnv == "ROLE_KEY",
+		"APIKeyKeyring":        got.APIKeyKeyring == "role-entry",
+		"CredentialCommand":    slices.Equal(got.CredentialCommand, []string{"role-cred", "get"}),
+		"ServiceTier":          got.ServiceTier == "flex",
+		"Providers":            slices.Equal(got.Providers, []string{"upstream"}),
+		"Extra":                got.Extra["added"] == "2" && got.Extra["kept"] == "1",
+		"AllowPrivateEndpoint": got.AllowPrivateEndpoint,
 	} {
 		if !ok {
 			t.Errorf("overlay dropped %s, so a role setting it is silently ignored", name)
@@ -626,5 +643,43 @@ func TestReviewModelOverridesUseRunnerChoices(t *testing.T) {
 	}
 	if got.Models.Default.Model != "z-ai/glm-5.3-flash" || got.Models.Triage.Model != "qwen/qwen3.8-27b" || got.Models.Validate.Provider != "openrouter" {
 		t.Errorf("models = %+v", got.Models)
+	}
+}
+
+func TestDismissAuthorityDefaultsToCodeownersAndAllowsTheAuthor(t *testing.T) {
+	var d DismissRespond
+	if d.EffectiveAuthority() != AuthorityCodeowners {
+		t.Errorf("default authority = %q, want codeowners", d.EffectiveAuthority())
+	}
+	if !d.AuthorMayDismiss() {
+		t.Error("the author may not dismiss by default")
+	}
+	off := false
+	if (DismissRespond{AllowAuthor: &off}).AuthorMayDismiss() {
+		t.Error("allow_author: false was ignored")
+	}
+	if errs := (DismissRespond{Authority: "anyone"}).validate(); len(errs) != 1 {
+		t.Errorf("an unknown authority produced %d errors, want 1", len(errs))
+	}
+}
+
+func TestARolesOwnFallbackSurvivesTheOverlay(t *testing.T) {
+	base := ModelSpec{Provider: "p", Model: "m", Fallback: &ModelSpec{Model: "default-fallback"}}
+	got := base.overlay(ModelSpec{Model: "role", Fallback: &ModelSpec{Model: "role-fallback"}})
+	if got.Fallback == nil || got.Fallback.Model != "role-fallback" {
+		t.Errorf("fallback = %+v, want the role's own", got.Fallback)
+	}
+	if kept := base.overlay(ModelSpec{Model: "role"}); kept.Fallback == nil || kept.Fallback.Model != "default-fallback" {
+		t.Errorf("fallback = %+v, want the inherited one when the role names none", kept.Fallback)
+	}
+}
+
+// NaN fails every comparison, so a range check written as t < 0 || t > 2 lets it
+// through, and it then cannot be encoded into a request.
+func TestATemperatureThatIsNotANumberIsRefused(t *testing.T) {
+	nan := math.NaN()
+	errs := ModelSpec{Provider: "p", Model: "m", Temperature: &nan}.validate(true)
+	if len(errs) == 0 {
+		t.Error("a NaN temperature passed validation")
 	}
 }

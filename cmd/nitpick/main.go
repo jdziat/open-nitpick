@@ -25,6 +25,7 @@ const (
 	exitOK       = 0
 	exitFindings = 1
 	exitError    = 2
+	exitLimit    = 3
 	exitUsage    = 64
 )
 
@@ -101,6 +102,13 @@ func run() int {
 		return exitUsage
 	}
 
+	return exitStatus(err)
+}
+
+// exitStatus maps a finished command's error to the process exit status. It is
+// a function so the contract callers script against can be tested without
+// running a command.
+func exitStatus(err error) int {
 	switch {
 	case err == nil:
 		return exitOK
@@ -111,6 +119,10 @@ func run() int {
 	case errors.Is(err, errFindings):
 		// The findings themselves were already reported.
 		return exitFindings
+	case errors.Is(err, errRoundLimit):
+		// Distinct from findings and from error, so a loop can tell "stop,
+		// the budget of rounds is spent" from both.
+		return exitLimit
 	case errors.Is(err, context.Canceled):
 		fmt.Fprintln(os.Stderr, "cancelled")
 		return exitError
@@ -119,6 +131,9 @@ func run() int {
 		return exitError
 	}
 }
+
+// errRoundLimit signals that review.max_rounds was reached and no model ran.
+var errRoundLimit = errors.New("the review round limit is reached")
 
 // errFindings signals that the review succeeded but found gating issues.
 var errFindings = errors.New("findings at or above the configured threshold")

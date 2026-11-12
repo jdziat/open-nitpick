@@ -61,6 +61,74 @@ type Respond struct {
 	// Fix bounds who may ask for a finding to be APPLIED, which is a write to
 	// the repository rather than an answer in a thread.
 	Fix FixRespond `yaml:"fix"`
+
+	// Dismiss bounds who may close a finding as settled, which is a statement
+	// about the code rather than a request for work.
+	Dismiss DismissRespond `yaml:"dismiss"`
+}
+
+// DismissAuthority names whose word closes a finding.
+type DismissAuthority string
+
+// The two authorities.
+const (
+	// AuthorityCodeowners lets the owners of the finding's path close it, and
+	// the pull request's author unless AllowAuthor says otherwise. A path no
+	// CODEOWNERS rule covers, or a repository with no CODEOWNERS, falls back
+	// to review.respond.from, so turning this on never leaves a finding that
+	// nobody may close. It is the default, so an install upgrading from a
+	// release without this key sees replies from non-owners stop closing
+	// findings in a repository that has CODEOWNERS, and a team owner needs a
+	// token with read:org; AuthorityAssociation keeps the old behaviour.
+	AuthorityCodeowners DismissAuthority = "codeowners"
+
+	// AuthorityAssociation lets anyone review.respond.from admits close any
+	// finding, which is what every release before this key did.
+	AuthorityAssociation DismissAuthority = "association"
+)
+
+// DismissRespond bounds who may close a finding.
+//
+// Separate from From because From answers "may this person spend my model
+// credit" and a dismissal answers a different question: a collaborator with no
+// stake in a file can say its finding is fine, and the finding stays quiet on
+// every later push. The statement is only worth something when the person
+// making it is answerable for the code.
+type DismissRespond struct {
+	// Authority picks whose reply or resolve command closes a finding. Empty
+	// means codeowners.
+	Authority DismissAuthority `yaml:"authority"`
+
+	// AllowAuthor lets the pull request's author close findings on their own
+	// change. Unset means on: the author is who the findings are for, and a
+	// reviewer that argues with them about whether they may answer it has
+	// made itself an adversary. Turn it off where the author should not grade
+	// their own work.
+	AllowAuthor *bool `yaml:"allow_author"`
+}
+
+// EffectiveAuthority resolves the default.
+func (d DismissRespond) EffectiveAuthority() DismissAuthority {
+	if d.Authority == "" {
+		return AuthorityCodeowners
+	}
+	return d.Authority
+}
+
+// AllowAuthorOn resolves allow_author, which is on when unset. Named for the
+// shape the configuration reference reads a shipped default from.
+func (d DismissRespond) AllowAuthorOn() bool { return d.AllowAuthor == nil || *d.AllowAuthor }
+
+// AuthorMayDismiss reports whether the pull request's author may close
+// findings on their own change.
+func (d DismissRespond) AuthorMayDismiss() bool { return d.AllowAuthorOn() }
+
+func (d DismissRespond) validate() []error {
+	switch d.EffectiveAuthority() {
+	case AuthorityCodeowners, AuthorityAssociation:
+		return nil
+	}
+	return []error{fmt.Errorf("review.respond.dismiss.authority %q is not codeowners or association", d.Authority)}
 }
 
 // RepliesEnabled reports whether a reply under a finding is read.
@@ -186,6 +254,7 @@ func (r Respond) validate() []error {
 	if r.MaxPerPullRequest < 0 {
 		errs = append(errs, fmt.Errorf("review.respond.max_per_pull_request cannot be negative"))
 	}
+	errs = append(errs, r.Dismiss.validate()...)
 
 	return errs
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -221,5 +222,103 @@ func TestGitHubPriorReviewKeepsTheCommentBody(t *testing.T) {
 	}
 	if !strings.Contains(body, "b.go calls this with a nil map") {
 		t.Errorf("the rationale did not survive:\n%s", body)
+	}
+}
+
+// A round is a review this tool published from a run that finished. A run that
+// failed leaves no round marker, and a person can paste the marker text into a
+// review of their own, so authorship is checked as well. A review from before
+// round markers counts by its completion marker.
+func TestGitHubPriorReviewCountsOnlyOwnFinishedReviewsAsRounds(t *testing.T) {
+	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/graphql":
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+		case strings.HasSuffix(r.URL.Path, "/pulls/7/reviews"):
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"id": 1, "user": map[string]any{"id": 42}, "body": "legacy\n" + DefaultBotMarker + "\n" + headMarker("aa01") + "\n" + completionMarker("aa01")},
+				{"id": 2, "user": map[string]any{"id": 42}, "body": "failed\n" + DefaultBotMarker + "\n" + headMarker("aa02")},
+				{"id": 3, "user": map[string]any{"id": 42}, "body": "oversized file, finished\n" + DefaultBotMarker + "\n" + headMarker("aa03") + "\n" + roundMarker},
+				{"id": 4, "user": map[string]any{"id": 42}, "body": "both\n" + DefaultBotMarker + "\n" + headMarker("aa04") + "\n" + completionMarker("aa04") + "\n" + roundMarker},
+				{"id": 5, "user": map[string]any{"id": 7}, "body": "forged\n" + DefaultBotMarker + "\n" + roundMarker},
+			})
+		case strings.HasSuffix(r.URL.Path, "/pulls/7/comments"):
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"id": 1, "user": map[string]any{"id": 42}, "path": "a.go", "line": 1, "body": "new\n" + DefaultBotMarker + "\n" + fingerprintMarker("aa11", "correctness") + "\n" + severityMarker("warning")},
+				{"id": 2, "user": map[string]any{"id": 42}, "path": "b.go", "line": 1, "body": "old\n" + DefaultBotMarker + "\n" + fingerprintMarker("bb22", "style")},
+			})
+		default:
+			t.Errorf("unexpected request %s", r.URL.Path)
+		}
+	})
+
+	prior, err := gh.PriorReview(context.Background(), testRef())
+	if err != nil {
+		t.Fatalf("PriorReview: %v", err)
+	}
+	if prior.Rounds != 3 {
+		t.Errorf("rounds = %d, want 3: the failed run and the other user's review are not rounds, and one review is one round", prior.Rounds)
+	}
+	if len(prior.Comments) != 2 || prior.Comments[0].Severity != "warning" || prior.Comments[1].Severity != "" {
+		t.Errorf("comments = %+v, want severity warning then unknown", prior.Comments)
+	}
+}
+
+// The fingerprint marker is what every earlier release parses, with an exact
+// pattern. A workflow pinned to one of those releases must still recognise a
+// thread this one published, so the severity cannot ride inside it.
+func TestACommentThisReleasePublishesStillParsesUnderTheEarlierPattern(t *testing.T) {
+	var captured capturedReview
+	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&captured)
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": 1})
+	})
+	err := gh.PublishReview(context.Background(), testRef(), Review{Head: "abc123", Round: true, Comments: []Comment{
+		{Path: "a.go", Line: 1, Body: "x", Fingerprint: "feed", Class: "security", Severity: "error"},
+	}})
+	if err != nil {
+		t.Fatalf("PublishReview: %v", err)
+	}
+	earlier := regexp.MustCompile(`<!-- open-nitpick fp:([0-9a-f]+) class:([a-z_-]*) -->`)
+	body := captured.Comments[0].Body
+	if m := earlier.FindStringSubmatch(body); m == nil || m[1] != "feed" {
+		t.Errorf("the earlier pattern cannot read the fingerprint from:\n%s", body)
+	}
+	if parseSeverity(body) != "error" {
+		t.Errorf("severity did not round-trip:\n%s", body)
+	}
+	if !strings.Contains(captured.Body, roundMarker) {
+		t.Errorf("a finished run's review carries no round marker:\n%s", captured.Body)
+	}
+}
+
+// Stripping one marker nested inside another must not leave the outer one
+// whole, and a marker that survives in the text must not outrank the real one.
+func TestModelTextCannotAssembleAMarkerOrLowerASeverity(t *testing.T) {
+	nested := "<!-- open-nitpick sev:<!-- open-nitpick sev:nit -->nit -->"
+	if got := stripMarkers(nested); strings.Contains(got, "open-nitpick") {
+		t.Errorf("stripping left a marker: %q", got)
+	}
+	body := "model text " + severityMarker("nit") + "\n" + severityMarker("error")
+	if got := parseSeverity(body); got != "error" {
+		t.Errorf("severity = %q, want the last marker's", got)
+	}
+}
+
+// With no summary a review is only markers, and a review without the bot marker
+// is invisible to PriorReview: its round, head and spend would never be read.
+func TestAReviewWithNoSummaryStillCarriesTheBotMarker(t *testing.T) {
+	var captured capturedReview
+	gh := newFakeGitHub(t, func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&captured)
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": 1})
+	})
+	if err := gh.PublishReview(context.Background(), testRef(), Review{Head: "abc123", Round: true}); err != nil {
+		t.Fatalf("PublishReview: %v", err)
+	}
+	for _, want := range []string{DefaultBotMarker, headMarker("abc123"), roundMarker} {
+		if !strings.Contains(captured.Body, want) {
+			t.Errorf("body lacks %q:\n%s", want, captured.Body)
+		}
 	}
 }

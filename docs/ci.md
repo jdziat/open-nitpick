@@ -106,7 +106,19 @@ later pushes; a thread someone resolved by hand can come back if the code still
 shows the problem.
 
 Replies pass through the same gates as a mention: `review.respond.from` and
-`max_per_pull_request`. To start a run on a reply, the workflow's `if:` also
+`max_per_pull_request`. Closing a finding takes more than that. By default only
+an owner of the finding's file in CODEOWNERS, read from the base branch so the
+change cannot name itself, or the author of the pull request, may close it
+with a reply or `@open-nitpick resolve`. Other replies are read by no one and
+logged. A repository without CODEOWNERS, or a file no rule covers, falls back
+to `review.respond.from`. A team named as owner is checked through the
+organisation's API, which the default `GITHUB_TOKEN` cannot read; give the
+workflow a token with `read:org`, or owners named only through a team cannot
+close findings. `review.respond.dismiss.authority: association`
+restores that rule everywhere, and is what to set to keep the behaviour of
+releases before this key, when any collaborator `review.respond.from` admitted
+could close any finding, and `review.respond.dismiss.allow_author:
+false` stops authors closing findings on their own change. To start a run on a reply, the workflow's `if:` also
 accepts any comment with `in_reply_to_id` from an account that is not a bot;
 the run stops before spending any model credit when the thread was not started
 by the reviewer. A runner still starts for each such reply, because an `if:`
@@ -114,6 +126,42 @@ expression cannot see who began the thread, so a busy pull request costs a
 short run per reply. `review.respond.replies: false` makes `nitpick respond`
 ignore replies and drops the invitation from new comments; removing the
 `in_reply_to_id` clause from the `if:` stops the runner starting for them.
+
+### Ending a series of reviews
+
+A review run again after every round of fixes only ends when it finds nothing,
+and a model rarely does. Two keys give the series an end. Both read their state
+from the pull request, so a runner that keeps nothing between jobs still knows
+which round it is on.
+
+- `review.max_rounds` (input `max-rounds`, flag `-max-rounds`): once that many
+  reviews from finished runs are on the pull request, the next run calls no
+  model, lists the threads still open, sets `result: limit` and exits 3. A run
+  that failed, or got no usable answer from the model, is not a round; a run
+  that finished but skipped an oversized file is. A fast review is not. The check stays red until
+  someone raises the limit in the base branch's configuration or the
+  workflow's input, which is the point: the series ends where a person decides
+  whether it continues. `@open-nitpick improve` is not counted or limited.
+- `review.stop_at` (input `stop-at`, flag `-stop-at`): when nothing at or
+  above that severity remains, from this run or from a thread still open
+  since an earlier round, the series is `settled` and the run exits 0. A
+  thread whose severity cannot be read, including every thread published
+  before comments carried one, counts as open at every level.
+
+Both keys are policy: a pull request that edits `.nitpick.yaml` is reviewed
+under the base branch's values, so it cannot settle its own series. On a
+working tree there is no pull request to count, so `max_rounds` does nothing
+and `stop_at` judges the run alone, which is the stopping rule for an agent
+re-running `nitpick review` on its own checkout.
+
+Every run with either key ends with a line such as `round 3 of 3: 2
+unresolved, 4 declined`. If the earlier reviews cannot be read, the line says
+the limit was not enforced, and the series is not called settled. Declined
+counts findings closed by an accepted reply; who may close one is set by
+`review.respond.dismiss`. A thread closed with GitHub's own resolve button
+leaves the open count without passing that gate: this release does not check
+who resolved a thread, so branch protection is what limits who can. A finding that
+asks to undo an earlier fix is not flagged yet.
 
 ### Superseded comments
 
@@ -181,6 +229,8 @@ than the repository root.
 | `model` | config | overrides `models.default.model` |
 | `api-key` | none | provider key; pass a secret, never a literal |
 | `fail-on` | `review.fail_on` | lowest severity that fails: `nit`, `info`, `warning`, `error`, `critical`, or `none` |
+| `max-rounds` | `review.max_rounds` | stops after this many complete reviews of one pull request: later runs call no model and exit 3 with `result: limit` |
+| `stop-at` | `review.stop_at` | `result: settled` and exit 0 when nothing at or above this severity remains |
 | `instruction` | none | one extra instruction for this run |
 | `pr-number` | triggering pull request | set for `workflow_dispatch` and comment events |
 | `dry-run` | `false` | writes to log and job summary without publishing |
@@ -203,7 +253,8 @@ step sets outputs a later step can read:
 
 | output | value |
 |---|---|
-| `result` | `clean`, `findings`, `skipped`, `degraded` or `error`. A completeness failure is `error`, not a clean review; `degraded` appears only with `allow-degraded-triage`. |
+| `result` | `clean`, `findings`, `settled`, `limit`, `skipped`, `degraded` or `error`. A completeness failure is `error`, not a clean review; `degraded` appears only with `allow-degraded-triage`; `settled` and `limit` appear only with `stop-at` and `max-rounds`. |
+| `round` | this run's number in the series, set when `max-rounds` or `stop-at` is on |
 | `findings` | number of findings published |
 | `practice_findings` | practice-report findings, including advisory findings and accepted exceptions; may overlap inline findings |
 | `practice_blocking` | engineering-policy violations without an accepted exception or unresolved uncertainty |
@@ -214,8 +265,8 @@ step sets outputs a later step can read:
 | `failed_stages` | comma-separated model stages that did not complete; empty when none did |
 
 
-Exit codes: `0` clean, `1` findings at or above `fail_on`, `2` the review could
-not run. CI can tell "this change has problems" apart from "the reviewer
+Exit codes: `0` clean or settled, `1` findings at or above `fail_on`, `2` the
+review could not run, `3` the round limit was reached and no model was called. CI can tell "this change has problems" apart from "the reviewer
 broke", and `result` says which without parsing the log.
 
 ### Analyzers on the runner

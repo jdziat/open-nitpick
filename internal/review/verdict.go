@@ -88,6 +88,7 @@ func (e *Engine) applyVerdict(f *Finding, v Verdict) {
 
 	// Moving a suggestion would attach its patch to different code. Preserve
 	// the original location when policy requires keeping the reviewer's claim.
+	reviewerLine := f.Line
 	if e.Config != nil && e.Config.Review.TriageNoNewClaims && f.Suggestion != "" && v.Line > 0 && v.Line != f.Line {
 		e.log().Debug("keeping the reviewer's line under the no-new-claims contract",
 			"path", f.Path, "line", f.Line, "triage", v.Line)
@@ -106,8 +107,10 @@ func (e *Engine) applyVerdict(f *Finding, v Verdict) {
 		f.Rationale = v.Rationale
 	}
 	// Suggestion text keeps its leading whitespace (it is part of the patch).
-	// Skip when the anchor moved: moveAnchor already cleared Suggestion.
-	if strings.TrimSpace(v.Suggestion) != "" && v.Line == f.Line {
+	// Skip when the anchor moved: the replacement was written for the line
+	// triage saw, and moveAnchor has already made f.Line equal to it, so the
+	// comparison has to be against the line the reviewer anchored.
+	if strings.TrimSpace(v.Suggestion) != "" && v.Line == reviewerLine {
 		f.Suggestion = v.Suggestion
 		// A replacement written for the anchored line alone must not inherit
 		// a wider range the reviewer's own suggestion covered: a shorter

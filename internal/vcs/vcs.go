@@ -164,6 +164,10 @@ type Comment struct {
 	// Class is the finding's class, carried beside the fingerprint so a later
 	// run can match a reworded finding of the same kind at the same place.
 	Class string
+
+	// Severity is the finding's severity, carried so a later run can judge a
+	// thread it did not re-read. Empty omits it from the marker.
+	Severity string
 }
 
 // Diff sides for a review comment, matching GitHub's LEFT/right parameter.
@@ -193,6 +197,11 @@ type Review struct {
 
 	// Incomplete prevents this run from becoming an incremental baseline.
 	Incomplete bool
+
+	// Round marks a review from a run whose pipeline finished, so it counts
+	// toward review.max_rounds. Unlike Incomplete it does not ask that every
+	// file was covered.
+	Round bool
 
 	// Spend is what this review was estimated to cost, in US dollars, and is
 	// recorded with it for the same reason Head is: a ceiling that covers a
@@ -245,6 +254,11 @@ type PriorReview struct {
 	// safe direction only for coverage, not for the bill, and the run reports
 	// the total it found so the gap is visible rather than assumed.
 	Spend float64
+
+	// Rounds counts the reviews this tool published from runs that finished.
+	// A run that failed or returned no usable model output publishes no round
+	// marker, so it is not a round.
+	Rounds int
 }
 
 // PriorComment is one inline comment an earlier run published.
@@ -264,6 +278,11 @@ type PriorComment struct {
 	// published with. See Comment.Fingerprint.
 	Fingerprint string
 	Class       string
+
+	// Severity is read back from the same marker. Empty means the comment was
+	// published before the marker carried one, so callers treat it as unknown
+	// and not as low.
+	Severity string
 
 	// Body is the comment as published: the title, the rationale, any
 	// suggestion, and the markers.

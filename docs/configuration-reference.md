@@ -1352,6 +1352,11 @@ MaxFiles caps how many changed files are reviewed in one run.
 integer, default `6`.
 MaxFilesPerRequest caps how many files are batched into one call.
 
+### `review.max_rounds`
+
+integer, default `0`.
+MaxRounds ends a series of reviews of one pull request.
+
 ### `review.mention`
 
 string, default `@open-nitpick`.
@@ -1397,6 +1402,16 @@ RelatedContextTokens bounds how much related context is attached per batch.
 boolean, default `true`.
 ResolveSuperseded lets an incremental run resolve its own earlier comment threads when the lines they pointed at changed and the finding did not recur, with a reply saying so.
 
+### `review.respond.dismiss.allow_author`
+
+boolean, default `true`.
+AllowAuthor lets the pull request's author close findings on their own change. Unset means on: the author is who the findings are for, and a reviewer that argues with them about whether they may answer it has made itself an adversary.
+
+### `review.respond.dismiss.authority`
+
+string, default `codeowners`.
+Authority picks whose reply or resolve command closes a finding. Empty means codeowners. One of: codeowners, association.
+
 ### `review.respond.fix.from`
 
 list of string, default `[owner member collaborator]`.
@@ -1436,6 +1451,11 @@ Slop asks the model for, and publishes, findings in the slop class: generated-lo
 
 boolean, default `false`.
 Standards hands the reviewer the conventions this repository was measured to follow, counted at the base revision.
+
+### `review.stop_at`
+
+string, default `none`.
+StopAt is the lowest severity that keeps a series of reviews going. One of: none, nit, info, warning, error, critical.
 
 ### `review.summary`
 

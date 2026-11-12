@@ -217,7 +217,7 @@ func TestSharedModelEvidencePreservesRoutesAndStandingFindings(t *testing.T) {
 	if got.State != practices.Completed || len(got.Examined) != 1 || len(got.Findings) != 1 || got.Findings[0].Title != "standing defect" {
 		t.Fatalf("standing finding lost or analyzer mislabeled as model evidence: %+v", got)
 	}
-	if len(got.ModelRuns) != 1 || got.ModelRuns[0].Primary != "primary" || got.ModelRuns[0].Fallback != "fallback" || len(got.ModelRuns[0].Ensemble) != 1 {
+	if len(got.ModelRuns) != 1 || got.ModelRuns[0].Primary != "primary" || got.ModelRuns[0].Fallback != "fallback" || len(got.ModelRuns[0].Ensemble) != 1 || got.ModelRuns[0].Ensemble[0] != "second" {
 		t.Fatalf("actual routed model identity lost: %+v", got.ModelRuns)
 	}
 }
@@ -670,6 +670,9 @@ func TestSlopFindingOnRelatedContextFileHasExaminedEvidence(t *testing.T) {
 	slopReport := practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: "head", PolicySource: "operator", PolicyDigest: "digest", Checks: checks}
 	if problems := slopReport.Problems(); len(problems) != 0 {
 		t.Fatalf("a slop finding on a related, unplanned file was rejected as unexamined: %v", problems)
+	}
+	if len(checks[0].Findings) != 1 || checks[0].Findings[0].Target.ID != "helper.go" {
+		t.Fatalf("the related-file slop finding was dropped, so an empty problem list proves nothing: %+v", checks[0].Findings)
 	}
 }
 

@@ -204,3 +204,75 @@ func TestAllowDegradedTriageForgivesOnlyAFailedTriage(t *testing.T) {
 		t.Error("degraded must be a result of its own")
 	}
 }
+
+func TestOnlyAFindingsResultIsSettledAndOnlyWhenNothingAtTheStopSeverityStands(t *testing.T) {
+	known := &review.RoundState{Known: true, Round: 2, StopAt: config.SeverityWarning}
+	onlyInfo := &review.Report{Rounds: known, Findings: []review.Finding{{Severity: "info"}}}
+	withWarning := &review.Report{Rounds: known, Findings: []review.Finding{{Severity: "warning"}}}
+
+	if got := settle(resultFindings, onlyInfo); got != resultSettled {
+		t.Errorf("infos under stop-at warning = %q, want settled", got)
+	}
+	if got := settle(resultFindings, withWarning); got != resultFindings {
+		t.Errorf("a warning under stop-at warning = %q, want findings", got)
+	}
+	if got := settle(resultError, onlyInfo); got != resultError {
+		t.Errorf("a failed run was reclassified as %q; an error must stay an error", got)
+	}
+	noStop := &review.Report{Rounds: &review.RoundState{Known: true}, Findings: []review.Finding{{Severity: "info"}}}
+	if got := settle(resultFindings, noStop); got != resultFindings {
+		t.Errorf("no stop severity = %q, want findings", got)
+	}
+	if got := settle(resultFindings, &review.Report{Findings: []review.Finding{{Severity: "info"}}}); got != resultFindings {
+		t.Errorf("no round state = %q, want findings", got)
+	}
+}
+
+// A limited run read nothing. A workflow checking complete=true and findings=0
+// must not read it as a clean review, and the summary must name what is still
+// open, since it has no findings table to show it in.
+func TestALimitedRunIsNotCompleteAndListsWhatStands(t *testing.T) {
+	dir := t.TempDir()
+	a := actionsEnv{outputs: filepath.Join(dir, "out"), summary: filepath.Join(dir, "summary")}
+	st := &review.RoundState{Known: true, Limit: true, Round: 3, Max: 3,
+		Unresolved: []vcs.PriorComment{{Path: "a.go", Line: 7, Severity: "warning", Class: "correctness"}}}
+	report := &review.Report{Rounds: st}
+
+	a.setOutputs(resultLimit, report)
+	a.writeSummary(resultLimit, report, nil, vcs.Ref{}, roundLimitNote(st))
+
+	out, err := os.ReadFile(a.outputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"result=limit\n", "complete=false\n", "round=3\n"} {
+		if !strings.Contains(string(out), want) {
+			t.Errorf("outputs lack %q:\n%s", want, out)
+		}
+	}
+	summary, err := os.ReadFile(a.summary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(summary), "`a.go:7` (warning, correctness)") {
+		t.Errorf("summary does not list the open thread:\n%s", summary)
+	}
+}
+
+// A run whose triage failed and was forgiven still has a series to end: with
+// stop_at above fail_on, findings between the two settle it, as they would in a
+// run whose triage worked.
+func TestAForgivenTriageFailureCanStillSettleTheSeries(t *testing.T) {
+	triage := review.StageStatus{Stage: "triage", Reason: "rate-limited"}
+	report := &review.Report{
+		Findings: []review.Finding{{Path: "a.go", Line: 1, Severity: "info", Title: "minor"}},
+		Stages:   []review.StageStatus{triage},
+		Rounds:   &review.RoundState{Known: true, Round: 2, StopAt: config.SeverityWarning},
+	}
+	if got := classify(report, config.SeverityInfo, true); got != resultSettled {
+		t.Errorf("classify = %q, want settled", got)
+	}
+	if got := classify(report, config.SeverityInfo, false); got != resultError {
+		t.Errorf("without the allowance classify = %q, want error: a failed triage is never settled", got)
+	}
+}

@@ -503,6 +503,20 @@ type Review struct {
 	// "none" disables this finding threshold, not required stages or practice policy.
 	FailOn Severity `yaml:"fail_on"`
 
+	// MaxRounds ends a series of reviews of one pull request. Once this many
+	// reviews from finished runs are on it, a further run calls no model,
+	// lists what is unresolved and exits with the limit status. Zero, the
+	// default, is no limit. A run that failed does not count, so a flaky model
+	// cannot use up the rounds. A working tree has no series to count.
+	MaxRounds int `yaml:"max_rounds"`
+
+	// StopAt is the lowest severity that keeps a series of reviews going. A
+	// run whose findings, and every thread still standing from earlier rounds,
+	// all sit below it reports the series as settled and exits zero, whatever
+	// fail_on says about the lower ones. On a working tree it judges the run
+	// alone. Empty, the default, never settles.
+	StopAt Severity `yaml:"stop_at"`
+
 	// MinSeverity drops findings below this severity before publishing.
 	MinSeverity Severity `yaml:"min_severity"`
 
@@ -1382,6 +1396,11 @@ func (s ModelSpec) overlay(over ModelSpec) ModelSpec {
 		out.Extra = make(map[string]string, len(s.Extra)+len(over.Extra))
 		maps.Copy(out.Extra, s.Extra)
 		maps.Copy(out.Extra, over.Extra)
+	}
+	// A role's own escalation model replaces the inherited one. Left out, a
+	// config naming models.review.fallback validated and then never escalated.
+	if over.Fallback != nil {
+		out.Fallback = over.Fallback
 	}
 	return out
 }
