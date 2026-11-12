@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.7.0](https://github.com/jdziat/open-nitpick/compare/v2.6.1...v2.7.0) (2026-11-12)
+
+
+### Features
+
+* **review:** end a review series with a round limit and stop_at ([#213](https://github.com/jdziat/open-nitpick/issues/213)) ([73736e7](https://github.com/jdziat/open-nitpick/commit/73736e7cae86a8fddb0ac173c4ec3bf021c50ce3))
+
+
+### Fixes
+
+* **llm:** cap OpenRouter reasoning calls so a runaway ends ([#215](https://github.com/jdziat/open-nitpick/issues/215)) ([8a0dfdb](https://github.com/jdziat/open-nitpick/commit/8a0dfdb1f6c1272fa8974412d97136b04fec32b0))
+
+
+### Documentation
+
+* apply the copy rules to every documentation page ([#210](https://github.com/jdziat/open-nitpick/issues/210)) ([b2d8244](https://github.com/jdziat/open-nitpick/commit/b2d82441eb3df7f93ea5b825b56c32b47edba7b1))
+
 ## [2.6.1](https://github.com/jdziat/open-nitpick/compare/v2.6.0...v2.6.1) (2026-11-11)
 
 
