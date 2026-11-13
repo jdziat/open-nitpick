@@ -18,7 +18,7 @@ in comments that match none?
 
 | | version | how it is run |
 |---|---|---|
-| open-nitpick | v2.7.0, the release binary | the eval harness, shipped defaults |
+| open-nitpick | v2.7.0, the release binary | `nitpick review -dry-run -no-linters` in a git checkout of each snapshot, shipped defaults |
 | Mira | `miracodeai/mira` at `04d3491` | its own replay harness, `scripts/replay_snapshot_review.py`, default settings |
 
 Mira is Apache-2.0 and self-hosted, so both tools run on this machine with no
@@ -30,8 +30,8 @@ tuned. Every model role in both tools is set to it.
 
 Settings are each tool's defaults except the model. Mira's are reasoning effort
 `medium` and a 16k-token output budget. Ours leave reasoning unset and carry the
-16384-token ceiling v2.7.0 adds for OpenRouter. Related-file context is off for
-open-nitpick, its shipped default. These differences are part of what is being
+16384-token ceiling v2.7.0 adds for OpenRouter, with the model set through
+`LLM_MODEL` and no repository or user configuration. These differences are part of what is being
 compared and are not equalised.
 
 ## Corpus
@@ -57,9 +57,11 @@ Reviewers never see the golden comments; they are read only by the scorer.
 
 1. Prepare the twenty snapshots (diff, source at the head commit, metadata).
 2. Run Mira on each snapshot with its replay harness.
-3. Run open-nitpick on each snapshot as a fixture: the files the diff touches,
-   before and after, with the pre-image rebuilt by reverse-applying the diff to
-   the head tree.
+3. Run open-nitpick on each snapshot as a checkout: the snapshot's head tree is
+   the working tree, with a base commit made by reverse-applying the diff and a
+   head commit that applies it again, and `nitpick review -base HEAD~1 -head
+   HEAD -dry-run -no-linters` reviews the pull request. Related-file context is on,
+   as shipped. Analyzers are off because the other reviewer runs none.
 4. Two independent passes of each tool, in the same session (Rule 2).
 5. Score every review with the upstream Martian scorer, one judge for both
    tools, Core profile as the headline and Strict beside it.
@@ -96,12 +98,21 @@ Following `docs/measurement.md`:
 - The judge is a model and varies between passes. The deterministic columns of
   `internal/evals` do not exist for this corpus, because the golden comments
   carry no file or line.
-- open-nitpick sees the changed files in full and the diff. Mira's harness
-  serves it the whole snapshot through its index tools. That is each tool's
-  shipped shape, and the cost and time columns show what each pays for it.
+- Each tool gets the whole head tree and reads what it chooses to: Mira through
+  its index tools, open-nitpick through its related-file context. That is each
+  tool's shipped shape, and the time column shows what each pays for it.
+- open-nitpick prints findings as dry-run text, and `tools/bakeoff/run_nitpick.py`
+  parses them. The raw output is kept beside each result so the parse can be
+  audited.
+- Token cost is not collected for open-nitpick, because the CLI does not report
+  it; Mira's harness does. Time is.
 - Twenty pull requests is a small sample and one model is one model. A result
   here says nothing about other models.
 
 ## Deviations
 
-None yet.
+- Before any result was read, the open-nitpick arm changed from the eval harness
+  on a fixture of the changed files to the shipped CLI on a full checkout. The
+  fixture gave it less than the other reviewer sees and left its related-file
+  context unable to run. Mira's first pass had started and its results were
+  unread; open-nitpick had not run.
