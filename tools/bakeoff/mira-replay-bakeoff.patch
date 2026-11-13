@@ -28,3 +28,15 @@ index 7429ee3..55e35f5 100644
      "review_round": 1,
      "source_files": len(tree),
      "limitations": [
+diff --git a/scripts/run_benchmark_sample.py b/scripts/run_benchmark_sample.py
+index ac01c41..317fa25 100644
+--- a/scripts/run_benchmark_sample.py
++++ b/scripts/run_benchmark_sample.py
+@@ -45,6 +45,7 @@ REPO = Path(__file__).resolve().parents[1]
+ MODELS = {
+     "deepseek": "deepseek/deepseek-v4.1-flash-1017",
+     "glm": "z-ai/glm-5.3-flash",
++    "sonnet": "anthropic/claude-sonnet-4.6",
+ }
+ # Locations are machine-specific, so they come from flags or these variables.
+ ENV_INPUTS = "MIRA_BENCHMARK_INPUTS"  # directory from prepare_benchmark_inputs.py

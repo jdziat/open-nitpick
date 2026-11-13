@@ -48,9 +48,13 @@ Arms B and C give each tool a stronger configuration.
 
 Mira's replay harness uses one model for every role, so a review model separate
 from a triage model is not reachable there. `fallback_model`, `ensemble_runs` and
-`second_look` are, through a 12-line change to `scripts/replay_snapshot_review.py`
+`second_look` are, through a 12-line change to `scripts/replay_snapshot_review.py` and a one-line model alias in `scripts/run_benchmark_sample.py`
 that reads them from the environment and leaves the default path untouched. The
 change is kept as `tools/bakeoff/mira-replay-bakeoff.patch`.
+
+Arms B and C give each review 900 seconds in both tools. Mira's own default is 420,
+which its sentry-5 review in arm A came within 11 seconds of, and a thorough
+setting with three ensemble runs would not fit.
 
 Arm C costs real money. Mira's reviews average about 443,000 prompt tokens each,
 which at Sonnet rates is roughly $1.80 a review, so about $35 for one pass over
