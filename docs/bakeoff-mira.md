@@ -34,6 +34,29 @@ Settings are each tool's defaults except the model. Mira's are reasoning effort
 `LLM_MODEL` and no repository or user configuration. These differences are part of what is being
 compared and are not equalised.
 
+## Arms
+
+Each arm is both tools run in the same session on the same twenty pull requests,
+two passes each. Arm A is the registered design above, one model for every role.
+Arms B and C give each tool a stronger configuration.
+
+| arm | open-nitpick | Mira |
+|---|---|---|
+| A, one model | `deepseek/deepseek-v4.1-flash-1017` for every role, shipped defaults | the same model for every role, default settings |
+| B, mixed models | `tools/bakeoff/nitpick-mix.yaml`: DeepSeek reviews, qwen3.8-27b is a second reviewer on every batch, the triage model and the fallback; related-file context and the caller walk on | DeepSeek, `fallback_model` qwen3.8-27b, `ensemble_runs` 3 and `second_look` on, Mira's own opt-in "thorough" settings |
+| C, frontier model | `anthropic/claude-sonnet-4.6` for every role | the same model, Mira's default |
+
+Mira's replay harness uses one model for every role, so a review model separate
+from a triage model is not reachable there. `fallback_model`, `ensemble_runs` and
+`second_look` are, through a 12-line change to `scripts/replay_snapshot_review.py`
+that reads them from the environment and leaves the default path untouched. The
+change is kept as `tools/bakeoff/mira-replay-bakeoff.patch`.
+
+Arm C costs real money. Mira's reviews average about 443,000 prompt tokens each,
+which at Sonnet rates is roughly $1.80 a review, so about $35 for one pass over
+twenty pull requests, and open-nitpick uses fewer tokens. Arm C runs one pass of
+each tool, and only after the cost is confirmed.
+
 ## Corpus
 
 The Martian Code Review Bench offline set at `withmartian/code-review-benchmark`
@@ -111,6 +134,10 @@ Following `docs/measurement.md`:
 
 ## Deviations
 
+- Arms B and C were added after arm A's first pass had been read and graded. They
+  exist because the first result raised the question of each tool's best
+  configuration, not because of which tool led, and arm A stays in the report
+  whatever B and C show.
 - Before any result was read, the open-nitpick arm changed from the eval harness
   on a fixture of the changed files to the shipped CLI on a full checkout. The
   fixture gave it less than the other reviewer sees and left its related-file

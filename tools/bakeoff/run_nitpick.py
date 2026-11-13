@@ -74,7 +74,7 @@ def parse(stdout: str):
     return comments
 
 
-def review(case, repos, out, model, timeout):
+def review(case, repos, out, model, timeout, config):
     repo = repos / case
     t0 = time.time()
     env = dict(os.environ, LLM_PROVIDER="openrouter", LLM_MODEL=model, NITPICK_NO_USER_CONFIG="1")
@@ -82,7 +82,8 @@ def review(case, repos, out, model, timeout):
     dest.mkdir(parents=True, exist_ok=True)
     try:
         run = subprocess.run(
-            ["nitpick", "review", "-repo", str(repo), "-base", "HEAD~1", "-head", "HEAD", "-dry-run", "-no-linters"],
+            ["nitpick", "review", "-repo", str(repo), "-base", "HEAD~1", "-head", "HEAD", "-dry-run", "-no-linters"]
+            + (["-config", str(config)] if config else []),
             capture_output=True, text=True, env=env, timeout=timeout,
         )
         code, stdout, stderr = run.returncode, run.stdout, run.stderr
@@ -98,7 +99,8 @@ def review(case, repos, out, model, timeout):
     result = {
         "result": {"comments": comments},
         "duration_seconds": seconds,
-        "manifest": {"reviewer": "open-nitpick", "model": model, "version": nitpick_version()},
+        "manifest": {"reviewer": "open-nitpick", "model": model, "version": nitpick_version(),
+                     "config": str(config) if config else None},
     }
     (dest / "status.json").write_text(json.dumps(status))
     (dest / "result.json").write_text(json.dumps(result, indent=2))
@@ -118,17 +120,18 @@ def main():
     ap.add_argument("--concurrency", type=int, default=2)
     ap.add_argument("--timeout", type=int, default=900)
     ap.add_argument("--only", default="")
+    ap.add_argument("--config", type=Path, default=None, help="a .nitpick.yaml to review under")
     args = ap.parse_args()
     selection = json.loads((args.inputs / "selection.json").read_text())
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "run.json").write_text(json.dumps({
         "selection": selection, "repeats": 1, "model": args.model, "reviewer": "open-nitpick",
-        "version": nitpick_version(),
+        "version": nitpick_version(), "config": str(args.config) if args.config else None,
     }))
     only = {x for x in args.only.split(",") if x}
     cases = [c["case"] for c in selection["cases"] if not only or c["case"] in only]
     with concurrent.futures.ThreadPoolExecutor(args.concurrency) as pool:
-        list(pool.map(lambda c: review(c, args.repos, args.out, args.model, args.timeout), cases))
+        list(pool.map(lambda c: review(c, args.repos, args.out, args.model, args.timeout, args.config), cases))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,29 @@
+# open-nitpick's mixed-model configuration for the bakeoff against Mira (arm B).
+#
+# The shape is the documented cheap composite (docs/comparison.md): two reviewers
+# on every batch, a second model triaging. DeepSeek V4 Flash reviews, as in arm A;
+# qwen3.8-27b is the second reviewer, the triage model and the fallback.
+# Related-file context and the caller walk are on, as this repository's own
+# .nitpick.yaml has them. Validation stays off: it lost recall when measured.
+models:
+  default:
+    provider: openrouter
+    model: deepseek/deepseek-v4.1-flash-1017
+    timeout: 8m
+    fallback:
+      model: qwen/qwen3.8-27b
+  triage:
+    provider: openrouter
+    model: qwen/qwen3.8-27b
+    temperature: 0
+    reasoning: "off"
+  ensemble:
+    - provider: openrouter
+      model: qwen/qwen3.8-27b
+
+review:
+  fail_on: none
+  min_severity: info
+  token_budget_per_request: 120000
+  related_context: true
+  related_context_callers: true
