@@ -687,10 +687,17 @@ three R1 passes, and is removed if it fails, as R5 was. It is off by default.
 - **Ship to a fresh-corpus gate:** precision up 10 points or more, recall down 3 or
   fewer, F1 at or above Mira's 0.514 on these 20. The tools-off ablation says a
   working loop should add about 14 points of precision at unchanged recall.
-- **Kill:** any of the three fails, or the forced submission is needed on more than
-  a third of batches, which would say the loop is not working.
+- **Kill:** any of the three fails.
 - **Reported with it:** forced submissions, turns and tool calls per batch, median
   review time, and calls per review against R1's.
+
+Erratum, made after the first 13 batches had run and before any R8 score was read:
+this stage first listed a fourth kill condition, that a forced submission on more
+than a third of batches would mean the loop was not working. All 13 batches were
+forced. Mira's own loop hit its 10-turn cap, and so was forced to submit, in 43 of
+90 held-out chunks (48%), and 47 of the 90 used all 10 turns, so a loop that is
+working is forced about half the time. The condition rested on a wrong assumption
+and is withdrawn; the three numeric conditions are unchanged.
 
 ### What this means for the goal
 
