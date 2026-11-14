@@ -789,6 +789,37 @@ running a thinking model through a tool loop on OpenRouter would want. The chang
 guard (`tools/bakeoff/llm-go-sdk-reasoning-replay.patch`, with a test). It is not
 applied here.
 
+### Locating Mira's gain (registered 2026-11-14, before it runs)
+
+Mira with tools off drafts at our level and with tools on drafts 14 points more
+precisely, and our own tool loop in three builds did not reproduce that. So the gain is
+in something that works with the tools. This switches off one of Mira's other parts at a
+time, with the tools left on, on the same 20 tuning pull requests, two passes each, and
+reads what each one costs the drafts. Mira's code is changed only through environment
+switches in `tools/bakeoff/mira-replay-bakeoff.patch`; the default path is untouched.
+
+| ablation | what is removed |
+|---|---|
+| no context | the cross-file code context placed in the prompt before the diff; the tools stay |
+| no footguns | the per-language list of hazards in the prompt |
+| no tool hint | the system-prompt section that tells the model to verify a cross-file claim before filing it; the tools stay |
+| no heuristics | the three sections naming where defects hide: the receiving side, what a rewrite dropped, callers that did not follow |
+| no exclusions | the two sections listing what not to file and what not to speculate about |
+
+The measure is the drafted stage (everything the model filed, before the noise filter and
+the critique), rebuilt with `tools/bakeoff/mira_funnel.py` and scored by the same judge:
+default 50.6% precision, 57.4% recall, F1 0.538; tools off 36.2%, 58.1%, 0.446.
+
+- **A part carries the gain** if removing it takes drafted precision down by 7 points or
+  more (half the tools effect) with recall within 3 points.
+- **Within the variance** otherwise. Two passes of 20 pull requests spread by about 0.03
+  F1 and several points of precision (the two default passes scored F1 0.552 and 0.524),
+  so a smaller shift is not read as a finding.
+- **What each answer would mean.** A part that carries it is the next thing to try in
+  our reviewer, singly. If none does, the gain is an interaction among them or in the
+  tools themselves (their ranking and windows), and no ablation of this kind will
+  find it.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
