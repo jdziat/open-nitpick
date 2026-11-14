@@ -361,6 +361,19 @@ findings are filtered. The remaining levers in this plan do not reach it.
   The reviewer's confidence does not rank well enough for a cap to remove noise
   faster than it removes defects. Mira posts 2.4 comments a pull request at 73.5%
   precision and 50% recall, so its selection happens before the comments exist.
+- Agreement across passes is not the missing selector either. Keeping a comment
+  only when another pass of the same reviewer commented within 5 lines of the same
+  file gives open-nitpick F1 0.498 (unverified, up from 0.485) and 0.497
+  (offline-verified, down from 0.512). It also lowers Mira's, from 0.596 to 0.577.
+  `tools/bakeoff/selectors.py` reproduces this and the cap table.
+- The gap is selection, not discovery. Over the three passes open-nitpick's output
+  matches 79 of the 105 golden comments and Mira's matches 62; only 5 are Mira's
+  alone. Open-nitpick finds nearly everything Mira finds and posts it among 263
+  false positives, and none of confidence, a repository check or agreement between
+  passes separates the two well enough. The remaining lever is a generator that
+  chooses what to say before it says it, which is a new architecture and not a
+  stage of this plan. Its evaluation needs a corpus neither tool has been scored
+  on: the 30 held-out pull requests have now been read once.
 - R4 aims at recall, and recall was never what Mira led on.
 - Mira's own agentic loop, noise filter and self-critique are a different shape
   of tool, and matching its precision means matching what produces it: fewer,
