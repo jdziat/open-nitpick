@@ -982,6 +982,24 @@ three passes, paired against the three R1 passes.
 - **Reported with it:** batches per pull request, tokens per call, pull requests whose one
   batch still exceeds 120,000 tokens, and median review time.
 
+#### Reasoning replay: result
+
+Mira's own loop, same model, tools and prompt, 20 tuning pull requests, two passes.
+
+| arm | drafts: precision, recall, F1 (comments) | posted: precision, recall, F1 (comments) |
+|---|---|---|
+| default, every key replayed | 50.6%, 57.4%, 0.538 (154) | 73.0%, 39.7%, 0.514 (74) |
+| text only (what R8b sends) | 49.4%, 58.8%, 0.537 (162) | 67.5%, 41.2%, 0.511 (83) |
+| no replay | 40.3%, 70.6%, 0.513 (238) | 59.1%, 50.0%, 0.542 (115) |
+
+The registered reading is "not replay": text only matches the default on drafts (-1.2
+points of precision, +1.4 of recall), so `reasoning_details` is not the carrier. The replay
+line of work ends. This also removes the R8b explanation: our loop already replays the text,
+and Mira's loop with text alone drafts at 49%, against 35% for ours. Replay does shape the
+balance. With no replay at all, Mira files more and is less precise. Its posted F1 of 0.542
+is above the default's 0.514 on two passes, but its precision is 59%, so it fails the
+registered precision condition, and the difference is inside the variance recorded above.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
