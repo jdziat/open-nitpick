@@ -735,6 +735,21 @@ The first alone does not explain the result. On the 36 reviews where every batch
 investigated, R8 scored precision 40.8% and recall 44.3% against R1's 39.9% and 51.9% on
 the same pull requests.
 
+#### R8b: R8 with its two defects fixed (registered before it runs)
+
+The same stage with the SDK replaying each assistant turn's reasoning on the wire and
+the forced submission retried with reasoning off when it comes back empty at the
+output cap. The reasoning replay is a one-line change to the SDK's converter, built
+here from a patched copy of the module through an alternate `go.mod`, so neither this
+repository's `go.mod` nor the SDK checkout is touched; a change to the SDK is made only
+if this works. Same conditions as R8 and the same 20 pull requests, three passes, paired
+against R1.
+
+- **Ship to a fresh-corpus gate:** precision up 10 points or more, recall down 3 or
+  fewer, F1 at or above Mira's 0.514.
+- **Kill:** any of the three fails. This is the third build of one hypothesis, the second
+  fixing a defect found in the source and not in the scores; a fail ends it.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
