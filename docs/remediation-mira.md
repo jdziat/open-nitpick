@@ -664,6 +664,34 @@ combination Mira runs has not been measured here. Its tuning-set ablation is
 two passes of one model, so the 14 points carry the variance this plan already
 documents; the direction is large enough to act on and the size is not exact.
 
+### R8. Mira's loop, whole (registered 2026-11-14, before it runs)
+
+The code review and the tools-off ablation say the gap is in the drafts and that the
+tool loop is where Mira's precision comes from. R5 gave our reviewer tools and R7
+gave it heuristics, and neither alone moved anything. R8 builds what Mira runs, as
+one change, with the three things R5 lacked:
+
+- tools, with reasoning on and echoed back across turns, as in R5b;
+- a forced structured submission whenever the model stops without submitting or runs
+  out of turns, over the whole transcript, so a finished investigation is never thrown
+  away for a diff-only review (R5b discarded 42 of 144);
+- a turn budget of 10 and a byte budget on tool output, and not a lookup budget, so
+  the model decides how much to read;
+- the review heuristics and the not-worth-a-finding list of R7, which say what to
+  go and check.
+
+It falls back to the ordinary review only when the first call fails before anything was
+read. It runs on the 20 tuning pull requests, three passes, paired against the
+three R1 passes, and is removed if it fails, as R5 was. It is off by default.
+
+- **Ship to a fresh-corpus gate:** precision up 10 points or more, recall down 3 or
+  fewer, F1 at or above Mira's 0.514 on these 20. The tools-off ablation says a
+  working loop should add about 14 points of precision at unchanged recall.
+- **Kill:** any of the three fails, or the forced submission is needed on more than
+  a third of batches, which would say the loop is not working.
+- **Reported with it:** forced submissions, turns and tool calls per batch, median
+  review time, and calls per review against R1's.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
