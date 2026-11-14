@@ -750,6 +750,45 @@ against R1.
 - **Kill:** any of the three fails. This is the third build of one hypothesis, the second
   fixing a defect found in the source and not in the scores; a fail ends it.
 
+#### R8b result: failed
+
+Three passes on the 20 tuning pull requests, paired against the same set's R1 passes. The
+loop ran as intended this time: 142 of 144 batches investigated (R8: 111), 2 fell back
+(R8: 33), the reviewer submitted on its own in 22 and was forced in 120, 41 forced calls
+came back empty at the output cap and every one was recovered by the retry without
+reasoning, and the median review took 161 seconds (R8: 350, R1: 146).
+
+| arm (3 passes, 20 pull requests) | TP | FP | FN | precision | recall | F1 |
+|---|---:|---:|---:|---:|---:|---:|
+| R1 | 105 | 211 | 99 | 33.2% | 51.5% | 0.404 |
+| R8 | 94 | 170 | 110 | 35.6% | 46.1% | 0.402 |
+| R8b, reasoning replayed, forced call retried | 90 | 169 | 114 | 34.7% | 44.1% | 0.389 |
+| Mira (2 passes) | 54 | 20 | 82 | 73.0% | 39.7% | 0.514 |
+
+Against R1: precision +1.5 points (-5.0 to +9.6), recall -7.4 (-14.7 to +0.6), F1 -0.015
+(-0.077 to +0.059). Per pass F1 was 0.350, 0.435 and 0.385. Against R8: -0.9, -2.0 and
+-0.013, all inside the interval. It fails the ship conditions, and the registration
+said a fail ends this hypothesis.
+
+**What this settles.** Giving our reviewer tools, a turn budget, a forced structured
+submission that survives an empty reply, replayed reasoning and the review heuristics,
+with the same model Mira runs on, does not reproduce the 14 points of precision that
+switching the same things off costs Mira. The two defects the build had were real and
+are fixed in this run, and fixing them moved nothing, so they were not why. What is
+left is a difference in what is around the loop and not in the loop: Mira's
+`grep_repo` ranks the files nearest the pull request first, its prompt carries a
+language-by-language list of footguns and requires each comment to quote the code it is
+about, its submission carries a summary and key issues the reviewer must reconcile with
+its comments, and the review is preceded by a cross-file context pass. Which of those
+does it is not known, and each would be a separate experiment on a stage that has now
+failed three times.
+
+**A defect found on the way, outside this repository.** `llm-go-sdk`'s OpenAI-compatible
+`ConvertMessages` does not send an assistant turn's `Reasoning` back, which any caller
+running a thinking model through a tool loop on OpenRouter would want. The change is one
+guard (`tools/bakeoff/llm-go-sdk-reasoning-replay.patch`, with a test). It is not
+applied here.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
@@ -793,9 +832,9 @@ findings are filtered. The remaining levers in this plan do not reach it.
 - R4 aims at recall, and recall was never what Mira led on.
 - R7 (review heuristics in the prompt) is killed above, and a verbatim-citation
   rule is no better.
-- What the code review found, and the one combination not yet tried (tools, a forced
-  submission, a turn budget and the heuristics together), is in "Where Mira's
-  results come from".
+- What the code review found is in "Where Mira's results come from". The combination it
+  pointed at, tools with a forced submission, a turn budget, replayed reasoning and the
+  heuristics together (R8, R8b), did not reproduce it.
 - R6 (a budget in the prompt) is killed above; it reproduces the cap.
 - R5 (the reviewer reads the repository while it files) is killed above. It was
   the generator change the plan had left, and it did not move precision.
