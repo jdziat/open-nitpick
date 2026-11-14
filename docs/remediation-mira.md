@@ -335,6 +335,32 @@ Two harness faults surfaced and are recorded so a later reader can discount them
   used; the stalled one is kept beside the runs as
   `gover-p3-sentry-9-r1.stalled`. The other 89 live reviews finished.
 
+### Is the gap reliability or volume
+
+The same repository checker (`tools/bakeoff/verify_filter.py`, DeepSeek with
+`read_file` and `grep_repo`) was run over Mira's 216 held-out comments, so both
+tools are graded by one neutral party that matches neither tool's labels.
+
+| held-out comments, 3 passes | comments | confirmed | refuted | uncertain | confirmed that matched a golden comment |
+|---|---:|---:|---:|---:|---:|
+| Mira | 216 | 200 (92.6%) | 1 | 15 | 158 of 200 (79%) |
+| open-nitpick | 448 | 324 (72.3%) | 69 | 54 | 165 of 324 (51%) |
+
+Both effects are real. The checker confirms 20 points fewer of open-nitpick's
+comments, so Mira's generation is more reliable and not merely shorter. And of
+the comments each checker-confirmed, open-nitpick posts 159 that match no
+golden comment against Mira's 42: about 53 a pass against 14. Those are real
+by the checker's reading and off the benchmark's list, which is the share a
+precision score charges as false positives.
+
+The checker is the same model family as both reviewers and shares its blind
+spots, and "confirmed" was agreed with a hand reading on only 14 of 111 cases
+earlier, so this is indicative. It does show that closing the gap on this
+benchmark would take two different changes: generation that is grounded the way
+Mira's is (a reliability change), and reporting less of what is real but
+unlabelled (a product change that makes the tool worse for a reader who wants
+those findings).
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
