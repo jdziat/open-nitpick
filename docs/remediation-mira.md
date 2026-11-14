@@ -1034,6 +1034,33 @@ paired against R1 and R8b.
 - **Reported with it:** forced submissions, turns and lookups per batch, batches per review,
   median review time, and calls per review.
 
+#### R10 result: killed by its recall and F1 conditions
+
+Three passes on the 20 tuning pull requests, no verify stage, paired against R1 and against
+Mira's two default passes. Batching: 51 of 60 reviews in one batch, 9 in two. The loop: 68
+batches investigated, 58 forced to submit, 10 submitted on their own, 1 fell back to the
+ordinary review. Median turns 10 and lookups 17 per batch. Median review time 137 seconds
+(R1 146). Forced calls that came back empty at the output cap were retried without reasoning,
+20 times.
+
+| arm | precision | recall | F1 | comments |
+|---|---:|---:|---:|---:|
+| R1, 6-file batches | 33.2% | 51.5% | 0.404 | 316 |
+| R8b, 6-file loop | 34.7% | 44.1% | 0.389 | 259 |
+| R9, whole PR, no tools | 27.8% | 43.1% | 0.338 | 316 |
+| R10, whole PR, loop | 48.6% | 43.6% | 0.460 | 183 |
+| Mira, default (2 passes) | 73.0% | 39.7% | 0.514 | 74 |
+
+R10 minus R1: precision +15.4 points (+7.6 to +22.3), recall -7.8 (-13.1 to -1.8), F1 +0.056
+(+0.005 to +0.102). R10 minus Mira: precision -24.3 (-38.1 to -12.4), recall +3.9 (-6.2 to
++14.2), F1 -0.054 (-0.148 to +0.040). Per pass F1 was 0.460, and R1's three passes were
+0.364, 0.425 and 0.424.
+
+It fails two of its three conditions (recall down 7.8, F1 below 0.514), so it is killed by
+its own rule. It is still the first lever in this work to move precision by an interval that
+clears zero, and the R9 and R10 pair says the whole-PR context helps only when the tool loop
+reads it. The gap to Mira's precision is 24 points.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
