@@ -395,8 +395,30 @@ The same sample says something about our checker. Against the hand grades it
 confirmed all 8 `real` comments, 4 of 6 `partly`, and 7 of 16 `not_real`; it
 refuted 6 and called 3 uncertain. Keeping only what it confirms therefore removes 9
 of 16 wrong comments and 2 of 14 real or partly real ones. It filters usefully and
-leaves 7 wrong comments in 19 kept, so a checker that confirms fewer of the wrong
-ones is the lever the earlier stages did not have.
+leaves 7 wrong comments in 19 kept. That pointed at a stronger checker, so one was
+tried on the same comments.
+
+#### A stronger checker, on the graded sample
+
+`tools/bakeoff/verify_filter.py --model anthropic/claude-sonnet-4.6` over the 30
+graded open-nitpick comments plus 20 randomly drawn matched ones as a recall
+control (880,000 prompt tokens and 44,000 completion tokens, about $3 at list
+price). Keeping only what each checker confirms:
+
+| of 50 comments | DeepSeek V4 Flash | Sonnet 4.6 |
+|---|---:|---:|
+| wrong comments removed (of 16 `not_real`) | 9 | 6 |
+| real, partly real or matched comments lost (of 34) | 4 | 1 |
+| verdicts of "uncertain" | 6 | 0 |
+
+The stronger model is not the better filter. It commits where DeepSeek hedges, so
+it loses fewer good comments and removes fewer bad ones: 10 of the 16 wrong
+comments are confirmed, against 7. At 4.9 lookups a comment it stops sooner than the
+graders did. The wrong comments that survive are the ones that need a framework's
+behaviour or a control flow read to rebut (a proxied controller property, a loop
+that runs a pass on shutdown), and a checker with reasoning off and eight lookups
+does not do that reading with either model. Whether one with reasoning on would is
+untested; at this sample size a difference of two or three comments is noise.
 
 Limits: 30 and 18 are small, and the intervals are wide; one family of grader read
 all 48; and `partly` is a judgement. The sample, key and verdicts are in
@@ -612,7 +634,8 @@ findings are filtered. The remaining levers in this plan do not reach it.
 The benchmark scores agreement with a short list of human-labelled defects, but the
 blind grade above shows that is not what explains the gap: over half of
 open-nitpick's unmatched comments are wrong, against about a tenth of Mira's. The
-gap is quality, and the open question is how much of it a stronger checker removes.
+gap is quality. A stronger checker without reasoning did not remove more of it, so
+the lever is still unidentified.
 
 ## Order, cost and time
 

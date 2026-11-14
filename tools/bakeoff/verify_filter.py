@@ -30,6 +30,7 @@ from critique_filter import diff_sections, window  # noqa: E402
 
 MODEL = "deepseek/deepseek-v4.1-flash-1017"
 MAX_HOPS = 8
+USAGE = {"prompt": 0, "completion": 0}
 
 TOOLS = [
     {"type": "function", "function": {
@@ -75,7 +76,11 @@ def chat(messages, key):
     for _ in range(3):
         try:
             with urllib.request.urlopen(req, timeout=240) as r:
-                return json.load(r)["choices"][0]["message"]
+                reply = json.load(r)
+            usage = reply.get("usage") or {}
+            USAGE["prompt"] += usage.get("prompt_tokens", 0)
+            USAGE["completion"] += usage.get("completion_tokens", 0)
+            return reply["choices"][0]["message"]
         except Exception as e:  # transient
             last = e
     raise last
@@ -136,13 +141,16 @@ def verify(case, c, sections, repo, key):
 
 
 def main():
+    global MODEL
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", type=Path, required=True)
     ap.add_argument("--repos", type=Path, required=True)
     ap.add_argument("--inputs", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True, help="prefix; -confirmed and -notrefuted are written")
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--model", default=MODEL, help="the checking model, as OpenRouter names it")
     args = ap.parse_args()
+    MODEL = args.model
     key = os.environ["OPENROUTER_API_KEY"]
     outs = {"confirmed": Path(f"{args.out}-confirmed"), "notrefuted": Path(f"{args.out}-notrefuted")}
     for o in outs.values():
@@ -187,6 +195,7 @@ def main():
           "mean hops:", round(sum(v["hops"] for v in verdicts.values()) / max(len(verdicts), 1), 1))
     for rule, (a, b) in totals.items():
         print(f"{rule}: {a} -> {b}")
+    print(f"model {MODEL}: {USAGE['prompt']} prompt tokens, {USAGE['completion']} completion tokens")
 
 
 if __name__ == "__main__":
