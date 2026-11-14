@@ -367,6 +367,28 @@ Mira's is (a reliability change), and reporting less of what is real but
 unlabelled (a product change that makes the tool worse for a reader who wants
 those findings).
 
+### R5. Generate with the repository open (registered 2026-11-13, before any run)
+
+The one lever the gate leaves is the generator. Mira's reviewer reads files and
+searches the repository while it decides what to file, and its prompt tells it to
+look before staying silent. Ours reviews from the diff and what the bundle
+carries, and a checker looks things up afterwards. R5 gives the reviewer the same
+two tools in its own call (`review.investigate`), with `submit_findings` as the
+way to finish, and changes nothing else: same prompt, same schema, same model.
+
+It runs on the 20 tuning pull requests only. The 30 held-out ones were read once
+and a second look is contaminated, so a result here is a reason to look for a new
+corpus, not a win.
+
+- **Ship to a fresh-corpus gate:** over three passes, paired against the same
+  tuning set's three R1 passes, precision up 10 points or more, recall down 3 or
+  fewer, and F1 at or above Mira's on the same 20 pull requests (0.505 and 0.524 in its
+  two passes; the three R1 passes it is paired against scored 0.364, 0.425 and 0.424).
+- **Kill:** any of the three fails. A precision gain with a larger recall loss is
+  a cap, which the gate already measured.
+- **Cost bound:** under twice the model calls of an R1 review, stated as measured
+  calls, and review time reported with it.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
