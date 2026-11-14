@@ -699,6 +699,42 @@ forced. Mira's own loop hit its 10-turn cap, and so was forced to submit, in 43 
 working is forced about half the time. The condition rested on a wrong assumption
 and is withdrawn; the three numeric conditions are unchanged.
 
+#### R8 result: failed, with two defects found in the build
+
+Three passes on the 20 tuning pull requests, paired against the same set's R1 passes.
+
+| arm (3 passes, 20 pull requests) | TP | FP | FN | precision | recall | F1 |
+|---|---:|---:|---:|---:|---:|---:|
+| R1 | 105 | 211 | 99 | 33.2% | 51.5% | 0.404 |
+| R8, Mira's loop whole | 94 | 170 | 110 | 35.6% | 46.1% | 0.402 |
+| Mira (2 passes) | 54 | 20 | 82 | 73.0% | 39.7% | 0.514 |
+
+Against R1: precision +2.4 points (-4.3 to +9.8), recall -5.4 (-10.0 to 0.0), F1 -0.002
+(-0.063 to +0.070). Per pass F1 was 0.453, 0.370 and 0.380. It fails all three ship
+conditions. The reviewer was forced to submit in 108 of the 111 investigated batches, a
+median of 10 turns and 20 lookups a batch, and a median review took 350 seconds against
+146 for R1.
+
+Two defects in the build, both visible in the logs and the SDK source and not in the
+scores, so neither was chosen to rescue the result:
+
+1. **The forced submission came back as prose, or empty, in 33 of 144 batches (23%),**
+   which then fell back to a diff-only review. A reasoning model that spends the whole
+   output budget thinking returns nothing, and `llm.Client` retries that with reasoning
+   off for an ordinary review (`internal/llm/structured.go:201`); this loop called the
+   SDK directly and had no such retry. Mira's provider has the equivalent
+   (`_budget_exhausted_retry`).
+2. **The model's reasoning was never replayed.** Our OpenRouter client is the SDK's
+   OpenAI-compatible provider, whose `ConvertMessages`
+   (`pkg/openaicompat/converters.go`) copies role, content and tool calls but not
+   `Message.Reasoning`, although the request type has a `reasoning` field for it. So each
+   turn re-thought from the tool results alone. Mira replays the reasoning of every turn
+   in raw message fields (`core/passes.py:154`).
+
+The first alone does not explain the result. On the 36 reviews where every batch was
+investigated, R8 scored precision 40.8% and recall 44.3% against R1's 39.9% and 51.9% on
+the same pull requests.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
