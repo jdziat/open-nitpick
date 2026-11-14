@@ -163,6 +163,22 @@ func TestVerificationWithholdsARefutedFindingAndSaysWhyAfterReadingTheFile(t *te
 	}
 }
 
+// A finding the check could not confirm was not disagreed with, so the summary
+// must not say an expert disagreed; a validation-only report keeps that wording.
+func TestAFindingWithheldByVerificationIsNotBlamedOnADisagreeingExpert(t *testing.T) {
+	finding := Finding{Path: "app.go", Line: 5, Title: "Close error is dropped", Severity: "warning"}
+	verified := &Report{Overruled: []Overruled{{Finding: finding, Expert: verifyExpert, Reason: "could not be confirmed against the repository: no caller found"}}}
+	summary := renderSummary(verified, nil)
+	if strings.Contains(summary, "domain expert disagreed") || !strings.Contains(summary, "withheld by a second check") {
+		t.Errorf("verification-withheld summary misdescribes the cause:\n%s", summary)
+	}
+
+	validated := &Report{Overruled: []Overruled{{Finding: finding, Expert: "a Go expert", Reason: "the error is checked by the deferred call"}}}
+	if got := validated.WithheldCause(); got != "after a domain expert disagreed" {
+		t.Errorf("validation-only cause = %q, want the expert wording kept", got)
+	}
+}
+
 func TestAnUncertainVerdictIsWithheldUnderConfirmedAndKeptUnderNotRefuted(t *testing.T) {
 	script := map[string][]llms.Response{
 		"Ignored error from http.Get": {verdict(verdictConfirmed, "ok")},

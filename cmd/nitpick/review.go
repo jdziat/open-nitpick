@@ -529,7 +529,7 @@ func printOverruled(report *review.Report) {
 		return
 	}
 
-	fmt.Fprintf(os.Stderr, "%d finding(s) withheld after a domain expert disagreed:\n", len(report.Overruled))
+	fmt.Fprintf(os.Stderr, "%d finding(s) withheld %s:\n", len(report.Overruled), report.WithheldCause())
 	for _, r := range report.Overruled {
 		cited := ""
 		if r.Cited != "" {
