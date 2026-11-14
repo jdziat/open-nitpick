@@ -200,6 +200,19 @@ grader look anything up, and gained 2 points. The difference this suggests is th
 tools, and it is untested whether a grader with tools but no diff window would do
 as well.
 
+Two follow-ups on the same findings. Verifying the two-reviewer union (arm B)
+left precision at 31.7% against 20.0% unverified, recall at 51.5%, F1 0.392, which
+is 0.085 worse than verifying the single reviewer (interval -0.145 to -0.009): the
+extra recall the second reviewer brings is mostly findings the grader also
+confirms and the judge does not match. And reading 14 of the 111 confirmed false
+positives, most look like real defects the benchmark's golden list does not
+contain (a migration with `force: true` that drops rows, a hard-coded upload cap
+that ignores a site setting, an async `forEach` in a second file). The
+benchmark's precision is therefore a measure of agreement with a short list of
+human-labelled issues, and a high-recall reviewer is penalised for reporting real
+ones. That bounds how much precision it is honest to chase, and it is the reason
+the held-out gate below judges against Mira's own score on the same labels.
+
 ### R3. Cap low-priority volume per pull request
 
 - Warnings and above always publish. Below that, a per-pull-request cap ranked by
