@@ -32,6 +32,18 @@ LOCATION = re.compile(r"^(\S[^\n]*?):(\d+)$")
 BOLD = re.compile(r"^\s*\*\*(.+)\*\*\s*$")
 
 
+SEVERITY_ROW = re.compile(r"\*\*\S*\s*(Critical|Error|Warning|Info|Nit)\*\*.*?·\s*(.*)$")
+
+
+def severity_row(lines, start, end):
+    """Severity word and class from the finding's second line, or (None, None)."""
+    for j in range(start + 1, min(end, start + 4)):
+        m = SEVERITY_ROW.search(html.unescape(lines[j]).replace("&nbsp;", " "))
+        if m:
+            return m.group(1).lower(), m.group(2).strip()
+    return None, None
+
+
 def parse(stdout: str):
     """Findings from a dry-run review: each starts at a `path:line` line."""
     lines = stdout.splitlines()
@@ -51,6 +63,7 @@ def parse(stdout: str):
         if not bolds:
             continue
         title_at, title = bolds[0]
+        sev, cls = severity_row(lines, i, end)
         body, fence = [], False
         for j in range(title_at + 1, end):
             raw = lines[j]
@@ -70,6 +83,8 @@ def parse(stdout: str):
             "path": path,
             "line": line,
             "body": html.unescape("\n".join(x for x in body if x)).strip(),
+            "severity": sev,
+            "class": cls,
         })
     return comments
 

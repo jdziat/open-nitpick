@@ -147,3 +147,120 @@ Following `docs/measurement.md`:
   fixture gave it less than the other reviewer sees and left its related-file
   context unable to run. Mira's first pass had started and its results were
   unread; open-nitpick had not run.
+
+## Results
+
+Upstream scorer, Core profile, judge `anthropic/claude-sonnet-4.5`, 20 pull requests
+and 62 golden comments, so one comment moves recall by 1.6 points. Every review
+completed; none failed. Each row is one pass.
+
+| arm | reviewer | pass | precision | recall | F1 | F2 | TP / FP / FN | comments | median seconds |
+|---|---|---:|---:|---:|---:|---:|---|---:|---:|
+| A, one model | Mira | 1 | 75.8% | 40.3% | 0.526 | 0.445 | 25 / 8 / 37 | 32 | 128 |
+| A | Mira | 2 | 68.4% | 41.9% | 0.520 | 0.455 | 26 / 12 / 36 | 41 | 107 |
+| A | open-nitpick | 1 | 27.6% | 54.8% | 0.368 | 0.458 | 34 / 89 / 28 | 128 | 189 |
+| A | open-nitpick | 2 | 28.8% | 54.8% | 0.378 | 0.464 | 34 / 84 / 28 | 123 | 155 |
+| B, mixed models | Mira (fallback, 3 ensemble runs, second look) | 1 | 76.9% | 32.3% | 0.455 | 0.365 | 20 / 6 / 42 | 33 | 229 |
+| B | Mira | 2 | 87.5% | 22.6% | 0.359 | 0.265 | 14 / 2 / 48 | 16 | 205 |
+| B | open-nitpick (two reviewers, qwen triage) | 1 | 20.0% | 61.3% | 0.302 | 0.434 | 38 / 152 / 24 | 199 | 177 |
+| B | open-nitpick | 2 | 19.2% | 62.9% | 0.294 | 0.432 | 39 / 164 / 23 | 212 | 198 |
+| C, `claude-sonnet-4.6` | Mira | 1 | 50.0% | 58.1% | 0.537 | 0.562 | 36 / 36 / 26 | 83 | 187 |
+| C | open-nitpick | 1 | 34.9% | 48.4% | 0.405 | 0.449 | 30 / 56 / 32 | 86 | 22 |
+
+The judge repeated on arm A with a fresh cache made 1,422 calls, 517 of them worded
+differently, and returned the same true, false and missed counts on all 80
+run-and-case pairs. Between passes of a reviewer the movement is larger: Mira's
+comment count went from 32 to 41, and in arm B from 33 to 16.
+
+What the table says. On one model, Mira leads on F1 by about 0.15 in both
+passes and open-nitpick leads on recall by about 13 points; on the benchmark's
+recall-weighted F2 they are level. Neither tool's mixed or thorough configuration
+beat its single-model one. With a frontier model Mira's recall rises to 58% and
+its F1 stays near 0.54, while open-nitpick's precision rises to 35% and its recall
+falls to 48%, and open-nitpick takes 22 seconds a review to Mira's 187.
+
+## The gap
+
+The gap is precision. Open-nitpick matches more of the golden comments than Mira
+does (46 of the 68 golden comments in all categories across its two arm A passes,
+against 35, with 30 found by both, 16 only by us and 5 only by Mira) and posts about 6.3 comments a pull request to
+Mira's 1.6.
+
+- **Mira's drafts are as numerous as ours.** Its audit trail shows 90 to 100 drafted
+  comments a pass. A noise filter drops 68 over two passes and a self-critique pass
+  drops 44, so 39% are posted. Posted comments have median confidence 0.78 and
+  dropped ones 0.665. Open-nitpick has no numeric confidence to filter on.
+- **Our severity does not rank.** The judge matched 11% of our Info comments (7 of
+  66), 30% of Warnings (39 of 130) and 37% of Errors (19 of 51), over both passes. A
+  per-pull-request cap by severity buys precision about as fast as it loses recall:
+  top 5 gives 34.6% precision at 40.4% recall (matched comments over all 68 golden
+  comments, not the scorer's recall), where Mira has 68 to 76% at 40 to 42%.
+- **Volume on large pull requests carries the noise.** Three pull requests with 11
+  or more comments account for 100 of our 251 comments, at 17% precision.
+- **Two kinds of comment match rarely:** titles saying something was removed or
+  dropped (2 of 27) and comments on test files (2 of 16). Both are small shares.
+- **Where Mira alone wins.** Two of the 5 golden comments only Mira found are the
+  cross-file `organization_context.member` can be `None` cases in sentry-1 and
+  sentry-2. The other three are small discourse issues: a percentage resize that
+  fails for animated GIFs, a nil `contents` in `TopicEmbed.import`, and
+  `-ms-align-items`. Mira reads other files through search and read tools.
+
+## What was tried on our side
+
+Offline, on the finished arm A findings, or as one-pass runs with the same model.
+
+| change | precision | recall | F1 | F2 |
+|---|---:|---:|---:|---:|
+| none (arm A, two passes) | 27.6%, 28.8% | 54.8%, 54.8% | 0.368, 0.378 | 0.458, 0.464 |
+| `validation.enabled: true` | 29.5% | 41.9% | 0.347 | 0.387 |
+| `persona.nitpick: minimal` | 31.7% | 61.3% | 0.418 | 0.516 |
+| evidence-graded critique, keep rule in code (offline) | 32.3%, 37.1% | 50.0%, 53.2% | 0.392, 0.437 | 0.451, 0.490 |
+| critique, then top 3 per pull request, proven first (offline) | 47.5% | 34.6% | | |
+
+The critique pass grades each comment against the diff around its cited lines as
+proven, plausible or unsupported. It keeps proven, keeps plausible at warning
+severity or worse, and drops unsupported, a rule held in code. It is Mira's design
+with a paraphrased prompt. My first version of it could not see severity and
+dropped every plausible comment, which looked like a recall loss; the rows above
+are the corrected rule.
+
+## Proposed fixes, in order
+
+1. **Make `minimal` the default persona level for review, after a replicate.** It
+   needs no code. One pass improved every column, and unmodified passes differ by
+   0.01 F1, so the 0.04 gain is outside that. The reason is not established: the
+   level filters which classes publish and I have not checked that it also changes
+   the prompt. Before changing the default, repeat the run and rerun the planted
+   defect corpus so a number in `docs/findings.md` does not move unseen.
+2. **Replace adversarial `validation` with the evidence-graded critique.**
+   Validation as shipped lost 13 points of recall for 1 to 2 of precision. The
+   critique estimate gains 5 to 8 points of precision for 2 to 5 of recall. Build it as a
+   stage with a code-owned keep rule, and measure it live rather than offline.
+3. **Have the reviewer emit a confidence and a code citation, and post by a
+   floor.** Severity does not separate matched from unmatched comments and
+   confidence does in Mira's data. This changes the finding schema and the prompt,
+   so it needs the planted corpus as well as this one.
+4. **Do not union two reviewers for pull requests without a denoise step.** Arm B
+   gained 4 to 5 matched comments and 63 to 80 false positives. `docs/comparison.md`
+   already says triage cannot drop a finding, and this is the cost.
+5. **Cap volume on large pull requests by confidence, not severity,** once 3 exists.
+   A cap by severity cannot do it.
+6. **Give the reviewer cross-file reads for the 5 Mira-only findings.** That is a
+   tool loop and the largest change. Leave it until 1 to 3 are measured, because
+   Mira's cost and time come from it: 187 seconds a review with Sonnet against our
+   22.
+
+Keep open-nitpick's speed: on the same frontier model it is about eight times faster.
+
+## Limits of this result
+
+- One judge model. A different judge could rank differently.
+- Twenty pull requests, 62 golden comments, one corpus. A real defect nobody
+  labelled counts as a false positive, which hurts the tool that comments more.
+- Arm C is one pass for each tool. The experiments on our side are one pass each,
+  and arm A shows a reviewer moving by more than the judge does.
+- The critique rows are offline estimates, not a built stage.
+- Mira's replay harness uses one model for every role, and its published figure
+  (75% precision, 55% recall over 50 pull requests) is a different corpus and one
+  pass.
+
