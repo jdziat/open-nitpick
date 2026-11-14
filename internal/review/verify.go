@@ -46,6 +46,33 @@ const (
 	verifyExpert = "a repository check"
 )
 
+// verifyCallTimeout bounds one checker turn, and is a variable so a test can
+// shorten it. OpenRouter answers a stalled DeepSeek request with HTTP 200 and a
+// keepalive, so no status ever arrives and only a deadline of ours ends it. Held
+// to the finding's five minutes, one stall delays the whole review by that long
+// and fails the stage; held to this, it costs a turn.
+var verifyCallTimeout = 90 * time.Second
+
+// generateBounded asks the checker for one turn under verifyCallTimeout and
+// sends it again once if that deadline, not the finding's, ended it. A second
+// stall is returned as the error it is.
+func generateBounded(ctx context.Context, llm interface {
+	GenerateContent(context.Context, []llms.Message, ...llms.CallOption) (*llms.Response, error)
+}, msgs []llms.Message, opts []llms.CallOption) (*llms.Response, error) {
+	var err error
+	for range 2 {
+		callCtx, cancel := context.WithTimeout(ctx, verifyCallTimeout)
+		var resp *llms.Response
+		resp, err = llm.GenerateContent(callCtx, msgs, opts...)
+		stalled := callCtx.Err() != nil && ctx.Err() == nil
+		cancel()
+		if err == nil || !stalled {
+			return resp, err
+		}
+	}
+	return nil, err
+}
+
 // verifyTools are the three functions the checker can call.
 func verifyTools(canSearch bool) []llms.Tool {
 	def := func(name, desc, params string) llms.Tool {
@@ -203,7 +230,7 @@ func (e *Engine) verifyOne(ctx context.Context, system string, tools *repoTools,
 	}
 	lookups := 0
 	for range verifyMaxLookups + 3 {
-		resp, err := client.LLM.GenerateContent(ctx, msgs, opts...)
+		resp, err := generateBounded(ctx, client.LLM, msgs, opts)
 		if err != nil {
 			e.log().Warn("verification failed; keeping the finding", "path", f.Path, "line", f.Line, "error", err)
 			return verifyOutcome{failed: errorKind(err)}

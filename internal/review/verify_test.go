@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
@@ -216,6 +217,91 @@ func TestAFailedCheckKeepsTheFindingAndSaysVerificationDidNotRun(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("stages = %v, want a verify entry so the run does not read as clean", report.Stages)
+	}
+}
+
+// stallLLM never answers its first stalls calls, the way a request the provider
+// has acknowledged with a keepalive never does: it returns only when its context
+// ends. Later calls answer with a confirming verdict.
+type stallLLM struct {
+	mu     sync.Mutex
+	stalls int
+	calls  int
+}
+
+func (s *stallLLM) GenerateContent(ctx context.Context, _ []llms.Message, _ ...llms.CallOption) (*llms.Response, error) {
+	s.mu.Lock()
+	s.calls++
+	stall := s.calls <= s.stalls
+	s.mu.Unlock()
+	if stall {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	r := verdict(verdictConfirmed, "app.go:4 discards the error")
+	return &r, nil
+}
+func (s *stallLLM) Stream(context.Context, []llms.Message, ...llms.CallOption) (<-chan llms.StreamChunk, error) {
+	return nil, errors.New("not supported")
+}
+func (s *stallLLM) Provider() llms.Provider { return "stall" }
+func (s *stallLLM) Model() string           { return "stall" }
+
+func shortCallTimeout(t *testing.T) {
+	t.Helper()
+	old := verifyCallTimeout
+	verifyCallTimeout = 40 * time.Millisecond
+	t.Cleanup(func() { verifyCallTimeout = old })
+}
+
+// One stalled turn costs one resend, not the finding: the check still returns
+// its verdict, and it does so on the call timeout rather than the five minutes.
+func TestAStalledCheckerTurnIsSentAgainAndTheFindingStillGetsAVerdict(t *testing.T) {
+	shortCallTimeout(t)
+	checker := &stallLLM{stalls: 1}
+	e, _ := verifyEngine(t, &toolLLM{}, config.VerifyConfirmed)
+	e.Roles.Validate = llm.NewClientForTest(checker, e.Config.Models.Default)
+	f := twoFindings()[0]
+	got := e.verifyOne(context.Background(), "system", newRepoTools("", e.Provider, vcs.Ref{}), f, nil)
+	if got.failed != "" || got.verdict != verdictConfirmed {
+		t.Errorf("outcome = %+v, want the verdict from the second send", got)
+	}
+	if checker.calls != 2 {
+		t.Errorf("calls = %d, want the stalled one and one resend", checker.calls)
+	}
+}
+
+// Two stalls in a row fail the finding, which the stage reports, and the second
+// ends on the call deadline: without it the loop would wait out verifyTimeout.
+func TestACheckerThatStallsTwiceFailsTheFindingOnTheCallDeadline(t *testing.T) {
+	shortCallTimeout(t)
+	checker := &stallLLM{stalls: 100}
+	e, _ := verifyEngine(t, &toolLLM{}, config.VerifyConfirmed)
+	e.Roles.Validate = llm.NewClientForTest(checker, e.Config.Models.Default)
+	f := twoFindings()[0]
+	start := time.Now()
+	got := e.verifyOne(context.Background(), "system", newRepoTools("", e.Provider, vcs.Ref{}), f, nil)
+	if got.failed != "timeout" {
+		t.Errorf("outcome = %+v, want a failed check of kind timeout", got)
+	}
+	if checker.calls != 2 || time.Since(start) > 5*time.Second {
+		t.Errorf("calls = %d after %s, want two sends ended by the call deadline", checker.calls, time.Since(start))
+	}
+}
+
+// A cancelled review is not a stalled call: resending would keep working for a
+// caller that has gone.
+func TestACancelledReviewDoesNotResendACheckerTurn(t *testing.T) {
+	shortCallTimeout(t)
+	checker := &stallLLM{stalls: 100}
+	e, _ := verifyEngine(t, &toolLLM{}, config.VerifyConfirmed)
+	e.Roles.Validate = llm.NewClientForTest(checker, e.Config.Models.Default)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	f := twoFindings()[0]
+	got := e.verifyOne(ctx, "system", newRepoTools("", e.Provider, vcs.Ref{}), f, nil)
+	if got.failed != "cancelled" || checker.calls != 1 {
+		t.Errorf("outcome = %+v after %d calls, want one call and a cancelled check", got, checker.calls)
 	}
 }
 
