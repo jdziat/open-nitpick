@@ -1061,6 +1061,23 @@ its own rule. It is still the first lever in this work to move precision by an i
 clears zero, and the R9 and R10 pair says the whole-PR context helps only when the tool loop
 reads it. The gap to Mira's precision is 24 points.
 
+### R11: triage off (registered 2026-11-14, before it runs)
+
+The R10 build runs a model triage pass after the reviewer. It dropped 16% of the findings it
+saw on the tuning set (12 to 20% across passes; R1 dropped 26 to 43%), and nothing in this
+work has measured whether those drops were right. R11 is the R10 build with that model call
+skipped: dedupe still runs, every other stage is unchanged. The switch is bakeoff-only,
+`NITPICK_BAKEOFF_NO_TRIAGE` (`tools/bakeoff/triage-off-bakeoff.patch`). A smoke review on
+calcom-1 published all 11 findings the reviewer filed.
+
+Three passes on the 20 tuning pull requests, paired against R10.
+
+- **Ship to a fresh-corpus gate:** precision at least 43.2% (R1 plus 10 points), recall at least
+  48.5% (R1 minus 3 points), and F1 at least Mira's 0.514.
+- **Kill:** any of the three fails.
+- **Read:** if recall rises and the precision cost is smaller than the recall gain, triage was
+  removing real findings. If precision holds, its drops were duplicates or low-value findings.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
