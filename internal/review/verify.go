@@ -53,15 +53,15 @@ const (
 // and fails the stage; held to this, it costs a turn.
 var verifyCallTimeout = 90 * time.Second
 
-// generateBounded asks for one turn under its own deadline and sends it again
-// once if that deadline, not the caller's, ended it. A second stall is
-// returned as the error it is.
+// generateBounded asks the checker for one turn under verifyCallTimeout and
+// sends it again once if that deadline, not the finding's, ended it. A second
+// stall is returned as the error it is.
 func generateBounded(ctx context.Context, llm interface {
 	GenerateContent(context.Context, []llms.Message, ...llms.CallOption) (*llms.Response, error)
-}, msgs []llms.Message, opts []llms.CallOption, timeout time.Duration) (*llms.Response, error) {
+}, msgs []llms.Message, opts []llms.CallOption) (*llms.Response, error) {
 	var err error
 	for range 2 {
-		callCtx, cancel := context.WithTimeout(ctx, timeout)
+		callCtx, cancel := context.WithTimeout(ctx, verifyCallTimeout)
 		var resp *llms.Response
 		resp, err = llm.GenerateContent(callCtx, msgs, opts...)
 		stalled := callCtx.Err() != nil && ctx.Err() == nil
@@ -73,50 +73,24 @@ func generateBounded(ctx context.Context, llm interface {
 	return nil, err
 }
 
-// lookupTools are the two functions that read the repository, shared by the
-// checker and by a reviewer that investigates. grep_repo is offered only where a
-// git checkout exists to search.
-func lookupTools(canSearch bool) []llms.Tool {
-	tools := []llms.Tool{toolDef("read_file",
+// verifyTools are the three functions the checker can call.
+func verifyTools(canSearch bool) []llms.Tool {
+	def := func(name, desc, params string) llms.Tool {
+		return llms.Tool{Type: llms.ToolTypeFunction, Function: &llms.FunctionDefinition{
+			Name: name, Description: desc, Parameters: json.RawMessage(params),
+		}}
+	}
+	tools := []llms.Tool{def("read_file",
 		"Read a window of a file in the repository at the head of the pull request. Lines are numbered.",
 		`{"type":"object","properties":{"path":{"type":"string"},"start_line":{"type":"integer"},"end_line":{"type":"integer"}},"required":["path"]}`)}
 	if canSearch {
-		tools = append(tools, toolDef("grep_repo",
+		tools = append(tools, def("grep_repo",
 			"Search the repository with an extended regular expression. Returns up to 30 matching lines as path:line:text.",
 			`{"type":"object","properties":{"pattern":{"type":"string"},"path_glob":{"type":"string","description":"Optional pathspec such as '*.py' or 'src/'"}},"required":["pattern"]}`))
 	}
-	return tools
-}
-
-func toolDef(name, desc, params string) llms.Tool {
-	return llms.Tool{Type: llms.ToolTypeFunction, Function: &llms.FunctionDefinition{
-		Name: name, Description: desc, Parameters: json.RawMessage(params),
-	}}
-}
-
-// verifyTools are the three functions the checker can call.
-func verifyTools(canSearch bool) []llms.Tool {
-	return append(lookupTools(canSearch), toolDef("submit_verdict",
+	return append(tools, def("submit_verdict",
 		"Finish. confirmed: the code you read shows the claimed defect is real and reachable. refuted: the code you read contradicts the claim. uncertain: you could not establish either.",
 		`{"type":"object","properties":{"verdict":{"type":"string","enum":["confirmed","refuted","uncertain"]},"reason":{"type":"string","description":"One sentence naming the file and line you decided on."}},"required":["verdict","reason"]}`))
-}
-
-// runLookup answers one read_file or grep_repo call, counting it against the
-// budget; finish names the tool a spent budget points the model at. The second
-// result is false for a name that is neither, so the caller decides what an
-// unknown tool means.
-func runLookup(ctx context.Context, tools *repoTools, name string, args map[string]any, lookups *int, budget int, finish string) (string, bool) {
-	if name != "read_file" && name != "grep_repo" {
-		return "", false
-	}
-	*lookups++
-	switch {
-	case *lookups > budget:
-		return "the lookup budget is spent: call " + finish + " now", true
-	case name == "read_file":
-		return tools.read(ctx, str(args["path"]), intArg(args["start_line"]), intArg(args["end_line"])), true
-	}
-	return tools.grep(ctx, str(args["pattern"]), str(args["path_glob"])), true
 }
 
 // keepAfterVerify is the rule that turns a verdict into a decision. It lives
@@ -256,7 +230,7 @@ func (e *Engine) verifyOne(ctx context.Context, system string, tools *repoTools,
 	}
 	lookups := 0
 	for range verifyMaxLookups + 3 {
-		resp, err := generateBounded(ctx, client.LLM, msgs, opts, verifyCallTimeout)
+		resp, err := generateBounded(ctx, client.LLM, msgs, opts)
 		if err != nil {
 			e.log().Warn("verification failed; keeping the finding", "path", f.Path, "line", f.Line, "error", err)
 			return verifyOutcome{failed: errorKind(err)}
@@ -280,11 +254,18 @@ func (e *Engine) verifyOne(ctx context.Context, system string, tools *repoTools,
 					v = verdictUncertain
 				}
 				return verifyOutcome{verdict: v, reason: oneLine(reason)}
-			default:
-				var ok bool
-				if result, ok = runLookup(ctx, tools, name, args, &lookups, verifyMaxLookups, "submit_verdict"); !ok {
-					result = "unknown tool " + name
+			case "read_file", "grep_repo":
+				lookups++
+				switch {
+				case lookups > verifyMaxLookups:
+					result = "the lookup budget is spent: call submit_verdict now"
+				case name == "read_file":
+					result = tools.read(ctx, str(args["path"]), intArg(args["start_line"]), intArg(args["end_line"]))
+				default:
+					result = tools.grep(ctx, str(args["pattern"]), str(args["path_glob"]))
 				}
+			default:
+				result = "unknown tool " + name
 			}
 			msgs = append(msgs, llms.Message{Role: llms.RoleTool, ToolCallID: call.ID, Content: bound(result)})
 		}

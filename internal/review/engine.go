@@ -1995,15 +1995,9 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 			callCtx, cancel = context.WithTimeout(ctx, e.RequestTimeout)
 			defer cancel()
 		}
-		investigated := false
-		if e.Config.Review.Investigate && !style {
-			result, investigated = e.tryInvestigate(callCtx, client, msgs, offeredClasses(e.Config.Review.Slop))
-		}
-		if !investigated {
-			result, err = llm.Extract[Result](callCtx, client, msgs, schema)
-			if err != nil {
-				return nil, err
-			}
+		result, err = llm.Extract[Result](callCtx, client, msgs, schema)
+		if err != nil {
+			return nil, err
 		}
 		if e.FastReview && !style && len(result.Findings) > 0 {
 			candidates, encodeErr := json.Marshal(result.Findings)
