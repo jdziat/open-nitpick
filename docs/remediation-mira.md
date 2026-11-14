@@ -341,21 +341,27 @@ The same repository checker (`tools/bakeoff/verify_filter.py`, DeepSeek with
 `read_file` and `grep_repo`) was run over Mira's 216 held-out comments, so both
 tools are graded by one neutral party that matches neither tool's labels.
 
-| held-out comments, 3 passes | comments | confirmed | refuted | uncertain | confirmed that matched a golden comment |
-|---|---:|---:|---:|---:|---:|
-| Mira | 216 | 200 (92.6%) | 1 | 15 | 158 of 200 (79%) |
-| open-nitpick | 448 | 324 (72.3%) | 69 | 54 | 165 of 324 (51%) |
+| held-out comments, 3 passes | comments | confirmed | refuted | uncertain | kept after the check: TP / FP | precision | recall | F1 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Mira | 216 | 200 (92.6%) | 1 | 15 | 150 / 50 | 75.0% | 47.6% | 0.583 |
+| open-nitpick | 448 | 324 (72.3%) | 69 | 54 | 165 / 165 | 50.0% | 52.4% | 0.512 |
 
-Both effects are real. The checker confirms 20 points fewer of open-nitpick's
-comments, so Mira's generation is more reliable and not merely shorter. And of
-the comments each checker-confirmed, open-nitpick posts 159 that match no
-golden comment against Mira's 42: about 53 a pass against 14. Those are real
-by the checker's reading and off the benchmark's list, which is the share a
-precision score charges as false positives.
+The check leaves Mira where it was (F1 0.596 before, 0.583 after, interval of the
+change -0.030 to +0.001) and moves its precision by 1.5 points, an interval that
+includes zero, so the checker is not what makes Mira's number look good. After it, open-nitpick is still 25 points
+behind on precision (interval -33.4 to -16.6) and 4.8 ahead on recall (interval
+-3.7 to +12.7).
+
+Two effects are visible. The checker confirms 20 points fewer of open-nitpick's
+comments, so Mira's generation is more reliable and not merely shorter. And among
+what it confirms, open-nitpick still posts 165 comments that match no golden
+comment against Mira's 50, about 55 a pass against 17. Those are real by the
+checker's reading and off the benchmark's list, which is the share a precision
+score charges as false positives.
 
 The checker is the same model family as both reviewers and shares its blind
-spots, and "confirmed" was agreed with a hand reading on only 14 of 111 cases
-earlier, so this is indicative. It does show that closing the gap on this
+spots, and "confirmed" was read by hand on only 14 of 111 cases earlier, so this is
+indicative. It does show that closing the gap on this
 benchmark would take two different changes: generation that is grounded the way
 Mira's is (a reliability change), and reporting less of what is real but
 unlabelled (a product change that makes the tool worse for a reader who wants
