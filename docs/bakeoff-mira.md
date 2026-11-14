@@ -127,6 +127,9 @@ Following `docs/measurement.md`:
   training data. Both tools use the same model, so any leak helps both equally.
 - Golden comments are human-curated and sparse on style. A tool that finds a real
   defect nobody labelled is scored as a false positive.
+  A blind grade of the held-out unmatched comments (remediation plan, "A blind
+  grade of the false positives") found 27% of open-nitpick's and 61% of Mira's were
+  real, so the labels do not explain the precision gap.
 - The judge is a model and varies between passes. The deterministic columns of
   `internal/evals` do not exist for this corpus, because the golden comments
   carry no file or line.

@@ -204,14 +204,14 @@ Two follow-ups on the same findings. Verifying the two-reviewer union (arm B)
 left precision at 31.7% against 20.0% unverified, recall at 51.5%, F1 0.392, which
 is 0.085 worse than verifying the single reviewer (interval -0.145 to -0.009): the
 extra recall the second reviewer brings is mostly findings the grader also
-confirms and the judge does not match. And reading 14 of the 111 confirmed false
-positives, most look like real defects the benchmark's golden list does not
-contain (a migration with `force: true` that drops rows, a hard-coded upload cap
-that ignores a site setting, an async `forEach` in a second file). The
-benchmark's precision is therefore a measure of agreement with a short list of
-human-labelled issues, and a high-recall reviewer is penalised for reporting real
-ones. That bounds how much precision it is honest to chase, and it is the reason
-the held-out gate below judges against Mira's own score on the same labels.
+confirms and the judge does not match. A hand read of 14 of the 111 confirmed
+false positives on the tuning set found most of them real-looking defects the
+golden list does not contain (a migration with `force: true` that drops rows, a
+hard-coded upload cap that ignores a site setting, an async `forEach` in a second
+file), which suggested the benchmark was charging real findings as false positives.
+That read was of checker-confirmed comments only. A random blind grade of all
+unmatched held-out comments, below, found otherwise for the false positives as a
+whole, so treat this paragraph as superseded by it.
 
 ### R3. Cap low-priority volume per pull request
 
@@ -355,17 +355,52 @@ behind on precision (interval -33.4 to -16.6) and 4.8 ahead on recall (interval
 Two effects are visible. The checker confirms 20 points fewer of open-nitpick's
 comments, so Mira's generation is more reliable and not merely shorter. And among
 what it confirms, open-nitpick still posts 165 comments that match no golden
-comment against Mira's 50, about 55 a pass against 17. Those are real by the
-checker's reading and off the benchmark's list, which is the share a precision
-score charges as false positives.
+comment against Mira's 50, about 55 a pass against 17. The checker reads those as
+real, which is not the same as being real: the blind grade below found it too
+lenient.
 
 The checker is the same model family as both reviewers and shares its blind
-spots, and "confirmed" was read by hand on only 14 of 111 cases earlier, so this is
-indicative. It does show that closing the gap on this
-benchmark would take two different changes: generation that is grounded the way
-Mira's is (a reliability change), and reporting less of what is real but
-unlabelled (a product change that makes the tool worse for a reader who wants
-those findings).
+spots, so this is indicative; the blind grade that follows tests it against hand
+reading.
+
+### A blind grade of the false positives
+
+The question the gate left open was how many of each tool's unmatched comments
+are real defects the golden list lacks, because that decides whether the
+precision gap is quality or labelling. A random sample of the held-out unmatched
+comments was drawn (30 of open-nitpick's 263 and 18 of Mira's 57, three passes
+pooled, seed 20261114), shuffled so no item showed which tool wrote it, and split
+across four graders, each a model with the repository checkout and the diff and
+told to judge the claim against the code and not to reward confidence. A grader
+returned `real`, `partly` (a genuine concern, overstated or misplaced),
+`not_real` (contradicted, handled elsewhere, pre-existing or speculative) or
+`unclear`. The graders are a different model family from the reviewers and the
+checker, and 44 of the 48 verdicts cite a file and line.
+
+| unmatched comments, sampled | n | real | partly | not real | unclear |
+|---|---:|---:|---:|---:|---:|
+| open-nitpick | 30 | 8 (27%, 95% interval 14 to 44) | 6 (20%) | 16 (53%) | 0 |
+| Mira | 18 | 11 (61%, 39 to 80) | 5 (28%) | 2 (11%) | 0 |
+
+Over half of open-nitpick's false positives are wrong by hand grade, against 11% of
+Mira's, and most of Mira's are real defects the labels lack. That reverses the
+earlier suggestion that our false positives were mostly unlabelled real defects.
+Counting a real unmatched comment as correct, open-nitpick's precision moves from
+41.3% to about 57% (50 to 67 across the sample's interval) and Mira's from 73.5% to
+about 90% (84 to 95); counting `partly` as well, 69% and 97%. The gap is 32.7
+points after the adjustment against 32.2 before it (28 counting `partly`), because
+Mira has real unlabelled comments too. The precision gap is a quality gap.
+
+The same sample says something about our checker. Against the hand grades it
+confirmed all 8 `real` comments, 4 of 6 `partly`, and 7 of 16 `not_real`; it
+refuted 6 and called 3 uncertain. Keeping only what it confirms therefore removes 9
+of 16 wrong comments and 2 of 14 real or partly real ones. It filters usefully and
+leaves 7 wrong comments in 19 kept, so a checker that confirms fewer of the wrong
+ones is the lever the earlier stages did not have.
+
+Limits: 30 and 18 are small, and the intervals are wide; one family of grader read
+all 48; and `partly` is a judgement. The sample, key and verdicts are in
+`/tmp/bakeoff/grade`, not in the repository.
 
 ### R5. Generate with the repository open (registered 2026-11-13, before any run)
 
@@ -574,10 +609,10 @@ findings are filtered. The remaining levers in this plan do not reach it.
   of tool, and matching its precision means matching what produces it: fewer,
   more carefully chosen comments, not more careful filtering of many.
 
-Whether to keep chasing this benchmark is a product call, not a measurement.
-The benchmark scores agreement with a short list of human-labelled defects, and
-reading 14 of the 111 confirmed false positives found most were real defects
-the list lacks. A tool that reports more real problems is penalised for it.
+The benchmark scores agreement with a short list of human-labelled defects, but the
+blind grade above shows that is not what explains the gap: over half of
+open-nitpick's unmatched comments are wrong, against about a tenth of Mira's. The
+gap is quality, and the open question is how much of it a stronger checker removes.
 
 ## Order, cost and time
 
@@ -597,10 +632,10 @@ Mira on the held-out split at the same time as open-nitpick, in the same session
 
 - One judge model scores everything. The plan does not test a second judge, and
   a different judge could move both tools.
-- The benchmark's golden comments are sparse and human-curated. A real defect
-  nobody labelled counts against the tool that reports it, and precision gains
-  can come partly from saying less about real problems. R0's per-comment output
-  makes that checkable by hand on a sample.
+- The benchmark's golden comments are sparse and human-curated, so a real defect
+  nobody labelled counts against the tool that reports it. A blind grade of 48
+  unmatched held-out comments sized it: 27% of open-nitpick's and 61% of Mira's
+  were real, which moves both precisions up and leaves the gap where it was.
 - The time and cost figures are estimates from the bakeoff, not measurements of
   the new stages. open-nitpick's token use per review was not recorded; Mira's
   was, at about 443,000 prompt tokens a review.
