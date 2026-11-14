@@ -427,6 +427,25 @@ Reasoning on also costs time: the median review went from 146 to 218 seconds, an
 Mira's takes 76 on the held-out set. The option was removed with this result
 rather than left on the books as a default-off stage nobody should enable.
 
+### R6. A budget in the prompt (registered 2026-11-14, before it runs)
+
+Every selector tried after generation, a cap by confidence, agreement between
+passes, a repository check, ranks comments the model has already written, and
+none ranks them as well as the model that wrote them chose. R6 moves the choice
+before the writing: the review prompt states a budget of two findings a batch and
+asks for the ones with the most severe demonstrated consequence if there are more.
+The model then allocates its attention knowing it has two to spend. This is the
+only change: same model, schema and context, no cap in code.
+
+It runs on the 20 tuning pull requests, three passes, paired against the three R1
+passes. It is a prompt edit, so it is measured by a build carrying the edit and
+reverted if it fails.
+
+- **Ship to a fresh-corpus gate:** precision up 10 points or more, recall down 3
+  or fewer, F1 at or above Mira's 0.514 on these 20.
+- **Kill:** any of the three fails. A precision gain bought with a larger recall
+  loss is the cap the held-out diagnostic already measured.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
