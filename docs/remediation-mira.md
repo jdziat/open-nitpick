@@ -163,6 +163,43 @@ a cost in recall and does not come near the 25 to 30 points the target needs.
 The stage stays in the tree, off, until R4 shows whether a grader that can read
 the repository does better; if it does not, it comes out.
 
+### R2b. Verify each finding with repository tools (replaces R2)
+
+Measured offline before building, on the 316 findings the three R1 passes
+produced, so the comparison is exact: the same findings with and without the
+filter. A grader given `read_file` and `grep_repo` over the head checkout and up
+to eight tool calls submits `confirmed`, `refuted` or `uncertain` for each finding,
+`tools/bakeoff/verify_filter.py`.
+
+| keep (counts pooled over the passes) | precision | recall | F1 | F2 |
+|---|---:|---:|---:|---:|
+| no filter | 33.2% | 51.5% | 0.404 | 0.464 |
+| confirmed only | 47.5% | 47.1% | 0.473 | 0.472 |
+| confirmed and uncertain | 39.4% | 49.0% | 0.437 | 0.467 |
+
+Against the unfiltered findings, keeping confirmed only changes precision by
++14.3 points (interval +8.3 to +20.0), recall by -4.4 (-7.9 to -1.5) and F1 by
++0.069 (+0.019 to +0.112). It graded 199 of 316 confirmed, 64 refuted and 53
+uncertain, used 8.3 tool calls a finding on average, and no grading failed.
+Against Mira on the same 20 pull requests the F1 gap closes from -0.14 to -0.04,
+with an interval of -0.13 to +0.05 that includes zero. Precision is still 25
+points behind.
+
+The recall-weighted F2 hardly moves (0.464 to 0.472), because the filter trades
+recall for precision. The win condition asks for F2 as well as F1, and Mira's F2
+was 0.445 and 0.455, so this does not reach it: F2 needs recall to rise, and
+nothing built so far does that.
+
+With a cap on top (offline, ranked by the reviewer's confidence within a pull
+request), 3 comments a pull request gives 56% precision at 44 comments a pass,
+and 2 gives 63% at 33. Mira posts about 36 a pass at 68 to 76%.
+
+This is the first change in this plan that moves precision by more than the
+variance. The critique stage it replaces graded the same claim without letting the
+grader look anything up, and gained 2 points. The difference this suggests is the
+tools, and it is untested whether a grader with tools but no diff window would do
+as well.
+
 ### R3. Cap low-priority volume per pull request
 
 - Warnings and above always publish. Below that, a per-pull-request cap ranked by
