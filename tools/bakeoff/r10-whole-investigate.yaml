@@ -1,0 +1,7 @@
+# R10: the R8b tool loop with each pull request in one batch, as Mira sends it.
+# The text reasoning replay is applied through the SDK patch in
+# tools/bakeoff/llm-go-sdk-reasoning-replay.patch, as in R8b.
+review:
+  investigate: true
+  max_files_per_request: 60
+  token_budget_per_request: 120000

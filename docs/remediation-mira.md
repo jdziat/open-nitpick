@@ -1000,6 +1000,40 @@ balance. With no replay at all, Mira files more and is less precise. Its posted 
 is above the default's 0.514 on two passes, but its precision is 59%, so it fails the
 registered precision condition, and the difference is inside the variance recorded above.
 
+#### R9 result: whole-PR batching lowers recall and does not raise precision
+
+Three passes on the 20 tuning pull requests, no verify stage, paired against R1. Whole-PR
+batching took 51 of 60 reviews to one batch (the other 9 had two), and no batch exceeded
+120,000 tokens; median review time was 119 seconds against 146.
+
+| arm | precision | recall | F1 | comments |
+|---|---:|---:|---:|---:|
+| R1, 6-file batches | 33.2% | 51.5% | 0.404 | 316 |
+| R9, whole PR | 27.8% | 43.1% | 0.338 | 316 |
+
+R9 minus R1: precision -5.4 points (-13.3 to +2.0), recall -8.3 (-13.4 to -3.2), F1 -0.065
+(-0.128 to -0.003). It fails its ship condition, and it moved the numbers down. Without tools,
+seeing the whole pull request does not help our reviewer, which matches the ablation above:
+whole-PR context did not help Mira's drafts either.
+
+### R10: the tool loop with whole-PR batching (registered 2026-11-14, before it runs)
+
+R9 tested batching without tools. The interaction is untested: R5, R5b, R8 and R8b ran the tool
+loop per 6-file batch, and Mira's loop checks cross-file claims against the whole diff. R10 is
+the R8b loop, built from commit 2ac4bfc, with the text reasoning replay of
+`tools/bakeoff/llm-go-sdk-reasoning-replay.patch` (Mira's default replays text, and the replay
+ablation showed that with no replay at all Mira files more and is less precise, so the patch
+keeps the comparison fair). It runs with `review.investigate: true`,
+`review.max_files_per_request: 60` and `review.token_budget_per_request: 120000`
+(`tools/bakeoff/r10-whole-investigate.yaml`), three passes on the 20 tuning pull requests,
+paired against R1 and R8b.
+
+- **Ship to a fresh-corpus gate:** precision up 10 points or more against R1, recall down 3
+  or fewer, and F1 at or above Mira's 0.514.
+- **Kill:** any of the three fails.
+- **Reported with it:** forced submissions, turns and lookups per batch, batches per review,
+  median review time, and calls per review.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
