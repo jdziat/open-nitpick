@@ -1,0 +1,42 @@
+diff --git a/scripts/replay_snapshot_review.py b/scripts/replay_snapshot_review.py
+index 7429ee3..55e35f5 100644
+--- a/scripts/replay_snapshot_review.py
++++ b/scripts/replay_snapshot_review.py
+@@ -80,6 +80,15 @@ config.llm.reasoning_effort = args.reasoning_effort
+ if args.agentic_max_hops is not None and hasattr(config.review, "agentic_max_hops"):
+     config.review.agentic_max_hops = args.agentic_max_hops
+ 
++# Bakeoff only: documented config fields, passed through the environment so the
++# tracked flags and the default path are untouched when the variables are unset.
++if os.environ.get("MIRA_BAKEOFF_FALLBACK_MODEL"):
++    config.llm.fallback_model = os.environ["MIRA_BAKEOFF_FALLBACK_MODEL"]
++if os.environ.get("MIRA_BAKEOFF_ENSEMBLE_RUNS"):
++    config.review.ensemble_runs = int(os.environ["MIRA_BAKEOFF_ENSEMBLE_RUNS"])
++if os.environ.get("MIRA_BAKEOFF_SECOND_LOOK"):
++    config.review.second_look = True
++
+ pr = PRInfo(
+     title=metadata["title"],
+     description=metadata["body"],
+@@ -114,6 +123,9 @@ manifest = {
+     "agentic_max_hops": getattr(config.review, "agentic_max_hops", None),
+     "security_agentic": config.review.security_agentic,
+     "self_critique": config.review.self_critique,
++    "fallback_model": config.llm.fallback_model,
++    "ensemble_runs": config.review.ensemble_runs,
++    "second_look": config.review.second_look,
+     "review_round": 1,
+     "source_files": len(tree),
+     "limitations": [
+diff --git a/scripts/run_benchmark_sample.py b/scripts/run_benchmark_sample.py
+index ac01c41..317fa25 100644
+--- a/scripts/run_benchmark_sample.py
++++ b/scripts/run_benchmark_sample.py
+@@ -45,6 +45,7 @@ REPO = Path(__file__).resolve().parents[1]
+ MODELS = {
+     "deepseek": "deepseek/deepseek-v4.1-flash-1017",
+     "glm": "z-ai/glm-5.3-flash",
++    "sonnet": "anthropic/claude-sonnet-4.6",
+ }
+ # Locations are machine-specific, so they come from flags or these variables.
+ ENV_INPUTS = "MIRA_BENCHMARK_INPUTS"  # directory from prepare_benchmark_inputs.py
