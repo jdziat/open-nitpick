@@ -123,6 +123,11 @@ type Engine struct {
 	// Full bypasses result reuse on an explicit operator request.
 	Full bool
 
+	// RepoRoot is the git checkout review.verify searches and reads. Empty
+	// means there is none, and verification then reads files through the
+	// provider and cannot grep.
+	RepoRoot string
+
 	// Rounds carries the operator's -max-rounds and -stop-at. They are applied
 	// over the resolved policy rather than written into Config, because a
 	// change that edits .nitpick.yaml has its Config replaced by the base
@@ -1105,13 +1110,13 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// threshold in either direction.
 	findings, overruled, validationFailures := e.validateFindings(ctx, findings, plan)
 	report.Stages = append(report.Stages, validationFailures...)
-	// Evidence grading follows validation and sees what survives it. Its
-	// withheld findings join the expert ones, so a reader sees one list of what
-	// was held back and why.
-	var critiqued []Overruled
-	findings, critiqued, critiqueFailures := e.critiqueFindings(ctx, findings, plan)
-	report.Stages = append(report.Stages, critiqueFailures...)
-	overruled = append(overruled, critiqued...)
+	// Repository verification follows validation and sees what survives it.
+	// Its withheld findings join the expert ones, so a reader sees one list of
+	// what was held back and why.
+	var unverified []Overruled
+	findings, unverified, verifyFailures := e.verifyFindings(ctx, ref, findings, plan)
+	report.Stages = append(report.Stages, verifyFailures...)
+	overruled = append(overruled, unverified...)
 	findings = append(findings, advisories...)
 
 	// After every pass that can raise a severity, and before the gate reads

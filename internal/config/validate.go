@@ -278,6 +278,11 @@ func (r Review) validate() []error {
 	if !r.FailOn.Valid() {
 		errs = append(errs, fmt.Errorf("review.fail_on %q is not a severity", r.FailOn))
 	}
+	switch r.Verify {
+	case "", VerifyConfirmed, VerifyNotRefuted:
+	default:
+		errs = append(errs, fmt.Errorf("review.verify %q is not confirmed or not_refuted; leave it empty to turn verification off", r.Verify))
+	}
 	if r.MaxRounds < 0 {
 		errs = append(errs, fmt.Errorf("review.max_rounds cannot be negative, got %d", r.MaxRounds))
 	}

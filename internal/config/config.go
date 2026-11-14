@@ -519,14 +519,16 @@ type Review struct {
 	// alone. Empty, the default, never settles.
 	StopAt Severity `yaml:"stop_at"`
 
-	// Critique turns on a pass that grades each model finding's evidence
-	// against the diff around the lines it cites, and withholds the ones the
-	// shown code does not support. Findings the grader calls proven are kept;
-	// plausible ones are kept at warning or worse; unsupported ones are
-	// withheld, listed with a reason rather than dropped silently. The rule is
-	// in code, not in the prompt. Analyzer findings are never graded. Off by
-	// default until measured: docs/remediation-mira.md, stage R2.
-	Critique bool `yaml:"critique"`
+	// Verify turns on a pass that checks each model finding against the
+	// repository with read_file and grep_repo, and withholds the ones it does
+	// not confirm. "confirmed" keeps only findings the checker confirmed;
+	// "not_refuted" also keeps the ones it could not settle. Empty is off.
+	// Withheld findings are listed with the checker's reason, never dropped
+	// silently, and analyzer findings are never checked. It needs a git
+	// checkout to search, and without one it reads files but cannot grep.
+	// Off by default: it costs about eight model calls a finding, and
+	// docs/remediation-mira.md, stage R2b, has the measurement.
+	Verify VerifyMode `yaml:"verify"`
 
 	// MinSeverity drops findings below this severity before publishing.
 	MinSeverity Severity `yaml:"min_severity"`
@@ -1463,3 +1465,15 @@ func ReasoningLevels() []string {
 
 // ReasoningValues reports the same, for the generated reference.
 func (s ModelSpec) ReasoningValues() []string { return ReasoningLevels() }
+
+// VerifyMode says which findings survive repository verification.
+type VerifyMode string
+
+// The verification modes. The empty value is off.
+const (
+	// VerifyConfirmed keeps a finding only when the checker confirmed it.
+	VerifyConfirmed VerifyMode = "confirmed"
+
+	// VerifyNotRefuted keeps a finding unless the checker refuted it.
+	VerifyNotRefuted VerifyMode = "not_refuted"
+)

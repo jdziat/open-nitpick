@@ -985,3 +985,18 @@ func ShouldEscalate(err error) bool {
 	}
 	return false
 }
+
+// NoReasoningOptions are the call options for a request that must not think:
+// the client's own options with reasoning turned off the way the provider
+// reads it, and no output ceiling beyond the client's.
+//
+// A tool loop needs this because each step is a short lookup, and a reasoning
+// model left on spends the call timeout thinking about a grep (issue #214).
+func (c *Client) NoReasoningOptions() []llms.CallOption {
+	off := false
+	opts := append(c.CallOptions(), llms.WithReasoning(llms.ReasoningConfig{Enabled: &off}))
+	if strings.EqualFold(strings.TrimSpace(c.Spec.Provider), "openrouter") {
+		opts = append(opts, llms.WithExtraBodyParam("reasoning", map[string]any{"enabled": false}))
+	}
+	return opts
+}

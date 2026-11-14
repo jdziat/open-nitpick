@@ -411,6 +411,7 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 	engine.Full = f.full
 	engine.Rounds = roundsOverride(f)
 	engine.Resume = true
+	engine.RepoRoot = repo
 
 	// Built per review from the resolved policy for the same reason. The
 	// analyzers read review.ignore themselves, so a change that edits.

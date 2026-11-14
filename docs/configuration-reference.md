@@ -1287,11 +1287,6 @@ Scope says what the ceiling covers. One of: run, pull_request.
 integer, default `4`.
 Concurrency bounds in-flight model calls.
 
-### `review.critique`
-
-boolean, default `false`.
-Critique turns on a pass that grades each model finding's evidence against the diff around the lines it cites, and withholds the ones the shown code does not support.
-
 ### `review.fail_on`
 
 string, default `none`.
@@ -1481,6 +1476,11 @@ TokenBudgetPerRequest bounds the context assembled for a single model call, incl
 
 boolean, default `false`.
 TriageNoNewClaims restores the reviewer's own words over anything triage rewrote, so triage may select, drop, group and re-anchor findings but may not author them.
+
+### `review.verify`
+
+string, default `none`.
+Verify turns on a pass that checks each model finding against the repository with read_file and grep_repo, and withholds the ones it does not confirm. "confirmed" keeps only findings the checker confirmed; "not_refuted" also keeps the ones it could not settle. Empty is off.
 
 ## security
 
