@@ -929,6 +929,37 @@ Not tested: other decisions (routing, severity), other question wording or crite
 whole files instead of the checker's evidence. The probe cost $0.02 in total. The probe sent
 public diffs to the same provider as every other call in this work.
 
+### Correction: tool semantics at the posted stage
+
+The tool-semantics line above reported drafts only. At the posted stage, 20 tuning PRs,
+two passes, Mira's own pipeline with our tools: default precision 73.0%, recall 39.7%, F1
+0.514 (74 comments); our short read windows 75.6%, 45.6%, 0.569 (82); our unranked grep
+73.8%, 43.4%, 0.546 (80); both 74.6%, 39.0%, 0.512 (71). Our tool semantics do not lower
+Mira's precision at the posted stage either. The short-read arm's F1 gain over the default
+is about 0.05 on two passes and is not separated from the variance the document already
+records.
+
+### Reasoning replay: Mira's loop, registered 2026-11-14 before it runs
+
+Mira replays each assistant turn's reasoning on the next request, both the `reasoning` text
+and the `reasoning_details` field (`core/passes.py`, `_REASONING_REPLAY_KEYS`). In its stored
+run it sent 51 of 61 assistant turns with both. Our loop, through the SDK, replays only the
+`reasoning` text (R8b), and drafts at 34.7% precision where Mira, with its tools, drafts at
+50.6%. Two ablations of Mira's replay, with the same model, tools and prompt, 20 tuning PRs,
+two passes each:
+
+- **none**: no reasoning replayed (`MIRA_BAKEOFF_NO_REASONING_REPLAY`);
+- **text only**: only the `reasoning` text replayed, which is what R8b sends
+  (`MIRA_BAKEOFF_TEXT_REASONING_ONLY`).
+
+Reading, against the default drafts at 50.6% precision and 57.4% recall:
+
+- **The gap is `reasoning_details`** if text only drops drafted precision by 7 points or
+  more with recall within 3 points. The next build then carries that field through the SDK.
+- **The gap is not replay** if text only matches the default. The replay line of work then
+  ends.
+- **Neither reading** if only none drops: that would contradict R8b, and it is reported as such.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
