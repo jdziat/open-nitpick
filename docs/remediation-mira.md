@@ -389,6 +389,44 @@ corpus, not a win.
 - **Cost bound:** under twice the model calls of an R1 review, stated as measured
   calls, and review time reported with it.
 
+#### R5 result: killed
+
+Two builds, three passes each, on the 20 tuning pull requests, paired against the
+same set's three R1 passes. R5a switched reasoning off for the whole generation
+call, which the checker does for its lookups; R5b left the client's reasoning on
+and echoed it back across tool turns, so the tools are the only change.
+
+| arm (3 passes, 20 pull requests) | TP | FP | FN | precision | recall | F1 | median review |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| R1, no tools | 105 | 211 | 99 | 33.2% | 51.5% | 0.404 | 146 s |
+| R5a, tools, reasoning off | 119 | 338 | 85 | 26.0% | 58.3% | 0.360 | 70 s |
+| R5b, tools, reasoning on | 88 | 186 | 116 | 32.1% | 43.1% | 0.368 | 218 s |
+| Mira (2 passes) | 54 | 20 | 82 | 73.0% | 39.7% | 0.514 | |
+
+| against R1 | precision | recall | F1 |
+|---|---|---|---|
+| R5a | -7.2 pts (-11.7 to -1.9) | +6.9 (-1.2 to +15.2) | -0.044 (-0.090 to +0.015) |
+| R5b | -1.1 (-7.4 to +4.7) | -8.3 (-14.2 to -2.0) | -0.036 (-0.088 to +0.024) |
+
+The ship condition was precision up 10 points, recall down at most 3, and F1 at
+or above Mira's 0.514. Neither build comes near any of the three. R5a lowers
+precision; R5b leaves it where it was and loses recall. The two differ from each
+other by what the thinking does: with it off the reviewer files more (457 comments
+against 274) and with it on, fewer; precision moves a little the other way
+(26.0% to 32.1%, interval +0.5 to +10.2) and recall falls 15 points, which is the
+trade a cap makes.
+
+How much the reviewer looked: in R5b every one of the 102 investigated batches
+used the whole 12-lookup budget, 8 turns at the median. A reviewer that looks up
+something particular would stop sooner on a small change; this one reads until it
+is stopped. 42 of 144 batches fell back to the ordinary review because the model
+ended without submitting, so R5b is a mix of the two modes and understates what
+tools alone would do. R5a fell back on 6 of 144.
+
+Reasoning on also costs time: the median review went from 146 to 218 seconds, and
+Mira's takes 76 on the held-out set. The option was removed with this result
+rather than left on the books as a default-off stage nobody should enable.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
@@ -424,11 +462,14 @@ findings are filtered. The remaining levers in this plan do not reach it.
   matches 79 of the 105 golden comments and Mira's matches 62; only 5 are Mira's
   alone. Open-nitpick finds nearly everything Mira finds and posts it among 263
   false positives, and none of confidence, a repository check or agreement between
-  passes separates the two well enough. The remaining lever is a generator that
+  passes separates the two well enough. Giving the reviewer the repository to read
+  (R5, below) did not separate them either. What is left is a generator that
   chooses what to say before it says it, which is a new architecture and not a
   stage of this plan. Its evaluation needs a corpus neither tool has been scored
   on: the 30 held-out pull requests have now been read once.
 - R4 aims at recall, and recall was never what Mira led on.
+- R5 (the reviewer reads the repository while it files) is killed above. It was
+  the generator change the plan had left, and it did not move precision.
 - Mira's own agentic loop, noise filter and self-critique are a different shape
   of tool, and matching its precision means matching what produces it: fewer,
   more carefully chosen comments, not more careful filtering of many.
