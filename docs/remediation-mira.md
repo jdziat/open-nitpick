@@ -146,6 +146,23 @@ the schema for that reason and for the JSON report; if R3 fails they are removed
 - **Kill:** recall falls more than 5 points, or precision does not move outside
   the interval.
 
+**Result (2026-11-13): killed.** Three live passes with `review.critique` on
+against the three R1 passes, which are the same build with the stage off. The
+critique scored precision 35.5% against 33.2% (+2.3 points, interval -2.6 to +8.0)
+and recall 42.6% against 51.5% (-8.8 points, interval -15.5 to -2.0), F1 0.388
+against 0.404. Comments per pass fell from 82 to 126 down to 77 to 86. Recall
+fell by more than the 5 points the kill condition allows, with the interval
+clear of zero.
+
+The offline estimate that motivated the stage (precision +5 to +8, recall -2 to
+-5) compared the same findings with and without the filter. The live comparison
+is between different generations, and the R1 passes alone span 48% to 65% recall,
+so some of the recall difference is the model returning different findings. Both
+ways of measuring agree that evidence grading buys a few points of precision at
+a cost in recall and does not come near the 25 to 30 points the target needs.
+The stage stays in the tree, off, until R4 shows whether a grader that can read
+the repository does better; if it does not, it comes out.
+
 ### R3. Cap low-priority volume per pull request
 
 - Warnings and above always publish. Below that, a per-pull-request cap ranked by
