@@ -190,9 +190,12 @@ Mira's 1.6.
   comments a pass. A noise filter drops 68 over two passes and a self-critique pass
   drops 44, so 39% are posted. Posted comments have median confidence 0.78 and
   dropped ones 0.665. Open-nitpick has no numeric confidence to filter on.
-- **Our severity does not rank.** The judge matched 11% of our Info comments (7 of
-  66), 30% of Warnings (39 of 130) and 37% of Errors (19 of 51), over both passes. A
-  per-pull-request cap by severity buys precision about as fast as it loses recall:
+- **Our severity ranks weakly.** The judge matched 11% of our Info comments (7 of
+  66), 30% of Warnings (39 of 130) and 37% of Errors (19 of 51), over both passes.
+  Across three later passes severity separates matched from unmatched comments with
+  an area under the curve of 0.66. That is better than chance and far from Mira's
+  filter, and a per-pull-request cap by severity buys precision about as fast as it
+  loses recall:
   top 5 gives 34.6% precision at 40.4% recall (matched comments over all 68 golden
   comments, not the scorer's recall), where Mira has 68 to 76% at 40 to 42%.
 - **Volume on large pull requests carries the noise.** Three pull requests with 11
@@ -240,10 +243,9 @@ are the corrected rule.
    Validation as shipped lost 13 points of recall for 1 to 2 of precision. The
    critique estimate gains 5 to 8 points of precision for 2 to 5 of recall. Build it as a
    stage with a code-owned keep rule, and measure it live rather than offline.
-3. **Have the reviewer emit a confidence and a code citation, and post by a
-   floor.** Severity does not separate matched from unmatched comments and
-   confidence does in Mira's data. This changes the finding schema and the prompt,
-   so it needs the planted corpus as well as this one.
+3. **Not a publish floor on the reviewer's own confidence.** This was measured and
+   failed its gate: see [Remediation](remediation-mira.md), stage R1. Mira's data
+   separates on confidence; DeepSeek's self-report here does not, enough.
 4. **Do not union two reviewers for pull requests without a denoise step.** Arm B
    gained 4 to 5 matched comments and 63 to 80 false positives. `docs/comparison.md`
    already says triage cannot drop a finding, and this is the cost.

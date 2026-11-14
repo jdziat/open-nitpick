@@ -84,7 +84,7 @@ The largest lever, and the one with the most risk.
   `internal/review/finding.go`, `internal/prompt/templates/review.md`.
 - A publish floor in code, `review.min_confidence`, applied after triage. It is
   set from the measurement below, not from Mira's 0.7.
-- Why: severity does not separate a real finding from noise here. The judge
+- Why: severity separates a real finding from noise only weakly here. The judge
   matched 11% of our info comments, 30% of warnings and 37% of errors. Mira's
   drafts do separate on confidence: posted comments have median 0.78 and dropped
   ones 0.665.
@@ -97,6 +97,34 @@ the curve of confidence against the judge's verdict.
   points or more while recall falls by 5 or fewer, across three passes.
 - **Kill:** area below 0.65. Self-reported confidence is then not a signal for
   this model and R2 carries the precision work alone.
+
+**Result (2026-11-13): killed.** Three passes on the 20 tuning pull requests
+produced 316 comments, every one carrying a confidence, 99 matched by the judge.
+The area under the curve is 0.628. Confidence sits between 0.6 and 0.85 for 87% of
+comments, so there is little spread to cut on: a floor of 0.8 keeps 132 comments
+at 40.9% precision and loses 45% of the matched ones, and a floor of 0.9 keeps 39
+comments at 51% and loses 80%. The floor, `review.min_confidence`, is not built.
+
+The three passes scored F1 0.367, 0.430 and 0.420 and precision 29.0%, 32.3% and
+37.0%, against 0.368 and 0.378 and 28 to 29% shipped. A paired bootstrap over the
+20 pull requests puts the F1 difference at +0.030 with an interval of -0.044 to
++0.092, so asking for a confidence and a citation moved nothing this corpus can
+resolve, in either direction.
+
+Looked at after the gate failed, and so not pre-registered, only a lead for R3:
+
+| signal | area under the curve |
+|---|---:|
+| confidence, within a pull request (490 matched-against-unmatched pairs) | 0.704 |
+| severity, over all comments | 0.663 |
+| confidence plus a little severity | 0.676 |
+| length of the rationale | 0.519 |
+
+A comment that quotes a citation matched 35.3% of the time (173 comments), against
+26.6% for one that did not (143). Ranking within a pull request is what a per-pull-request cap needs, so R3 may use confidence as its
+ranking even though R1's floor is dead. That has to be confirmed on the held-out
+split before anyone relies on it. The `confidence` and `citation` fields stay in
+the schema for that reason and for the JSON report; if R3 fails they are removed.
 
 ### R2. An evidence-graded critique stage
 
