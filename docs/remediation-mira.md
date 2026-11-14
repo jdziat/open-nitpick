@@ -960,6 +960,28 @@ Reading, against the default drafts at 50.6% precision and 57.4% recall:
   ends.
 - **Neither reading** if only none drops: that would contradict R8b, and it is reported as such.
 
+### R9: whole-PR batching (registered 2026-11-14, before it runs)
+
+Our default batches at most 6 files, under a token budget of 60,000
+(`internal/config/defaults.go:94-95`). Mira sends each pull request in one call of up to
+120,000 tokens: on the 20 tuning pull requests it made one call per pull request, 20 of 20.
+In R1, 12 of the 20 were split into 2 to 10 batches, and comments per review rose with the
+batch count (2.8, 4.8 and 9.9 for one, two and three or more batches). Pull request size
+confounds that, and Rule 8 of `docs/measurement.md` records that batching has never been
+measured as a variable.
+
+R9 is the R1 build with `review.max_files_per_request: 60` and
+`review.token_budget_per_request: 120000` (`tools/bakeoff/r9-whole.yaml`). Nothing else
+changes: same model, prompt, and verify stage off. It runs on the 20 tuning pull requests,
+three passes, paired against the three R1 passes.
+
+- **Ship to a fresh-corpus gate:** precision up 10 points or more, recall down 3 or fewer,
+  and F1 at or above Mira's 0.514.
+- **Kill:** any of the three fails. If R9 fails, the next run is the R8b tool loop with
+  whole-PR batching, rebuilt from commit 2ac4bfc, registered separately before it runs.
+- **Reported with it:** batches per pull request, tokens per call, pull requests whose one
+  batch still exceeds 120,000 tokens, and median review time.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
