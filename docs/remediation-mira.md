@@ -365,7 +365,7 @@ findings are filtered. The remaining levers in this plan do not reach it.
   only when another pass of the same reviewer commented within 5 lines of the same
   file gives open-nitpick F1 0.498 (unverified, up from 0.485) and 0.497
   (offline-verified, down from 0.512). It also lowers Mira's, from 0.596 to 0.577.
-  `tools/bakeoff/selectors.py` reproduces this and the cap table.
+  `tools/bakeoff/selector_diagnostics.py` reproduces this and the cap table.
 - The gap is selection, not discovery. Over the three passes open-nitpick's output
   matches 79 of the 105 golden comments and Mira's matches 62; only 5 are Mira's
   alone. Open-nitpick finds nearly everything Mira finds and posts it among 263

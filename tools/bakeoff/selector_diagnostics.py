@@ -8,7 +8,7 @@ reproduces the published counts, which is the check that the simulation
 matches the scorer. Cap sizes and the line window are chosen after seeing the
 data, so the numbers flatter the selector; they are a diagnostic, not a gate.
 
-    python3 tools/bakeoff/selectors.py --root /tmp/bakeoff/heldout
+    python3 tools/bakeoff/selector_diagnostics.py --root /tmp/bakeoff/heldout
 """
 import argparse
 import json
