@@ -1,8 +1,8 @@
 diff --git a/scripts/replay_snapshot_review.py b/scripts/replay_snapshot_review.py
-index 7429ee3..55e35f5 100644
+index 7429ee3..ccabb6b 100644
 --- a/scripts/replay_snapshot_review.py
 +++ b/scripts/replay_snapshot_review.py
-@@ -80,6 +80,15 @@ config.llm.reasoning_effort = args.reasoning_effort
+@@ -80,6 +80,20 @@ config.llm.reasoning_effort = args.reasoning_effort
  if args.agentic_max_hops is not None and hasattr(config.review, "agentic_max_hops"):
      config.review.agentic_max_hops = args.agentic_max_hops
  
@@ -14,11 +14,16 @@ index 7429ee3..55e35f5 100644
 +    config.review.ensemble_runs = int(os.environ["MIRA_BAKEOFF_ENSEMBLE_RUNS"])
 +if os.environ.get("MIRA_BAKEOFF_SECOND_LOOK"):
 +    config.review.second_look = True
++if os.environ.get("MIRA_BAKEOFF_NO_AGENTIC"):
++    config.review.agentic_tools = False
++    config.review.security_agentic = False
++if os.environ.get("MIRA_BAKEOFF_NO_CRITIQUE"):
++    config.review.self_critique = False
 +
  pr = PRInfo(
      title=metadata["title"],
      description=metadata["body"],
-@@ -114,6 +123,9 @@ manifest = {
+@@ -114,6 +128,9 @@ manifest = {
      "agentic_max_hops": getattr(config.review, "agentic_max_hops", None),
      "security_agentic": config.review.security_agentic,
      "self_critique": config.review.self_critique,

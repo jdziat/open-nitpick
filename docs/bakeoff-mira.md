@@ -50,7 +50,8 @@ Mira's replay harness uses one model for every role, so a review model separate
 from a triage model is not reachable there. `fallback_model`, `ensemble_runs` and
 `second_look` are, through a 12-line change to `scripts/replay_snapshot_review.py` and a one-line model alias in `scripts/run_benchmark_sample.py`
 that reads them from the environment and leaves the default path untouched. The
-change is kept as `tools/bakeoff/mira-replay-bakeoff.patch`.
+change is kept as `tools/bakeoff/mira-replay-bakeoff.patch`, which also carries two ablation
+switches, `MIRA_BAKEOFF_NO_AGENTIC` and `MIRA_BAKEOFF_NO_CRITIQUE`.
 
 The held-out scoring needed a second change, to `scripts/score_snapshot_runs.py`: it
 re-asks the judge when a grouping answer repeats or omits an index, and is kept as

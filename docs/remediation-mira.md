@@ -581,6 +581,89 @@ More than half the comments carry no citation (167 of 447 on the held-out set),
 because the field is optional, and the ones that have one are no more likely to
 match. The rule halves recall and leaves precision where it was.
 
+### Where Mira's results come from
+
+Read from Mira's source (`core/engine.py`, `core/passes.py`, `core/noise_filter.py`,
+`llm/prompts/templates/review.jinja2`, `config.py`) and measured by rebuilding what
+each stage of its pipeline drafted and removed (`tools/bakeoff/mira_funnel.py`,
+which joins the audit trail Mira stores with the drafts in its stored model calls;
+the join matches the audit's draft count on every review checked).
+
+What Mira does, in order, per chunk of at most 120,000 tokens (`config.py:66`):
+
+1. **A reviewer that reads while it reviews** (`core/passes.py:326`). The model gets
+   `read_file` and `grep_repo` beside the terminal `submit_review`, up to 10 turns, with
+   its reasoning replayed on every turn. A model that stops calling tools, or runs
+   out of turns, is not abandoned: the submission is forced over the whole transcript
+   (`:86`). The system prompt tells it to verify a cross-file claim before filing it
+   (`:172`). Over the 90 held-out reviews it made 12.7 tool calls a review.
+2. **A prompt of review heuristics** (`review.jinja2`): trace the receiving side of a
+   new value, audit what a rewrite dropped, check callers of a changed signature, plus
+   explicit lists of what not to file and not to speculate about, and no comment quota.
+3. **A noise filter in code** (`core/noise_filter.py:116`): confidence floor 0.7,
+   duplicates merged, a cap of 5 on suggestions and nitpicks only.
+4. **A self-critique** (`core/passes.py:942`): one batched call grades each draft
+   `proven`, `plausible` or `unsupported` against the diff window around it, and a keep
+   rule in code (`:921`) keeps `plausible` only at warning or above with confidence of
+   0.75 or more.
+
+What is off by default: the second look (`config.py:352`), the multi-run ensemble
+(`config.py:291`). Neither ran in the bakeoff.
+
+**The funnel.** Counts pooled over passes, held-out set (30 PRs, 3 passes) and tuning
+set (20 PRs, 2 passes):
+
+| stage | held-out precision / recall / F1 | tuning precision / recall / F1 |
+|---|---|---|
+| Mira, drafted (everything the model filed) | 53.9% / 63.5% / 0.583 | 50.6% / 57.4% / 0.538 |
+| after the noise filter | 63.4% / 58.4% / 0.608 | 56.5% / 47.8% / 0.518 |
+| posted, after the critique | 73.5% / 50.2% / 0.596 | 73.0% / 39.7% / 0.514 |
+| open-nitpick, no filter | 41.3% / 58.7% / 0.485 | 33.2% / 51.5% / 0.404 |
+| open-nitpick, verify on | 50.0% / 52.4% / 0.512 | |
+
+The two filters buy about 20 points of precision with about 13 of recall and leave F1
+where the drafts had it (+0.013 held-out, -0.024 tuning). They are the same trade a cap
+makes. The noise filter was right to drop 65 of the 81 held-out comments it removed,
+the critique 49 of 75. **Mira's lead is in the drafts**: its raw F1 is 0.098 above ours
+on the held-out set and 0.134 above on the tuning set, from fewer comments (371 against
+448) and more matches (200 against 185). The filters account for none of it; our own
+verify stage gains slightly more F1 than Mira's two filters do.
+
+Two things I had suspected are not it. Mira's confidence separates real from wrong no
+better than ours (area under the curve 0.647 on its 463 drafts against 0.680 on our
+447), so the floor at 0.7 is not a better signal than what we had. And the filters
+do not inflate the benchmark number: on the tuning set they lower F1.
+
+**Ablation.** Mira with `agentic_tools` and `security_agentic` off
+(`MIRA_BAKEOFF_NO_AGENTIC`), same model, same prompt, 20 tuning PRs, two passes, no
+tool calls in any audit trail:
+
+| 20 tuning PRs | comments | precision | recall | F1 |
+|---|---:|---:|---:|---:|
+| Mira drafted, tools on (2 passes) | 154 | 50.6% | 57.4% | 0.538 |
+| Mira drafted, tools off (2 passes) | 218 | 36.2% | 58.1% | 0.446 |
+| open-nitpick R1 (3 passes) | 316 | 33.2% | 51.5% | 0.404 |
+| Mira posted, tools on | 74 | 73.0% | 39.7% | 0.514 |
+| Mira posted, tools off | 85 | 51.8% | 32.4% | 0.398 |
+
+**Taking the tools away puts Mira's drafts where ours are** (36.2% precision at 58.1%
+recall against our 33.2% at 51.5%) and the filters then cannot rescue it: posted F1
+falls to 0.398, below our unfiltered 0.404. The tool loop is worth about 14 points of
+precision at equal recall in the drafts, and it is what makes the later filters work.
+The same ablation moves recall by under a point, so the tools make the model say
+fewer wrong things and do not make it find more.
+
+**Why R5 did not reproduce that.** R5 gave our reviewer the same two tools and
+found no gain, so the loop is not enough by itself. What R5 lacked that Mira has:
+a forced structured submission when the model stops (R5b fell back to a diff-only
+review for 42 of 144 batches, Mira never discards its transcript); a turn budget
+and not a lookup budget (every R5b batch exhausted its 12 lookups, so the model was
+browsing, not checking); and a prompt that says what to go and check. R7 supplied that
+prompt without tools and R5 supplied the tools without the prompt, so the
+combination Mira runs has not been measured here. Its tuning-set ablation is
+two passes of one model, so the 14 points carry the variance this plan already
+documents; the direction is large enough to act on and the size is not exact.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
@@ -624,6 +707,9 @@ findings are filtered. The remaining levers in this plan do not reach it.
 - R4 aims at recall, and recall was never what Mira led on.
 - R7 (review heuristics in the prompt) is killed above, and a verbatim-citation
   rule is no better.
+- What the code review found, and the one combination not yet tried (tools, a forced
+  submission, a turn budget and the heuristics together), is in "Where Mira's
+  results come from".
 - R6 (a budget in the prompt) is killed above; it reproduces the cap.
 - R5 (the reviewer reads the repository while it files) is killed above. It was
   the generator change the plan had left, and it did not move precision.
