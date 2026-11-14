@@ -519,6 +519,15 @@ type Review struct {
 	// alone. Empty, the default, never settles.
 	StopAt Severity `yaml:"stop_at"`
 
+	// Critique turns on a pass that grades each model finding's evidence
+	// against the diff around the lines it cites, and withholds the ones the
+	// shown code does not support. Findings the grader calls proven are kept;
+	// plausible ones are kept at warning or worse; unsupported ones are
+	// withheld, listed with a reason rather than dropped silently. The rule is
+	// in code, not in the prompt. Analyzer findings are never graded. Off by
+	// default until measured: docs/remediation-mira.md, stage R2.
+	Critique bool `yaml:"critique"`
+
 	// MinSeverity drops findings below this severity before publishing.
 	MinSeverity Severity `yaml:"min_severity"`
 

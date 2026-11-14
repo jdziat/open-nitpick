@@ -1287,6 +1287,11 @@ Scope says what the ceiling covers. One of: run, pull_request.
 integer, default `4`.
 Concurrency bounds in-flight model calls.
 
+### `review.critique`
+
+boolean, default `false`.
+Critique turns on a pass that grades each model finding's evidence against the diff around the lines it cites, and withholds the ones the shown code does not support.
+
 ### `review.fail_on`
 
 string, default `none`.

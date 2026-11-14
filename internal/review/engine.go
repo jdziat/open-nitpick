@@ -1105,6 +1105,13 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// threshold in either direction.
 	findings, overruled, validationFailures := e.validateFindings(ctx, findings, plan)
 	report.Stages = append(report.Stages, validationFailures...)
+	// Evidence grading follows validation and sees what survives it. Its
+	// withheld findings join the expert ones, so a reader sees one list of what
+	// was held back and why.
+	var critiqued []Overruled
+	findings, critiqued, critiqueFailures := e.critiqueFindings(ctx, findings, plan)
+	report.Stages = append(report.Stages, critiqueFailures...)
+	overruled = append(overruled, critiqued...)
 	findings = append(findings, advisories...)
 
 	// After every pass that can raise a severity, and before the gate reads
