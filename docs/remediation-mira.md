@@ -491,6 +491,39 @@ none is taken from a golden comment.
   fewer, F1 at or above Mira's 0.514 on these 20.
 - **Kill:** any of the three fails.
 
+#### R7 result: killed
+
+Three passes on the 20 tuning pull requests with the three heuristics and the
+exclusion list in the review prompt, paired against the same set's R1 passes.
+
+| arm (3 passes, 20 pull requests) | TP | FP | FN | precision | recall | F1 | comments |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| R1 | 105 | 211 | 99 | 33.2% | 51.5% | 0.404 | 316 |
+| R7, heuristics in the prompt | 92 | 192 | 112 | 32.4% | 45.1% | 0.377 | 282 |
+| Mira (2 passes) | 54 | 20 | 82 | 73.0% | 39.7% | 0.514 | |
+
+Against R1: precision -0.8 points (-4.8 to +3.2), recall -6.4 (-13.8 to 0.0), F1
+-0.027 (-0.074 to +0.014). The prompt moved the reviewer's output by a small amount
+and in no useful direction. So the 25 points of precision Mira has at matched
+volume and recall are not in the review heuristics a prompt can state. R6 showed it
+is not in how much the model says either.
+
+One more selector, checked offline on the stored R1-build output
+(`tools/bakeoff/citation_filter.py`): Mira discards a comment whose quoted code is
+not in the diff, so the same rule applied to open-nitpick's `citation` field keeps a
+comment only when it cites code present in the diff.
+
+| stored output | comments | precision | recall | F1 |
+|---|---:|---:|---:|---:|
+| held-out, no filter | 447 | 41.3% | 58.7% | 0.485 |
+| held-out, citation present and in the diff | 219 | 41.6% | 29.2% | 0.343 |
+| tuning, no filter | 316 | 33.2% | 51.5% | 0.404 |
+| tuning, citation present and in the diff | 135 | 32.1% | 21.1% | 0.254 |
+
+More than half the comments carry no citation (167 of 447 on the held-out set),
+because the field is optional, and the ones that have one are no more likely to
+match. The rule halves recall and leaves precision where it was.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
@@ -532,6 +565,8 @@ findings are filtered. The remaining levers in this plan do not reach it.
   stage of this plan. Its evaluation needs a corpus neither tool has been scored
   on: the 30 held-out pull requests have now been read once.
 - R4 aims at recall, and recall was never what Mira led on.
+- R7 (review heuristics in the prompt) is killed above, and a verbatim-citation
+  rule is no better.
 - R6 (a budget in the prompt) is killed above; it reproduces the cap.
 - R5 (the reviewer reads the repository while it files) is killed above. It was
   the generator change the plan had left, and it did not move precision.
