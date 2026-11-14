@@ -213,7 +213,8 @@ Offline, on the finished arm A findings, or as one-pass runs with the same model
 |---|---:|---:|---:|---:|
 | none (arm A, two passes) | 27.6%, 28.8% | 54.8%, 54.8% | 0.368, 0.378 | 0.458, 0.464 |
 | `validation.enabled: true` | 29.5% | 41.9% | 0.347 | 0.387 |
-| `persona.nitpick: minimal` | 31.7% | 61.3% | 0.418 | 0.516 |
+| `persona.nitpick: minimal`, two passes | 31.7%, 36.7% | 61.3%, 53.2% | 0.418, 0.434 | 0.516, 0.488 |
+| `persona.nitpick: minimal` and `validation.enabled: true` | 29.3% | 46.8% | 0.360 | 0.418 |
 | evidence-graded critique, keep rule in code (offline) | 32.3%, 37.1% | 50.0%, 53.2% | 0.392, 0.437 | 0.451, 0.490 |
 | critique, then top 3 per pull request, proven first (offline) | 47.5% | 34.6% | | |
 
@@ -226,12 +227,15 @@ are the corrected rule.
 
 ## Proposed fixes, in order
 
-1. **Make `minimal` the default persona level for review, after a replicate.** It
-   needs no code. One pass improved every column, and unmodified passes differ by
-   0.01 F1, so the 0.04 gain is outside that. The reason is not established: the
-   level filters which classes publish and I have not checked that it also changes
-   the prompt. Before changing the default, repeat the run and rerun the planted
-   defect corpus so a number in `docs/findings.md` does not move unseen.
+1. **Not `persona.nitpick: minimal`, though both passes scored above the shipped
+   level.** The level changes no prompt: generation always runs at `normal`
+   (`config.GenerationLevel`), and `minimal` only drops the `tests` and
+   `maintainability` classes after triage. Applied offline to the shipped passes,
+   that removes 6 and 5 comments and moves precision by under one point, and a
+   filter cannot raise recall from 54.8% to 61.3%. The four runs of the same
+   generator scored F1 0.368, 0.378, 0.418 and 0.434 and posted 92 to 128
+   comments, so the gain is run-to-run variance, and that variance is the more
+   useful finding: see [Remediation](remediation-mira.md).
 2. **Replace adversarial `validation` with the evidence-graded critique.**
    Validation as shipped lost 13 points of recall for 1 to 2 of precision. The
    critique estimate gains 5 to 8 points of precision for 2 to 5 of recall. Build it as a
