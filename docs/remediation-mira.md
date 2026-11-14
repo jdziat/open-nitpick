@@ -894,6 +894,41 @@ no coverage note). Same 20 tuning pull requests, two passes each, drafted stage.
   else. If neither does, the tools' behaviour is not what separates our loop from
   Mira's, and this line of work stops.
 
+### Tool semantics and Jev: results (unregistered probes)
+
+Both were run as probes, not as registered stages, so they carry no ship condition.
+
+**Tool semantics.** Mira's drafts with our 6,000-byte read window, with our unranked grep,
+and with both, on the 20 tuning pull requests, two passes: F1 0.551, 0.559 and 0.571, against
+0.538 with Mira's own tools. Our tool behaviour does not explain the precision gap: Mira's
+drafts stay at 50 to 52% precision with our tools.
+
+**Jev as a decision filter.** The endpoint is the one cleatus's `scripts/jev_parity.py` calls,
+`https://openrouter.ai/api/alpha/decisions`, with model `~typesafe/jev-latest` (it resolves to
+`typesafe/jev-1.14-20261014`). Each call costs about 0.002 cents and returns in about 0.3 s. The
+probe asked one yes-or-no question per comment, with the claim and the diff window, on the 50
+hand-graded comments (16 wrong, 34 good), two decisions each, `tools/bakeoff/jev_probe.py`.
+
+| Jev probability | AUC, wrong vs good | removes wrong of 16 | loses good of 34 |
+|---|---:|---:|---:|
+| diff only, keep at 0.7 | 0.667 | 9 | 13 |
+| diff and the checker's evidence, keep at 0.7 | 0.653 | 8 | 10 |
+| diff and the checker's evidence, keep at 0.8 | 0.653 | 14 | 20 |
+| DeepSeek checker, same run, confirmed only | | 10 | 5 |
+| checker confirmed and Jev at least 0.7 | | 12 | 12 |
+
+Repeats agree closely (median spread 0.01). The mean probability was about 0.72 for real
+comments, 0.68 to 0.70 for partly real, 0.63 to 0.64 for wrong and 0.74 to 0.77 for matched
+controls, so Jev sits near a prior and does not rank the comments. TypeSafe reports good
+calibration, and the cleatus benchmark reports ECE 0.03 on policy-style questions. Calibration
+is not discrimination, and neither benchmark is a code review.
+
+Jev does not help as a filter on our findings. Its evidence-free AUC equals our own
+self-reported confidence (0.68 held-out), and adding what the checker read does not improve it.
+Not tested: other decisions (routing, severity), other question wording or criteria, and Jev on
+whole files instead of the checker's evidence. The probe cost $0.02 in total. The probe sent
+public diffs to the same provider as every other call in this work.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this

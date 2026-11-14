@@ -19,6 +19,7 @@ import argparse
 import concurrent.futures
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -30,6 +31,7 @@ from critique_filter import diff_sections, window  # noqa: E402
 
 MODEL = "deepseek/deepseek-v4.1-flash-1017"
 MAX_HOPS = 8
+TOOLS_MODE = "default"
 USAGE = {"prompt": 0, "completion": 0}
 
 TOOLS = [
@@ -105,7 +107,99 @@ def grep_repo(repo: Path, pattern, glob=None):
     return "\n".join(line[:240] for line in out) or "(no matches)"
 
 
-def verify(case, c, sections, repo, key):
+WINDOW_BYTES = 12_000
+GREP_HITS = 30
+TEST_HINTS = ("test", "spec", "fixture", "mock", "__tests__")
+
+
+def read_file_windowed(repo: Path, path, start=1, end=None):
+    """A byte-bounded window that says where it stopped and how to continue."""
+    target = (repo / path).resolve()
+    if not str(target).startswith(str(repo.resolve())) or not target.is_file():
+        run = subprocess.run(["git", "ls-files"], cwd=repo, capture_output=True, text=True, timeout=60)
+        close = [p for p in run.stdout.splitlines() if str(path).lower() in p.lower()][:5]
+        return f"[file not found at the pull request head: {path}." + (f" Did you mean: {', '.join(close)}?" if close else "") + "]"
+    lines = target.read_text(errors="replace").splitlines()
+    total = len(lines)
+    first = max(1, int(start or 1))
+    if first > total:
+        return f"[{path} has {total} lines; start_line {first} is past the end]"
+    last = min(total, int(end)) if end else total
+    out, used, shown = [], 0, first - 1
+    for i in range(first, last + 1):
+        text = f"{i:5}  {lines[i - 1]}"[:WINDOW_BYTES]
+        if used + len(text) + 1 > WINDOW_BYTES and out:
+            break
+        out.append(text)
+        used += len(text) + 1
+        shown = i
+    note = ""
+    if shown < last:
+        note = f"\n... [truncated: window capped at line {shown} of {total}; call read_file with start_line={shown + 1} to continue]"
+    elif first > 1 or shown < total:
+        note = f"\n... [showing lines {first}-{shown} of {total}]"
+    return f"{path}:\n" + "\n".join(out) + note
+
+
+def _dirs(path):
+    return path.split("/")[:-1]
+
+
+def _rank(path, changed, tokens):
+    """Higher is nearer: the directory of a changed file, its extension, the pattern in the name."""
+    segs, best = _dirs(path), 0
+    for c in changed:
+        cd, n = _dirs(c), 0
+        for a, b in zip(segs, cd, strict=False):
+            if a != b:
+                break
+            n += 1
+        if n == len(cd) and n == len(segs):
+            n += 1
+        best = max(best, n)
+    score = min(best, 4)
+    if "." in path and any(path.endswith(c[c.rfind("."):]) for c in changed if "." in c):
+        score += 1
+    if any(h in path.lower() for h in TEST_HINTS):
+        score -= 1
+    name = path.rsplit("/", 1)[-1].lower()
+    if any(t in name for t in tokens):
+        score += 6
+    elif any(t in path.lower() for t in tokens):
+        score += 2
+    return score
+
+
+def grep_repo_ranked(repo: Path, pattern, glob=None, changed=()):
+    """Matches from the files nearest the change first, with how many files matched."""
+    cmd = ["git", "grep", "-n", "-E", "-I", "--no-color", "-e", pattern]
+    if glob:
+        cmd += ["--", glob]
+    run = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, timeout=60)
+    by_file = {}
+    for line in run.stdout.splitlines()[:50_000]:
+        f, _, rest = line.partition(":")
+        by_file.setdefault(f, []).append(rest)
+    if not by_file:
+        total = len(subprocess.run(["git", "ls-files"], cwd=repo, capture_output=True, text=True, timeout=60).stdout.splitlines())
+        return f"[no content matches for `{pattern}` (searched {total} tracked files)]"
+    tokens = {t.lower() for t in re.findall(r"[A-Za-z_][A-Za-z0-9_]{3,}", pattern)}
+    ranked = sorted(by_file, key=lambda f: (-_rank(f, list(changed), tokens), f))
+    hits = []
+    for f in ranked:
+        for rest in by_file[f]:
+            hits.append(f"{f}:{rest}"[:240])
+            if len(hits) >= GREP_HITS:
+                break
+        if len(hits) >= GREP_HITS:
+            break
+    head = f"Content matches ({len(by_file)} files matched, nearest the change first)"
+    if len(hits) == GREP_HITS:
+        head += f", showing the first {GREP_HITS}"
+    return head + ":\n" + "\n".join(hits)
+
+
+def verify(case, c, sections, repo, key, evidence=None):
     sec = sections.get(c["path"], "")
     user = (f"Comment: {c['path']}:{c['line']} ({c.get('severity', '?')})\nTitle: {c['title']}\nClaim: {c['body'][:900]}\n"
             f"Diff around the cited lines:\n{window(sec, c['line']) if sec else '(file not in the diff)'}")
@@ -131,26 +225,38 @@ def verify(case, c, sections, repo, key):
             if hops > MAX_HOPS:
                 result = "tool budget spent: submit your verdict now"
             elif name == "read_file":
-                result = read_file(repo, args.get("path", ""), args.get("start_line"), args.get("end_line"))
+                if TOOLS_MODE == "improved":
+                    result = read_file_windowed(repo, args.get("path", ""), args.get("start_line"), args.get("end_line"))
+                else:
+                    result = read_file(repo, args.get("path", ""), args.get("start_line"), args.get("end_line"))
             elif name == "grep_repo":
-                result = grep_repo(repo, args.get("pattern", ""), args.get("path_glob"))
+                if TOOLS_MODE == "improved":
+                    result = grep_repo_ranked(repo, args.get("pattern", ""), args.get("path_glob"), list(sections))
+                else:
+                    result = grep_repo(repo, args.get("pattern", ""), args.get("path_glob"))
             else:
                 result = f"unknown tool {name}"
-            msgs.append({"role": "tool", "tool_call_id": call["id"], "content": result[:6000]})
+            if evidence is not None:
+                evidence.append(f"{name} {json.dumps(args)[:200]}\n{result[:3000]}")
+            msgs.append({"role": "tool", "tool_call_id": call["id"], "content": result if TOOLS_MODE == "improved" else result[:6000]})
     return {"verdict": "uncertain", "reason": "the grader never submitted", "hops": hops}
 
 
 def main():
-    global MODEL
+    global MODEL, TOOLS_MODE
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", type=Path, required=True)
     ap.add_argument("--repos", type=Path, required=True)
     ap.add_argument("--inputs", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True, help="prefix; -confirmed and -notrefuted are written")
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--evidence-out", type=Path, default=None, help="write what each check looked at, for a later decision")
     ap.add_argument("--model", default=MODEL, help="the checking model, as OpenRouter names it")
+    ap.add_argument("--tools", choices=("default", "improved"), default="default",
+                    help="improved: byte windows that say where they stopped, and search ranked by nearness to the change")
     args = ap.parse_args()
     MODEL = args.model
+    TOOLS_MODE = args.tools
     key = os.environ["OPENROUTER_API_KEY"]
     outs = {"confirmed": Path(f"{args.out}-confirmed"), "notrefuted": Path(f"{args.out}-notrefuted")}
     for o in outs.values():
@@ -165,8 +271,9 @@ def main():
         for i, c in enumerate(res["result"]["comments"]):
             jobs.append((case, i, c, sections))
     verdicts = {}
+    evidence = {}
     with concurrent.futures.ThreadPoolExecutor(args.workers) as pool:
-        futs = {pool.submit(verify, case, c, sections, args.repos / case, key): (case, i)
+        futs = {pool.submit(verify, case, c, sections, args.repos / case, key, evidence.setdefault((case, i), [])): (case, i)
                 for case, i, c, sections in jobs}
         for f in concurrent.futures.as_completed(futs):
             case, i = futs[f]
@@ -174,6 +281,10 @@ def main():
                 verdicts[(case, i)] = f.result()
             except Exception as e:  # a failed grade keeps the finding
                 verdicts[(case, i)] = {"verdict": "uncertain", "reason": f"grading failed: {e}", "hops": 0, "failed": True}
+    if args.evidence_out:
+        dump = {f"{case}|{c['path']}|{c['line']}|{c['title']}": "\n\n".join(evidence.get((case, i), []))[:9000]
+                for case, i, c, _ in jobs}
+        args.evidence_out.write_text(json.dumps(dump, indent=1))
     totals = {"confirmed": [0, 0], "notrefuted": [0, 0]}
     for rule, out in outs.items():
         for case_dir in sorted(out.glob("*-r1")):
