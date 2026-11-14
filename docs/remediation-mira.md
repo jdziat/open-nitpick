@@ -473,6 +473,24 @@ precision is still 25 points lower. At equal volume and equal recall, Mira's
 comments are better aimed by 25 points, which is a difference in what the model
 looks for and not in how many things it says. The template change was reverted.
 
+### R7. What the prompt tells the reviewer to look for (registered 2026-11-14, before it runs)
+
+R6 posted about as many comments as Mira, recalled about as much, and was still 25
+points less precise, so the difference is in what the model goes looking for. Mira's
+prompt is a set of review heuristics, and none of ours is: it names three places
+defects hide (the consuming side of a value that crosses a boundary, what a refactor
+silently dropped, callers and implementers that did not follow a signature change)
+and a list of things not worth a finding. R7 adds both to our review prompt, in our
+own words, and changes nothing else.
+
+It runs on the 20 tuning pull requests, three passes, paired against the three R1
+passes, and is reverted if it fails. The heuristics are general review practice and
+none is taken from a golden comment.
+
+- **Ship to a fresh-corpus gate:** precision up 10 points or more, recall down 3 or
+  fewer, F1 at or above Mira's 0.514 on these 20.
+- **Kill:** any of the three fails.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
