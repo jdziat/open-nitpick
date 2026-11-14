@@ -2028,6 +2028,7 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 		}
 		e.recordSeverity(&f)
 		f.Class = e.normalizeClass(f)
+		f.Confidence = clampConfidence(f.Confidence)
 		// Always this client's name: a model that writes a source of its
 		// own would let two reviewers' findings pass as one's.
 		f.Source = client.String()

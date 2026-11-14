@@ -2,6 +2,7 @@ package review
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"sort"
 	"strings"
@@ -128,6 +129,17 @@ type Finding struct {
 
 	// Rationale explains the consequence and the reasoning.
 	Rationale string `json:"rationale"`
+
+	// Confidence is the reviewer's own estimate, from 0 to 1, that the defect
+	// is real and reachable. Nil means the reviewer gave none: an analyzer
+	// finding, or a model that ignored the schema. It is a model's claim and is
+	// treated as one, kept apart from Severity, which says how much the defect
+	// matters if it is real. See docs/remediation-mira.md, stage R1.
+	Confidence *float64 `json:"confidence,omitempty"`
+
+	// Citation quotes the lines of shown code the claim rests on, empty when
+	// the reviewer quoted none.
+	Citation string `json:"citation,omitempty"`
 
 	// Suggestion is optional replacement code for the anchored line, or for
 	// the lines Line through FixEndLine when FixEndLine is set.
@@ -343,3 +355,14 @@ func IsAdvisoryRule(rule string) bool { return advisoryRule.MatchString(rule) }
 // scanner: deterministic evidence, which no model pass judges. See
 // Engine.Review, which holds these out of triage and validation.
 func (f Finding) IsAdvisory() bool { return f.FromAnalyzer && IsAdvisoryRule(f.Source) }
+
+// clampConfidence keeps a model's confidence inside [0, 1]. A value outside
+// it is the model misreading the scale rather than a stronger claim, so it is
+// pinned to the nearest end; NaN carries no claim at all and becomes nil.
+func clampConfidence(c *float64) *float64 {
+	if c == nil || math.IsNaN(*c) {
+		return nil
+	}
+	v := min(max(*c, 0), 1)
+	return &v
+}

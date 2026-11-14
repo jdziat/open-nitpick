@@ -11,8 +11,9 @@ writes), so both reviewers' runs can be scored together by one judge:
 
 The review is the shipped CLI at shipped defaults, with the model set through
 LLM_MODEL and no analyzers, since the other reviewer runs none. Findings are
-read from the dry-run text, which is the only machine-readable form `review`
-prints; the raw output is kept beside the result so the parse can be audited.
+read from `review -format json`; a binary older than that flag prints no JSON
+and every review is recorded as failed. The raw output is kept beside the
+result.
 
     python3 tools/bakeoff/run_nitpick.py --repos /tmp/bakeoff/repos --inputs /tmp/bakeoff/inputs \
         --out /tmp/bakeoff/nitpick-pass1
@@ -44,7 +45,7 @@ def severity_row(lines, start, end):
     return None, None
 
 
-def parse(stdout: str):
+def parse(stdout: str):  # runs recorded before review -format json existed
     """Findings from a dry-run review: each starts at a `path:line` line."""
     lines = stdout.splitlines()
     starts = [i for i, ln in enumerate(lines) if LOCATION.match(ln) and "://" not in ln]
@@ -89,7 +90,7 @@ def parse(stdout: str):
     return comments
 
 
-def review(case, repos, out, model, timeout, config):
+def review(case, repos, out, model, timeout, config, binary):
     repo = repos / case
     t0 = time.time()
     env = dict(os.environ, LLM_PROVIDER="openrouter", LLM_MODEL=model, NITPICK_NO_USER_CONFIG="1")
@@ -97,7 +98,8 @@ def review(case, repos, out, model, timeout, config):
     dest.mkdir(parents=True, exist_ok=True)
     try:
         run = subprocess.run(
-            ["nitpick", "review", "-repo", str(repo), "-base", "HEAD~1", "-head", "HEAD", "-dry-run", "-no-linters"]
+            [binary, "review", "-repo", str(repo), "-base", "HEAD~1", "-head", "HEAD", "-dry-run", "-no-linters",
+             "-format", "json"]
             + (["-config", str(config)] if config else []),
             capture_output=True, text=True, env=env, timeout=timeout,
         )
@@ -107,14 +109,24 @@ def review(case, repos, out, model, timeout, config):
     seconds = time.time() - t0
     (dest / "stdout.txt").write_text(stdout)
     (dest / "stderr.txt").write_text(stderr)
-    # exit 1 is "findings at the gate"; only 2 and a timeout are failures.
-    failed = code not in (0, 1) or "Reviewed " not in (stdout + stderr)
+    # exit 1 is "findings at the gate"; only 2 and a timeout are failures, and
+    # a report that says the run did not finish is one too.
+    try:
+        report = json.loads(stdout)
+    except json.JSONDecodeError:
+        report = None
+    failed = code not in (0, 1) or report is None or not report.get("complete")
     status = {"exit_code": 1 if failed else 0, "nitpick_exit": code}
-    comments = [] if failed else parse(stdout)
+    comments = [] if failed else [
+        {"title": f["title"], "path": f["path"], "line": f["line"], "body": f["rationale"],
+         "severity": f["severity"], "class": f["class"], "confidence": f.get("confidence"),
+         "citation": f.get("citation", "")}
+        for f in report["findings"]
+    ]
     result = {
         "result": {"comments": comments},
         "duration_seconds": seconds,
-        "manifest": {"reviewer": "open-nitpick", "model": model, "version": nitpick_version(),
+        "manifest": {"reviewer": "open-nitpick", "model": model, "version": nitpick_version(binary),
                      "config": str(config) if config else None},
     }
     (dest / "status.json").write_text(json.dumps(status))
@@ -122,8 +134,8 @@ def review(case, repos, out, model, timeout, config):
     print(json.dumps({"case": case, "exit": code, "findings": len(comments), "seconds": round(seconds)}), flush=True)
 
 
-def nitpick_version():
-    return subprocess.run(["nitpick", "version"], capture_output=True, text=True).stdout.strip()
+def nitpick_version(binary="nitpick"):
+    return subprocess.run([binary, "version"], capture_output=True, text=True).stdout.strip()
 
 
 def main():
@@ -136,17 +148,18 @@ def main():
     ap.add_argument("--timeout", type=int, default=900)
     ap.add_argument("--only", default="")
     ap.add_argument("--config", type=Path, default=None, help="a .nitpick.yaml to review under")
+    ap.add_argument("--binary", default="nitpick", help="the nitpick binary to run")
     args = ap.parse_args()
     selection = json.loads((args.inputs / "selection.json").read_text())
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "run.json").write_text(json.dumps({
         "selection": selection, "repeats": 1, "model": args.model, "reviewer": "open-nitpick",
-        "version": nitpick_version(), "config": str(args.config) if args.config else None,
+        "version": nitpick_version(args.binary), "config": str(args.config) if args.config else None,
     }))
     only = {x for x in args.only.split(",") if x}
     cases = [c["case"] for c in selection["cases"] if not only or c["case"] in only]
     with concurrent.futures.ThreadPoolExecutor(args.concurrency) as pool:
-        list(pool.map(lambda c: review(c, args.repos, args.out, args.model, args.timeout, args.config), cases))
+        list(pool.map(lambda c: review(c, args.repos, args.out, args.model, args.timeout, args.config, args.binary), cases))
 
 
 if __name__ == "__main__":

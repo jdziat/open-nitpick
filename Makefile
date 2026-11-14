@@ -377,6 +377,24 @@ eval-security:
 eval-security-heldout:
 	NITPICK_EVAL_SECURITY=1 NITPICK_EVAL_SECURITY_DEPTH='$(or $(DEPTH),deep)' $(MAKE) benchmark-multifile FIXTURES='$(SECURITY_HELD_OUT)' MODELS='$(or $(MODELS),$(SECURITY_MODELS))' RUNS='$(or $(RUNS),2)'
 
+# The Martian benchmark bakeoff (docs/bakeoff-mira.md). The inputs live outside
+# the repository: BAKEOFF is a directory holding inputs/ (from Mira's
+# prepare_benchmark_inputs.py), repos/ (from tools/bakeoff/build_repos.py),
+# bench/ (the pinned upstream checkout) and deps/ (its Python dependencies).
+# MIRA is a Mira checkout, whose scorer is the one the published numbers use.
+# One pass of this checkout's nitpick, written to $(BAKEOFF)/runs/$(NAME), then
+# scored into $(BAKEOFF)/scores/$(NAME). Compare arms with tools/bakeoff/compare.py.
+.PHONY: bakeoff
+bakeoff:
+	@test -n "$(BAKEOFF)" -a -n "$(MIRA)" -a -n "$(NAME)" || { echo "set BAKEOFF, MIRA and NAME"; exit 2; }
+	go build -o $(BAKEOFF)/bin/nitpick-$(NAME) ./cmd/nitpick
+	python3 tools/bakeoff/run_nitpick.py --repos $(BAKEOFF)/repos --inputs $(BAKEOFF)/inputs \
+		--out $(BAKEOFF)/runs/$(NAME) --binary $(BAKEOFF)/bin/nitpick-$(NAME) \
+		$(if $(MODEL),--model '$(MODEL)') $(if $(CONFIG),--config '$(CONFIG)')
+	cd $(MIRA) && uv run python scripts/score_snapshot_runs.py --benchmark $(BAKEOFF)/bench \
+		--inputs $(BAKEOFF)/inputs --dependency-path $(BAKEOFF)/deps \
+		--run $(NAME)=$(BAKEOFF)/runs/$(NAME) --output $(BAKEOFF)/scores/$(NAME)
+
 .PHONY: benchmark-multifile
 benchmark-multifile:
 	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \

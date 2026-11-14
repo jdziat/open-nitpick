@@ -39,6 +39,7 @@ type reviewFlags struct {
 	allowDegradedTriage bool
 	verbose             bool
 	logFormat           string
+	format              string
 	noLinters           bool
 	full                bool
 
@@ -79,6 +80,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	fs.BoolVar(&f.full, "full", false, "review the whole change even if an earlier run reviewed part of it (no incremental narrowing)")
 	fs.BoolVar(&f.verbose, "v", false, "verbose logging")
 	fs.StringVar(&f.logFormat, "log-format", "text", "log format: text or json")
+	fs.StringVar(&f.format, "format", "text", "output: text prints the review, json prints the result and published findings as one JSON object")
 
 	// improve only. review generates at config.GenerationLevel whatever the
 	// configured level says, so a level flag there would name something the
@@ -127,6 +129,9 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	}
 	// "none" is accepted here, unlike in the configuration: it is how one run
 	// turns off a configured stop_at, as -max-rounds 0 does for the limit.
+	if f.format != "text" && f.format != "json" {
+		return fmt.Errorf("invalid -format %q (text, json)", f.format)
+	}
 	if sev := config.Severity(f.stopAt); f.stopAt != "" && !sev.IsFinding() && sev.String() != string(config.SeverityNone) {
 		return fmt.Errorf("invalid -stop-at %q (none, nit, info, warning, error, critical)", f.stopAt)
 	}
@@ -249,6 +254,9 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		fmt.Fprintln(os.Stderr, report.Skipped)
 		actions.setOutputs(resultSkipped, nil)
 		actions.writeSummary(resultSkipped, nil, nil, ref, report.Skipped)
+		if f.format == "json" {
+			return writeJSONReport(os.Stdout, resultSkipped, nil)
+		}
 		return nil
 	}
 	var note string
@@ -268,7 +276,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		if actions.active() {
 			fmt.Printf("::warning::open-nitpick: %s\n", reason)
 		}
-		if perr := (&dryRunProvider{source: provider, out: os.Stdout}).PublishReview(ctx, ref,
+		if perr := (&dryRunProvider{source: provider, out: textOut(&f)}).PublishReview(ctx, ref,
 			review.Render(report, report.Files, cfg)); perr != nil {
 			log.Warn("could not print the review either", "error", perr)
 		}
@@ -278,6 +286,11 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		printRoundLimit(report)
 		actions.setOutputs(resultLimit, report)
 		actions.writeSummary(resultLimit, report, nil, ref, roundLimitNote(report.Rounds))
+		if f.format == "json" {
+			if werr := writeJSONReport(os.Stdout, resultLimit, report); werr != nil {
+				return werr
+			}
+		}
 		return errRoundLimit
 	default:
 		actions.setOutputs(resultError, nil)
@@ -300,6 +313,11 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	rendered := review.Render(report, report.Files, cfg)
 	actions.setOutputs(result, report)
 	actions.writeSummary(result, report, &rendered, ref, note)
+	if f.format == "json" {
+		if err := writeJSONReport(os.Stdout, result, report); err != nil {
+			return err
+		}
+	}
 
 	return exitFor(result)
 }
@@ -537,7 +555,7 @@ func printOverruled(report *review.Report) {
 // request is still read from GitHub, and the review is printed instead of
 // posted, so a misconfigured CI job cannot post while someone is testing.
 func selectProvider(f *reviewFlags, repo string) (vcs.Provider, vcs.Ref, error) {
-	local := vcs.NewLocal(repo, os.Stdout)
+	local := vcs.NewLocal(repo, textOut(f))
 	localRef := vcs.Ref{Base: f.base, Head: f.head}
 
 	ref, wantsPR, err := resolvePullRequest(f)
@@ -554,7 +572,7 @@ func selectProvider(f *reviewFlags, repo string) (vcs.Provider, vcs.Ref, error) 
 			if err != nil {
 				return nil, vcs.Ref{}, err
 			}
-			return &dryRunProvider{source: gh, out: os.Stdout}, ref, nil
+			return &dryRunProvider{source: gh, out: textOut(f)}, ref, nil
 		}
 		return local, localRef, nil
 	}
@@ -1046,4 +1064,13 @@ func roundLimitNote(st *review.RoundState) string {
 		fmt.Fprintf(&b, "\n> - `%s:%d` (%s, %s)", c.Path, c.Line, sev, c.Class)
 	}
 	return b.String()
+}
+
+// textOut is where the printed review goes: stdout, unless -format json has
+// claimed stdout for the report, when the review is still printed, on stderr.
+func textOut(f *reviewFlags) io.Writer {
+	if f.format == "json" {
+		return os.Stderr
+	}
+	return os.Stdout
 }

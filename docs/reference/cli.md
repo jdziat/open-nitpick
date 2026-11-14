@@ -45,6 +45,7 @@ The normal change review. With no `-base`, it reviews uncommitted changes; with
 | `-profile` | Opt in to an engineering assessment profile. |
 | `-instruction` | One extra instruction for this invocation. |
 | `-fail-on` | Override `review.fail_on`: `nit`, `info`, `warning`, `error`, `critical`, or `none`. |
+| `-format` | `text` prints the review. `json` prints one object with `result`, `complete`, `failed_stages` and the published findings, each with `confidence` and `citation` when the reviewer gave them; the review text then goes to stderr. |
 | `-max-rounds` | Override `review.max_rounds`. Once that many complete reviews are on the pull request, the run calls no model, lists what is unresolved and exits 3. `0` lifts the limit. |
 | `-stop-at` | Override `review.stop_at`: `nit`, `info`, `warning`, `error` or `critical`; `none` turns a configured value off for this run. When nothing at or above it remains, `result` is `settled` and the exit status is 0. |
 | `-owner`, `-repo-name`, `-pr` | GitHub repository and pull request to review. |
