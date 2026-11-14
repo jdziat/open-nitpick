@@ -446,6 +446,33 @@ reverted if it fails.
 - **Kill:** any of the three fails. A precision gain bought with a larger recall
   loss is the cap the held-out diagnostic already measured.
 
+#### R6 result: killed
+
+Three passes on the 20 tuning pull requests with the budget in the prompt, paired
+against the same set's three R1 passes. The reviewer posted 152 comments where R1
+posted 316.
+
+| arm (3 passes, 20 pull requests) | TP | FP | FN | precision | recall | F1 |
+|---|---:|---:|---:|---:|---:|---:|
+| R1 | 105 | 211 | 99 | 33.2% | 51.5% | 0.404 |
+| R6, budget of two a batch | 76 | 82 | 128 | 48.1% | 37.3% | 0.420 |
+| Mira (2 passes) | 54 | 20 | 82 | 73.0% | 39.7% | 0.514 |
+
+Against R1: precision +14.9 points (+7.4 to +21.3), recall -14.2 (-24.5 to -5.1),
+F1 +0.016 (-0.070 to +0.085). Per pass F1 was 0.393, 0.439 and 0.427. Against
+Mira: precision -24.9 (-37.4 to -13.4), recall -2.5 (-14.8 to +9.1), F1 -0.094
+(-0.204 to +0.019).
+
+Precision cleared the ship condition and recall and F1 did not, so it is killed. It
+is the cap again, reached through the prompt: the model that chooses before
+writing lands where the post-hoc cap lands (at 2.5 comments a pull request the
+held-out cap table gives 54% precision at 37% recall for unverified output), not
+above it. The worth of this run is the comparison with Mira at matched recall:
+R6 recalls 37.3% against Mira's 39.7% and posts about as many comments, and its
+precision is still 25 points lower. At equal volume and equal recall, Mira's
+comments are better aimed by 25 points, which is a difference in what the model
+looks for and not in how many things it says. The template change was reverted.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
@@ -487,6 +514,7 @@ findings are filtered. The remaining levers in this plan do not reach it.
   stage of this plan. Its evaluation needs a corpus neither tool has been scored
   on: the 30 held-out pull requests have now been read once.
 - R4 aims at recall, and recall was never what Mira led on.
+- R6 (a budget in the prompt) is killed above; it reproduces the cap.
 - R5 (the reviewer reads the repository while it files) is killed above. It was
   the generator change the plan had left, and it did not move precision.
 - Mira's own agentic loop, noise filter and self-critique are a different shape
