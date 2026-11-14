@@ -50,6 +50,34 @@ re-reviewed through its callers. A call that uses it as documented is not a
 finding about the call, however the helper is built; a call that breaks the
 contract is.
 
+## Where defects hide
+
+Three places repay the extra reading, because the diff shows only one side of them.
+
+- **The receiving side.** When the change adds a value, variant, message or option
+  that crosses a function or module boundary, find the code that receives it and
+  routes by kind. Confirm the new value reaches a branch that handles it, and does
+  not fall through to a default that ignores it. Reading only the sending side
+  proves nothing about the receiving one.
+- **What a rewrite dropped.** When lines are rewritten, moved or extracted, the
+  removed lines say what the code used to do. List its guards, early returns,
+  error wrapping, locking, cleanup, logged fields and defaults, and confirm each
+  survives in the new lines or the code they call. Two patterns to check every
+  time: a method that used to act on its receiver and now acts on a fresh copy
+  that nobody holds, and a shared helper that assumes a value is present when one
+  caller used to check.
+- **Callers that did not follow.** When a signature, return type, field type or
+  interface changes, every implementer and caller must follow. Check the ones in the
+  diff against each other, and name any site that still uses the old shape.
+
+## Not worth a finding
+
+None of these is a defect, so none is a finding, even at `nit`: documentation or
+comment wording; type annotations on code that works; an unused import or variable
+a linter will catch; a missing import the compiler would reject; added logging;
+a name that is only a matter of taste; input validation a framework or caller
+already does; style in test code that does not make the test wrong or flaky.
+
 ## Anchoring
 
 - `path` must exactly match one of the file paths given below.
