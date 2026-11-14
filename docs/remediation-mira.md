@@ -867,6 +867,33 @@ that failed every review chunk with a `NameError`, and its ten runs were discard
 unscored; the switches were then checked with a linter and a real review before the
 ten runs above.
 
+### Mira's tool semantics (registered 2026-11-14, before it runs)
+
+The ablation above left the tools themselves. Reading Mira's `llm/agentic_tools.py`
+against `internal/review/repotools.go` shows two differences that any loop of ours,
+including the checker, would feel:
+
+- **A capped read says where it stopped.** Mira's `read_file` fills a 12,000-byte window
+  by lines and, when it cuts, reports "window capped at line N of TOTAL; call read_file
+  with start_line=N+1 to continue". Ours returns up to 120 lines by default, cuts the
+  text at 6,000 bytes, and appends a bare "[truncated]", so a model reading a large file
+  sees roughly the first 75 lines and cannot tell where it ended.
+- **A search is ranked.** Mira's `grep_repo` scans the files nearest the changed ones
+  first, up to 40 files, and reports how many it scanned and how many it did not. Ours
+  runs `git grep` over the whole tree and returns the first 30 hits in path order, with
+  "(no matches)" when there are none and no note of coverage.
+
+Two switches in the Mira harness make its tools behave as ours do: `MIRA_BAKEOFF_SHORT_READ`
+(a 6,000-byte window, 120 lines by default, a bare "[truncated]") and
+`MIRA_BAKEOFF_NO_RANK` (every file scanned in path order, the first 30 hits returned,
+no coverage note). Same 20 tuning pull requests, two passes each, drafted stage.
+
+- **The semantic matters** if removing it takes drafted precision down 7 points or more,
+  the same rule as the parts above.
+- **If either does,** the next build of our loop is these two tool changes and nothing
+  else. If neither does, the tools' behaviour is not what separates our loop from
+  Mira's, and this line of work stops.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
