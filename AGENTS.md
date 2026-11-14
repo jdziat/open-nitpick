@@ -66,5 +66,6 @@ code demonstrates. The evidence after each is a band, not a count: run
 - Wrap an error you are formatting into a new one with %w, not %v or %s. (every site of 200+ places)
 - Call t.Helper() at the top of a test helper. (every site of 100+ places)
 - Return named results explicitly; do not use a bare return. (every site of 60+ places)
+- Name Python functions and methods in snake_case. (every site of 20+ places)
 
 <!-- nitpick:standards:end -->

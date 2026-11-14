@@ -1,6 +1,6 @@
 # Remediation: closing the precision gap to Mira
 
-**Status:** proposed, nothing built
+**Status:** gate run on 2026-11-13; the win condition was not met (see "Held-out result")
 **Date:** 2026-11-13
 **Evidence:** [Bakeoff: open-nitpick against Mira](bakeoff-mira.md)
 
@@ -256,6 +256,104 @@ Each of these was measured in the bakeoff and lost.
   not say which one did it.
 - **Use adversarial validation for precision.** See R2.
 - **Treat one pass as a result.** See the variance section.
+
+## Held-out result
+
+The gate ran once on the 30 held-out pull requests: three passes each of Mira,
+open-nitpick as it shipped plus R1's confidence and citation fields, and that
+same output kept only when the offline checker confirmed it
+(`tools/bakeoff/verify_filter.py`). A fourth arm ran the Go stage
+(`review.verify: confirmed`, `internal/review/verify.go`) live, three passes.
+All used `deepseek/deepseek-v4.1-flash-1017` in every role and the same judge.
+Counts are pooled over the three passes and over all golden categories, as in
+`tools/bakeoff/compare.py`.
+
+| arm (3 passes) | TP | FP | FN | precision | recall | F1 | F2 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Mira | 158 | 57 | 157 | 73.5% | 50.2% | 0.596 | 0.536 |
+| open-nitpick | 185 | 263 | 130 | 41.3% | 58.7% | 0.485 | 0.542 |
+| open-nitpick, offline-verified | 165 | 165 | 150 | 50.0% | 52.4% | 0.512 | 0.519 |
+| open-nitpick, Go verify, live | 149 | 161 | 166 | 48.1% | 47.3% | 0.477 | 0.475 |
+
+Per pass, F1 for Mira was 0.586, 0.616 and 0.588; offline-verified was 0.484,
+0.495 and 0.556; the live Go stage was 0.442, 0.528 and 0.458. Mira is ahead in
+every pass of every arm.
+
+Paired bootstrap over the 30 pull requests, 95% interval, each arm minus Mira:
+
+| arm | precision | recall | F1 |
+|---|---|---|---|
+| open-nitpick | -32.2 pts (-41.0 to -23.3) | +8.6 (+0.4 to +16.2) | -0.111 (-0.169 to -0.052) |
+| offline-verified | -23.5 (-32.7 to -14.4) | +2.2 (-5.9 to +9.9) | -0.085 (-0.146 to -0.023) |
+| Go verify, live | -25.4 (-34.4 to -16.8) | -2.9 (-12.2 to +5.8) | -0.119 (-0.194 to -0.047) |
+
+**The win condition failed on every line it set.** F1 was to be 0.08 above
+Mira's in every pass; the best open-nitpick pass (0.556) is below the worst Mira pass (0.586). F2 was to be 0.08 above and
+is level at best (0.542 and 0.519 against 0.536). Precision was to reach 60% and
+reached 50%. Median review time was to be no worse than Mira's: Mira's median was
+76 seconds a review and open-nitpick's 131 (133 with the Go stage), though all
+nine passes shared one machine and one provider key, so that gap is indicative.
+The planted-defect corpus was not run, because a stage that fails the first
+three conditions does not ship on the strength of the fourth.
+
+What held and what did not:
+
+- **Verification still helps against its own baseline.** Against the unfiltered
+  output it moved precision by +8.7 points (interval +4.5 to +12.7) and recall by
+  -6.3 (-9.2 to -3.7), and F1 by +0.027, an interval (-0.006 to +0.054) that
+  includes zero. On the tuning set the same filter moved F1 by +0.069. The held-out
+  gain is smaller than the tuning one, as the variance section warned.
+- **The tuning-set claim that it closes most of the F1 gap did not hold.** It
+  reported a gap of -0.04; the held-out gap is -0.085.
+- **The Go stage did not reproduce the offline filter.** It scored 0.035 F1
+  below it (interval -0.072 to +0.001), with 5 points less recall and a
+  precision no better. These are different generations, not the same findings
+  filtered twice, so the difference mixes the stage with the variance between
+  passes. It does not show the live stage is worse; it shows it did not do better.
+- **Recall is the one axis open-nitpick led, and only unfiltered.** 58.7% against
+  Mira's 50.2% (interval +0.4 to +8.6 points over three passes), bought with 263
+  false positives against 57.
+
+Two harness faults surfaced and are recorded so a later reader can discount them.
+
+- **The judge's grouping answers.** The upstream scorer rejects a grouping that
+  repeats or omits an index. Twice that stopped scoring on an answer a
+  temperature-0 judge repeats unchanged, once because numbered lists inside a
+  comment body read as extra candidates. `tools/bakeoff/mira-scorer-dedup-repair.patch`
+  re-asks up to three times, labelling each candidate and quoting the rejected
+  answer, and caches the accepted one under the original prompt. Every arm gets
+  the same repair. Two grouping prompts needed it, both Mira's (pass 3, grafana-6
+  and keycloak-6); no open-nitpick arm needed any. A repaired grouping can merge
+  duplicate comments, which lowers a false-positive count by at most one in about
+  215, so it cannot account for a gap of this size, but it is not neutral.
+- **One stalled live review.** In the Go arm's third pass one checker call never
+  answered and held its finding for the full five minutes, failing the stage and
+  the review (exit 2). That is the same provider behaviour the `firstAttemptMaxTokens`
+  work bounded for review calls, and the stage had no per-call deadline. It now
+  has one (`verifyCallTimeout`, 90 seconds, one resend), with tests that fail
+  without it. The review was run once more under the new binary and its result
+  used; the stalled one is kept beside the runs as
+  `gover-p3-sentry-9-r1.stalled`. The other 89 live reviews finished.
+
+### What this means for the goal
+
+Nothing built here, alone or stacked, beats Mira on this benchmark with this
+model. The ceiling is visible in the table: precision between 41% and 50% for
+every open-nitpick arm, against 73.5%, and a recall edge that disappears once
+findings are filtered. The remaining levers in this plan do not reach it.
+
+- R3 (cap by confidence) was measured offline at 56% precision for 3 comments a
+  pull request, below 60%, and the cap loses recall the table shows is already
+  gone.
+- R4 aims at recall, and recall was never what Mira led on.
+- Mira's own agentic loop, noise filter and self-critique are a different shape
+  of tool, and matching its precision means matching what produces it: fewer,
+  more carefully chosen comments, not more careful filtering of many.
+
+Whether to keep chasing this benchmark is a product call, not a measurement.
+The benchmark scores agreement with a short list of human-labelled defects, and
+reading 14 of the 111 confirmed false positives found most were real defects
+the list lacks. A tool that reports more real problems is penalised for it.
 
 ## Order, cost and time
 

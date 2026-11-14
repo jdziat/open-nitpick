@@ -52,6 +52,11 @@ from a triage model is not reachable there. `fallback_model`, `ensemble_runs` an
 that reads them from the environment and leaves the default path untouched. The
 change is kept as `tools/bakeoff/mira-replay-bakeoff.patch`.
 
+The held-out scoring needed a second change, to `scripts/score_snapshot_runs.py`: it
+re-asks the judge when a grouping answer repeats or omits an index, and is kept as
+`tools/bakeoff/mira-scorer-dedup-repair.patch` (see the held-out result in
+[the remediation plan](remediation-mira.md)).
+
 Arms B and C give each review 900 seconds in both tools. Mira's own default is 420,
 which its sentry-5 review in arm A came within 11 seconds of, and a thorough
 setting with three ensemble runs would not fit.

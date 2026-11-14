@@ -1,0 +1,50 @@
+diff --git a/scripts/score_snapshot_runs.py b/scripts/score_snapshot_runs.py
+index 677f9bb..4cb03c5 100644
+--- a/scripts/score_snapshot_runs.py
++++ b/scripts/score_snapshot_runs.py
+@@ -141,11 +141,41 @@ async def run(args):
+                     prompt = DEDUP_PROMPT.format(
+                         candidates="\n".join(f"{i}. {c}" for i, c in enumerate(candidates))
+                     )
+-                    response = await call(
+-                        prompt,
+-                        "You group duplicate code review comments. Always respond with valid JSON only.",
+-                    )
++                    dedup_system = "You group duplicate code review comments. Always respond with valid JSON only."
++                    response = await call(prompt, dedup_system)
+                     groups = _parse_groups_response(json.dumps(response), len(candidates))
++                    # A judge that repeats an index or drops one has made a format
++                    # error, not a judgement. At temperature 0 asking the same
++                    # question returns the same answer, so each retry quotes the
++                    # rejected answer and names the index it broke. The accepted
++                    # answer is cached under the original prompt, and every arm
++                    # gets the same repair.
++                    for attempt in range(1, 4):
++                        if groups is not None:
++                            break
++                        # Numbered lists inside a comment body read as extra
++                        # candidates, so the repair labels each one unambiguously.
++                        block = "\n".join(f"{i}. {c}" for i, c in enumerate(candidates))
++                        labelled = "\n".join(
++                            f"=== CANDIDATE {i} (of {len(candidates)}) ===\n{c}"
++                            for i, c in enumerate(candidates)
++                        )
++                        repair = (
++                            prompt.replace(block, labelled)
++                            + f"\n\nAttempt {attempt}. Your previous answer was rejected:\n"
++                            + json.dumps(response)[:600]
++                            + f"\nThere are exactly {len(candidates)} candidates, marked CANDIDATE 0 to "
++                            + f"CANDIDATE {len(candidates) - 1}. Text inside a candidate that looks like a "
++                            + "numbered list is part of that candidate. Every index must appear in "
++                            + "exactly one group, with none repeated and none missing. "
++                            + "Reply with the JSON object only, no commentary."
++                        )
++                        response = await call(repair, dedup_system)
++                        groups = _parse_groups_response(json.dumps(response), len(candidates))
++                        if groups is not None:
++                            calls.append({"prompt": prompt, "system": dedup_system, "model": args.judge_model,
++                                          "raw_response": json.dumps(response)})
++                            cache_path.write_text(json.dumps(calls, indent=2))
+                     if groups is None:
+                         raise ValueError("Invalid deduplication response")
+                 verdict = await evaluate_review(
