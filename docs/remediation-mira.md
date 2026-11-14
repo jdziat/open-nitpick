@@ -342,9 +342,25 @@ model. The ceiling is visible in the table: precision between 41% and 50% for
 every open-nitpick arm, against 73.5%, and a recall edge that disappears once
 findings are filtered. The remaining levers in this plan do not reach it.
 
-- R3 (cap by confidence) was measured offline at 56% precision for 3 comments a
-  pull request, below 60%, and the cap loses recall the table shows is already
-  gone.
+- R3 (cap by confidence) is killed. Run after the gate on the stored held-out
+  passes, ranking each pull request's comments by the reviewer's confidence and
+  keeping the top N, it never gets F1 past 0.517 for any N, against Mira's 0.596.
+  This is a post-hoc diagnostic: N was read off the data, so it flatters the cap,
+  and it still loses. The unfiltered counts (185 TP, 263 FP, 130 FN) reproduce the
+  table above, which is the check that the simulation matches the scorer.
+
+  | keep per pull request | unverified: precision / recall / F1 | offline-verified: precision / recall / F1 |
+  |---|---|---|
+  | all | 41.3% / 58.7% / 0.485 | 50.0% / 52.4% / 0.512 |
+  | 6 | 49.0% / 52.4% / 0.506 | 54.2% / 49.5% / 0.517 |
+  | 4 | 51.1% / 43.2% / 0.468 | 57.8% / 43.5% / 0.496 |
+  | 3 | 54.0% / 36.8% / 0.438 | 59.4% / 38.1% / 0.464 |
+  | 2 | 62.3% / 31.4% / 0.418 | 66.4% / 32.1% / 0.433 |
+
+  Precision reaches 60% only at 2 a pull request, where recall has fallen to 32%.
+  The reviewer's confidence does not rank well enough for a cap to remove noise
+  faster than it removes defects. Mira posts 2.4 comments a pull request at 73.5%
+  precision and 50% recall, so its selection happens before the comments exist.
 - R4 aims at recall, and recall was never what Mira led on.
 - Mira's own agentic loop, noise filter and self-critique are a different shape
   of tool, and matching its precision means matching what produces it: fewer,
