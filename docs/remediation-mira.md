@@ -820,6 +820,53 @@ default 50.6% precision, 57.4% recall, F1 0.538; tools off 36.2%, 58.1%, 0.446.
   tools themselves (their ranking and windows), and no ablation of this kind will
   find it.
 
+#### Locating Mira's gain: result
+
+Each part removed with the tools left on, 20 tuning pull requests, two passes, drafted stage.
+The five switches were checked by rendering Mira's real prompt under each: the system
+prompt is 15,262 characters by default, 11,868 without the footgun list (and no footgun
+line), 12,704 without the three heuristic sections (exclusions and severity guide still
+present) and 12,601 without the two exclusion sections. Every ablated run had 20 of 20
+reviews, no failed chunk, and 14 to 16 tool calls a review, so the tools were in use in all.
+
+| drafts, 2 passes pooled | comments | precision | recall | F1 | per pass F1 |
+|---|---:|---:|---:|---:|---|
+| default, tools on | 154 | 50.6% | 57.4% | 0.538 | 0.552, 0.524 |
+| tools off | 218 | 36.2% | 58.1% | 0.446 | 0.427, 0.466 |
+| no cross-file context | 169 | 49.7% | 61.8% | 0.551 | 0.539, 0.562 |
+| no footgun list | 160 | 48.1% | 56.6% | 0.520 | 0.486, 0.553 |
+| no tool-use hint | 166 | 50.0% | 61.0% | 0.550 | 0.555, 0.544 |
+| no heuristics sections | 172 | 49.4% | 62.5% | 0.552 | 0.548, 0.556 |
+| no exclusions sections | 181 | 45.3% | 60.3% | 0.517 | 0.557, 0.478 |
+
+By the rule registered before it ran, **no part carries the gain**: none takes drafted
+precision down by 7 points (the changes are -0.9, -2.5, -0.6, -1.2 and -5.3, against -14.4
+for tools off). Removing the cross-file context, the tool-use hint or the heuristic
+sections moves drafted precision by about a point and raises recall by 4 to 5 points, so
+those parts do not help Mira's drafts at all. That agrees with R7 and R8, which gave our
+reviewer the same heuristics with and without tools and moved nothing. The exclusions list
+is the largest effect (-5.3 points, and the two passes scored F1 0.557 and 0.478) and is
+inside the variance.
+
+What the ablation does show is in the posted column: with any one part removed, Mira's
+posted precision falls from 73.0% to 64 to 68% and posted F1 from 0.514 to between 0.437
+and 0.518, although its drafts are no worse. The filters that follow, the confidence floor
+and the critique, work best on the drafts the full prompt produces. Posted counts of 70 to
+88 comments over two passes cannot separate that from a lucky default draw, so it is noted
+and not relied on.
+
+So the gain sits in the tools themselves, and what is left to explain is why our
+loop (R8b: 34.7% precision, 44.1% recall) does not have it. The parts of Mira's loop that
+no switch has touched are the tool semantics (`grep_repo` ranks the files nearest the
+changed ones first and returns paths on request, `read_file` returns 12,000-byte
+windows), the structured submission (each comment must carry a verbatim quote and an
+agent prompt, and the submission a summary and key issues), the explicit
+`reasoning_effort: medium`, and the transcript replay of every message key a provider
+returns. A first attempt at this ablation ran with a broken switch, an undefined name
+that failed every review chunk with a `NameError`, and its ten runs were discarded
+unscored; the switches were then checked with a linter and a real review before the
+ten runs above.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
