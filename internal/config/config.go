@@ -530,6 +530,15 @@ type Review struct {
 	// docs/remediation-mira.md, stage R2b, has the measurement.
 	Verify VerifyMode `yaml:"verify"`
 
+	// Investigate lets the reviewer read files and search the repository
+	// while it decides what to file, finishing with submit_findings, instead
+	// of reviewing from the diff and the bundled context alone. It needs a
+	// git checkout to search; without one the review runs as it did, and
+	// says so in the log. A call that fails falls back to the ordinary review
+	// of the same batch. Off by default: it costs several model calls a
+	// batch, and docs/remediation-mira.md, stage R5, has the measurement.
+	Investigate bool `yaml:"investigate"`
+
 	// MinSeverity drops findings below this severity before publishing.
 	MinSeverity Severity `yaml:"min_severity"`
 
