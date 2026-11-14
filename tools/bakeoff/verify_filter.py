@@ -19,7 +19,6 @@ import argparse
 import concurrent.futures
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -98,7 +97,7 @@ def grep_repo(repo: Path, pattern, glob=None):
         cmd += ["--", glob]
     run = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, timeout=60)
     out = run.stdout.splitlines()[:30]
-    return "\n".join(l[:240] for l in out) or "(no matches)"
+    return "\n".join(line[:240] for line in out) or "(no matches)"
 
 
 def verify(case, c, sections, repo, key):
