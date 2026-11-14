@@ -1312,11 +1312,6 @@ IncludeFullFiles sends whole changed files alongside the diff when the token bud
 boolean, default `true`.
 Incremental reuses successful model requests from the previous PR review when their prompts, context, model and policy still match.
 
-### `review.investigate`
-
-boolean, default `false`.
-Investigate lets the reviewer read files and search the repository while it decides what to file, over several turns, and finish by submitting its findings.
-
 ### `review.knowledge`
 
 boolean, default `false`.
