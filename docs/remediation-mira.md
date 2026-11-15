@@ -1078,6 +1078,29 @@ Three passes on the 20 tuning pull requests, paired against R10.
 - **Read:** if recall rises and the precision cost is smaller than the recall gain, triage was
   removing real findings. If precision holds, its drops were duplicates or low-value findings.
 
+#### R11 result: killed; triage removes mostly wrong comments
+
+Three passes on the 20 tuning pull requests, paired against R10 (triage on).
+
+| arm | precision | recall | F1 | comments |
+|---|---:|---:|---:|---:|
+| R10, triage on | 48.6% | 43.6% | 0.460 | 183 |
+| R11, triage off | 44.1% | 47.5% | 0.458 | 220 |
+| Mira, default (2 passes) | 73.0% | 39.7% | 0.514 | 74 |
+
+R11 minus R10: precision -4.5 points (-11.1 to +1.9), recall +3.9 (-1.1 to +9.4), F1 -0.002
+(-0.044 to +0.044). R11 misses its recall gate by about one point and misses its F1 gate, so
+it is killed.
+
+Triage's own drops, from the difference: R11 has 37 more comments, of which 8 matched a golden
+comment and 29 did not. Triage removes wrong comments at 78%, so it is a good filter and not
+the cause of the gap.
+
+The gap is in draft recall. Per pass on the same 20 pull requests, Mira's drafts (before its
+noise filter and critique) match 39 golden comments and file 38 unmatched. Our output with
+triage off matches 32 and files 41. Mira finds about 7 more real findings per pass with
+three fewer wrong comments.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
