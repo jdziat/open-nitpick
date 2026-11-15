@@ -1165,6 +1165,27 @@ smoke run of R12 on three pull requests checks the settings first and is not sco
 - **Reported with it:** those fallbacks for each pass, median review time, comments per
   review, and model spend for each pass.
 
+#### R12 and R13 result: neither ranked; a single call still loses its reasoning
+
+Three passes each on the 20 tuning pull requests, the R1 binary, scored with the counts
+`tools/bakeoff/compare.py` uses. The last column is from `tools/bakeoff/fallbacks.py`.
+
+| arm | precision | recall | F1 | comments | review calls sent again without reasoning, each pass |
+|---|---:|---:|---:|---:|---|
+| R1, 6-file batches, 16,384-token cap | 33.2% | 51.5% | 0.404 | 316 | 39, 38, 36 of 48 |
+| R13, 6-file batches, 131,072-token cap | 32.0% | 41.7% | 0.362 | 266 | 24, 24, 19 of 48 |
+| R9, whole PR, 16,384-token cap | 27.8% | 43.1% | 0.338 | 316 | 19, 19, 20 of 23 |
+| R12, whole PR, 131,072-token cap | 37.4% | 37.7% | 0.376 | 206 | 14, 11, 13 of 23 |
+| Mira, default (2 passes) | 73.0% | 39.7% | 0.514 | 74 | 1, 0 of 20 reviews |
+
+With a cap eight times larger, DeepSeek V4.1 Flash still thought past it on 40% to 61% of
+single calls, so both arms fail their validity condition and neither is ranked. The batching
+reading cannot be taken either: R12 minus R13 is F1 +0.014 (-0.062 to +0.081). R13 minus R1
+lost recall (-9.8 points, -16.2 to -3.5), so more room to think did not help a single call.
+What the pair shows is that no cap tried keeps this model's reasoning in one call, and the
+loop does: the deep-review smoke had no fallbacks. The batching question moves to deep
+review, where every call reasons.
+
 ## Deep review (registered 2026-11-14)
 
 `nitpick review` stays as it is. `nitpick deep-review` is a second mode that reviews the
