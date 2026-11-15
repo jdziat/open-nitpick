@@ -1674,8 +1674,7 @@ measured on it.
 4. Each golden comment is given one of Martian's ten categories by `anthropic/claude-sonnet-5.5`
    from the comment, the diff hunk and the path. A pull request needs at least one comment in
    a core category (bug, security, concurrency, data, api, perf, test_gap, doc_defect) to be
-   eligible. Scoring is upstream's core profile, so a match to a style or speculative comment is
-   neither rewarded nor penalised.
+   eligible.
 5. Eligible pull requests are ordered by the SHA-256 of `owner/repo#number`, and the first six
    per language are taken, at most two per repository. Nothing about a pull request's content,
    or any tool's result on it, enters the order.
@@ -1691,6 +1690,12 @@ Sol, Terra and Luna with the upstream matching prompts, posted and drafted sets 
 - ~~D5f, the current build `d865d18` with `review.deep.confidence_floor: 0.6`.~~ Dropped on
   2026-11-15, before any F7 arm ran: D5f scored 0.412 against D1c's 0.416 on the tuning set, so
   it is D1c with a different floor and adds no arm.
+
+**Counts.** The primary figures are `compare.py`'s raw counts over every golden category, as in
+every earlier stage. The upstream core profile, in which a match to a style or speculative
+comment is neither rewarded nor penalised, is reported beside them, because this corpus has far
+more of those than the Martian set (amended 2026-11-15, before any arm ran: the registration had
+named the core profile as the measure).
 
 **Reading,** each difference paired by pull request with a bootstrap interval, under Sol first
 and the other two beside it. A grade holds when its sign repeats and the point estimate is within
