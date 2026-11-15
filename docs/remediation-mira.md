@@ -1386,6 +1386,22 @@ against D1 (what the fixes change), D3m (what the prompts change) and Mira.
   failed agent, is reported and the arm is not ranked. A review that comes back incomplete is
   re-run once and both runs are reported.
 
+### D1t: twenty investigation turns (registered 2026-11-14, before it runs)
+
+Most agents stop at the turn cap: 70% of D3m's agent runs (97 of 138) ended in a forced submission, and
+60% of Mira's loops hit its 10-hop cap. Neither tool's misses on the tuning set are cheap
+lookups. Of the 28 golden comments neither tool's drafts matched, the ones that name code
+elsewhere (the delegate that `getForLogin` should call, the key a validator reads, a
+queryset that cannot take a negative slice) take more reading than ten turns of a
+flash-class model gives them. D1t is D1c with `review.deep.max_turns: 20`
+(`/tmp/bakeoff/cfg/d1t-turns20.yaml`) and nothing else changed. Three passes on the 20
+tuning pull requests, scored by Sol, Terra and Luna, paired against D1c.
+
+- **Adopt 20 as the default:** posted F1 under Sol above D1c's by 0.03 or more.
+- **Otherwise 10 stays,** and the cost of the extra turns is reported against what they bought.
+- **Reported with it:** turns, lookups and tokens per review, model spend, forced
+  submissions, and drafted recall against D1c's.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
