@@ -1422,6 +1422,40 @@ often, so the forced-submission steps are counted.
 - **Several knobs:** D1t and D1h each change one setting. If both are adopted, the
   combination is run on the tuning set before the held-out gate, not assumed.
 
+#### D1c and D1h results: the prompt carries D3m's gain, and neither the fixes nor effort do
+
+Three passes each on the 20 tuning pull requests, 60 reviews each, scored by all three judges.
+Two D1c reviews came back incomplete and were re-run once, as registered: discourse-4 in pass 1
+(the critique used 4,167 reasoning tokens and made no call, so it returned no grades) and
+calcom-5 in pass 3 (an agent's `submit_findings` did not parse). Both are failure modes the
+build since fixed. The key's weekly limit then stopped the work for a day, and the runs
+resumed from the stored reviews without re-running any that had completed.
+
+| judge | D1c precision, recall, F1 | D1h precision, recall, F1 | D1c minus D1 | D1h minus D1c | D3m minus D1c |
+|---|---|---|---|---|---|
+| Sol | 55.3%, 33.3%, 0.416 | 57.9%, 32.4%, 0.415 | +0.001 (-0.044, +0.043) | -0.001 (-0.065, +0.070) | +0.070 (+0.001, +0.146) |
+| Terra | 53.2%, 32.4%, 0.402 | 58.0%, 31.9%, 0.411 | -0.012 | +0.009 | +0.074 (+0.003, +0.153) |
+| Luna | 53.6%, 32.8%, 0.407 | 56.5%, 31.9%, 0.408 | -0.023 | +0.000 | +0.090 (+0.019, +0.165) |
+
+The registered readings:
+
+- **The prompt.** D3m minus D1c excludes zero under every judge, and the whole of it is recall:
+  +9.3 points under Sol (+3.0 to +16.7), with precision unchanged (+1.2, -9.8 to +12.7). Drafts
+  say the same: D3m's are 57.8% recalled against D1c's 49.0%, at 36.0% and 39.5% precision.
+  So Mira's prompts, and not the forced-submission cap, carried the gain. D3o writes our own
+  text to that structure.
+- **The fixes** (the forced-submission cap and ladder, the critique retries, the report of a
+  failed agent) change F1 by +0.001 under Sol. They are robustness work, and the record does not
+  claim a quality gain for them.
+- **High effort is killed.** D1h minus D1c is -0.001 under Sol against a registered +0.03, and
+  it cost 30% more ($0.062 to $0.064 a review against $0.047 to $0.053) and took 254 to 313
+  seconds against 200 to 235. Medium stays.
+- **D1c is not the build that ships.** Its F1 under Sol is 0.416 against Mira's 0.481 (-0.065,
+  -0.143 to +0.003).
+
+Validity: no failed agent in either arm, and 1 forced submission in each D1c pass (2.9% to
+3.1%) and 0 to 1 in D1h was sent again without reasoning, under the 5% limit.
+
 ### L1: the repository build on GPT-6 Luna (registered 2026-11-14, before it runs)
 
 Every arm so far is DeepSeek V4.1 Flash, the model Mira was frozen on. GPT-6 Luna costs about
