@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -93,25 +94,94 @@ func (e *Engine) deepAgents(system string) ([]deepAgent, error) {
 	return agents, nil
 }
 
-// deepReviewBatch reviews one batch with every configured agent in parallel
-// and reports whether any of them produced a result. One agent failing does
-// not cost the batch the others' findings. A batch no agent could review, for
-// want of a checkout to search or because every agent failed, is left to the
-// ordinary single call, and the log says which.
-func (e *Engine) deepReviewBatch(ctx context.Context, client *llm.Client, msgs []llms.Message, classes []string) (Result, bool) {
+// deepOutcome says how a batch's deep review went, beyond its findings.
+type deepOutcome struct {
+	// reviewed is true when at least one agent produced a result. When it is
+	// false the batch has no result yet and the ordinary single call runs.
+	reviewed bool
+
+	// degraded is true when the batch's result is not the whole deep review:
+	// an agent failed, or no agent ran. A degraded result is reported and is
+	// not saved for a resumed run, which would otherwise serve it back without
+	// the agent that failed.
+	degraded bool
+}
+
+// deepNotes collects what went wrong in one deep review, so the report names it.
+// Silence from a security agent that never answered is not silence from one
+// that found nothing, and the two must not read alike.
+type deepNotes struct {
+	mu       sync.Mutex
+	failures map[string]string
+	fellBack map[string]bool
+}
+
+func newDeepNotes() *deepNotes {
+	return &deepNotes{failures: map[string]string{}, fellBack: map[string]bool{}}
+}
+
+// agentFailed records that an agent did not finish a batch. The first reason
+// seen for an agent is the one reported.
+func (n *deepNotes) agentFailed(agent string, err error) {
+	if n == nil {
+		return
+	}
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if _, ok := n.failures[agent]; !ok {
+		n.failures[agent] = errorKind(err)
+	}
+}
+
+// ranWithoutTools records that a batch was reviewed in one call without tools.
+func (n *deepNotes) ranWithoutTools(why string) {
+	if n == nil {
+		return
+	}
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.fellBack[why] = true
+}
+
+// stages turns the notes into stage statuses, in a fixed order so a report does
+// not change between runs of the same review.
+func (n *deepNotes) stages() []StageStatus {
+	if n == nil {
+		return nil
+	}
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	var out []StageStatus
+	for _, agent := range slices.Sorted(maps.Keys(n.failures)) {
+		out = append(out, StageStatus{Stage: "deep-review " + agent + " agent", Reason: n.failures[agent]})
+	}
+	for _, why := range slices.Sorted(maps.Keys(n.fellBack)) {
+		out = append(out, StageStatus{Stage: "deep-review", Reason: why})
+	}
+	return out
+}
+
+// deepReviewBatch reviews one batch with every configured agent in parallel.
+// One agent failing does not cost the batch the others' findings. A batch no
+// agent could review, for want of a checkout to search or because every agent
+// failed, is left to the ordinary single call. Either way the report says so.
+func (e *Engine) deepReviewBatch(ctx context.Context, client *llm.Client, msgs []llms.Message, classes []string) (Result, deepOutcome) {
 	if !newRepoTools(e.RepoRoot, e.Provider, vcs.Ref{}).canSearch() {
 		e.log().Warn("deep-review needs a git checkout to search; reviewing from the diff alone")
-		return Result{}, false
+		e.deepNotes.ranWithoutTools("no git checkout to search")
+		return Result{}, deepOutcome{degraded: true}
 	}
 	at := slices.IndexFunc(msgs, func(m llms.Message) bool { return m.Role == llms.RoleSystem })
 	if at < 0 {
 		e.log().Warn("deep-review found no system prompt to extend; reviewing from the diff alone")
-		return Result{}, false
+		e.deepNotes.ranWithoutTools("no system prompt")
+		return Result{}, deepOutcome{degraded: true}
 	}
 	agents, err := e.deepAgents(msgs[at].Content)
 	if err != nil {
 		e.log().Warn("deep-review agents could not be built; reviewing from the diff alone", "error", err)
-		return Result{}, false
+		e.deepNotes.ranWithoutTools("agents could not be built")
+		return Result{}, deepOutcome{degraded: true}
 	}
 
 	results := make([]Result, len(agents))
@@ -134,6 +204,7 @@ func (e *Engine) deepReviewBatch(ctx context.Context, client *llm.Client, msgs [
 	for i, agent := range agents {
 		if errs[i] != nil {
 			e.log().Warn("a deep-review agent failed; keeping the other agents' findings", "agent", agent.name, "error", errs[i])
+			e.deepNotes.agentFailed(agent.name, errs[i])
 			continue
 		}
 		finished++
@@ -141,9 +212,10 @@ func (e *Engine) deepReviewBatch(ctx context.Context, client *llm.Client, msgs [
 	}
 	if finished == 0 {
 		e.log().Warn("every deep-review agent failed; reviewing the batch from the diff alone", "agents", len(agents))
-		return Result{}, false
+		e.deepNotes.ranWithoutTools("every agent failed")
+		return Result{}, deepOutcome{degraded: true}
 	}
-	return merged, true
+	return merged, deepOutcome{reviewed: true, degraded: finished < len(agents)}
 }
 
 // agentRun is what one agent's loop reports beside its findings.

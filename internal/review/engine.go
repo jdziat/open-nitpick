@@ -50,6 +50,10 @@ type Engine struct {
 	// critique. Set by nitpick deep-review; see deep.go and deepselect.go.
 	Deep bool
 
+	// deepNotes collects what failed during the current deep review, for the
+	// report. It is replaced at the start of every analysis.
+	deepNotes *deepNotes
+
 	// RequestTimeout bounds one model request independently of the caller's
 	// overall context. Zero leaves the configured client timeout in control.
 	RequestTimeout time.Duration
@@ -990,6 +994,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		}
 		return nil, err
 	}
+	report.Stages = append(report.Stages, e.deepNotes.stages()...)
 
 	if styleErr != nil {
 		e.log().Warn("style pass failed; the review is complete for defects "+
@@ -1729,6 +1734,7 @@ func withholdAlreadyReported(findings []Finding, prior *vcs.PriorReview) (publis
 // Partial results are published with failed batches recorded as incomplete.
 func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.Plan, sem chan struct{}) ([]Finding, []string, []Escalation, error) {
 	e.assessedDesignTasks = nil
+	e.deepNotes = newDeepNotes()
 	// Built once for the default reviewer so a prompt error surfaces before
 	// any batch runs; routed reviewers build theirs on first use.
 	if _, err := e.reviewPromptFor(e.Roles.Review); err != nil {
@@ -2011,11 +2017,11 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 			callCtx, cancel = context.WithTimeout(ctx, e.RequestTimeout)
 			defer cancel()
 		}
-		reviewed := false
+		var deep deepOutcome
 		if e.Deep && !style {
-			result, reviewed = e.deepReviewBatch(callCtx, client, msgs, offeredClasses(e.Config.Review.Slop))
+			result, deep = e.deepReviewBatch(callCtx, client, msgs, offeredClasses(e.Config.Review.Slop))
 		}
-		if !reviewed {
+		if !deep.reviewed {
 			result, err = llm.Extract[Result](callCtx, client, msgs, schema)
 			if err != nil {
 				return nil, err
@@ -2038,7 +2044,9 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 				return nil, fmt.Errorf("verify fast-review candidates: %w", err)
 			}
 		}
-		e.progress.save(key, result.Findings)
+		if !deep.degraded {
+			e.progress.save(key, result.Findings)
+		}
 	}
 
 	var taskContext *TaskContext

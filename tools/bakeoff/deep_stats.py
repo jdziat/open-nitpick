@@ -28,7 +28,7 @@ def fields(line):
 
 
 def summarize(run):
-    agents = failed = forced = reasoning_off = turns = lookups = 0
+    agents = failed = forced = reasoning_low = reasoning_off = turns = lookups = 0
     prompt = completion = 0
     times = []
     reviews = pending = 0
@@ -46,6 +46,7 @@ def summarize(run):
                 turns += int(f.get("turns", 0))
                 lookups += int(f.get("lookups", 0))
                 forced += f.get("forced") == "true"
+                reasoning_low += int(f.get("reasoning_low", 0))
                 reasoning_off += int(f.get("reasoning_off", 0))
                 prompt += int(f.get("prompt_tokens", 0))
                 completion += int(f.get("completion_tokens", 0))
@@ -61,7 +62,9 @@ def summarize(run):
     spend = prompt / 1e6 * PRICE_IN + completion / 1e6 * PRICE_OUT
     return (
         f"{run}: {reviews} reviews, {started} agent runs, {failed} failed ({failed / max(started, 1):.1%}), "
-        f"{forced} forced, {reasoning_off} sent again without reasoning ({reasoning_off / max(started, 1):.1%}); "
+        f"{forced} forced, {reasoning_low} stepped down to low effort, "
+        f"{reasoning_off} sent again without reasoning ({reasoning_off / max(started, 1):.1%} of agent runs, "
+        f"{reasoning_off / max(forced, 1):.1%} of forced submissions); "
         f"per review {turns / reviews:.1f} turns, {lookups / reviews:.1f} lookups, "
         f"{prompt / reviews / 1000:.0f}k prompt and {completion / reviews / 1000:.0f}k completion tokens, "
         f"${spend / reviews:.4f}; median {statistics.median(times):.0f}s"

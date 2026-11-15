@@ -3,6 +3,7 @@ package review
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -218,8 +219,10 @@ func TestDeepReviewKeepsTheFindingsOfBothTheGeneralAndTheSecurityAgent(t *testin
 }
 
 // One agent failing outright costs the review that agent, not the other's
-// findings and not a fall back to the ordinary call.
-func TestADeepAgentThatFailsLeavesTheOtherAgentsFindingsInTheReview(t *testing.T) {
+// findings and not a fall back to the ordinary call. The report names the agent
+// that failed, so a missing security agent is not read as a clean security
+// review.
+func TestADeepAgentThatFailsLeavesTheOtherAgentsFindingsAndIsNamedInTheReport(t *testing.T) {
 	fs := confident(twoFindings(), 0.9)
 	reviewer := &deepLLM{
 		general:     []llms.Response{submit(t, fs[:1])},
@@ -238,11 +241,21 @@ func TestADeepAgentThatFailsLeavesTheOtherAgentsFindingsInTheReview(t *testing.T
 	if reviewer.reviewed != 0 {
 		t.Errorf("ordinary reviews = %d, want none while one agent finished", reviewer.reviewed)
 	}
+	if got := report.FailedStages(); len(got) != 1 || got[0] != "deep-review security agent" {
+		t.Errorf("failed stages = %v, want the security agent named", got)
+	}
+	if report.PipelineComplete() {
+		t.Error("the review reads as complete with its security agent missing")
+	}
+	if notice := stageNotice(report); !strings.Contains(notice, "deep-review security agent failed") {
+		t.Errorf("notice = %q, want it to say the security agent failed", notice)
+	}
 }
 
 // With every agent failed there is nothing of the deep review to keep, so the
-// batch is reviewed by the ordinary call, whose findings still pass the filter.
-func TestWhenEveryDeepAgentFailsTheBatchIsReviewedTheOrdinaryWay(t *testing.T) {
+// batch is reviewed by the ordinary call, whose findings still pass the filter,
+// and the report says the batch was not reviewed by the agents.
+func TestWhenEveryDeepAgentFailsTheBatchIsReviewedTheOrdinaryWayAndTheReportSaysSo(t *testing.T) {
 	fs := confident(twoFindings(), 0.9)
 	reviewer := &deepLLM{
 		generalErr:  errors.New("upstream 503"),
@@ -258,19 +271,72 @@ func TestWhenEveryDeepAgentFailsTheBatchIsReviewedTheOrdinaryWay(t *testing.T) {
 	if reviewer.reviewed != 1 || len(report.Findings) != 2 {
 		t.Errorf("ordinary reviews %d with %d findings, want one ordinary review of both", reviewer.reviewed, len(report.Findings))
 	}
+	want := []string{"deep-review general agent", "deep-review security agent", "deep-review"}
+	if got := report.FailedStages(); !slices.Equal(got, want) {
+		t.Errorf("failed stages = %v, want %v", got, want)
+	}
+	if notice := stageNotice(report); !strings.Contains(notice, "without tools (every agent failed)") {
+		t.Errorf("notice = %q, want it to say the batch ran without tools", notice)
+	}
+}
+
+// A degraded batch is not saved for a resumed run. Saved, it would be served
+// back without the agent that failed, and the resumed review would read as
+// whole.
+func TestADegradedDeepBatchIsNotServedFromTheCacheOnAResumedRun(t *testing.T) {
+	fs := confident(twoFindings(), 0.9)
+	reviewer := &deepLLM{
+		general:     []llms.Response{submit(t, fs[:1])},
+		securityErr: errors.New("upstream 503"),
+		grades:      gradeAll(t, "proven"),
+	}
+	provider := &incrementalProvider{stubProvider: stubProvider{diff: engineDiff}, head: "abcdef"}
+	e := resumeEngine(t, &scriptedLLM{fallback: `{"findings":[]}`}, provider)
+	e.Roles.Review = llm.NewClientForTest(reviewer, e.Config.Models.Default)
+	e.Deep = true
+	e.RepoRoot = appRepo(t)
+
+	first, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.FailedStages()) == 0 {
+		t.Fatal("the first run did not report its failed agent")
+	}
+	reviewer.securityErr = nil
+	reviewer.security = []llms.Response{submit(t, fs[1:])}
+	provider.prior = &vcs.PriorReview{Progress: provider.published.Progress}
+	second, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.ReusedRequests != 0 || reviewer.turns[config.DeepAgentSecurity] < 2 {
+		t.Errorf("reused %d requests and asked the security agent %d times, want the degraded batch run again",
+			second.ReusedRequests, reviewer.turns[config.DeepAgentSecurity])
+	}
+	if len(second.FailedStages()) != 0 {
+		t.Errorf("failed stages = %v, want none once the agent answered", second.FailedStages())
+	}
 }
 
 // With no checkout there is nothing to search, so the batch is reviewed by the
-// ordinary call.
-func TestDeepReviewWithoutACheckoutReviewsTheOrdinaryWay(t *testing.T) {
+// ordinary call, and the report says a deep review was asked for and not done.
+func TestDeepReviewWithoutACheckoutReviewsTheOrdinaryWayAndTheReportSaysSo(t *testing.T) {
 	fs := confident(twoFindings(), 0.9)
 	reviewer := &deepLLM{grades: gradeAll(t, "proven", "proven"), ordinary: mustJSON(t, Result{Findings: fs})}
 	e, _ := deepEngine(t, reviewer, "")
-	if _, err := e.Review(context.Background(), vcs.Ref{}); err != nil {
+	report, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
 		t.Fatal(err)
 	}
 	if reviewer.reviewed != 1 || len(reviewer.turns) != 0 {
 		t.Errorf("ordinary reviews %d, agent turns %v; want the ordinary review alone", reviewer.reviewed, reviewer.turns)
+	}
+	if got := report.FailedStages(); len(got) != 1 || got[0] != "deep-review" {
+		t.Errorf("failed stages = %v, want the deep review named", got)
+	}
+	if notice := stageNotice(report); !strings.Contains(notice, "no git checkout to search") {
+		t.Errorf("notice = %q, want the missing checkout named", notice)
 	}
 }
 
