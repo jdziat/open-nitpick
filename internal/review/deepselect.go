@@ -249,12 +249,24 @@ func (e *Engine) deepCritique(ctx context.Context, findings []Finding, plan *bun
 	}
 
 	resp, err := e.generateDeep(ctx, client, msgs, opts, deepCallTimeout)
-	if err == nil && resp.FinishReason == llms.FinishReasonLength {
-		// Cut at the cap, empty or mid-answer: grades cut off part way do not
-		// parse, so a truncated reply is as useless as an empty one.
-		e.log().Warn("the critique ran out of output budget; asking again without reasoning")
+	var grades []critiqueGrade
+	var ok bool
+	if err == nil {
+		grades, ok = parseGrades(resp)
+	}
+	if err == nil && (!ok || len(grades) == 0) {
+		// A critique that gave no usable grades is asked once more without
+		// reasoning. It can be cut at the output cap, empty or part way through
+		// its grades, or it can spend its whole output thinking and end without
+		// calling the tool it was told to call, as one did on discourse-4 with
+		// 4,167 reasoning tokens and no call. None of those graded anything.
+		e.log().Warn("the critique gave no usable grades; asking again without reasoning",
+			"finish", resp.FinishReason, "tool_calls", len(resp.ToolCalls), "reasoning_tokens", resp.Usage.ReasoningTokens)
 		opts = append(client.CallOptionsWith(&zero, config.ReasoningOff), tool, choice)
 		resp, err = e.generateDeep(ctx, client, msgs, opts, deepCallTimeout)
+		if err == nil {
+			grades, ok = parseGrades(resp)
+		}
 	}
 	if err != nil {
 		e.log().Warn("the critique failed; keeping every finding", "error", err)
@@ -263,7 +275,6 @@ func (e *Engine) deepCritique(ctx context.Context, findings []Finding, plan *bun
 	e.log().Info("deep-review critique answered", "findings", len(findings),
 		"prompt_tokens", resp.Usage.PromptTokens, "completion_tokens", resp.Usage.CompletionTokens,
 		"reasoning_tokens", resp.Usage.ReasoningTokens)
-	grades, ok := parseGrades(resp)
 	if !ok || len(grades) == 0 {
 		e.log().Warn("the critique returned no grades; keeping every finding", "findings", len(findings))
 		return findings, nil, &StageStatus{Stage: "critique", Reason: "no grades"}

@@ -316,3 +316,38 @@ func TestACritiqueCutAtTheOutputCapMidAnswerIsAskedAgainWithoutReasoning(t *test
 		t.Errorf("kept %v, withheld %d; want the retry's grades applied", got, len(withheld))
 	}
 }
+
+// A critique that spends its output thinking and ends without calling the tool
+// it was told to call has graded nothing, and the review is not called
+// incomplete for it: it is asked again without reasoning and its grades applied.
+func TestACritiqueThatMadeNoToolCallIsAskedAgainWithoutReasoning(t *testing.T) {
+	fs := []Finding{finding("real", "error", 0.9), finding("wrong", "error", 0.9)}
+	silent := llms.Response{FinishReason: llms.FinishReasonStop}
+	reviewer := &deepLLM{critiqueReplies: []llms.Response{silent, *gradeAll(t, "proven", "unsupported")}}
+	e := critiqueEngine(t, reviewer)
+	kept, withheld, failed := e.deepCritique(context.Background(), apart(fs), nil)
+	if failed != nil {
+		t.Fatalf("stage failed: %+v", failed)
+	}
+	if len(reviewer.critiqueOff) != 2 || reviewer.critiqueOff[0] || !reviewer.critiqueOff[1] {
+		t.Errorf("reasoning off per critique call = %v, want on then off", reviewer.critiqueOff)
+	}
+	if got := keptTitles(kept); len(got) != 1 || got[0] != "real" || len(withheld) != 1 {
+		t.Errorf("kept %v, withheld %d; want the retry's grades applied", got, len(withheld))
+	}
+}
+
+// Grades whose arguments are not JSON are no grades either.
+func TestACritiqueWhoseGradesDoNotParseIsAskedAgain(t *testing.T) {
+	fs := []Finding{finding("real", "error", 0.9)}
+	garbled := llms.Response{ToolCalls: []llms.ToolCall{{
+		ID: "g", Type: llms.ToolTypeFunction,
+		Function: &llms.FunctionCall{Name: submitGrades, Arguments: `{"grades": [{"number": 0, `},
+	}}}
+	reviewer := &deepLLM{critiqueReplies: []llms.Response{garbled, *gradeAll(t, "proven")}}
+	e := critiqueEngine(t, reviewer)
+	kept, _, failed := e.deepCritique(context.Background(), fs, nil)
+	if failed != nil || len(kept) != 1 || reviewer.critiqued != 2 {
+		t.Errorf("failed %+v, kept %d, critique calls %d; want a second call and its grade applied", failed, len(kept), reviewer.critiqued)
+	}
+}
