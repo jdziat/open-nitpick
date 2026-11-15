@@ -19,7 +19,6 @@ var templates embed.FS
 const (
 	NameReview          = "review"
 	NameFastReview      = "fast_review"
-	NameDeepReview      = "deep_review"
 	NameTriage          = "triage"
 	NameRoute           = "route"
 	NameApproveResidual = "approve_residual"

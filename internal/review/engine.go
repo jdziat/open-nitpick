@@ -2026,16 +2026,7 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 				callCtx, cancel = context.WithTimeout(ctx, e.RequestTimeout)
 				defer cancel()
 			}
-			callMsgs := msgs
-			if e.Deep && !style {
-				// Told it can read the repository through tools this call does not
-				// offer, a model may answer with a call nobody will run.
-				if ordinary, perr := e.reviewPromptNamed(client, prompt.NameReview); perr == nil {
-					callMsgs = slices.Clone(msgs)
-					callMsgs[0].Content = ordinary
-				}
-			}
-			result, err = llm.Extract[Result](callCtx, client, callMsgs, schema)
+			result, err = llm.Extract[Result](callCtx, client, msgs, schema)
 			if err != nil {
 				return nil, err
 			}
@@ -2716,18 +2707,6 @@ func (e *Engine) reviewPrompt() (string, error) {
 // is shared, the model-family layer is the client's own. A nil client is
 // the configured review model, for callers that only want the text.
 func (e *Engine) reviewPromptFor(client *llm.Client) (string, error) {
-	name := prompt.NameReview
-	if e.Deep {
-		// The deep agents can read the repository and are followed by a critique,
-		// so their base prompt asks for what the ordinary one tells a reviewer
-		// working from the diff alone to leave out. The layers above it are the same.
-		name = prompt.NameDeepReview
-	}
-	return e.reviewPromptNamed(client, name)
-}
-
-// reviewPromptNamed builds the review system prompt over the named base.
-func (e *Engine) reviewPromptNamed(client *llm.Client, name string) (string, error) {
 	if e.FastReview {
 		p, err := prompt.Build(prompt.NameFastReview, prompt.Options{Run: e.Instruction})
 		if err != nil {
@@ -2747,7 +2726,7 @@ func (e *Engine) reviewPromptNamed(client *llm.Client, name string) (string, err
 	if e.Config.Review.Slop {
 		slopText = prompt.SlopGuidance()
 	}
-	p, err := prompt.Build(name, prompt.Options{
+	p, err := prompt.Build(prompt.NameReview, prompt.Options{
 		PersonaText: prompt.Persona(e.Config.Persona),
 		ModelText:   modelText,
 		SlopText:    slopText,
