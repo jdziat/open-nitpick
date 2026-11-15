@@ -390,17 +390,34 @@ func BuildRolesContext(ctx context.Context, cfg *config.Config) (*Roles, error) 
 }
 
 // CallOptions renders the spec's generation parameters as SDK call options.
-func (c *Client) CallOptions() []llms.CallOption {
+func (c *Client) CallOptions() []llms.CallOption { return callOptions(c.Spec) }
+
+// CallOptionsWith is CallOptions with the temperature and the reasoning level
+// chosen by the caller, for a stage that samples differently from the model's
+// own configuration. A nil temperature or an empty level keeps the model's.
+func (c *Client) CallOptionsWith(temperature *float64, reasoning config.ReasoningLevel) []llms.CallOption {
+	spec := c.Spec
+	if temperature != nil {
+		spec.Temperature = temperature
+	}
+	if reasoning != "" {
+		spec.Reasoning = reasoning
+	}
+	return callOptions(spec)
+}
+
+// callOptions renders a spec's generation parameters as SDK call options.
+func callOptions(spec config.ModelSpec) []llms.CallOption {
 	var opts []llms.CallOption
 
-	if c.Spec.Temperature != nil {
-		opts = append(opts, llms.WithTemperature(*c.Spec.Temperature))
+	if spec.Temperature != nil {
+		opts = append(opts, llms.WithTemperature(*spec.Temperature))
 	}
-	if r, ok := reasoningOption(c.Spec.Reasoning); ok {
+	if r, ok := reasoningOption(spec.Reasoning); ok {
 		opts = append(opts, r)
 	}
-	if strings.EqualFold(c.Spec.Provider, "openrouter") {
-		if c.Spec.Reasoning == config.ReasoningOff {
+	if strings.EqualFold(spec.Provider, "openrouter") {
+		if spec.Reasoning == config.ReasoningOff {
 			// The SDK's neutral switch emits thinking.type, while OpenRouter
 			// routes its own reasoning.enabled field to upstream providers.
 			opts = append(opts, llms.WithExtraBodyParam("reasoning", map[string]any{"enabled": false}))
@@ -414,13 +431,13 @@ func (c *Client) CallOptions() []llms.CallOption {
 		routing := map[string]any{
 			"require_parameters": true,
 		}
-		if len(c.Spec.Providers) > 0 {
-			routing["only"] = append([]string(nil), c.Spec.Providers...)
+		if len(spec.Providers) > 0 {
+			routing["only"] = append([]string(nil), spec.Providers...)
 			routing["allow_fallbacks"] = false
 		}
 		opts = append(opts, llms.WithExtraBodyParam("provider", routing))
 	}
-	if len(c.Spec.Providers) > 0 && !strings.EqualFold(c.Spec.Provider, "openrouter") {
+	if len(spec.Providers) > 0 && !strings.EqualFold(spec.Provider, "openrouter") {
 		// OpenRouter's provider routing. "only" restricts the candidate set;
 		// "order" ranks whatever set the other filters leave, which is not the
 		// same thing and was the bug. With order plus allow_fallbacks false,
@@ -434,14 +451,14 @@ func (c *Client) CallOptions() []llms.CallOption {
 		// chosen, and this is what stops the router serving the request from
 		// outside that list when none of them is available.
 		opts = append(opts, llms.WithExtraBodyParam("provider", map[string]any{
-			"only":            append([]string(nil), c.Spec.Providers...),
+			"only":            append([]string(nil), spec.Providers...),
 			"allow_fallbacks": false,
 		}))
 	}
 	switch {
-	case c.Spec.MaxTokens > 0:
-		opts = append(opts, llms.WithMaxTokens(c.Spec.MaxTokens))
-	case strings.EqualFold(strings.TrimSpace(c.Spec.Provider), "openrouter") && c.Spec.Reasoning != config.ReasoningOff:
+	case spec.MaxTokens > 0:
+		opts = append(opts, llms.WithMaxTokens(spec.MaxTokens))
+	case strings.EqualFold(strings.TrimSpace(spec.Provider), "openrouter") && spec.Reasoning != config.ReasoningOff:
 		// A reasoning model with no cap can think for the whole call timeout.
 		// DeepSeek V4 Flash on a 330 KB prompt gave no answer in 300s at the
 		// default and at effort minimal, and took 157s and 182s at effort low
@@ -450,7 +467,7 @@ func (c *Client) CallOptions() []llms.CallOption {
 		// cap ends the runaway in tens of seconds, and the empty answer at the
 		// cap is already retried once with reasoning off. See issue #214.
 		opts = append(opts, llms.WithMaxTokens(firstAttemptMaxTokens))
-	case strings.EqualFold(strings.TrimSpace(c.Spec.Provider), "anthropic"):
+	case strings.EqualFold(strings.TrimSpace(spec.Provider), "anthropic"):
 		// Anthropic's API requires max_tokens, and the SDK fills an unset
 		// one with 4,096, a cap a reasoning model's thinking exhausts on
 		// an ordinary review. Every other provider is sent no cap at all
@@ -459,7 +476,7 @@ func (c *Client) CallOptions() []llms.CallOption {
 		// asking the API what each model's maximum is.
 		opts = append(opts, llms.WithMaxTokens(anthropicUnsetMaxTokens))
 	}
-	if tier := strings.TrimSpace(c.Spec.ServiceTier); tier != "" {
+	if tier := strings.TrimSpace(spec.ServiceTier); tier != "" {
 		opts = append(opts, llms.WithExtraBodyParam("service_tier", tier))
 	}
 	return opts

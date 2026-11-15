@@ -1035,11 +1035,13 @@ func overruledNotes(report *Report) string {
 // WithheldCause completes "withheld ..." for the findings in Overruled.
 //
 // A repository check withholds a finding it could not confirm as well as one
-// it refuted, so "a domain expert disagreed" would misstate why an unconfirmed
-// finding is missing. The narrower wording is kept when only experts ruled.
+// it refuted, and a deep review withholds findings below its confidence floor
+// that nobody disagreed with, so "a domain expert disagreed" would misstate
+// why either is missing. The narrower wording is kept when only experts ruled.
 func (r *Report) WithheldCause() string {
 	for _, o := range r.Overruled {
-		if o.Expert == verifyExpert {
+		switch o.Expert {
+		case verifyExpert, deepFilterExpert, deepCritiqueExpert:
 			return "by a second check"
 		}
 	}

@@ -45,6 +45,11 @@ type Engine struct {
 	// names the omission; on its own it publishes untriaged findings silently.
 	SkipTriage bool
 
+	// Deep reviews each batch with several agents that read the repository
+	// over many turns, and replaces triage with a confidence floor and a
+	// critique. Set by nitpick deep-review; see deep.go and deepselect.go.
+	Deep bool
+
 	// RequestTimeout bounds one model request independently of the caller's
 	// overall context. Zero leaves the configured client timeout in control.
 	RequestTimeout time.Duration
@@ -1049,11 +1054,16 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	beforeTriage := findings
 	var summary string
 	var withheldByTriage []Overruled
-	if e.SkipTriage {
+	switch {
+	case e.Deep:
+		var deepStages []StageStatus
+		findings, withheldByTriage, deepStages = e.deepSelect(ctx, findings, plan)
+		report.Stages = append(report.Stages, deepStages...)
+	case e.SkipTriage:
 		// Findings are already locally deduplicated below. A fast pass spends
 		// its request budget on changed files, and says it omitted model triage.
 		findings = dedupe(findings)
-	} else {
+	default:
 		summary, findings, withheldByTriage, err = e.triage(ctx, pr, findings)
 	}
 	switch {
@@ -1970,7 +1980,13 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 		return nil, err
 	}
 
-	key := e.progress.key(client, base, body.String())
+	keyBase := base
+	if e.Deep && !style {
+		// The engine's mode is not configuration, so the key has to carry it:
+		// a resumed run must never serve one mode's answer to the other.
+		keyBase += "\x00deep-review"
+	}
+	key := e.progress.key(client, keyBase, body.String())
 	if e.standingOnly != nil {
 		for _, p := range b.Paths() {
 			if e.standingOnly[p] {
@@ -1995,9 +2011,15 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 			callCtx, cancel = context.WithTimeout(ctx, e.RequestTimeout)
 			defer cancel()
 		}
-		result, err = llm.Extract[Result](callCtx, client, msgs, schema)
-		if err != nil {
-			return nil, err
+		reviewed := false
+		if e.Deep && !style {
+			result, reviewed = e.deepReviewBatch(callCtx, client, msgs, offeredClasses(e.Config.Review.Slop))
+		}
+		if !reviewed {
+			result, err = llm.Extract[Result](callCtx, client, msgs, schema)
+			if err != nil {
+				return nil, err
+			}
 		}
 		if e.FastReview && !style && len(result.Findings) > 0 {
 			candidates, encodeErr := json.Marshal(result.Findings)

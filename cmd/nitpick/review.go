@@ -96,6 +96,8 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 			fmt.Fprintln(os.Stderr, "Usage: nitpick improve [flags]\n\nThe wider pass: the classes a normal review filters out. Reviews the working tree by default.\n\nFlags:")
 		case "fast-review":
 			fmt.Fprintln(os.Stderr, "Usage: nitpick fast-review [flags]\n\nReviews changed diffs concurrently and reports the ten highest-ranked findings.\n\nFlags:")
+		case "deep-review":
+			fmt.Fprintln(os.Stderr, "Usage: nitpick deep-review [flags]\n\nReviews each pull request whole with a general and a security agent that read the repository over many turns, then withholds findings below a confidence floor or that a critique finds unsupported. Configured under review.deep.\n\nFlags:")
 		default:
 			fmt.Fprintln(os.Stderr, "Usage: nitpick review [flags]\n\nReviews the working tree by default.\n\nFlags:")
 		}

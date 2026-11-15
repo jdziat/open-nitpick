@@ -278,6 +278,7 @@ func (r Review) validate() []error {
 	if !r.FailOn.Valid() {
 		errs = append(errs, fmt.Errorf("review.fail_on %q is not a severity", r.FailOn))
 	}
+	errs = append(errs, r.Deep.validate()...)
 	switch r.Verify {
 	case "", VerifyConfirmed, VerifyNotRefuted:
 	default:
@@ -494,4 +495,50 @@ func (s Standards) Validate() error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func (d DeepReview) validate() []error {
+	var errs []error
+	if len(d.Agents) == 0 {
+		errs = append(errs, errors.New("review.deep.agents must name at least one agent"))
+	}
+	seen := map[string]bool{}
+	for _, a := range d.Agents {
+		switch a {
+		case DeepAgentGeneral, DeepAgentSecurity:
+		default:
+			errs = append(errs, fmt.Errorf("review.deep.agents: %q is not %s or %s", a, DeepAgentGeneral, DeepAgentSecurity))
+		}
+		if seen[a] {
+			errs = append(errs, fmt.Errorf("review.deep.agents names %q twice", a))
+		}
+		seen[a] = true
+	}
+	if d.MaxTurns < 1 || d.MaxTurns > 30 {
+		errs = append(errs, fmt.Errorf("review.deep.max_turns must be between 1 and 30, got %d", d.MaxTurns))
+	}
+	if d.Temperature < 0 || d.Temperature > 2 {
+		errs = append(errs, fmt.Errorf("review.deep.temperature must be between 0 and 2, got %g", d.Temperature))
+	}
+	switch d.Reasoning {
+	case "", ReasoningMinimal, ReasoningLow, ReasoningMedium, ReasoningHigh, ReasoningXHigh, ReasoningMax, ReasoningOff:
+	default:
+		errs = append(errs, fmt.Errorf("review.deep.reasoning %q is not a reasoning level", d.Reasoning))
+	}
+	if d.MaxTokens < 0 {
+		errs = append(errs, fmt.Errorf("review.deep.max_tokens must not be negative, got %d", d.MaxTokens))
+	}
+	if d.ConfidenceFloor < 0 || d.ConfidenceFloor > 1 {
+		errs = append(errs, fmt.Errorf("review.deep.confidence_floor must be between 0 and 1, got %g", d.ConfidenceFloor))
+	}
+	if d.LowPriorityCap < 0 {
+		errs = append(errs, fmt.Errorf("review.deep.low_priority_cap must not be negative, got %d", d.LowPriorityCap))
+	}
+	if d.MaxFilesPerRequest <= 0 {
+		errs = append(errs, fmt.Errorf("review.deep.max_files_per_request must be positive, got %d", d.MaxFilesPerRequest))
+	}
+	if d.TokenBudgetPerRequest <= 0 {
+		errs = append(errs, fmt.Errorf("review.deep.token_budget_per_request must be positive, got %d", d.TokenBudgetPerRequest))
+	}
+	return errs
 }

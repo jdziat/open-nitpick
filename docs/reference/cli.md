@@ -69,6 +69,21 @@ stages, so do not use it as an approval decision. It accepts the same flags as
 [`review`](#review) except `-profile`: fast review rejects the engineering
 assessment profile because that assessment needs the full review path.
 
+## `deep-review`
+
+```sh
+nitpick deep-review -base origin/main -dry-run
+```
+
+Reviews each pull request whole with two agents in parallel, a general reviewer
+and a security reviewer, that read files and search the repository over up to
+ten turns before they file anything. What they file then passes a confidence
+floor, a cap on low-priority findings, and a critique that grades each finding
+against the code it cites; the review lists what was withheld and why. It makes
+about twenty model calls a pull request where [`review`](#review) makes a few,
+and its settings are under `review.deep`. Without a git checkout to search, it
+reviews from the diff. It accepts the same flags as [`review`](#review).
+
 ## `full-review`
 
 ```sh

@@ -1287,6 +1287,56 @@ Scope says what the ceiling covers. One of: run, pull_request.
 integer, default `4`.
 Concurrency bounds in-flight model calls.
 
+### `review.deep.agents`
+
+list of string, default `[general security]`.
+Agents names the reviewers that read each batch in parallel: general reviews with the ordinary prompt, and security looks only for vulnerabilities.
+
+### `review.deep.confidence_floor`
+
+number, default `0.7`.
+ConfidenceFloor is the confidence a finding needs to be posted.
+
+### `review.deep.critique`
+
+boolean, default `true`.
+Critique grades each finding that passed the floor against the code it cites, and withholds the ones the code does not support.
+
+### `review.deep.low_priority_cap`
+
+integer, default `5`.
+LowPriorityCap keeps at most this many info and nit findings a review, the most confident first.
+
+### `review.deep.max_files_per_request`
+
+integer, default `60`.
+MaxFilesPerRequest replaces review.max_files_per_request, so a pull request is read as a whole.
+
+### `review.deep.max_tokens`
+
+integer, default `0`.
+MaxTokens caps the output of each agent call, reasoning included. Zero keeps the review model's cap.
+
+### `review.deep.max_turns`
+
+integer, default `10`.
+MaxTurns bounds how many times each agent is asked before it must submit what it has found.
+
+### `review.deep.reasoning`
+
+string, default `medium`.
+Reasoning is the agents' reasoning level, whatever the review model's own. One of: minimal, low, medium, high, xhigh, max, off.
+
+### `review.deep.temperature`
+
+number, default `0.2`.
+Temperature is the agents' sampling temperature, whatever the review model's own.
+
+### `review.deep.token_budget_per_request`
+
+integer, default `120000`.
+TokenBudgetPerRequest replaces review.token_budget_per_request.
+
 ### `review.fail_on`
 
 string, default `none`.

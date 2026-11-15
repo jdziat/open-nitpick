@@ -43,6 +43,38 @@ func TestTheJSONReportSaysWhetherTheRunFinishedAndCarriesConfidence(t *testing.T
 	}
 }
 
+// A finding held back after the reviewer reported it is listed with what held
+// it back and why, and a run that withheld nothing prints an empty list, so the
+// two cannot be confused.
+func TestTheJSONReportListsWithheldFindingsWithTheirStageAndReason(t *testing.T) {
+	var buf bytes.Buffer
+	if err := writeJSONReport(&buf, resultClean, &review.Report{}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), `"withheld": []`) {
+		t.Errorf("a report that withheld nothing:\n%s", buf.String())
+	}
+
+	buf.Reset()
+	c := 0.6
+	report := &review.Report{Overruled: []review.Overruled{{
+		Finding: review.Finding{Path: "a.go", Line: 3, Severity: "warning", Class: "correctness", Title: "t", Rationale: "r", Confidence: &c},
+		Expert:  "the deep-review filter",
+		Reason:  "its confidence of 0.60 is below the floor of 0.70",
+	}}}
+	if err := writeJSONReport(&buf, resultClean, report); err != nil {
+		t.Fatal(err)
+	}
+	var got jsonReport
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("not json: %v\n%s", err, buf.String())
+	}
+	if len(got.Withheld) != 1 || got.Withheld[0].Title != "t" || got.Withheld[0].WithheldBy != "the deep-review filter" ||
+		!strings.Contains(got.Withheld[0].Reason, "0.60") || len(got.Findings) != 0 {
+		t.Errorf("withheld = %+v, findings = %+v; want the one withheld finding with its stage and reason", got.Withheld, got.Findings)
+	}
+}
+
 func TestAnUnknownOutputFormatIsRefused(t *testing.T) {
 	err := runReview(context.Background(), []string{"-repo", t.TempDir(), "-format", "xml"})
 	if err == nil || !strings.Contains(err.Error(), "invalid -format") {

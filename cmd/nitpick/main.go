@@ -54,6 +54,8 @@ func run() int {
 		err = runReview(ctx, os.Args[2:])
 	case "fast-review":
 		err = runFastReview(ctx, os.Args[2:])
+	case "deep-review":
+		err = runDeepReview(ctx, os.Args[2:])
 	case "full-review":
 		err = runFullReview(ctx, os.Args[2:])
 	case "repo-score":
@@ -151,6 +153,7 @@ func usage() {
 Usage:
   nitpick review [flags]           Review a change
   nitpick fast-review [flags]      Review changed diffs in parallel and show the top ten findings
+  nitpick deep-review [flags]      Review a change with agents that read the repository, at several times the cost
   nitpick full-review [flags] [path...]
                                    Review the whole tree, or the paths given, with a remediation plan
   nitpick repo-score [flags] [path...]

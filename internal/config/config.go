@@ -530,6 +530,12 @@ type Review struct {
 	// docs/remediation-mira.md, stage R2b, has the measurement.
 	Verify VerifyMode `yaml:"verify"`
 
+	// Deep configures nitpick deep-review: several agents read each pull
+	// request with the repository open, over many turns, and what they file
+	// passes a confidence floor and a critique before it is posted.
+	// nitpick review ignores it.
+	Deep DeepReview `yaml:"deep"`
+
 	// MinSeverity drops findings below this severity before publishing.
 	MinSeverity Severity `yaml:"min_severity"`
 
@@ -1465,6 +1471,60 @@ func ReasoningLevels() []string {
 
 // ReasoningValues reports the same, for the generated reference.
 func (s ModelSpec) ReasoningValues() []string { return ReasoningLevels() }
+
+// DeepReview configures nitpick deep-review. Its defaults are the settings
+// Mira reviews with; docs/remediation-mira.md, "Deep review", has the design
+// and the measurements.
+type DeepReview struct {
+	// Agents names the reviewers that read each batch in parallel: general
+	// reviews with the ordinary prompt, and security looks only for
+	// vulnerabilities. Default both.
+	Agents []string `yaml:"agents"`
+
+	// MaxTurns bounds how many times each agent is asked before it must
+	// submit what it has found. Default 10.
+	MaxTurns int `yaml:"max_turns"`
+
+	// Temperature is the agents' sampling temperature, whatever the review
+	// model's own. Default 0.2.
+	Temperature float64 `yaml:"temperature"`
+
+	// Reasoning is the agents' reasoning level, whatever the review model's
+	// own. Default medium.
+	Reasoning ReasoningLevel `yaml:"reasoning"`
+
+	// MaxTokens caps the output of each agent call, reasoning included. Zero
+	// keeps the review model's cap.
+	MaxTokens int `yaml:"max_tokens"`
+
+	// ConfidenceFloor is the confidence a finding needs to be posted. One
+	// below it is listed with the withheld findings, not dropped unseen.
+	// Default 0.7.
+	ConfidenceFloor float64 `yaml:"confidence_floor"`
+
+	// LowPriorityCap keeps at most this many info and nit findings a review,
+	// the most confident first. Warnings and above are never capped. Zero
+	// turns the cap off. Default 5.
+	LowPriorityCap int `yaml:"low_priority_cap"`
+
+	// Critique grades each finding that passed the floor against the code it
+	// cites, and withholds the ones the code does not support. Default on.
+	Critique bool `yaml:"critique"`
+
+	// MaxFilesPerRequest replaces review.max_files_per_request, so a pull
+	// request is read as a whole. Default 60.
+	MaxFilesPerRequest int `yaml:"max_files_per_request"`
+
+	// TokenBudgetPerRequest replaces review.token_budget_per_request.
+	// Default 120000.
+	TokenBudgetPerRequest int `yaml:"token_budget_per_request"`
+}
+
+// Deep review agent names.
+const (
+	DeepAgentGeneral  = "general"
+	DeepAgentSecurity = "security"
+)
 
 // VerifyMode says which findings survive repository verification.
 type VerifyMode string
