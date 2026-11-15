@@ -1202,9 +1202,9 @@ The security agent extends the review prompt with a security focus
 (`internal/prompt/templates/deep_security.md`), so both agents file in one shape. An agent
 that stops early or runs out of turns is asked to submit what it has; one failing does not
 cost the others' findings; a batch every agent failed is reviewed by the ordinary call.
-Reasoning replay between turns waits on `nocturnium/llm-go-sdk`, whose v6.15.0 still drops
-an assistant turn's reasoning; Mira's replay ablation above found it trades recall for
-precision at about the same F1.
+Reasoning replay between turns is off. `nocturnium/llm-go-sdk` v6.15.0 drops an assistant
+turn's reasoning, the loop keeps it on each turn, and the D2r result below measured sending
+it back as worse than not sending it.
 
 The loop: each stage is registered here before it runs, measured with three passes on the
 20 tuning pull requests paired against R1, R10 and Mira, kept only if it meets its
