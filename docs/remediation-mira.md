@@ -1776,6 +1776,22 @@ change a person asked for, so a real defect a tool found that nobody commented o
 false, and "false" is likely to be overstated for every arm. The same corpus gives the same bias to all
 three, which is why the order between them is the reading and the level is not.
 
+### D4b: the held-out gate for Mira's adapted prompts on the build at HEAD (registered 2026-11-15, before it runs)
+
+F7 left one leg of the Mira-prompt question unmeasured. D3m has been run on the tuning set (0.486
+against Mira's 0.481) and on the fresh corpus (0.099 against 0.130) and never on the held-out set.
+D6m is the build that would ship if the prompts were adopted: the code at HEAD, which has not
+changed since `d865d18`, with the two agents' system prompts replaced by Mira's general and
+security prompts adapted to our schema, as in D3m, and nothing else touched. D4b runs it for three
+passes on the 30 held-out pull requests, scored by Sol, Terra and Luna and paired against Mira's
+three held-out passes rescored under the same judges.
+
+It decides nothing alone. Mira's prompts carry the contamination limit below, since one of their
+items restates a golden comment on the tuning set, so a result above Mira's on this set does not
+count towards beating it; the fresh corpus is the clean reading, and D3m was 0.031 below Mira there.
+D4b is reported whatever it shows, and it completes the three corpora for the owner's decision on
+the prompts.
+
 ### What this means for the goal
 
 Deep review is built: two agents a batch that read the repository over up to ten turns,
