@@ -1402,6 +1402,12 @@ tuning pull requests, scored by Sol, Terra and Luna, paired against D1c.
 - **Reported with it:** turns, lookups and tokens per review, model spend, forced
   submissions, and drafted recall against D1c's.
 
+Erratum, 2026-11-15, before any D1t score was read: the paragraph above states as fact what
+is a hypothesis. That the missed comments need more reading than ten turns give is not
+shown, and one of its three examples is a language rule the model has to recall (a Django
+queryset takes no negative slice), not code it has to read. The conditions above are
+unchanged.
+
 ### D1h: high reasoning effort (registered 2026-11-14, before it runs)
 
 Mira reviews at medium effort, as does every deep arm so far. The golden comments neither
