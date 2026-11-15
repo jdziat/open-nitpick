@@ -26,11 +26,19 @@ type deepLLM struct {
 
 	general, security       []llms.Response
 	generalErr, securityErr error
-	forcedReplies           []llms.Response
-	grades                  *llms.Response
-	critiqueReplies         []llms.Response
-	critiqueErr             error
-	ordinary                string
+
+	// refuseTemperature answers a request that carries a temperature with the
+	// router's refusal, as the newest models behind require_parameters do: "all"
+	// refuses every such request, "forced" only a forced submission and
+	// "critique" only the critique. The last two keep the refusal from being
+	// learned on an earlier call, so the call under test is the one that meets it.
+	refuseTemperature string
+	refused           int
+	forcedReplies     []llms.Response
+	grades            *llms.Response
+	critiqueReplies   []llms.Response
+	critiqueErr       error
+	ordinary          string
 
 	turns                       map[string]int
 	forced, critiqued, reviewed int
@@ -47,12 +55,20 @@ func (d *deepLLM) GenerateContent(_ context.Context, msgs []llms.Message, opts .
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	applied := llms.ApplyOptions(opts...)
-	if len(applied.Tools) > 0 {
-		d.offeredTools++
-	}
 	system := ""
 	if len(msgs) > 0 {
 		system = msgs[0].Content
+	}
+	if applied.Temperature != nil {
+		isCritique := strings.Contains(system, "You are grading draft review comments")
+		isForced := len(msgs) > 0 && strings.Contains(msgs[len(msgs)-1].Content, "submit_findings now")
+		if d.refuseTemperature == "all" || (d.refuseTemperature == "forced" && isForced) || (d.refuseTemperature == "critique" && isCritique) {
+			d.refused++
+			return nil, errors.New("openrouter: generate content: No endpoints found that can handle the requested parameters")
+		}
+	}
+	if len(applied.Tools) > 0 {
+		d.offeredTools++
 	}
 	switch {
 	case strings.Contains(system, "You are grading draft review comments"):
@@ -569,5 +585,94 @@ func TestFlippingDeepReviewBetweenResumedRunsDoesNotReplayTheOtherModesAnswer(t 
 	if report.ReusedRequests != 0 || reviewer.turns[config.DeepAgentGeneral] == 0 {
 		t.Errorf("reused %d requests and ran the general agent %d times, want a live deep review after the flip",
 			report.ReusedRequests, reviewer.turns[config.DeepAgentGeneral])
+	}
+}
+
+// A model that takes no temperature still gets a deep review: every call, the
+// agents' turns, their forced submissions and the critique, is sent again
+// without it, and the review reads as complete.
+func TestADeepReviewCompletesOnAModelThatTakesNoTemperature(t *testing.T) {
+	fs := confident(twoFindings(), 0.9)
+	reviewer := &deepLLM{
+		refuseTemperature: "all",
+		general:           []llms.Response{lookup("app.go"), submit(t, fs[:1])},
+		security:          []llms.Response{submit(t, fs[1:])},
+		grades:            gradeAll(t, "proven", "proven"),
+	}
+	e, _ := deepEngine(t, reviewer, appRepo(t))
+	report, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := titles(report); len(got) != 2 {
+		t.Errorf("findings = %v, want one from each agent", got)
+	}
+	if len(report.FailedStages()) != 0 || !report.PipelineComplete() {
+		t.Errorf("failed stages = %v; a model that takes no temperature must not make the review incomplete", report.FailedStages())
+	}
+	if reviewer.refused == 0 {
+		t.Error("the model was never asked with a temperature, so the test did not exercise the refusal")
+	}
+	// Each of the two agents can meet the refusal once, on its first call. After
+	// that the client has learned it, and a call whose options were built earlier
+	// must still leave the temperature out instead of being refused again.
+	if reviewer.refused > 2 {
+		t.Errorf("the model refused %d requests, want at most one per agent: a refusal already learned must not be paid for again", reviewer.refused)
+	}
+	if reviewer.critiqued == 0 {
+		t.Error("the critique did not run")
+	}
+}
+
+// The forced submission is the call a loop reaches last, with options built
+// before the first turn, so it meets the refusal on its own: a model that took
+// every earlier turn with a temperature and refuses only this one.
+func TestAForcedSubmissionIsSentAgainWithoutATemperatureTheModelRefuses(t *testing.T) {
+	fs := confident(twoFindings(), 0.9)
+	reviewer := &deepLLM{
+		refuseTemperature: "forced",
+		general:           []llms.Response{lookup("app.go"), lookup("app.go")},
+		security:          []llms.Response{submit(t, nil)},
+		forcedReplies:     []llms.Response{submit(t, fs[:1])},
+		grades:            gradeAll(t, "proven"),
+	}
+	e, _ := deepEngine(t, reviewer, appRepo(t))
+	e.Config.Review.Deep.MaxTurns = 2
+	report, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reviewer.refused == 0 || reviewer.forced != 1 {
+		t.Fatalf("refused %d, forced submissions %d; the forced call did not meet the refusal", reviewer.refused, reviewer.forced)
+	}
+	if got := titles(report); len(got) != 1 || len(report.FailedStages()) != 0 {
+		t.Errorf("findings %v, failed stages %v; want the forced submission's finding and a complete review", got, report.FailedStages())
+	}
+}
+
+// The critique is built after the agents finish, so a model that took their
+// turns with a temperature and refuses only the critique meets the refusal
+// there, and its grades are still applied.
+func TestTheCritiqueIsSentAgainWithoutATemperatureTheModelRefuses(t *testing.T) {
+	fs := confident(twoFindings(), 0.9)
+	reviewer := &deepLLM{
+		refuseTemperature: "critique",
+		general:           []llms.Response{submit(t, fs[:1])},
+		security:          []llms.Response{submit(t, fs[1:])},
+		grades:            gradeAll(t, "proven", "unsupported"),
+	}
+	e, _ := deepEngine(t, reviewer, appRepo(t))
+	report, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reviewer.refused == 0 {
+		t.Fatal("the critique never met the refusal")
+	}
+	if len(report.FailedStages()) != 0 {
+		t.Errorf("failed stages = %v; the critique must not fail on a refused temperature", report.FailedStages())
+	}
+	if got := titles(report); len(got) != 1 {
+		t.Errorf("findings = %v, want the critique's grades applied: one kept, one withheld", got)
 	}
 }

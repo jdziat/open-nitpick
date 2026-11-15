@@ -177,6 +177,13 @@ func markStalled(ctx context.Context, err error) error {
 // retryAfter decides whether an attempt is sent again and with what options.
 // started is when the first attempt began; see retryBudgetSpent.
 func (c *Client) retryAfter(ctx context.Context, attempt int, started time.Time, call []llms.CallOption, resp *llms.Response, err error) ([]llms.CallOption, bool) {
+	// Not a retry of the transport and not counted against its budget: it fires
+	// at most once per call, since the options sent again carry no temperature.
+	if c.RejectsTemperature(err, call) {
+		c.logger().Warn("the model accepts no temperature; sending again without it",
+			"model", c.String())
+		return WithoutTemperature(call), true
+	}
 	if attempt >= c.stallRetries {
 		return nil, false
 	}
@@ -230,7 +237,7 @@ func (c *Client) retryAfter(ctx context.Context, attempt int, started time.Time,
 			"attempt", attempt+1,
 			"retries_left", c.stallRetries-attempt)
 		return next, true
-	case attempt > 0 && truncated(resp, err) && !hasTemperatureAbove(call, 0):
+	case attempt > 0 && truncated(resp, err) && !hasTemperatureAbove(call, 0) && !c.OmitsTemperature():
 		// Only after a retry: a first attempt cut at a cap the caller chose is
 		// the caller's to handle. Only from temperature zero: a sampling
 		// temperature the caller set is kept, and a loop at 0.3 is the model's

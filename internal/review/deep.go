@@ -272,7 +272,7 @@ func (e *Engine) runDeepAgent(ctx context.Context, client *llm.Client, name stri
 	}
 	for run.turns < deep.MaxTurns {
 		run.turns++
-		resp, err := generateBounded(ctx, client.LLM, msgs, opts, deepCallTimeout)
+		resp, err := e.generateDeep(ctx, client, msgs, opts, deepCallTimeout)
 		if err != nil {
 			if run.turns == 1 {
 				return Result{}, err
@@ -324,6 +324,22 @@ func (e *Engine) runDeepAgent(ctx context.Context, client *llm.Client, name stri
 	return finish(r)
 }
 
+// generateDeep is generateBounded for a deep-review call. It adds the one thing
+// the client's own retry layer does and a bare SDK call does not: when the model
+// takes no temperature, the call is sent again without it. The client remembers
+// the refusal, so later calls leave the temperature out from the start.
+func (e *Engine) generateDeep(ctx context.Context, client *llm.Client, msgs []llms.Message, opts []llms.CallOption, timeout time.Duration) (*llms.Response, error) {
+	if client.OmitsTemperature() {
+		opts = llm.WithoutTemperature(opts)
+	}
+	resp, err := generateBounded(ctx, client.LLM, msgs, opts, timeout)
+	if client.RejectsTemperature(err, opts) {
+		e.log().Warn("the model accepts no temperature; sending again without it", "model", client.String())
+		return generateBounded(ctx, client.LLM, msgs, llm.WithoutTemperature(opts), timeout)
+	}
+	return resp, err
+}
+
 // deepTools are the lookups plus the one way to finish.
 func deepTools(canSearch bool, schema json.RawMessage) []llms.Tool {
 	return append(lookupTools(canSearch), toolDef(submitFindings,
@@ -358,7 +374,7 @@ func (e *Engine) forceSubmission(ctx context.Context, client *llm.Client, msgs [
 	nudged := false
 	for step := 0; step < len(ladder); {
 		rung := ladder[step]
-		resp, err := generateBounded(ctx, client.LLM, convo, rung.opts, deepForcedTimeout)
+		resp, err := e.generateDeep(ctx, client, convo, rung.opts, deepForcedTimeout)
 		if err != nil {
 			return Result{}, fmt.Errorf("forced submission: %w", err)
 		}

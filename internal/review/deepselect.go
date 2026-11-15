@@ -248,13 +248,13 @@ func (e *Engine) deepCritique(ctx context.Context, findings []Finding, plan *bun
 		{Role: llms.RoleUser, Content: critiqueRequest(findings, filesByPath(plan))},
 	}
 
-	resp, err := generateBounded(ctx, client.LLM, msgs, opts, deepCallTimeout)
+	resp, err := e.generateDeep(ctx, client, msgs, opts, deepCallTimeout)
 	if err == nil && resp.FinishReason == llms.FinishReasonLength {
 		// Cut at the cap, empty or mid-answer: grades cut off part way do not
 		// parse, so a truncated reply is as useless as an empty one.
 		e.log().Warn("the critique ran out of output budget; asking again without reasoning")
 		opts = append(client.CallOptionsWith(&zero, config.ReasoningOff), tool, choice)
-		resp, err = generateBounded(ctx, client.LLM, msgs, opts, deepCallTimeout)
+		resp, err = e.generateDeep(ctx, client, msgs, opts, deepCallTimeout)
 	}
 	if err != nil {
 		e.log().Warn("the critique failed; keeping every finding", "error", err)

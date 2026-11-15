@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
@@ -53,6 +54,11 @@ type Client struct {
 	// question, how many times this deployment is willing to pay for one
 	// batch, and a config that lowers one has no reason to want the other.
 	stallRetries int
+
+	// noTemperature is set once a router has refused a request because no
+	// endpoint for the model takes a temperature. It is per client, so the
+	// refusal is paid for once and not on every call.
+	noTemperature atomic.Bool
 
 	// clock replaces time.Now for the retry budget. Nil outside tests.
 	clock func() time.Time
@@ -390,7 +396,7 @@ func BuildRolesContext(ctx context.Context, cfg *config.Config) (*Roles, error) 
 }
 
 // CallOptions renders the spec's generation parameters as SDK call options.
-func (c *Client) CallOptions() []llms.CallOption { return callOptions(c.Spec) }
+func (c *Client) CallOptions() []llms.CallOption { return callOptions(c.Spec, c.noTemperature.Load()) }
 
 // CallOptionsWith is CallOptions with the temperature and the reasoning level
 // chosen by the caller, for a stage that samples differently from the model's
@@ -403,14 +409,47 @@ func (c *Client) CallOptionsWith(temperature *float64, reasoning config.Reasonin
 	if reasoning != "" {
 		spec.Reasoning = reasoning
 	}
-	return callOptions(spec)
+	return callOptions(spec, c.noTemperature.Load())
 }
 
-// callOptions renders a spec's generation parameters as SDK call options.
-func callOptions(spec config.ModelSpec) []llms.CallOption {
+// OmitsTemperature reports whether this client has learned that its model takes
+// no temperature, so a caller building its own options leaves one out.
+func (c *Client) OmitsTemperature() bool { return c.noTemperature.Load() }
+
+// RejectsTemperature reports whether err is a router refusing call because no
+// endpoint for the model accepts its temperature, and remembers it if so.
+//
+// OpenRouter lists the parameters each model takes, and the newest OpenAI and
+// Anthropic models do not list temperature. With require_parameters set, which
+// the client sets so that reasoning and max_tokens are honoured, a request that
+// carries one is answered "No endpoints found that can handle the requested
+// parameters" and the whole review fails, where the same request without the
+// temperature succeeds. A caller that sees true sends the call again with
+// [WithoutTemperature].
+func (c *Client) RejectsTemperature(err error, call []llms.CallOption) bool {
+	if err == nil || llms.ApplyOptions(call...).Temperature == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	if !strings.Contains(msg, "no endpoints found") || !strings.Contains(msg, "parameters") {
+		return false
+	}
+	c.noTemperature.Store(true)
+	return true
+}
+
+// WithoutTemperature returns call with its temperature unset. Options apply in
+// order, so appending the unset is enough and no earlier option is edited.
+func WithoutTemperature(call []llms.CallOption) []llms.CallOption {
+	return append(slices.Clone(call), func(o *llms.CallOptions) { o.Temperature = nil })
+}
+
+// callOptions renders a spec's generation parameters as SDK call options. A
+// temperature the model has been found to refuse is left out.
+func callOptions(spec config.ModelSpec, omitTemperature bool) []llms.CallOption {
 	var opts []llms.CallOption
 
-	if spec.Temperature != nil {
+	if spec.Temperature != nil && !omitTemperature {
 		opts = append(opts, llms.WithTemperature(*spec.Temperature))
 	}
 	if r, ok := reasoningOption(spec.Reasoning); ok {
