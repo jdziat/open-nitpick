@@ -35,6 +35,7 @@ export OPENROUTER_API_KEY=sk-or-...
 nitpick init            # writes .nitpick.yaml for this repository
 nitpick review          # reviews your uncommitted changes
 nitpick fast-review     # changed diffs, top ten findings
+nitpick deep-review     # agents that read the repository, at many times the cost
 ```
 
 Verifying that download is one command and

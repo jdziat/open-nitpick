@@ -238,8 +238,8 @@ than the repository root.
 | `allow-degraded-triage` | `false` | when only triage failed, publishes the findings, applies `fail-on` and reports `result: degraded` instead of exiting 2 |
 | `version` | `latest` | release tag or `latest`; falls back to building the Action checkout when its release is unavailable |
 | `analyzers` | empty | catalog names to install, comma separated; `auto` selects ones for changed languages; empty uses runner tools |
-| `command` | `review` | `review`, `fast-review`, or `respond` |
-| `args` | none | flags passed to `review` and `fast-review` |
+| `command` | `review` | `review`, `fast-review`, `deep-review`, or `respond`; `deep-review` needs the repository checked out and makes many times the model calls |
+| `args` | none | flags passed to `review`, `fast-review` and `deep-review` |
 
 ### What a run does
 

@@ -129,13 +129,15 @@ inputs:
   command:
     description: >-
       What to run: "review" (the default), "fast-review" for a quick
-      changed-diff pass, or "respond"
+      changed-diff pass, "deep-review" for agents that read the repository
+      over many turns (it needs the repository checked out, and makes many
+      times the model calls of "review"), or "respond"
       answers a comment that mentioned the reviewer, for a workflow on
       issue_comment and pull_request_review_comment events.
     required: false
     default: review
   args:
-    description: Additional flags passed verbatim to review and fast-review.
+    description: Additional flags passed verbatim to review, fast-review and deep-review.
     required: false
 
 outputs:
@@ -484,8 +486,8 @@ runs:
           exit 0
         fi
         case "$NITPICK_COMMAND" in
-          review|fast-review) ;;
-          *) message="command must be review, fast-review, or respond"
+          review|fast-review|deep-review) ;;
+          *) message="command must be review, fast-review, deep-review, or respond"
              echo "::error::open-nitpick: $message"
              echo "result=error" >> "$GITHUB_OUTPUT"
              exit 2 ;;
