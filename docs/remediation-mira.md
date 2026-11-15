@@ -1303,6 +1303,25 @@ against D1 and Mira under the same judge.
 - **Ship to the held-out gate:** posted F1 above Mira's under Sol.
 - **Validity:** D1's. The forced-submission fallbacks are reported either way.
 
+### D1c: the repository build (registered 2026-11-14, before it runs)
+
+D3m changed two things at once from D1: Mira's prompts and a larger forced-submission cap.
+The repository build has the cap, a ladder behind it (low effort, then none), a critique
+that is asked again when it is cut mid-answer, and a report that names a failed agent or a
+batch reviewed without tools, all with our own prompts. D1c is that build at its defaults,
+three passes on the 20 tuning pull requests, scored by Sol (primary), Terra and Luna, paired
+against D1 (what the fixes change), D3m (what the prompts change) and Mira.
+
+- **Reading:** D3m minus D1c, posted F1 under Sol, with its interval. An interval that
+  excludes zero says the prompts carry part of D3m's gain, and the next stage writes our own
+  prompts to D3m's structure. An interval that includes zero keeps the repository's prompts.
+- **Ship to the held-out gate:** D1c's posted F1 above Mira's under Sol, as a point
+  comparison like every earlier stage. The held-out run is made once, on the build that is in
+  the repository, and nothing is tuned on its result.
+- **Validity:** more than 5% of forced submissions sent again without reasoning, or any
+  failed agent, is reported and the arm is not ranked. A review that comes back incomplete is
+  re-run once and both runs are reported.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
