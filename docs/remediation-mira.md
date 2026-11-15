@@ -1456,6 +1456,24 @@ The registered readings:
 Validity: no failed agent in either arm, and 1 forced submission in each D1c pass (2.9% to
 3.1%) and 0 to 1 in D1h was sent again without reasoning, under the 5% limit.
 
+#### D1t result: twenty turns trade recall for precision, and ten stay
+
+Three passes on the 20 tuning pull requests, 60 reviews, scored by all three judges. Seven
+reviews that the key limit cut short were re-run on the same binary, and no agent failed.
+
+| judge | D1t precision, recall, F1 | D1t minus D1c, F1 | D1t minus Mira, F1 |
+|---|---|---|---|
+| Sol | 60.5%, 33.8%, 0.434 | +0.018 (-0.036, +0.080) | -0.047 (-0.133, +0.024) |
+| Terra | 60.5%, 33.8%, 0.434 | +0.032 (-0.014, +0.078) | -0.035 (-0.126, +0.042) |
+| Luna | 61.1%, 33.8%, 0.435 | +0.028 (-0.010, +0.066) | -0.043 (-0.134, +0.037) |
+
+The registered adoption condition was posted F1 above D1c's by 0.03 or more under Sol. It is
++0.018, so ten turns stay. The gain that is there is precision (60.5% against 55.3%), and the
+agents file less: drafted recall fell from 49.0% to 43.6%, and drafted precision from 39.5% to
+35.7%. A review made 32 to 35 turns and 57 to 62 lookups against 18 to 19 and 32 to 36,
+cost $0.065 to $0.085 against $0.047 to $0.053, and took 285 to 385 seconds against 200 to
+235. Forced submissions were sent again without reasoning in 0% to 3.1% of cases.
+
 ### L1: the repository build on GPT-6 Luna (registered 2026-11-14, before it runs)
 
 Every arm so far is DeepSeek V4.1 Flash, the model Mira was frozen on. GPT-6 Luna costs about
