@@ -1476,6 +1476,22 @@ the 20 tuning pull requests, scored by Sol, Terra and Luna, paired against D1c, 
 - **Reported with it:** drafted recall and precision against D1c's and D3m's, and how many
   agents used their time budget.
 
+### D4a: the held-out gate for the build at `ab683d3` (registered 2026-11-15, before it runs)
+
+The held-out set is 30 pull requests the tuning work never selected on, read once for the
+earlier arms. D4a runs the repository build at its current HEAD, `ab683d3`, which has the deep
+base prompt, ten turns, medium effort and the failure-path fixes: three passes on the 30
+pull requests, scored by Sol, Terra and Luna against Mira's three held-out passes rescored
+under the same judges. It runs while D3o is still being measured on the tuning set, so that
+no held-out number can steer a choice the tuning set has not already made.
+
+- **Ship:** posted F1 above Mira's under Sol as a point comparison, reported with its
+  interval and under the other two judges.
+- **If D3o is not kept** (below D1c on the tuning set), `ab683d3` is not the build that ships.
+  D4a is still reported, and the build that ships gets its own gate, D4b.
+- **If D1t or D1h is adopted,** the build that ships changes and gets its own gate as well.
+  Every held-out run is reported, whatever it shows.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
