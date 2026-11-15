@@ -1175,7 +1175,7 @@ stored runs:
 |---|---|---|---|
 | Shape | a general loop and a security loop per pull request, in parallel, up to 10 tool turns each (`core/passes.py:365`) | one call per batch of 6 files or 60,000 tokens, no tools | a general agent and a security agent per batch of up to 60 files or 120,000 tokens, in parallel, up to 10 turns each with `read_file` and `grep_repo` (`internal/review/deep.go`) |
 | Sampling | temperature 0.2, effort medium (`config.py:60`) | the model's own: temperature 0, effort unset | `review.deep.temperature` 0.2 and `review.deep.reasoning` medium |
-| Selection | confidence floor 0.7, cap of 5 on suggestions and nitpicks (`config.py:117-122`), then a critique grading each draft proven, plausible or unsupported (`core/passes.py:930`) | model triage | the same floor, cap and critique, with Mira's keep rule (`internal/review/deepselect.go`) |
+| Selection | confidence floor 0.7, cap of 5 on suggestions and nitpicks (`config.py:117-122`), then a critique grading each draft proven, plausible or unsupported (`core/passes.py:930`) | model triage | the same floor, duplicate rule, cap and critique, with Mira's keep rule (`internal/review/deepselect.go`) |
 
 The security agent extends the review prompt with a security focus
 (`internal/prompt/templates/deep_security.md`), so both agents file in one shape. An agent
@@ -1218,6 +1218,11 @@ the same runs, at the drafted and after-filter stages.
   submissions sent again without reasoning, is reported and not ranked.
 - **Reported with it:** calls, turns, lookups and tokens for each review, model spend, and
   median review time.
+
+Amended 2026-11-14, before any D1 score was read: the first D1 build lacked Mira's
+duplicate rule, so two agents filing one defect posted it twice (calcom-1 posted one async
+`forEach` defect twice on each of two lines). The partial runs were deleted unscored, and D1
+restarted on the build with the rule (`deepDuplicate`, `internal/review/deepselect.go`).
 
 ### What this means for the goal
 
