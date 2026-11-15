@@ -1534,6 +1534,27 @@ the 20 tuning pull requests, scored by Sol, Terra and Luna, paired against D1c, 
 - **Reported with it:** drafted recall and precision against D1c's and D3m's, and how many
   agents used their time budget.
 
+#### D3o result: below D1c under Sol, so the deep prompt is reverted
+
+Under Sol, D3o's posted F1 was 0.411, against D1c's 0.416 (-0.004, interval -0.063 to
++0.063) and D3m's 0.486 (-0.075, -0.150 to -0.003). It raised recall 5.4 points over D1c
+(+0.5 to +10.8) and cut precision 11.4 (-19.2 to -1.8): asked to file every defect it can
+defend, the agent did, and D3o posted 186 comments over three passes where D1c posted 126
+and D3m 166. Terra and Luna put it 0.015 and 0.010 above D1c and 0.059 and 0.079 below D3m.
+The registered condition is Sol's, so `ea01431` is reverted (`d865d18`) and the deep agents
+review under the ordinary prompt with the lookup note. Our text did not do what Mira's did:
+D3m gained 9.3 points of recall over D1c at no cost in precision.
+
+| Sol, three passes | posted precision | posted recall | posted F1 | drafted precision | drafted recall | drafted F1 |
+|---|---|---|---|---|---|---|
+| D1c | 55.3% | 33.3% | 0.416 | 39.5% | 49.0% | 0.438 |
+| D3m | 56.5% | 42.6% | 0.486 | 36.0% | 57.8% | 0.444 |
+| D3o | 43.9% | 38.7% | 0.411 | 29.7% | 52.5% | 0.379 |
+
+No agent used its 15-minute budget. D3o's agents were made to submit in 128 of 144 runs
+(89%), against D1c's 99 of 138 (72%), and a review cost $0.057 to $0.076 with a median of
+284 to 391 seconds, against $0.047 to $0.053 and 200 to 235 seconds for D1c.
+
 ### D4a: the held-out gate for the build at `ab683d3` (registered 2026-11-15, before it runs)
 
 The held-out set is 30 pull requests the tuning work never selected on, read once for the
@@ -1575,6 +1596,15 @@ built from. F6 runs on D1c now and on D3o once D3o is scored.
 - **Keep the floor at 0.6:** D5f's posted F1 under Sol at least 0.03 above its parent's, the
   bar D1t was held to. The default then changes, and the build gets its own held-out gate.
 - **Leave the floor at 0.7:** F6 below 0.02 on either arm, or D5f below its bar.
+
+#### F6 result: a floor of 0.6 clears its bar on D1c
+
+On D1c, the sets a floor of 0.6 would post scored F1 0.440 under Sol, against 0.416 for the
+same passes as posted (+0.024, interval -0.027 to +0.082). Recall rose 7.8 points (+3.5 to
++12.6) and precision fell 8.1 (-14.0 to -1.5). That clears the registered 0.02. On D3o it
+was +0.017 (-0.029 to +0.074), but D3o is not kept and its condition lapsed with it. D5f
+therefore runs on the build that ships, `d865d18`, with `review.deep.confidence_floor: 0.6`.
+The estimate from labels had put the gain at about 0.045; on posted sets it is half that.
 
 ### What this means for the goal
 
@@ -1651,14 +1681,15 @@ Mira on the held-out split at the same time as open-nitpick, in the same session
 
 ## Limits
 
-- Since 2026-11-14 three judges score every arm (GPT-6.1 Sol, Terra and Luna), and they agree
-  on the order of the arms. Every figure before that was scored by one judge, Sonnet 4.5, and
+- Since 2026-11-14 three judges score every arm (GPT-6.1 Sol, Terra and Luna). They agree on
+  the order of the arms except D3o against D1c, which Sol puts 0.004 below and Terra and Luna
+  0.015 and 0.010 above. Every figure before that was scored by one judge, Sonnet 4.5, and
   those stay as history.
 - The 20 tuning and 30 held-out pull requests have been read by the person writing the
   prompts, and their golden comments with them. Text written for the deep agents is not clean
   of that. `deep_security.md` was written after reading Mira's security prompt, whose items
-  include classes of defect the benchmark labels, and `deep_review.md` follows the structure of
-  Mira's prompt, which D3m showed carries recall. A gain from either is not shown to
+  include classes of defect the benchmark labels, and `deep_review.md`, reverted after D3o,
+  followed the structure of Mira's prompt, which D3m showed carries recall. A gain from either is not shown to
   generalize. No pitfall list for the benchmark's languages was written for that reason, since
   the choice of items would be steered by the comments already read. A corpus neither the
   prompts nor the tool have seen is the test that would settle it.
