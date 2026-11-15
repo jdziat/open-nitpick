@@ -1634,6 +1634,23 @@ same passes as posted (+0.024, interval -0.008 to +0.059), with recall up 6.4 po
 both fewer and truer: 13 true of 34 scored for D3m, against 16 of 55 for D1c. The same gain
 on our own prompt (F6, D1c) leaves it at 0.440, below Mira's 0.481.
 
+*Erratum, 2026-11-15:* the sets for F6 and F6m leave the critique out of the findings they add,
+and D5f showed that it withholds most of them. Neither figure was reproduced live: F6 on D1c
+became 0.412 for D5f. F6m's 0.510 is an upper bound for a floor of 0.6, and Mira's prompts at
+the default floor, 0.486, are the measured figure.
+
+#### D5f result: the floor of 0.6 adds nothing live, and F6 overstated it
+
+D5f, the build at `d865d18` with `review.deep.confidence_floor: 0.6`, scored posted F1 0.412
+under Sol, against D1c's 0.416 (-0.004, interval -0.049 to +0.046); Terra put it 0.005 above
+and Luna 0.011 above. It misses F6's bar of 0.02 and the 0.03 the floor needed to change the
+default, so the floor stays at 0.7. F6 had put the same change at +0.024 on D1c's drafts. It
+let the 60 findings between 0.6 and 0.7 straight into the posted set, and the critique was
+never asked about them. Live, 62 findings in that band passed the floor and the critique withheld
+42 of them, so only 13 were posted, against 60 in F6's sets. A plausible finding is kept
+only at confidence 0.75 or more, which makes the critique the binding limit for the band the floor
+opens. F6m has the same flaw (see its result).
+
 ### F7: a corpus neither tool has seen (registered 2026-11-15, before it is built)
 
 Asked whether to adopt prompts adapted from Mira or keep ours, the owner asked first for a
@@ -1671,7 +1688,9 @@ Sol, Terra and Luna with the upstream matching prompts, posted and drafted sets 
 - Mira, with the settings of its frozen arm A.
 - D1c, the repository build with our prompt, as measured on the tuning set.
 - D3m, the same build with Mira's two prompts adapted to our schema.
-- D5f, the current build `d865d18` with `review.deep.confidence_floor: 0.6`.
+- ~~D5f, the current build `d865d18` with `review.deep.confidence_floor: 0.6`.~~ Dropped on
+  2026-11-15, before any F7 arm ran: D5f scored 0.412 against D1c's 0.416 on the tuning set, so
+  it is D1c with a different floor and adds no arm.
 
 **Reading,** each difference paired by pull request with a bootstrap interval, under Sol first
 and the other two beside it. A grade holds when its sign repeats and the point estimate is within
@@ -1702,13 +1721,15 @@ yet beat Mira.
 - Held out, the one build gated so far (D4a) scored F1 0.494 under Sol against Mira's 0.547.
   Recall was level with Mira's and precision 12 points lower.
 - On the tuning set the agent prompt is what separates the tools. With Mira's prompts
-  adapted (D3m), the same pipeline scored 0.486 against Mira's 0.481, and with a floor of 0.6
-  (F6m) 0.510. With ours it scored 0.416 (D1c), 0.411 with the prompt written for it (D3o),
-  and 0.440 with the floor (F6).
+  adapted (D3m), the same pipeline scored 0.486 against Mira's 0.481. With ours it scored 0.416
+  (D1c) and 0.411 with the prompt written for it (D3o).
 - Shipping prompts adapted from Mira's is the owner's decision: Mira is Apache-2.0, so it
   needs attribution, and the limit on contamination below applies to it more than to
   anything else here, since Mira's authors measure themselves on this benchmark.
-- D5f measures the floor of 0.6 on the build that ships.
+- A floor of 0.6 did not help live (D5f 0.412 against D1c's 0.416). The offline estimates
+  that suggested it (F6, F6m) left the critique out.
+- F7 repeats the comparison on pull requests from other repositories, before anything is
+  adopted.
 
 #### Before deep review, judged by Sonnet 4.5
 
