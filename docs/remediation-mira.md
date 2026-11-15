@@ -1443,8 +1443,8 @@ sent again without it and later calls left it out.
 | Luna | 62.5%, 29.4%, 0.400 | 68.5%, 36.8%, 0.478 |
 
 Mira's column is its DeepSeek run and is shown for scale. It is not a comparison. Luna drafted
-122 findings in all and posted 101 (1.7 a review), against 400 and 154 for D3m on DeepSeek, so
-its recall is the lower. It also cost $0.006 to $0.015 a review at its list price of $0.10 and
+122 findings in all and posted 101 (1.7 a review), against 400 and 166 (2.8 a review) for D3m on
+DeepSeek, so its recall is the lower. It also cost $0.006 to $0.015 a review at its list price of $0.10 and
 $0.50 per million tokens, against about $0.04, and a review took a median of 60 to 73 seconds
 against 183 to 246. The mode is not tied to one model. On this set Luna is the cheap and fast
 setting, and DeepSeek the more thorough one.
