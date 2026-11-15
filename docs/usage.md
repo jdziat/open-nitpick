@@ -83,7 +83,10 @@ checkout to search, and it says so when it has none. On DeepSeek V4.1 Flash a re
 about 19 agent turns and 35 lookups, plus a final submission for each agent and one
 critique, and cost about $0.04, with a median of three to four minutes. Its settings are under `review.deep`, and `docs/remediation-mira.md` has the
 measurements. When an agent fails, or a batch is reviewed in one call without tools, the
-review names the stage that did not complete.
+review names the stage that did not complete. The model's context has to hold more than the
+pull request: `review.deep.token_budget_per_request`, 120,000 tokens by default, sizes an
+agent's first request, and the agent may then read up to 80,000 bytes and ask for an answer
+of up to 65,536 tokens when it is made to submit.
 
 With no model configured it selects `deepseek/deepseek-v4.1-flash` over
 OpenRouter, needing `OPENROUTER_API_KEY`. It aims for feedback in under a minute

@@ -1525,8 +1525,10 @@ type DeepReview struct {
 	// request is read as a whole. Default 60.
 	MaxFilesPerRequest int `yaml:"max_files_per_request"`
 
-	// TokenBudgetPerRequest replaces review.token_budget_per_request.
-	// Default 120000.
+	// TokenBudgetPerRequest replaces review.token_budget_per_request. It
+	// sizes an agent's first request only: the model's context must also hold
+	// what the agent reads, up to 80,000 bytes, and a forced submission's
+	// answer of up to 65,536 tokens. Default 120000.
 	TokenBudgetPerRequest int `yaml:"token_budget_per_request"`
 }
 
