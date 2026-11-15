@@ -416,27 +416,24 @@ func (c *Client) CallOptionsWith(temperature *float64, reasoning config.Reasonin
 // no temperature, so a caller building its own options leaves one out.
 func (c *Client) OmitsTemperature() bool { return c.noTemperature.Load() }
 
-// RejectsTemperature reports whether err is a router refusing call because no
-// endpoint for the model accepts its temperature, and remembers it if so.
-//
-// OpenRouter lists the parameters each model takes, and the newest OpenAI and
-// Anthropic models do not list temperature. With require_parameters set, which
-// the client sets so that reasoning and max_tokens are honoured, a request that
-// carries one is answered "No endpoints found that can handle the requested
-// parameters" and the whole review fails, where the same request without the
-// temperature succeeds. A caller that sees true sends the call again with
-// [WithoutTemperature].
+// RejectsTemperature reports whether err is OpenRouter's refusal of a request
+// whose temperature no endpoint for the model takes, which require_parameters
+// turns into a failed review on the newest OpenAI and Anthropic models. A caller
+// that sees true sends the call again with [WithoutTemperature]. It only
+// classifies: the router's words name no parameter, so the client learns that
+// its model takes none from a retry that succeeds, through [Client.NoteNoTemperature].
 func (c *Client) RejectsTemperature(err error, call []llms.CallOption) bool {
 	if err == nil || llms.ApplyOptions(call...).Temperature == nil {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
-	if !strings.Contains(msg, "no endpoints found") || !strings.Contains(msg, "parameters") {
-		return false
-	}
-	c.noTemperature.Store(true)
-	return true
+	return strings.Contains(msg, "no endpoints found") && strings.Contains(msg, "parameters")
 }
+
+// NoteNoTemperature records that a call without a temperature succeeded where
+// the same call with one was refused, so later calls leave the temperature out
+// from the start.
+func (c *Client) NoteNoTemperature() { c.noTemperature.Store(true) }
 
 // WithoutTemperature returns call with its temperature unset. Options apply in
 // order, so appending the unset is enough and no earlier option is edited.

@@ -21,6 +21,11 @@ type noTempLLM struct {
 	mu      sync.Mutex
 	sent    []*float64
 	content string
+
+	// alwaysRefuse refuses every request with the router's words, whether or not
+	// it carries a temperature, as a router does when some other parameter is the
+	// one no endpoint takes.
+	alwaysRefuse bool
 }
 
 func (f *noTempLLM) GenerateContent(_ context.Context, _ []llms.Message, opts ...llms.CallOption) (*llms.Response, error) {
@@ -28,7 +33,7 @@ func (f *noTempLLM) GenerateContent(_ context.Context, _ []llms.Message, opts ..
 	defer f.mu.Unlock()
 	applied := llms.ApplyOptions(opts...)
 	f.sent = append(f.sent, applied.Temperature)
-	if applied.Temperature != nil {
+	if applied.Temperature != nil || f.alwaysRefuse {
 		return nil, errRouterRefusal
 	}
 	return &llms.Response{Content: f.content, FinishReason: llms.FinishReasonStop}, nil
@@ -120,8 +125,8 @@ func TestOnlyARouterRefusalOfARequestWithATemperatureDropsIt(t *testing.T) {
 		if got := c.RejectsTemperature(tc.err, tc.call); got != tc.want {
 			t.Errorf("%s: RejectsTemperature = %v, want %v", name, got, tc.want)
 		}
-		if c.OmitsTemperature() != tc.want {
-			t.Errorf("%s: the client remembered %v, want %v", name, c.OmitsTemperature(), tc.want)
+		if c.OmitsTemperature() {
+			t.Errorf("%s: classifying an error taught the client to omit temperature; only a retry that succeeds may", name)
 		}
 	}
 }
@@ -135,5 +140,59 @@ func TestWithoutTemperatureUnsetsOnlyTheTemperature(t *testing.T) {
 	}
 	if kept := llms.ApplyOptions(call...); kept.Temperature == nil {
 		t.Error("WithoutTemperature edited the options it was given")
+	}
+}
+
+// A refusal whose cause was some other parameter is not a model that takes no
+// temperature. The retry without one fails the same way, and the client must not
+// learn from it to drop a temperature the model accepts.
+func TestAClientDoesNotLearnToOmitTemperatureFromARefusalTheRetryDidNotFix(t *testing.T) {
+	fake := &noTempLLM{alwaysRefuse: true}
+	c := noTempClient(fake)
+	if _, err := Extract[result](context.Background(), c, []llms.Message{{Role: llms.RoleUser, Content: "review"}}); err == nil {
+		t.Fatal("Extract succeeded against a model that refuses every request")
+	}
+	if len(fake.requests()) < 2 {
+		t.Fatalf("requests = %d, want the refused one and its retry without a temperature", len(fake.requests()))
+	}
+	if c.OmitsTemperature() {
+		t.Error("the client learned to omit temperature from a retry that did not succeed")
+	}
+}
+
+func schemaClient(fake *noTempLLM) *Client {
+	c := noTempClient(fake)
+	c.mode = config.StructuredSchema
+	c.Spec.StructuredOutput = config.StructuredSchema
+	return c
+}
+
+// The schema path has its own retry loop, and a model that takes no temperature
+// is handled there the same way: asked again without one, and remembered.
+func TestTheSchemaPathAlsoLearnsThatAModelTakesNoTemperature(t *testing.T) {
+	fake := &noTempLLM{content: validJSON}
+	c := schemaClient(fake)
+	got, err := Extract[result](context.Background(), c, []llms.Message{{Role: llms.RoleUser, Content: "review"}})
+	if err != nil {
+		t.Fatalf("Extract failed on a model that takes no temperature: %v", err)
+	}
+	assertOneFinding(t, got)
+	if sent := fake.requests(); len(sent) != 2 || sent[0] == nil || sent[1] != nil {
+		t.Errorf("temperatures sent = %v, want one refused request with a temperature, then one without", sent)
+	}
+	if !c.OmitsTemperature() {
+		t.Error("the client did not learn from a retry that succeeded")
+	}
+}
+
+// And on the schema path a retry that fails too teaches the client nothing.
+func TestTheSchemaPathDoesNotLearnFromARetryThatFailedToo(t *testing.T) {
+	fake := &noTempLLM{alwaysRefuse: true}
+	c := schemaClient(fake)
+	if _, err := Extract[result](context.Background(), c, []llms.Message{{Role: llms.RoleUser, Content: "review"}}); err == nil {
+		t.Fatal("Extract succeeded against a model that refuses every request")
+	}
+	if c.OmitsTemperature() {
+		t.Error("the client learned to omit temperature from a retry that did not succeed")
 	}
 }

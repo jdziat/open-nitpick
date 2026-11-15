@@ -75,6 +75,10 @@ func (d *deepLLM) GenerateContent(_ context.Context, msgs []llms.Message, opts .
 	if len(msgs) > 0 {
 		system = msgs[0].Content
 	}
+	if d.refuseTemperature == "always" {
+		d.refused++
+		return nil, errors.New("openrouter: generate content: No endpoints found that can handle the requested parameters")
+	}
 	if applied.Temperature != nil {
 		isCritique := strings.Contains(system, "You are grading draft review comments")
 		isForced := len(msgs) > 0 && strings.Contains(msgs[len(msgs)-1].Content, "submit_findings now")
@@ -865,5 +869,20 @@ func TestDeepAgentsReviewUnderTheDeepPromptAndTheOrdinaryReviewKeepsItsOwn(t *te
 	}
 	if ordinary.ordinarySystem == "" || strings.Contains(ordinary.ordinarySystem, deepPromptMarker) {
 		t.Errorf("the ordinary review's system prompt is missing or carries the deep prompt: %.80q", ordinary.ordinarySystem)
+	}
+}
+
+// A deep call refused for a reason a missing temperature does not cure fails
+// again on the retry, and the client does not learn from that to drop a
+// temperature the model takes.
+func TestADeepCallRefusedForAnotherParameterDoesNotTeachTheClientToDropTemperature(t *testing.T) {
+	reviewer := &deepLLM{refuseTemperature: "always", ordinary: mustJSON(t, Result{})}
+	e, _ := deepEngine(t, reviewer, appRepo(t))
+	_, _ = e.Review(context.Background(), vcs.Ref{})
+	if reviewer.refused < 2 {
+		t.Fatalf("refused %d requests, want the call and its retry at least", reviewer.refused)
+	}
+	if e.Roles.Review.OmitsTemperature() {
+		t.Error("the client learned to omit temperature from retries that failed too")
 	}
 }

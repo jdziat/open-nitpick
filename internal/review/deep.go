@@ -356,7 +356,10 @@ func (e *Engine) generateDeep(ctx context.Context, client *llm.Client, msgs []ll
 	resp, err := generateBounded(ctx, client.LLM, msgs, opts, timeout)
 	if client.RejectsTemperature(err, opts) {
 		e.log().Warn("the model accepts no temperature; sending again without it", "model", client.String())
-		return generateBounded(ctx, client.LLM, msgs, llm.WithoutTemperature(opts), timeout)
+		resp, err = generateBounded(ctx, client.LLM, msgs, llm.WithoutTemperature(opts), timeout)
+		if err == nil {
+			client.NoteNoTemperature()
+		}
 	}
 	return resp, err
 }

@@ -127,8 +127,13 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 // records because such a review will not reproduce. Budget is max_retries.
 func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, call []llms.CallOption) (T, *llms.Response, error) {
 	started := c.now()
+	dropped := false
 	for attempt := 0; ; attempt++ {
 		value, raw, err := llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
+		if err == nil && dropped {
+			c.NoteNoTemperature()
+		}
+		dropped = dropped || c.RejectsTemperature(err, call)
 		if next, ok := c.retryAfter(ctx, attempt, started, call, raw, err); ok {
 			call = next
 			continue
@@ -141,6 +146,7 @@ func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, c
 // generateContent is GenerateContent with generateTyped's retries.
 func generateContent(ctx context.Context, c *Client, msgs []llms.Message, call []llms.CallOption) (*llms.Response, error) {
 	started := c.now()
+	dropped := false
 	for attempt := 0; ; attempt++ {
 		var resp *llms.Response
 		err := whileWaiting(ctx, c.Log, "model call", c.String(), waitInterval, func() error {
@@ -148,6 +154,10 @@ func generateContent(ctx context.Context, c *Client, msgs []llms.Message, call [
 			resp, err = c.LLM.GenerateContent(ctx, msgs, call...)
 			return err
 		})
+		if err == nil && dropped {
+			c.NoteNoTemperature()
+		}
+		dropped = dropped || c.RejectsTemperature(err, call)
 		if next, ok := c.retryAfter(ctx, attempt, started, call, resp, err); ok {
 			call = next
 			continue
