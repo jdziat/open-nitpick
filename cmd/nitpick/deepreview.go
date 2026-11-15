@@ -24,6 +24,9 @@ func runDeepReview(ctx context.Context, args []string) error {
 func applyDeepReviewScope(cfg *config.Config) {
 	cfg.Review.MaxFilesPerRequest = cfg.Review.Deep.MaxFilesPerRequest
 	cfg.Review.TokenBudgetPerRequest = cfg.Review.Deep.TokenBudgetPerRequest
+	// Triage writes the prose walkthrough, and deep review replaces triage.
+	// Left at prose, the review would open with no walkthrough at all.
+	cfg.Review.SummaryStyle = config.SummaryReceipt
 }
 
 // deepReviewScoped applies the deep-review scope to a policy resolved for one

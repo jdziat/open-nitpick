@@ -82,7 +82,9 @@ floor, a cap on low-priority findings, and a critique that grades each finding
 against the code it cites; the review lists what was withheld and why. It makes
 about twenty model calls a pull request where [`review`](#review) makes a few,
 and its settings are under `review.deep`. Without a git checkout to search, it
-reviews from the diff. It accepts the same flags as [`review`](#review).
+reviews from the diff. Its walkthrough is always the receipt, because the prose
+style is written by triage, which it does not run. It accepts the same flags as
+[`review`](#review).
 
 ## `full-review`
 

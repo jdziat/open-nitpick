@@ -710,7 +710,8 @@ type Review struct {
 	RelatedContextTokens int `yaml:"related_context_tokens"`
 
 	// SummaryStyle chooses how the walkthrough at the top of a review is
-	// produced. See internal/review/receipt.go.
+	// produced. Deep review prints the receipt whatever this says, because
+	// the prose is written by triage and deep review has none.
 	SummaryStyle SummaryStyle `yaml:"summary_style"`
 
 	// TriageNoNewClaims restores the reviewer's own words over anything triage
