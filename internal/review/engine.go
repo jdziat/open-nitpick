@@ -2722,7 +2722,14 @@ func (e *Engine) reviewPromptFor(client *llm.Client) (string, error) {
 	if e.Config.Review.Slop {
 		slopText = prompt.SlopGuidance()
 	}
-	p, err := prompt.Build(prompt.NameReview, prompt.Options{
+	name := prompt.NameReview
+	if e.Deep {
+		// The deep agents can read the repository and are followed by a critique,
+		// so their base prompt asks for what the ordinary one tells a reviewer
+		// working from the diff alone to leave out. The layers above it are the same.
+		name = prompt.NameDeepReview
+	}
+	p, err := prompt.Build(name, prompt.Options{
 		PersonaText: prompt.Persona(e.Config.Persona),
 		ModelText:   modelText,
 		SlopText:    slopText,

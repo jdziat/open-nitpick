@@ -41,7 +41,12 @@ type deepLLM struct {
 
 	// shown is the newest tool message each agent turn was handed, so a test
 	// can say what the agent was told after a call it made.
-	shown           []string
+	shown []string
+
+	// agentSystem is the system prompt each agent was given, and
+	// ordinarySystem the one the ordinary single call was.
+	agentSystem     map[string]string
+	ordinarySystem  string
 	forcedReplies   []llms.Response
 	grades          *llms.Response
 	critiqueReplies []llms.Response
@@ -101,6 +106,7 @@ func (d *deepLLM) GenerateContent(_ context.Context, msgs []llms.Message, opts .
 		return &out, nil
 	case !strings.Contains(system, "## Looking things up"):
 		d.reviewed++
+		d.ordinarySystem = system
 		return &llms.Response{Content: d.ordinary}, nil
 	}
 	agent, script, fail := config.DeepAgentGeneral, d.general, d.generalErr
@@ -130,6 +136,10 @@ func (d *deepLLM) GenerateContent(_ context.Context, msgs []llms.Message, opts .
 	if last := msgs[len(msgs)-1]; last.Role == llms.RoleTool {
 		d.shown = append(d.shown, last.Content)
 	}
+	if d.agentSystem == nil {
+		d.agentSystem = map[string]string{}
+	}
+	d.agentSystem[agent] = system
 	if d.turns == nil {
 		d.turns = map[string]int{}
 	}
@@ -817,5 +827,40 @@ func TestAConfiguredMaxTokensBoundsEveryStepOfTheForcedSubmission(t *testing.T) 
 	}
 	if want := []int{4096, 4096, 4096}; !slices.Equal(reviewer.forcedMaxTokens, want) {
 		t.Errorf("forced max tokens per step = %v, want %v", reviewer.forcedMaxTokens, want)
+	}
+}
+
+// deepPromptMarker is a heading only the deep base prompt has.
+const deepPromptMarker = "## File every defect you can defend"
+
+// Deep agents review under the deep base prompt, both of them, and the ordinary
+// review keeps its own: the two are written for different reviewers, one that
+// can read the repository and is followed by a critique, and one that cannot.
+func TestDeepAgentsReviewUnderTheDeepPromptAndTheOrdinaryReviewKeepsItsOwn(t *testing.T) {
+	fs := confident(twoFindings(), 0.9)
+	reviewer := &deepLLM{
+		general:  []llms.Response{submit(t, fs[:1])},
+		security: []llms.Response{submit(t, nil)},
+		grades:   gradeAll(t, "proven"),
+		ordinary: mustJSON(t, Result{Findings: fs}),
+	}
+	e, _ := deepEngine(t, reviewer, appRepo(t))
+	if _, err := e.Review(context.Background(), vcs.Ref{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, agent := range []string{config.DeepAgentGeneral, config.DeepAgentSecurity} {
+		if !strings.Contains(reviewer.agentSystem[agent], deepPromptMarker) {
+			t.Errorf("the %s agent did not review under the deep prompt", agent)
+		}
+	}
+
+	ordinary := &deepLLM{ordinary: mustJSON(t, Result{Findings: fs})}
+	plain, _ := deepEngine(t, ordinary, appRepo(t))
+	plain.Deep = false
+	if _, err := plain.Review(context.Background(), vcs.Ref{}); err != nil {
+		t.Fatal(err)
+	}
+	if ordinary.ordinarySystem == "" || strings.Contains(ordinary.ordinarySystem, deepPromptMarker) {
+		t.Errorf("the ordinary review's system prompt is missing or carries the deep prompt: %.80q", ordinary.ordinarySystem)
 	}
 }
