@@ -1606,6 +1606,14 @@ was +0.017 (-0.029 to +0.074), but D3o is not kept and its condition lapsed with
 therefore runs on the build that ships, `d865d18`, with `review.deep.confidence_floor: 0.6`.
 The estimate from labels had put the gain at about 0.045; on posted sets it is half that.
 
+### F6m: the same floor on D3m's drafts (registered 2026-11-15, before it runs)
+
+F6's method applied to D3m's three stored passes, scored by Sol and paired with them as
+posted. It sizes what Mira's adapted prompts would post with a floor of 0.6, and decides
+nothing by itself: shipping text adapted from Mira's prompts is the owner's decision, for its
+licence and attribution and for the contamination limit below. It is reported for that
+decision, whatever it shows.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
