@@ -1416,6 +1416,18 @@ often, so the forced-submission steps are counted.
 - **Several knobs:** D1t and D1h each change one setting. If both are adopted, the
   combination is run on the tuning set before the held-out gate, not assumed.
 
+### L1: the repository build on GPT-6 Luna (registered 2026-11-14, before it runs)
+
+Every arm so far is DeepSeek V4.1 Flash, the model Mira was frozen on. GPT-6 Luna costs about
+the same ($0.10 and $0.50 per million tokens) and takes no temperature, which makes it the
+test of the temperature handling added to the client and of whether the mode depends on one
+model. L1 is the repository build at its defaults with `LLM_MODEL=openai/gpt-6-luna`,
+three passes on the 20 tuning pull requests, scored by Sol, Terra and Luna.
+
+It is descriptive. Mira has no frozen run on this model, so L1 is not ranked against it, and
+no ship condition is attached. It is read against D1c, to see what the model changes, and for
+two counts: reviews that completed, and agent turns that were refused for a temperature.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
