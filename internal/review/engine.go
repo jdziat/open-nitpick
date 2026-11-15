@@ -2011,17 +2011,21 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 	if reused {
 		e.log().Info("reusing completed model review", "files", b.Paths(), "model", client.String())
 	} else {
-		callCtx := ctx
-		var cancel context.CancelFunc
-		if e.RequestTimeout > 0 {
-			callCtx, cancel = context.WithTimeout(ctx, e.RequestTimeout)
-			defer cancel()
-		}
 		var deep deepOutcome
 		if e.Deep && !style {
-			result, deep = e.deepReviewBatch(callCtx, client, msgs, offeredClasses(e.Config.Review.Slop))
+			// Not under RequestTimeout, which bounds one request: the agents
+			// make many, bounded each and as a whole by review.deep. Under it
+			// they were cut off partway, and the fallback below inherited the
+			// expired context and failed the batch.
+			result, deep = e.deepReviewBatch(ctx, client, msgs, offeredClasses(e.Config.Review.Slop))
 		}
 		if !deep.reviewed {
+			callCtx := ctx
+			if e.RequestTimeout > 0 {
+				var cancel context.CancelFunc
+				callCtx, cancel = context.WithTimeout(ctx, e.RequestTimeout)
+				defer cancel()
+			}
 			callMsgs := msgs
 			if e.Deep && !style {
 				// Told it can read the repository through tools this call does not

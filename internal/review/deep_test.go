@@ -64,9 +64,12 @@ type deepLLM struct {
 	critiqueRequest             string
 }
 
-func (d *deepLLM) GenerateContent(_ context.Context, msgs []llms.Message, opts ...llms.CallOption) (*llms.Response, error) {
+func (d *deepLLM) GenerateContent(ctx context.Context, msgs []llms.Message, opts ...llms.CallOption) (*llms.Response, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if d.delay > 0 {
 		time.Sleep(d.delay)
 	}
@@ -324,6 +327,33 @@ func TestWhenEveryDeepAgentFailsTheBatchIsReviewedTheOrdinaryWayAndTheReportSays
 	}
 	if notice := stageNotice(report); !strings.Contains(notice, "without tools (every agent failed)") {
 		t.Errorf("notice = %q, want it to say the batch ran without tools", notice)
+	}
+}
+
+// RequestTimeout bounds one request, and a deep review makes many, which
+// review.deep bounds itself. Applied to the agents, it expired during their run
+// and the fallback call inherited it, so a batch the ordinary call could still
+// have reviewed failed instead. Every call here takes 150ms and the limit is
+// 200ms: the two failed agent turns use 300ms between them, and the fallback
+// call still answers.
+func TestRequestTimeoutBoundsTheFallbackCallAndNotTheDeepAgentsRun(t *testing.T) {
+	fs := confident(twoFindings(), 0.9)
+	reviewer := &deepLLM{
+		generalErr:  errors.New("upstream 503"),
+		securityErr: errors.New("upstream 503"),
+		grades:      gradeAll(t, "proven", "proven"),
+		ordinary:    mustJSON(t, Result{Findings: fs}),
+		delay:       150 * time.Millisecond,
+	}
+	e, _ := deepEngine(t, reviewer, appRepo(t))
+	e.RequestTimeout = 200 * time.Millisecond
+	report, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reviewer.reviewed != 1 || len(report.Findings) != 2 || len(report.Incomplete) != 0 {
+		t.Errorf("ordinary reviews %d, %d findings, unreviewed %v; want the fallback to review both findings' file",
+			reviewer.reviewed, len(report.Findings), report.Incomplete)
 	}
 }
 
