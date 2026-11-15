@@ -131,6 +131,7 @@ func Defaults() *Config {
 				Critique:              true,
 				MaxFilesPerRequest:    60,
 				TokenBudgetPerRequest: 120000,
+				Timeout:               15 * time.Minute,
 			},
 			Approve: Approve{
 				// Residual max_severity is stated so an operator who turns

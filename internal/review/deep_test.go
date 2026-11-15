@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
@@ -34,11 +35,18 @@ type deepLLM struct {
 	// learned on an earlier call, so the call under test is the one that meets it.
 	refuseTemperature string
 	refused           int
-	forcedReplies     []llms.Response
-	grades            *llms.Response
-	critiqueReplies   []llms.Response
-	critiqueErr       error
-	ordinary          string
+
+	// delay is how long every call takes, for a test about wall-clock time.
+	delay time.Duration
+
+	// shown is the newest tool message each agent turn was handed, so a test
+	// can say what the agent was told after a call it made.
+	shown           []string
+	forcedReplies   []llms.Response
+	grades          *llms.Response
+	critiqueReplies []llms.Response
+	critiqueErr     error
+	ordinary        string
 
 	turns                       map[string]int
 	forced, critiqued, reviewed int
@@ -54,6 +62,9 @@ type deepLLM struct {
 func (d *deepLLM) GenerateContent(_ context.Context, msgs []llms.Message, opts ...llms.CallOption) (*llms.Response, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.delay > 0 {
+		time.Sleep(d.delay)
+	}
 	applied := llms.ApplyOptions(opts...)
 	system := ""
 	if len(msgs) > 0 {
@@ -115,6 +126,9 @@ func (d *deepLLM) GenerateContent(_ context.Context, msgs []llms.Message, opts .
 		}
 		out := d.forcedReplies[i]
 		return &out, nil
+	}
+	if last := msgs[len(msgs)-1]; last.Role == llms.RoleTool {
+		d.shown = append(d.shown, last.Content)
 	}
 	if d.turns == nil {
 		d.turns = map[string]int{}
@@ -674,5 +688,134 @@ func TestTheCritiqueIsSentAgainWithoutATemperatureTheModelRefuses(t *testing.T) 
 	}
 	if got := titles(report); len(got) != 1 {
 		t.Errorf("findings = %v, want the critique's grades applied: one kept, one withheld", got)
+	}
+}
+
+// unparsed is a submit_findings call whose arguments are not JSON.
+func unparsed() llms.Response {
+	return llms.Response{ToolCalls: []llms.ToolCall{{
+		ID: "bad", Type: llms.ToolTypeFunction,
+		Function: &llms.FunctionCall{Name: submitFindings, Arguments: `{"findings": [{"path": "app.go", `},
+	}}}
+}
+
+// An agent whose submission does not parse is told so as the answer to its call
+// and sends the findings again, instead of costing the batch the agent.
+func TestADeepAgentWhoseFindingsDoNotParseIsAskedToSendThemAgain(t *testing.T) {
+	fs := confident(twoFindings(), 0.9)
+	reviewer := &deepLLM{
+		general:  []llms.Response{unparsed(), submit(t, fs[:1])},
+		security: []llms.Response{submit(t, nil)},
+		grades:   gradeAll(t, "proven"),
+	}
+	e, _ := deepEngine(t, reviewer, appRepo(t))
+	report, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := titles(report); len(got) != 1 || got[0] != fs[0].Title {
+		t.Errorf("findings = %v, want the resent submission's %q", got, fs[0].Title)
+	}
+	if len(report.FailedStages()) != 0 {
+		t.Errorf("failed stages = %v; a submission the agent could repair must not fail it", report.FailedStages())
+	}
+	if len(reviewer.shown) != 1 || !strings.Contains(reviewer.shown[0], "did not parse as JSON") {
+		t.Errorf("the agent was shown %q, want the parse failure as the answer to its call", reviewer.shown)
+	}
+}
+
+// The forced submission treats a call that does not parse like prose: it is
+// asked once more at the same step, and its answer is kept.
+func TestAForcedSubmissionThatDoesNotParseIsAskedAgain(t *testing.T) {
+	fs := confident(twoFindings(), 0.9)
+	reviewer := &deepLLM{
+		general:       []llms.Response{lookup("app.go")},
+		security:      []llms.Response{submit(t, nil)},
+		forcedReplies: []llms.Response{unparsed(), submit(t, fs[:1])},
+		grades:        gradeAll(t, "proven"),
+	}
+	e, _ := deepEngine(t, reviewer, appRepo(t))
+	e.Config.Review.Deep.MaxTurns = 1
+	report, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reviewer.forced != 2 {
+		t.Errorf("forced calls = %d, want the unparsed one and its retry", reviewer.forced)
+	}
+	if got := titles(report); len(got) != 1 || len(report.FailedStages()) != 0 {
+		t.Errorf("findings %v, failed stages %v; want the retry's finding and a complete review", got, report.FailedStages())
+	}
+}
+
+// An agent that has used its wall-clock budget is asked to submit between turns
+// instead of reading on, so a slow provider ends a review and does not hold it.
+func TestADeepAgentThatUsedItsTimeBudgetIsAskedToSubmit(t *testing.T) {
+	fs := confident(twoFindings(), 0.9)
+	reviewer := &deepLLM{
+		delay:         5 * time.Millisecond,
+		general:       []llms.Response{lookup("app.go"), lookup("app.go"), submit(t, nil)},
+		security:      []llms.Response{submit(t, nil)},
+		forcedReplies: []llms.Response{submit(t, fs[:1])},
+		grades:        gradeAll(t, "proven"),
+	}
+	e, _ := deepEngine(t, reviewer, appRepo(t))
+	e.Config.Review.Deep.Timeout = time.Millisecond
+	report, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reviewer.turns[config.DeepAgentGeneral] != 1 || reviewer.forced != 1 {
+		t.Errorf("general turns %d, forced submissions %d; want one turn and then the forced submission",
+			reviewer.turns[config.DeepAgentGeneral], reviewer.forced)
+	}
+	if got := titles(report); len(got) != 1 || got[0] != fs[0].Title {
+		t.Errorf("findings = %v, want the forced submission's %q", got, fs[0].Title)
+	}
+}
+
+// A timeout of zero removes the budget: the agent reads on to its own
+// submission however long each turn takes.
+func TestAZeroTimeBudgetLetsADeepAgentReadOn(t *testing.T) {
+	fs := confident(twoFindings(), 0.9)
+	reviewer := &deepLLM{
+		delay:    5 * time.Millisecond,
+		general:  []llms.Response{lookup("app.go"), lookup("app.go"), submit(t, fs[:1])},
+		security: []llms.Response{submit(t, nil)},
+		grades:   gradeAll(t, "proven"),
+	}
+	e, _ := deepEngine(t, reviewer, appRepo(t))
+	e.Config.Review.Deep.Timeout = 0
+	if _, err := e.Review(context.Background(), vcs.Ref{}); err != nil {
+		t.Fatal(err)
+	}
+	if reviewer.turns[config.DeepAgentGeneral] != 3 || reviewer.forced != 0 {
+		t.Errorf("general turns %d, forced submissions %d; want three turns and no forced submission",
+			reviewer.turns[config.DeepAgentGeneral], reviewer.forced)
+	}
+}
+
+// A configured max_tokens bounds the forced submission too, on every step of
+// its ladder, and not only the agent's turns.
+func TestAConfiguredMaxTokensBoundsEveryStepOfTheForcedSubmission(t *testing.T) {
+	fs := confident(twoFindings(), 0.9)
+	reviewer := &deepLLM{
+		general:  []llms.Response{lookup("app.go")},
+		security: []llms.Response{submit(t, nil)},
+		forcedReplies: []llms.Response{
+			{FinishReason: llms.FinishReasonLength},
+			{FinishReason: llms.FinishReasonLength},
+			submit(t, fs[:1]),
+		},
+		grades: gradeAll(t, "proven"),
+	}
+	e, _ := deepEngine(t, reviewer, appRepo(t))
+	e.Config.Review.Deep.MaxTokens = 4096
+	e.Config.Review.Deep.MaxTurns = 1
+	if _, err := e.Review(context.Background(), vcs.Ref{}); err != nil {
+		t.Fatal(err)
+	}
+	if want := []int{4096, 4096, 4096}; !slices.Equal(reviewer.forcedMaxTokens, want) {
+		t.Errorf("forced max tokens per step = %v, want %v", reviewer.forcedMaxTokens, want)
 	}
 }

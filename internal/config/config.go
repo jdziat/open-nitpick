@@ -1493,9 +1493,16 @@ type DeepReview struct {
 	// own. Default medium.
 	Reasoning ReasoningLevel `yaml:"reasoning"`
 
-	// MaxTokens caps the output of each agent call, reasoning included. Zero
-	// keeps the review model's cap.
+	// MaxTokens caps the output of each agent call, reasoning included, and of
+	// its final submission. Zero keeps the review model's cap for a turn and
+	// gives the final submission 65,536 tokens to finish thinking.
 	MaxTokens int `yaml:"max_tokens"`
+
+	// Timeout is the wall-clock budget of one agent on one batch. When it runs
+	// out between two turns the agent is asked to submit what it has found, so
+	// a slow provider ends a review instead of holding a CI job for an hour.
+	// Zero removes the budget. Default 15m.
+	Timeout time.Duration `yaml:"timeout"`
 
 	// ConfidenceFloor is the confidence a finding needs to be posted. One
 	// below it is listed with the withheld findings, not dropped unseen.

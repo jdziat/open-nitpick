@@ -528,6 +528,9 @@ func (d DeepReview) validate() []error {
 	if d.MaxTokens < 0 {
 		errs = append(errs, fmt.Errorf("review.deep.max_tokens must not be negative, got %d", d.MaxTokens))
 	}
+	if d.Timeout < 0 {
+		errs = append(errs, fmt.Errorf("review.deep.timeout must not be negative, got %s", d.Timeout))
+	}
 	if d.ConfidenceFloor < 0 || d.ConfidenceFloor > 1 {
 		errs = append(errs, fmt.Errorf("review.deep.confidence_floor must be between 0 and 1, got %g", d.ConfidenceFloor))
 	}

@@ -255,11 +255,19 @@ func (e *Engine) runDeepAgent(ctx context.Context, client *llm.Client, name stri
 	// finish, then low effort, then none. Each step down is taken only when the
 	// one before ran out of output budget.
 	submit := llms.WithToolChoiceTool(submitFindings)
-	room := llms.WithMaxTokens(deepForcedMaxTokens)
+	forcedCap := deepForcedMaxTokens
+	if deep.MaxTokens > 0 {
+		forcedCap = deep.MaxTokens
+	}
+	room := llms.WithMaxTokens(forcedCap)
+	noThinking := append(client.CallOptionsWith(&temperature, config.ReasoningOff), offered, submit)
+	if deep.MaxTokens > 0 {
+		noThinking = append(noThinking, room)
+	}
 	ladder := []forcedRung{
 		{opts: append(slices.Clone(opts), submit, room)},
 		{opts: append(client.CallOptionsWith(&temperature, config.ReasoningLow), offered, submit, room), low: true},
-		{opts: append(client.CallOptionsWith(&temperature, config.ReasoningOff), offered, submit), off: true},
+		{opts: noThinking, off: true},
 	}
 
 	var run agentRun
@@ -270,7 +278,13 @@ func (e *Engine) runDeepAgent(ctx context.Context, client *llm.Client, name stri
 			"reasoning_tokens", run.usage.ReasoningTokens)
 		return r, nil
 	}
+	started := time.Now()
 	for run.turns < deep.MaxTurns {
+		if run.turns > 0 && deep.Timeout > 0 && time.Since(started) >= deep.Timeout {
+			e.log().Warn("a deep-review agent used its time budget; asking it to submit what it has",
+				"agent", name, "budget", deep.Timeout, "turns", run.turns)
+			break
+		}
 		run.turns++
 		resp, err := e.generateDeep(ctx, client, msgs, opts, deepCallTimeout)
 		if err != nil {
@@ -296,10 +310,17 @@ func (e *Engine) runDeepAgent(ctx context.Context, client *llm.Client, name stri
 			}
 			if fn == submitFindings {
 				r, err := parseSubmission(raw)
-				if err != nil {
-					return Result{}, err
+				if err == nil {
+					return finish(r)
 				}
-				return finish(r)
+				// A tool call needs an answer or the next request is invalid, and
+				// the answer that lets the agent repair its submission is the
+				// error. Failing here would cost the batch the whole agent over
+				// one malformed call.
+				e.log().Warn("an agent's findings did not parse; asking it to send them again", "agent", name, "error", err)
+				msgs = append(msgs, llms.Message{Role: llms.RoleTool, ToolCallID: call.ID,
+					Content: "The findings did not parse as JSON (" + err.Error() + "). Call " + submitFindings + " again with valid JSON."})
+				continue
 			}
 			run.lookups++
 			result, ok := runLookup(ctx, tools, fn, args)
@@ -379,13 +400,19 @@ func (e *Engine) forceSubmission(ctx context.Context, client *llm.Client, msgs [
 			return Result{}, fmt.Errorf("forced submission: %w", err)
 		}
 		run.add(resp.Usage)
+		var unparsed error
 		for _, call := range resp.ToolCalls {
 			if call.Function != nil && call.Function.Name == submitFindings && resp.FinishReason != llms.FinishReasonLength {
-				return parseSubmission(call.Function.Arguments)
+				r, err := parseSubmission(call.Function.Arguments)
+				if err == nil {
+					return r, nil
+				}
+				unparsed = err
+				break
 			}
 		}
-		e.log().Warn("a forced submission made no tool call",
-			"step", step+1, "finish", resp.FinishReason, "content_bytes", len(resp.Content))
+		e.log().Warn("a forced submission made no usable tool call",
+			"step", step+1, "finish", resp.FinishReason, "content_bytes", len(resp.Content), "unparsed", unparsed != nil)
 		switch {
 		case resp.FinishReason == llms.FinishReasonLength:
 			last = errors.New("the forced submission ran out of output budget")
@@ -401,10 +428,22 @@ func (e *Engine) forceSubmission(ctx context.Context, client *llm.Client, msgs [
 		case !nudged:
 			nudged = true
 			last = errors.New("the forced submission came back as prose")
+			ask := "That was prose, not a tool call. Call " + submitFindings + " now with the findings you have."
+			said := resp.Content
+			if unparsed != nil {
+				last = unparsed
+				ask = "The findings did not parse as JSON (" + unparsed.Error() + "). Call " + submitFindings + " now with valid JSON."
+				if strings.TrimSpace(said) == "" {
+					said = "I called " + submitFindings + "."
+				}
+			}
 			convo = append(convo,
-				llms.Message{Role: llms.RoleAssistant, Content: resp.Content, Reasoning: resp.Reasoning},
-				llms.Message{Role: llms.RoleUser, Content: "That was prose, not a tool call. Call " + submitFindings + " now with the findings you have."})
+				llms.Message{Role: llms.RoleAssistant, Content: said, Reasoning: resp.Reasoning},
+				llms.Message{Role: llms.RoleUser, Content: ask})
 		default:
+			if unparsed != nil {
+				return Result{}, unparsed
+			}
 			return Result{}, errors.New("the forced submission came back as prose")
 		}
 	}

@@ -1315,7 +1315,7 @@ MaxFilesPerRequest replaces review.max_files_per_request, so a pull request is r
 ### `review.deep.max_tokens`
 
 integer, default `0`.
-MaxTokens caps the output of each agent call, reasoning included. Zero keeps the review model's cap.
+MaxTokens caps the output of each agent call, reasoning included, and of its final submission. Zero keeps the review model's cap for a turn and gives the final submission 65,536 tokens to finish thinking.
 
 ### `review.deep.max_turns`
 
@@ -1331,6 +1331,11 @@ Reasoning is the agents' reasoning level, whatever the review model's own. One o
 
 number, default `0.2`.
 Temperature is the agents' sampling temperature, whatever the review model's own.
+
+### `review.deep.timeout`
+
+duration, default `15m0s`.
+Timeout is the wall-clock budget of one agent on one batch.
 
 ### `review.deep.token_budget_per_request`
 

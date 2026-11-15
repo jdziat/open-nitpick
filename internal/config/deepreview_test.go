@@ -3,6 +3,7 @@ package config
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // The defaults are the settings Mira reviews with, which is what the deep
@@ -21,15 +22,16 @@ func TestDeepReviewValidationRejectsWhatCannotRun(t *testing.T) {
 		tune func(*DeepReview)
 		want string
 	}{
-		"no agents":        {func(d *DeepReview) { d.Agents = nil }, "at least one agent"},
-		"an unknown agent": {func(d *DeepReview) { d.Agents = []string{"general", "perf"} }, `"perf"`},
-		"an agent twice":   {func(d *DeepReview) { d.Agents = []string{"general", "general"} }, "twice"},
-		"zero turns":       {func(d *DeepReview) { d.MaxTurns = 0 }, "max_turns"},
-		"a floor above 1":  {func(d *DeepReview) { d.ConfidenceFloor = 1.5 }, "confidence_floor"},
-		"a negative cap":   {func(d *DeepReview) { d.LowPriorityCap = -1 }, "low_priority_cap"},
-		"a bad reasoning":  {func(d *DeepReview) { d.Reasoning = "lots" }, "reasoning"},
-		"a hot sampler":    {func(d *DeepReview) { d.Temperature = 3 }, "temperature"},
-		"no batch files":   {func(d *DeepReview) { d.MaxFilesPerRequest = 0 }, "max_files_per_request"},
+		"no agents":          {func(d *DeepReview) { d.Agents = nil }, "at least one agent"},
+		"an unknown agent":   {func(d *DeepReview) { d.Agents = []string{"general", "perf"} }, `"perf"`},
+		"an agent twice":     {func(d *DeepReview) { d.Agents = []string{"general", "general"} }, "twice"},
+		"zero turns":         {func(d *DeepReview) { d.MaxTurns = 0 }, "max_turns"},
+		"a floor above 1":    {func(d *DeepReview) { d.ConfidenceFloor = 1.5 }, "confidence_floor"},
+		"a negative cap":     {func(d *DeepReview) { d.LowPriorityCap = -1 }, "low_priority_cap"},
+		"a bad reasoning":    {func(d *DeepReview) { d.Reasoning = "lots" }, "reasoning"},
+		"a hot sampler":      {func(d *DeepReview) { d.Temperature = 3 }, "temperature"},
+		"no batch files":     {func(d *DeepReview) { d.MaxFilesPerRequest = 0 }, "max_files_per_request"},
+		"a negative timeout": {func(d *DeepReview) { d.Timeout = -time.Second }, "timeout"},
 	} {
 		cfg := Defaults()
 		cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
@@ -43,5 +45,13 @@ func TestDeepReviewValidationRejectsWhatCannotRun(t *testing.T) {
 	cfg.Models.Default = ModelSpec{Provider: "openai", Model: "gpt-4o"}
 	if err := cfg.Validate(); err != nil {
 		t.Errorf("the defaults do not validate: %v", err)
+	}
+}
+
+// An agent has a wall-clock budget by default, so a slow provider cannot hold a
+// review open for as long as it likes, and zero turns it off.
+func TestDeepReviewHasAWallClockBudgetByDefault(t *testing.T) {
+	if got := Defaults().Review.Deep.Timeout; got != 15*time.Minute {
+		t.Errorf("review.deep.timeout default = %s, want 15m", got)
 	}
 }
