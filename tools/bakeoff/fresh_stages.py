@@ -1,41 +1,90 @@
 #!/usr/bin/env python3
 """On the fresh corpus: how often a drafted finding is a true positive, by the stage that held it back.
-Labels come from the judge's verdicts on the drafted sets; a diagnostic, not the registered measure.
+
+Labels come from the judge's verdicts on the drafted sets. This is a diagnostic, not the registered
+measure.
 
     python3 tools/bakeoff/fresh_stages.py [judge] [fresh directory]
 """
-import json, glob, sys, collections
+
+import collections
+import json
+import sys
 from pathlib import Path
-F = sys.argv[2] if len(sys.argv) > 2 else "/tmp/bakeoff/fresh"
-J = sys.argv[1] if len(sys.argv) > 1 else "openai-gpt-6.1-sol"
-def key(c): return f'{c["title"]}\n{c["path"]}:{c["line"]}\n{c["body"]}'.strip()
-def kind(stage):
-    if stage == "posted": return "posted"
-    if "below the floor" in stage: return "held by the floor"
-    if "repeats" in stage: return "held as a duplicate"
-    if "unsupported" in stage: return "held by the critique (unsupported)"
-    if "plausible" in stage: return "held by the critique (plausible)"
-    return "other: " + stage[:30]
-for arm in ("d1c", "d3m"):
-    ev = json.loads(Path(f"{F}/scores-{arm}-{J}/scores.json").read_text())["evaluations"]
-    tally = collections.defaultdict(lambda: [0, 0]); conf = collections.defaultdict(lambda: [0, 0]); merged = 0
-    for p in (1, 2, 3):
-        for case_dir in sorted(Path(f"{F}/runs/{arm}-p{p}").glob("*-r1")):
-            v = ev.get(case_dir.name, {}).get(f"{arm}-p{p}-drafted")
-            if v is None: continue
-            tp = {c["matched_candidate"].strip() for c in v["true_positives"]}
-            fp = {c["candidate"].strip() for c in v["false_positives"]}
-            r = json.loads((case_dir / "result.json").read_text())["result"]
-            drafts = [(c, "posted") for c in r["comments"]] + [(w, w["reason"]) for w in r.get("withheld", [])]
-            for c, why in drafts:
-                k = key(c)
-                if k in tp: hit = 1
-                elif k in fp: hit = 0
-                else: merged += 1; continue
-                tally[kind(why)][0] += hit; tally[kind(why)][1] += 1
-                b = "0.9+" if float(c.get("confidence") or 0) >= 0.9 else ("0.8" if float(c.get("confidence") or 0) >= 0.8 else ("0.7" if float(c.get("confidence") or 0) >= 0.7 else "<0.7"))
-                conf[b][0] += hit; conf[b][1] += 1
-    tot = sum(v[1] for v in tally.values()); hits = sum(v[0] for v in tally.values())
-    print(f"{arm}: {tot} labelled drafts, {hits} true ({merged} merged by the scorer's own dedup)")
-    for k, (h, n) in sorted(tally.items(), key=lambda kv: -kv[1][1]): print(f"   {k:38} {h:3}/{n:3} true = {h/n:.0%}")
-    print("   by confidence: " + ", ".join(f"{b} {conf[b][0]}/{conf[b][1]} ({conf[b][0]/conf[b][1]:.0%})" for b in ("<0.7", "0.7", "0.8", "0.9+") if conf[b][1]))
+
+JUDGE = sys.argv[1] if len(sys.argv) > 1 else "openai-gpt-6.1-sol"
+FRESH = Path(sys.argv[2] if len(sys.argv) > 2 else "/tmp/bakeoff/fresh")
+
+
+def key(comment):
+    """The scorer's rendering of a candidate, which is how a verdict names it."""
+    return f'{comment["title"]}\n{comment["path"]}:{comment["line"]}\n{comment["body"]}'.strip()
+
+
+def stage_of(reason):
+    if reason == "posted":
+        return "posted"
+    if "below the floor" in reason:
+        return "held by the floor"
+    if "repeats" in reason:
+        return "held as a duplicate"
+    if "unsupported" in reason:
+        return "held by the critique (unsupported)"
+    if "plausible" in reason:
+        return "held by the critique (plausible)"
+    return "other: " + reason[:30]
+
+
+def band(confidence):
+    if confidence >= 0.9:
+        return "0.9+"
+    if confidence >= 0.8:
+        return "0.8"
+    if confidence >= 0.7:
+        return "0.7"
+    return "<0.7"
+
+
+def labelled_drafts(arm, evaluations):
+    """Every draft of an arm with the judge's verdict on it, and how many the scorer merged away."""
+    drafts, merged = [], 0
+    for pass_number in (1, 2, 3):
+        for case_dir in sorted((FRESH / "runs" / f"{arm}-p{pass_number}").glob("*-r1")):
+            verdict = evaluations.get(case_dir.name, {}).get(f"{arm}-p{pass_number}-drafted")
+            if verdict is None:
+                continue
+            true = {c["matched_candidate"].strip() for c in verdict["true_positives"]}
+            false = {c["candidate"].strip() for c in verdict["false_positives"]}
+            result = json.loads((case_dir / "result.json").read_text())["result"]
+            held = [(w, w["reason"]) for w in result.get("withheld", [])]
+            for comment, reason in [(c, "posted") for c in result["comments"]] + held:
+                if key(comment) in true:
+                    drafts.append((comment, reason, 1))
+                elif key(comment) in false:
+                    drafts.append((comment, reason, 0))
+                else:
+                    merged += 1
+    return drafts, merged
+
+
+def main():
+    for arm in ("d1c", "d3m"):
+        path = FRESH / f"scores-{arm}-{JUDGE}" / "scores.json"
+        drafts, merged = labelled_drafts(arm, json.loads(path.read_text())["evaluations"])
+        by_stage = collections.defaultdict(lambda: [0, 0])
+        by_band = collections.defaultdict(lambda: [0, 0])
+        for comment, reason, hit in drafts:
+            for table, name in ((by_stage, stage_of(reason)), (by_band, band(float(comment.get("confidence") or 0)))):
+                table[name][0] += hit
+                table[name][1] += 1
+        hits = sum(h for h, _ in by_stage.values())
+        print(f"{arm}: {len(drafts)} labelled drafts, {hits} true ({merged} merged by the scorer's own dedup)")
+        for name, (h, n) in sorted(by_stage.items(), key=lambda item: -item[1][1]):
+            print(f"   {name:38} {h:3}/{n:3} true = {h / n:.0%}")
+        rates = ", ".join(f"{b} {by_band[b][0]}/{by_band[b][1]} ({by_band[b][0] / by_band[b][1]:.0%})"
+                          for b in ("<0.7", "0.7", "0.8", "0.9+") if by_band[b][1])
+        print(f"   by confidence: {rates}")
+
+
+if __name__ == "__main__":
+    main()
