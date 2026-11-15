@@ -1550,6 +1550,32 @@ no held-out number can steer a choice the tuning set has not already made.
 - **If D1t or D1h is adopted,** the build that ships changes and gets its own gate as well.
   Every held-out run is reported, whatever it shows.
 
+### F6: a confidence floor of 0.6, scored from stored drafts (registered 2026-11-15, before it runs)
+
+The deep selection's floor of 0.7 is Mira's number, taken without a measurement of our own.
+Joined with the scorer's verdicts on the drafted sets, the drafts that floor withheld at
+confidence 0.6 to 0.69 were true 34% to 37% of the time on D1c under each of the three judges,
+and 42% of the time on D3m under Sol. Adding a finding raises F1 when it is true more often
+than half the current F1, about 24% here, so the floor appears to withhold findings that
+would raise it. The estimate from those labels is biased: it puts D3m's posted F1 at 0.447,
+where its posted sets scored 0.486. It is therefore checked on posted sets before an arm runs.
+
+F6 builds, from each stored pass, the set a floor of 0.6 would post: the posted findings plus
+the drafts the floor withheld at 0.6 or more, with the cap of five info and nit findings
+applied in severity-then-confidence order (`floorset.py`, beside the bakeoff scripts). The
+critique never saw the added drafts, so this is a 0.6 floor with the critique off for them.
+The critique withholds mostly false findings (8 true of 85 on D3m), so a real arm should do
+no worse. The sets are scored by Sol and paired by pull request with the passes they were
+built from. F6 runs on D1c now and on D3o once D3o is scored.
+
+- **Run the arm, D5f:** F6's posted F1 under Sol at least 0.02 above the passes it was built
+  from, on D1c and, if D3o is kept, on D3o. D5f is the build that ships with
+  `review.deep.confidence_floor: 0.6`: three passes on the tuning set, scored by Sol, Terra
+  and Luna.
+- **Keep the floor at 0.6:** D5f's posted F1 under Sol at least 0.03 above its parent's, the
+  bar D1t was held to. The default then changes, and the build gets its own held-out gate.
+- **Leave the floor at 0.7:** F6 below 0.02 on either arm, or D5f below its bar.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
