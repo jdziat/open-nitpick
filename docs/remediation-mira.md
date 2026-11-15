@@ -1634,6 +1634,63 @@ same passes as posted (+0.024, interval -0.008 to +0.059), with recall up 6.4 po
 both fewer and truer: 13 true of 34 scored for D3m, against 16 of 55 for D1c. The same gain
 on our own prompt (F6, D1c) leaves it at 0.440, below Mira's 0.481.
 
+### F7: a corpus neither tool has seen (registered 2026-11-15, before it is built)
+
+Asked whether to adopt prompts adapted from Mira or keep ours, the owner asked first for a
+comparison on different bugs, to see whether the grades hold. Every pull request so far is from
+the Martian set, which the person writing the prompts has read and Mira's authors score
+themselves on. F7 builds a second corpus by a rule fixed here and runs the arms already
+measured on it.
+
+**Corpus rule, applied mechanically.**
+
+1. Merged pull requests from 2026-09-01 to 2026-11-08 in public repositories with at least 200
+   stars whose primary language is TypeScript, Python, Go, Java or Ruby, excluding the five
+   Martian repositories. The window is after the Martian benchmark's own data and recent
+   enough that no reviewer here is likely to have trained on it.
+2. 2 to 40 changed files, 40 to 1,500 changed lines, an author that is not a bot.
+3. A golden comment is a review thread whose first comment is by a human other than the pull
+   request's author, is at least 30 characters, and which GitHub marks outdated, meaning a later
+   commit changed the lines it was on. The reviewed state is the commit that carries the most
+   such threads (ties: the earliest). Its diff against the pull request's base is the review
+   input, and only threads on that commit count.
+4. Each golden comment is given one of Martian's ten categories by `anthropic/claude-sonnet-5.5`
+   from the comment, the diff hunk and the path. A pull request needs at least one comment in
+   a core category (bug, security, concurrency, data, api, perf, test_gap, doc_defect) to be
+   eligible. Scoring is upstream's core profile, so a match to a style or speculative comment is
+   neither rewarded nor penalised.
+5. Eligible pull requests are ordered by the SHA-256 of `owner/repo#number`, and the first six
+   per language are taken, at most two per repository. Nothing about a pull request's content,
+   or any tool's result on it, enters the order.
+6. The golden text is the human's comment as written, prefixed with `path:line: `. Nothing is
+   paraphrased.
+
+**Arms.** Three passes each, `deepseek/deepseek-v4.1-flash-1017` for every role, scored by
+Sol, Terra and Luna with the upstream matching prompts, posted and drafted sets both:
+
+- Mira, with the settings of its frozen arm A.
+- D1c, the repository build with our prompt, as measured on the tuning set.
+- D3m, the same build with Mira's two prompts adapted to our schema.
+- D5f, the current build `d865d18` with `review.deep.confidence_floor: 0.6`.
+
+**Reading,** each difference paired by pull request with a bootstrap interval, under Sol first
+and the other two beside it. A grade holds when its sign repeats and the point estimate is within
+0.04 of the earlier one; the earlier values, under Sol, are Mira minus D1c +0.065, D3m minus D1c
++0.070 and D3m minus Mira +0.005.
+
+- **Adopt the adapted prompts** (a recommendation, the decision is the owner's): D3m minus D1c
+  at least +0.03 and D3m minus Mira at least -0.02 under Sol. Otherwise the adoption case falls
+  away and our prompts stay.
+- **Beating Mira** is claimed for a configuration only when its posted F1 exceeds Mira's under
+  Sol on this corpus and on the held-out set. No build with Mira's prompts has been gated on
+  the held-out set, so D4b follows if D3m clears the adoption condition here.
+- Every number is reported, whatever it shows.
+
+**Rules for the corpus.** It is read only to check the build: the counts and a sample of golden
+comments. No prompt, filter or default changes because of what it contains. Each arm is scored
+once per judge. Mira's runs are frozen when they finish, like the others. The estimate is $60,
+and the work stops and reports if the key's weekly usage passes $300 (it was $223 on the 15th).
+
 ### What this means for the goal
 
 Deep review is built: two agents a batch that read the repository over up to ten turns,
