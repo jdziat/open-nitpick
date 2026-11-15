@@ -37,6 +37,13 @@ const (
 	deepCallTimeout = 4 * time.Minute
 
 	submitFindings = "submit_findings"
+
+	// deepForcedMaxTokens and deepForcedTimeout give the forced submission room
+	// to think over the whole transcript. At the 16,384-token cap the client
+	// otherwise sends, D1's forced submissions ran out 16% to 34% of the time;
+	// replayed, the same request finished between 16k and 65k.
+	deepForcedMaxTokens = 65536
+	deepForcedTimeout   = 10 * time.Minute
 )
 
 // deepAgent is one reviewer in a deep review: a name for the logs and the
@@ -143,6 +150,7 @@ func (e *Engine) deepReviewBatch(ctx context.Context, client *llm.Client, msgs [
 type agentRun struct {
 	turns, lookups, bytes int
 	forced                bool
+	reasoningLow          int
 	reasoningOff          int
 	usage                 llms.Usage
 }
@@ -171,12 +179,21 @@ func (e *Engine) runDeepAgent(ctx context.Context, client *llm.Client, name stri
 		opts = append(opts, llms.WithMaxTokens(deep.MaxTokens))
 	}
 	opts = append(opts, offered, llms.WithToolChoiceAuto())
-	plain := append(client.CallOptionsWith(&temperature, config.ReasoningOff), offered)
+	// The forced submission's ladder: the configured reasoning with room to
+	// finish, then low effort, then none. Each step down is taken only when the
+	// one before ran out of output budget.
+	submit := llms.WithToolChoiceTool(submitFindings)
+	room := llms.WithMaxTokens(deepForcedMaxTokens)
+	ladder := []forcedRung{
+		{opts: append(slices.Clone(opts), submit, room)},
+		{opts: append(client.CallOptionsWith(&temperature, config.ReasoningLow), offered, submit, room), low: true},
+		{opts: append(client.CallOptionsWith(&temperature, config.ReasoningOff), offered, submit), off: true},
+	}
 
 	var run agentRun
 	finish := func(r Result) (Result, error) {
 		e.log().Info("deep-review agent finished", "agent", name, "turns", run.turns, "lookups", run.lookups,
-			"forced", run.forced, "reasoning_off", run.reasoningOff, "findings", len(r.Findings),
+			"forced", run.forced, "reasoning_low", run.reasoningLow, "reasoning_off", run.reasoningOff, "findings", len(r.Findings),
 			"prompt_tokens", run.usage.PromptTokens, "completion_tokens", run.usage.CompletionTokens,
 			"reasoning_tokens", run.usage.ReasoningTokens)
 		return r, nil
@@ -228,7 +245,7 @@ func (e *Engine) runDeepAgent(ctx context.Context, client *llm.Client, name stri
 	}
 
 	run.forced = true
-	r, err := e.forceSubmission(ctx, client, msgs, opts, plain, run.turns >= deep.MaxTurns, &run)
+	r, err := e.forceSubmission(ctx, client, msgs, ladder, run.turns >= deep.MaxTurns, &run)
 	if err != nil {
 		return Result{}, err
 	}
@@ -249,54 +266,61 @@ const forcedSubmitPrompt = "Your investigation is over and no further lookups wi
 	"finding only because you could not read one more file: if the evidence you have supports " +
 	"it, file it with a confidence that reflects what is still uncertain."
 
+// forcedRung is one step of the forced submission's ladder.
+type forcedRung struct {
+	opts     []llms.CallOption
+	low, off bool
+}
+
 // forceSubmission makes the model call submit_findings over the transcript. A
-// reply in prose gets one more request, and a reply that is empty because
-// reasoning used the whole output budget gets one more with reasoning off,
-// before the agent is given up.
-func (e *Engine) forceSubmission(ctx context.Context, client *llm.Client, msgs []llms.Message, opts, noReasoning []llms.CallOption, outOfTurns bool, run *agentRun) (Result, error) {
+// reply cut at the output cap, empty or mid-answer, steps down the ladder; a
+// reply in prose gets one more request at the same step. The agent is given up
+// only when the ladder runs out or the call itself fails.
+func (e *Engine) forceSubmission(ctx context.Context, client *llm.Client, msgs []llms.Message, ladder []forcedRung, outOfTurns bool, run *agentRun) (Result, error) {
 	text := forcedSubmitPrompt
 	if outOfTurns {
 		text = "You have used your turns. " + text
 	}
 	convo := append(slices.Clone(msgs), llms.Message{Role: llms.RoleUser, Content: text})
-	forced := append(slices.Clone(opts), llms.WithToolChoiceTool(submitFindings))
-	var last error
-	reasoningOff, nudged := false, false
-	for attempt := range 3 {
-		resp, err := generateBounded(ctx, client.LLM, convo, forced, deepCallTimeout)
+	last := errors.New("the forced submission never made a tool call")
+	nudged := false
+	for step := 0; step < len(ladder); {
+		rung := ladder[step]
+		resp, err := generateBounded(ctx, client.LLM, convo, rung.opts, deepForcedTimeout)
 		if err != nil {
 			return Result{}, fmt.Errorf("forced submission: %w", err)
 		}
 		run.add(resp.Usage)
 		for _, call := range resp.ToolCalls {
-			if call.Function != nil && call.Function.Name == submitFindings {
+			if call.Function != nil && call.Function.Name == submitFindings && resp.FinishReason != llms.FinishReasonLength {
 				return parseSubmission(call.Function.Arguments)
 			}
 		}
-		last = errors.New("the forced submission came back as prose")
 		e.log().Warn("a forced submission made no tool call",
-			"attempt", attempt+1, "finish", resp.FinishReason, "content_bytes", len(resp.Content))
+			"step", step+1, "finish", resp.FinishReason, "content_bytes", len(resp.Content))
 		switch {
-		case emptyAtOutputCap(resp) && !reasoningOff:
-			// Thinking used the budget. Ask again without it, once.
-			reasoningOff = true
-			run.reasoningOff++
-			forced = append(slices.Clone(noReasoning), llms.WithToolChoiceTool(submitFindings))
-		case !emptyAtOutputCap(resp) && !nudged:
+		case resp.FinishReason == llms.FinishReasonLength:
+			last = errors.New("the forced submission ran out of output budget")
+			step++
+			if step < len(ladder) {
+				if ladder[step].low {
+					run.reasoningLow++
+				}
+				if ladder[step].off {
+					run.reasoningOff++
+				}
+			}
+		case !nudged:
 			nudged = true
+			last = errors.New("the forced submission came back as prose")
 			convo = append(convo,
 				llms.Message{Role: llms.RoleAssistant, Content: resp.Content, Reasoning: resp.Reasoning},
 				llms.Message{Role: llms.RoleUser, Content: "That was prose, not a tool call. Call " + submitFindings + " now with the findings you have."})
 		default:
-			return Result{}, last
+			return Result{}, errors.New("the forced submission came back as prose")
 		}
 	}
 	return Result{}, last
-}
-
-// emptyAtOutputCap reports a reply cut at the output limit with nothing in it.
-func emptyAtOutputCap(resp *llms.Response) bool {
-	return resp.FinishReason == llms.FinishReasonLength && strings.TrimSpace(resp.Content) == ""
 }
 
 // parseSubmission reads the arguments of a submit_findings call.

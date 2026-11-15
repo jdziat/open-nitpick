@@ -294,3 +294,25 @@ func TestTheDeepFilterKeepsTheHigherRankedOfTwoDuplicates(t *testing.T) {
 		t.Errorf("kept = %v, want the more confident warning", got)
 	}
 }
+
+// A critique cut at the output cap part way through its grades has graded
+// nothing that parses, so it is asked again without reasoning, and that
+// answer's grades are applied.
+func TestACritiqueCutAtTheOutputCapMidAnswerIsAskedAgainWithoutReasoning(t *testing.T) {
+	fs := []Finding{finding("real", "error", 0.9), finding("wrong", "error", 0.9)}
+	cut := *gradeAll(t, "proven", "unsupported")
+	cut.FinishReason = llms.FinishReasonLength
+	cut.ToolCalls[0].Function.Arguments = cut.ToolCalls[0].Function.Arguments[:15]
+	reviewer := &deepLLM{critiqueReplies: []llms.Response{cut, *gradeAll(t, "proven", "unsupported")}}
+	e := critiqueEngine(t, reviewer)
+	kept, withheld, failed := e.deepCritique(context.Background(), apart(fs), nil)
+	if failed != nil {
+		t.Fatalf("stage failed: %+v", failed)
+	}
+	if len(reviewer.critiqueOff) != 2 || reviewer.critiqueOff[0] || !reviewer.critiqueOff[1] {
+		t.Errorf("reasoning off per critique call = %v, want on then off", reviewer.critiqueOff)
+	}
+	if got := keptTitles(kept); len(got) != 1 || got[0] != "real" || len(withheld) != 1 {
+		t.Errorf("kept %v, withheld %d; want the retry's grades applied", got, len(withheld))
+	}
+}

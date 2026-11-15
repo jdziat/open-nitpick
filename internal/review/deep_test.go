@@ -27,12 +27,16 @@ type deepLLM struct {
 	generalErr, securityErr error
 	forcedReplies           []llms.Response
 	grades                  *llms.Response
+	critiqueReplies         []llms.Response
 	critiqueErr             error
 	ordinary                string
 
 	turns                       map[string]int
 	forced, critiqued, reviewed int
 	forcedOff                   []bool
+	forcedEffort                []llms.ReasoningEffort
+	forcedMaxTokens             []int
+	critiqueOff                 []bool
 	sampling                    []*llms.CallOptions
 	offeredTools                int
 	critiqueRequest             string
@@ -53,8 +57,14 @@ func (d *deepLLM) GenerateContent(_ context.Context, msgs []llms.Message, opts .
 	case strings.Contains(system, "You are grading draft review comments"):
 		d.critiqued++
 		d.critiqueRequest = msgs[len(msgs)-1].Content
+		r := applied.Reasoning
+		d.critiqueOff = append(d.critiqueOff, r != nil && r.Enabled != nil && !*r.Enabled)
 		if d.critiqueErr != nil {
 			return nil, d.critiqueErr
+		}
+		if i := d.critiqued - 1; i < len(d.critiqueReplies) {
+			out := d.critiqueReplies[i]
+			return &out, nil
 		}
 		if d.grades == nil {
 			return &llms.Response{Content: "no grades"}, nil
@@ -74,6 +84,15 @@ func (d *deepLLM) GenerateContent(_ context.Context, msgs []llms.Message, opts .
 		d.forced++
 		r := applied.Reasoning
 		d.forcedOff = append(d.forcedOff, r != nil && r.Enabled != nil && !*r.Enabled)
+		effort, maxTokens := llms.ReasoningEffort(""), 0
+		if r != nil {
+			effort = r.Effort
+		}
+		if applied.MaxTokens != nil {
+			maxTokens = *applied.MaxTokens
+		}
+		d.forcedEffort = append(d.forcedEffort, effort)
+		d.forcedMaxTokens = append(d.forcedMaxTokens, maxTokens)
 		if i >= len(d.forcedReplies) {
 			return &llms.Response{Content: "prose"}, nil
 		}
@@ -302,14 +321,16 @@ func TestADeepAgentThatAnswersInProseIsAskedToSubmit(t *testing.T) {
 	}
 }
 
-// A forced submission that comes back empty because reasoning used the output
-// budget is asked once more, with reasoning off.
-func TestAForcedSubmissionEmptyAtTheOutputCapIsAskedAgainWithoutReasoning(t *testing.T) {
+// A forced submission that runs out of output budget steps down a ladder: it
+// first gets room to finish at the configured reasoning, then low effort, then
+// none, and the findings of the step that answers are kept.
+func TestAForcedSubmissionThatRunsOutStepsDownToLowEffortThenNoReasoning(t *testing.T) {
 	fs := confident(twoFindings(), 0.9)
 	reviewer := &deepLLM{
 		general:  []llms.Response{lookup("app.go")},
 		security: []llms.Response{submit(t, nil)},
 		forcedReplies: []llms.Response{
+			{FinishReason: llms.FinishReasonLength},
 			{FinishReason: llms.FinishReasonLength},
 			submit(t, fs[:1]),
 		},
@@ -320,11 +341,63 @@ func TestAForcedSubmissionEmptyAtTheOutputCapIsAskedAgainWithoutReasoning(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(reviewer.forcedOff) != 2 || reviewer.forcedOff[0] || !reviewer.forcedOff[1] {
-		t.Errorf("reasoning off per forced call = %v, want on then off", reviewer.forcedOff)
+	if len(reviewer.forcedEffort) != 3 {
+		t.Fatalf("forced calls = %d, want three steps", len(reviewer.forcedEffort))
+	}
+	if reviewer.forcedEffort[0] != llms.ReasoningEffort(config.ReasoningMedium) || reviewer.forcedOff[0] {
+		t.Errorf("first step effort %q, off %v; want the configured medium", reviewer.forcedEffort[0], reviewer.forcedOff[0])
+	}
+	if reviewer.forcedEffort[1] != llms.ReasoningEffort(config.ReasoningLow) || reviewer.forcedOff[1] {
+		t.Errorf("second step effort %q, off %v; want low effort, still reasoning", reviewer.forcedEffort[1], reviewer.forcedOff[1])
+	}
+	if !reviewer.forcedOff[2] {
+		t.Error("third step still reasons, want reasoning off as the last resort")
 	}
 	if len(report.Findings) != 1 {
-		t.Errorf("findings = %v, want the second attempt's", titles(report))
+		t.Errorf("findings = %v, want the last step's", titles(report))
+	}
+}
+
+// The forced submission thinks over the whole transcript, so it is given more
+// room than an ordinary turn before it is counted as having run out.
+func TestAForcedSubmissionGetsRoomToFinishThinking(t *testing.T) {
+	reviewer := &deepLLM{
+		general:       []llms.Response{lookup("app.go")},
+		security:      []llms.Response{submit(t, nil)},
+		forcedReplies: []llms.Response{submit(t, nil)},
+	}
+	e, _ := deepEngine(t, reviewer, appRepo(t))
+	if _, err := e.Review(context.Background(), vcs.Ref{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(reviewer.forcedMaxTokens) != 1 || reviewer.forcedMaxTokens[0] != deepForcedMaxTokens {
+		t.Errorf("forced max tokens = %v, want %d", reviewer.forcedMaxTokens, deepForcedMaxTokens)
+	}
+}
+
+// A forced submission cut at the cap part way through its tool call has not
+// submitted: arguments cut off do not hold the findings, so it steps down too.
+func TestAForcedSubmissionCutMidAnswerStepsDownTheLadder(t *testing.T) {
+	fs := confident(twoFindings(), 0.9)
+	cut := submit(t, fs)
+	cut.FinishReason = llms.FinishReasonLength
+	cut.ToolCalls[0].Function.Arguments = cut.ToolCalls[0].Function.Arguments[:20]
+	reviewer := &deepLLM{
+		general:       []llms.Response{lookup("app.go")},
+		security:      []llms.Response{submit(t, nil)},
+		forcedReplies: []llms.Response{cut, submit(t, fs[:1])},
+		grades:        gradeAll(t, "proven"),
+	}
+	e, _ := deepEngine(t, reviewer, appRepo(t))
+	report, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reviewer.forcedEffort) != 2 || reviewer.forcedEffort[1] != llms.ReasoningEffort(config.ReasoningLow) {
+		t.Errorf("forced efforts = %v, want a second step at low effort", reviewer.forcedEffort)
+	}
+	if len(report.Findings) != 1 {
+		t.Errorf("findings = %v, want the second step's one finding", titles(report))
 	}
 }
 
