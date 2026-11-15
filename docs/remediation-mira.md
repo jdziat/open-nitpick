@@ -1571,6 +1571,17 @@ no held-out number can steer a choice the tuning set has not already made.
 - **If D1t or D1h is adopted,** the build that ships changes and gets its own gate as well.
   Every held-out run is reported, whatever it shows.
 
+#### D4a result: below Mira on the held-out set, at the same recall
+
+The build at `ab683d3`, with the deep prompt D3o later removed, scored posted F1 0.494 under
+Sol on the 30 held-out pull requests, against Mira's 0.547 (-0.054, interval -0.126 to
++0.022). Recall was level, 45.4% against 46.7% (-1.3 points, -10.0 to +7.5), and precision
+was 12 points lower, 54.2% against 66.2% (-19.6 to -5.0). Terra put it 0.054 below Mira and
+Luna 0.067 below. It is 0.066 above the R1 build on the same set under Sol (+0.000 to
++0.136), 0.052 under Terra and 0.065 under Luna. No agent failed in 204 agent runs, and a
+review cost $0.057 to $0.060 with a median of 254 to 303 seconds. The ship condition fails,
+and the build would not have shipped anyway, since D3o was not kept.
+
 ### F6: a confidence floor of 0.6, scored from stored drafts (registered 2026-11-15, before it runs)
 
 The deep selection's floor of 0.7 is Mira's number, taken without a measurement of our own.
@@ -1624,6 +1635,25 @@ both fewer and truer: 13 true of 34 scored for D3m, against 16 of 55 for D1c. Th
 on our own prompt (F6, D1c) leaves it at 0.440, below Mira's 0.481.
 
 ### What this means for the goal
+
+Deep review is built: two agents a batch that read the repository over up to ten turns,
+sampling at the deep temperature and reasoning level, a forced submission that steps down
+when it runs out, and a selection of floor, duplicate rule, cap and critique. It runs on a
+model that takes no temperature (L1), and every failure path names its stage. It does not
+yet beat Mira.
+
+- Held out, the one build gated so far (D4a) scored F1 0.494 under Sol against Mira's 0.547.
+  Recall was level with Mira's and precision 12 points lower.
+- On the tuning set the agent prompt is what separates the tools. With Mira's prompts
+  adapted (D3m), the same pipeline scored 0.486 against Mira's 0.481, and with a floor of 0.6
+  (F6m) 0.510. With ours it scored 0.416 (D1c), 0.411 with the prompt written for it (D3o),
+  and 0.440 with the floor (F6).
+- Shipping prompts adapted from Mira's is the owner's decision: Mira is Apache-2.0, so it
+  needs attribution, and the limit on contamination below applies to it more than to
+  anything else here, since Mira's authors measure themselves on this benchmark.
+- D5f measures the floor of 0.6 on the build that ships.
+
+#### Before deep review, judged by Sonnet 4.5
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
 model. The ceiling is visible in the table: precision between 41% and 50% for
