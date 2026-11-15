@@ -1428,6 +1428,33 @@ It is descriptive. Mira has no frozen run on this model, so L1 is not ranked aga
 no ship condition is attached. It is read against D1c, to see what the model changes, and for
 two counts: reviews that completed, and agent turns that were refused for a temperature.
 
+### D3o: our own deep base prompt (registered 2026-11-14, before it runs)
+
+D3m's recall gain could come from Mira's prompt or from the forced-submission cap, and D1c
+separates the two. D3o prepares the answer in case it is the prompt. Our review prompt is
+written for a reviewer with the diff alone: report nothing it cannot demonstrate, choose the
+lower level when torn, drop a finding that needs code it was not shown. A deep agent reads
+the repository and is followed by a critique, so those rules ask it to be silent about what
+it has tools to check. `internal/prompt/templates/deep_review.md` is written for it. It
+keeps our anchoring, severity, confidence, citation and suggestion rules, which the filters
+depend on, and asks the agent to file every defect it can defend, follow a change to the code
+that receives it, treat the removed lines of a refactor as its specification, and check every
+implementer and caller of a changed contract, with lists of what not to file and what not
+to speculate about. It is our own text, written from those practices and not from Mira's.
+The persona, model notes and run instruction layer over it as before.
+
+D3o is the repository build at its commit `ea01431` with nothing else changed: three passes on
+the 20 tuning pull requests, scored by Sol, Terra and Luna, paired against D1c, D3m and Mira.
+
+- **Keep the deep prompt:** posted F1 under Sol at least D1c's. Otherwise the commit is
+  reverted before the held-out gate and the deep agents go back to the ordinary base prompt.
+- **Reading:** D3o minus D1c and D3o minus D3m, each with its interval, so the record shows
+  whether our text does what Mira's did.
+- **Ship to the held-out gate:** kept, and posted F1 above Mira's under Sol as a point
+  comparison.
+- **Reported with it:** drafted recall and precision against D1c's and D3m's, and how many
+  agents used their time budget.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
