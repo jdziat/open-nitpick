@@ -26,6 +26,9 @@ def main():
     ap.add_argument("--run", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True, help="prefix; <out>-drafted and <out>-afterfilter are written")
     args = ap.parse_args()
+    unfinished = [c.name for c in sorted(args.run.glob("*-r1")) if not (c / "result.json").exists()]
+    if unfinished:
+        raise SystemExit(f"{args.run} has reviews with no result yet, so no stage was written: {', '.join(unfinished)}")
     stages = {"drafted": lambda w: True, "afterfilter": lambda w: w.get("withheld_by") == CRITIQUE}
     counts = {}
     for stage, keep in stages.items():

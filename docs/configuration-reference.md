@@ -1305,7 +1305,7 @@ Critique grades each finding that passed the floor against the code it cites, an
 ### `review.deep.low_priority_cap`
 
 integer, default `5`.
-LowPriorityCap keeps at most this many info and nit findings a review, the most confident first.
+LowPriorityCap keeps at most this many info and nit findings a review.
 
 ### `review.deep.max_files_per_request`
 

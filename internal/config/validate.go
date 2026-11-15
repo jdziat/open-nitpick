@@ -517,7 +517,7 @@ func (d DeepReview) validate() []error {
 	if d.MaxTurns < 1 || d.MaxTurns > 30 {
 		errs = append(errs, fmt.Errorf("review.deep.max_turns must be between 1 and 30, got %d", d.MaxTurns))
 	}
-	if d.Temperature < 0 || d.Temperature > 2 {
+	if !(d.Temperature >= 0 && d.Temperature <= 2) {
 		errs = append(errs, fmt.Errorf("review.deep.temperature must be between 0 and 2, got %g", d.Temperature))
 	}
 	switch d.Reasoning {
@@ -531,7 +531,7 @@ func (d DeepReview) validate() []error {
 	if d.Timeout < 0 {
 		errs = append(errs, fmt.Errorf("review.deep.timeout must not be negative, got %s", d.Timeout))
 	}
-	if d.ConfidenceFloor < 0 || d.ConfidenceFloor > 1 {
+	if !(d.ConfidenceFloor >= 0 && d.ConfidenceFloor <= 1) {
 		errs = append(errs, fmt.Errorf("review.deep.confidence_floor must be between 0 and 1, got %g", d.ConfidenceFloor))
 	}
 	if d.LowPriorityCap < 0 {

@@ -1509,8 +1509,10 @@ type DeepReview struct {
 	// Default 0.7.
 	ConfidenceFloor float64 `yaml:"confidence_floor"`
 
-	// LowPriorityCap keeps at most this many info and nit findings a review,
-	// the most confident first. Warnings and above are never capped. Zero
+	// LowPriorityCap keeps at most this many info and nit findings a review.
+	// They are ranked as all findings are, by severity and then confidence, so
+	// an info finding is kept before a nit whatever either's confidence.
+	// Warnings and above are never capped. Zero
 	// turns the cap off. Default 5.
 	LowPriorityCap int `yaml:"low_priority_cap"`
 

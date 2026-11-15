@@ -1,6 +1,7 @@
 package config
 
 import (
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +31,8 @@ func TestDeepReviewValidationRejectsWhatCannotRun(t *testing.T) {
 		"a negative cap":     {func(d *DeepReview) { d.LowPriorityCap = -1 }, "low_priority_cap"},
 		"a bad reasoning":    {func(d *DeepReview) { d.Reasoning = "lots" }, "reasoning"},
 		"a hot sampler":      {func(d *DeepReview) { d.Temperature = 3 }, "temperature"},
+		"a NaN sampler":      {func(d *DeepReview) { d.Temperature = math.NaN() }, "temperature"},
+		"a NaN floor":        {func(d *DeepReview) { d.ConfidenceFloor = math.NaN() }, "confidence_floor"},
 		"no batch files":     {func(d *DeepReview) { d.MaxFilesPerRequest = 0 }, "max_files_per_request"},
 		"a negative timeout": {func(d *DeepReview) { d.Timeout = -time.Second }, "timeout"},
 	} {
