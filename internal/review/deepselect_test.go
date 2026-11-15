@@ -28,6 +28,15 @@ func finding(title, severity string, confidence float64) Finding {
 		Title: title, Rationale: "r", Confidence: &c}
 }
 
+// apart puts each finding on its own line, ten apart, so a test about the
+// floor or the cap is not also a test of the duplicate rule.
+func apart(fs []Finding) []Finding {
+	for i := range fs {
+		fs[i].Line = 10 * (i + 1)
+	}
+	return fs
+}
+
 func keptTitles(fs []Finding) []string {
 	var out []string
 	for _, f := range fs {
@@ -64,7 +73,7 @@ func TestTheDeepFilterCapsLowPriorityFindingsAndNeverWarnings(t *testing.T) {
 		in = append(in, finding(fmt.Sprintf("warning %d", i), "warning", 0.71))
 	}
 	in = append(in, finding("nit", "nit", 0.99))
-	kept, withheld := deepFilter(in, 0.7, 2)
+	kept, withheld := deepFilter(apart(in), 0.7, 2)
 	var warnings, low []string
 	for _, f := range kept {
 		if f.Severity == "warning" {
@@ -87,7 +96,7 @@ func TestTheDeepFilterCapsLowPriorityFindingsAndNeverWarnings(t *testing.T) {
 // A cap of zero is off.
 func TestADeepFilterCapOfZeroKeepsEveryLowPriorityFinding(t *testing.T) {
 	in := []Finding{finding("a", "info", 0.8), finding("b", "info", 0.8), finding("c", "info", 0.8)}
-	kept, withheld := deepFilter(in, 0.7, 0)
+	kept, withheld := deepFilter(apart(in), 0.7, 0)
 	if len(kept) != 3 || len(withheld) != 0 {
 		t.Errorf("kept %d, withheld %d; want every finding kept", len(kept), len(withheld))
 	}
@@ -216,5 +225,72 @@ func TestAFindingWithheldByTheDeepSelectionIsNotBlamedOnADisagreeingExpert(t *te
 		if got := r.WithheldCause(); got != "by a second check" {
 			t.Errorf("%s: cause = %q, want by a second check", expert, got)
 		}
+	}
+}
+
+func at(path string, line int, class, title, rationale string) Finding {
+	return Finding{Path: path, Line: line, Class: class, Title: title, Rationale: rationale, Severity: "warning"}
+}
+
+// Each branch of Mira's duplicate rule, and the case each one must leave
+// apart: one defect filed twice is one finding, two defects are two.
+func TestTheDeepDuplicateRule(t *testing.T) {
+	long := "the deferred close runs on a nil response body when the request fails and panics the handler"
+	other := "the cache key omits the tenant so one tenant reads another tenant's cached rows on a hit"
+	for _, tc := range []struct {
+		name string
+		a, b Finding
+		dup  bool
+	}{
+		{"same line and class, unrelated titles",
+			at("b.tsx", 553, "correctness", "Async forEach leaves calendar deletion unawaited", "x"),
+			at("b.tsx", 553, "correctness", "requestReschedule returns before calendar events are deleted", "y"), true},
+		{"same line, two classes, unrelated titles",
+			at("a.go", 9, "resource", "File handle leaks on the error path", "x"),
+			at("a.go", 9, "security", "Path joins untrusted input", "y"), false},
+		{"same class two lines apart, similar text",
+			at("a.go", 10, "correctness", "Nil body closed", long),
+			at("a.go", 12, "correctness", "Close on failed request", long), true},
+		{"same class two lines apart, different text",
+			at("a.go", 10, "correctness", "Nil body closed", long),
+			at("a.go", 12, "correctness", "Cache key misses tenant", other), false},
+		{"overlapping span, titles sharing words",
+			Finding{Path: "a.go", Line: 20, EndLine: 30, Class: "correctness", Title: "Async forEach defers calendar deletion past function return"},
+			Finding{Path: "a.go", Line: 25, Class: "concurrency", Title: "Async forEach drops calendar deletions and escapes try/catch"}, true},
+		{"one file, far apart, near-identical titles",
+			at("a.go", 10, "correctness", "Ignored error from http.Get", "x"),
+			at("a.go", 90, "contract", "Ignored error from http.Get call", "y"), true},
+		{"two files, near-identical title and rationale",
+			at("a.go", 10, "correctness", "Ignored error from http.Get", long),
+			at("b.go", 10, "correctness", "Ignored error from http.Get", long), true},
+		{"two files, same title, different rationale",
+			at("a.go", 10, "correctness", "Ignored error from http.Get", long),
+			at("b.go", 10, "correctness", "Ignored error from http.Get", other), false},
+	} {
+		if got := deepDuplicate(tc.a, tc.b); got != tc.dup {
+			t.Errorf("%s: duplicate = %v, want %v", tc.name, got, tc.dup)
+		}
+	}
+}
+
+// Of two findings that are one defect, the higher ranked is posted and the
+// other is listed as repeating it.
+func TestTheDeepFilterKeepsTheHigherRankedOfTwoDuplicates(t *testing.T) {
+	lower := finding("Async forEach leaves calendar deletion unawaited", "warning", 0.95)
+	higher := finding("requestReschedule returns before calendar events are deleted", "error", 0.80)
+	kept, withheld := deepFilter([]Finding{lower, higher}, 0.7, 5)
+	if got := keptTitles(kept); len(got) != 1 || got[0] != higher.Title {
+		t.Errorf("kept = %v, want only the error", got)
+	}
+	if len(withheld) != 1 || !strings.Contains(withheld[0].Reason, "repeats") || !strings.Contains(withheld[0].Reason, "requestReschedule") {
+		t.Errorf("withheld = %+v, want the warning, naming the finding it repeats", withheld)
+	}
+
+	// At one severity, the more confident of the two is the one posted.
+	doubtful := finding("Async forEach leaves calendar deletion unawaited", "warning", 0.75)
+	sure := finding("requestReschedule returns before calendar events are deleted", "warning", 0.95)
+	kept, _ = deepFilter([]Finding{doubtful, sure}, 0.7, 5)
+	if got := keptTitles(kept); len(got) != 1 || got[0] != sure.Title {
+		t.Errorf("kept = %v, want the more confident warning", got)
 	}
 }

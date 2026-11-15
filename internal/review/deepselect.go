@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -77,9 +79,10 @@ func confidenceOf(f Finding) float64 {
 }
 
 // deepFilter withholds findings below the confidence floor, orders the rest by
-// severity and then confidence, and keeps at most lowCap info and nit findings.
-// Warnings and above are never capped: the cap controls noise, and a real
-// defect is not noise however many there are.
+// severity and then confidence, withholds a finding that repeats one ranked
+// above it, and keeps at most lowCap info and nit findings. Warnings and above
+// are never capped: the cap controls noise, and a real defect is not noise
+// however many there are.
 func deepFilter(findings []Finding, floor float64, lowCap int) ([]Finding, []Overruled) {
 	var kept []Finding
 	var withheld []Overruled
@@ -97,6 +100,16 @@ func deepFilter(findings []Finding, floor float64, lowCap int) ([]Finding, []Ove
 		}
 		return confidenceOf(kept[i]) > confidenceOf(kept[j])
 	})
+	unique := kept[:0:0]
+	for _, f := range kept {
+		if i := slices.IndexFunc(unique, func(u Finding) bool { return deepDuplicate(f, u) }); i >= 0 {
+			withheld = append(withheld, Overruled{Finding: f, Expert: deepFilterExpert,
+				Reason: fmt.Sprintf("it repeats %q at %s:%d", oneLine(unique[i].Title), unique[i].Path, unique[i].Line)})
+			continue
+		}
+		unique = append(unique, f)
+	}
+	kept = unique
 	if lowCap == 0 {
 		return kept, withheld
 	}
@@ -114,6 +127,87 @@ func deepFilter(findings []Finding, floor float64, lowCap int) ([]Finding, []Ove
 		out = append(out, f)
 	}
 	return out, withheld
+}
+
+// Two agents reading one pull request file one defect twice, under different
+// titles and often on adjacent lines, and the exact match dedupe makes keeps
+// both. deepDuplicate is Mira's composite rule (core/noise_filter.py).
+const (
+	deepNearLines         = 3
+	deepNearTextThreshold = 0.25
+	deepMinTextTokens     = 8
+	deepTitleThreshold    = 0.6
+)
+
+// deepDuplicate reports whether two findings are one defect: in different
+// files, near-identical titles and rationales; in one file, the same lines and
+// class, or the same class within three lines with similar text, or overlapping
+// lines with titles that share words, or near-identical titles anywhere. Two
+// classes on one line stay apart, since one call can leak and inject at once.
+func deepDuplicate(a, b Finding) bool {
+	title := wordOverlap(a.Title, b.Title)
+	if a.Path != b.Path {
+		return title >= 0.8 && wordOverlap(a.Rationale, b.Rationale) >= 0.5
+	}
+	endA, endB := lastLine(a), lastLine(b)
+	if a.Line == b.Line && endA == endB && a.Class == b.Class {
+		return true
+	}
+	if a.Class == b.Class && abs(a.Line-b.Line) <= deepNearLines &&
+		tokenOverlap(a.Title+" "+a.Rationale, b.Title+" "+b.Rationale) >= deepNearTextThreshold {
+		return true
+	}
+	if a.Line <= endB && b.Line <= endA && title >= 0.2 {
+		return true
+	}
+	return title >= deepTitleThreshold
+}
+
+func lastLine(f Finding) int {
+	if f.EndLine > f.Line {
+		return f.EndLine
+	}
+	return f.Line
+}
+
+// wordOverlap is the Jaccard overlap of two texts' lowercased words.
+func wordOverlap(a, b string) float64 {
+	return jaccard(strings.Fields(strings.ToLower(a)), strings.Fields(strings.ToLower(b)))
+}
+
+var identifierToken = regexp.MustCompile(`[a-z0-9_]+`)
+
+// tokenOverlap is the Jaccard overlap of two texts' identifier-like tokens, or
+// zero when either is too short for an overlap to mean anything.
+func tokenOverlap(a, b string) float64 {
+	ta := identifierToken.FindAllString(strings.ToLower(a), -1)
+	tb := identifierToken.FindAllString(strings.ToLower(b), -1)
+	if len(set(ta)) < deepMinTextTokens || len(set(tb)) < deepMinTextTokens {
+		return 0
+	}
+	return jaccard(ta, tb)
+}
+
+func set(words []string) map[string]bool {
+	out := make(map[string]bool, len(words))
+	for _, w := range words {
+		out[w] = true
+	}
+	return out
+}
+
+func jaccard(a, b []string) float64 {
+	sa, sb := set(a), set(b)
+	if len(sa) == 0 || len(sb) == 0 {
+		return 0
+	}
+	shared := 0
+	for w := range sa {
+		if sb[w] {
+			shared++
+		}
+	}
+	return float64(shared) / float64(len(sa)+len(sb)-shared)
 }
 
 // critiqueGrade is one grade from the critique.
