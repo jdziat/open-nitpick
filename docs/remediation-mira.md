@@ -1428,6 +1428,27 @@ It is descriptive. Mira has no frozen run on this model, so L1 is not ranked aga
 no ship condition is attached. It is read against D1c, to see what the model changes, and for
 two counts: reviews that completed, and agent turns that were refused for a temperature.
 
+#### L1 result: the mode runs on a model that takes no temperature, at lower recall
+
+Three passes on the 20 tuning pull requests, GPT-6 Luna, the repository build before the deep
+prompt. All 60 reviews completed. No agent failed and no review came back incomplete. The model
+refused a temperature on 138 first calls, one for each agent run, because a review starts its
+agents together and so each meets the refusal once before the client has learned it. Each was
+sent again without it and later calls left it out.
+
+| judge | L1 precision, recall, F1 | Mira precision, recall, F1 |
+|---|---|---|
+| Sol | 60.6%, 27.9%, 0.383 | 69.4%, 36.8%, 0.481 |
+| Terra | 60.6%, 27.9%, 0.383 | 67.1%, 36.0%, 0.469 |
+| Luna | 62.5%, 29.4%, 0.400 | 68.5%, 36.8%, 0.478 |
+
+Mira's column is its DeepSeek run and is shown for scale. It is not a comparison. Luna drafted
+122 findings in all and posted 101 (1.7 a review), against 400 and 154 for D3m on DeepSeek, so
+its recall is the lower. It also cost $0.006 to $0.015 a review at its list price of $0.10 and
+$0.50 per million tokens, against about $0.04, and a review took a median of 60 to 73 seconds
+against 183 to 246. The mode is not tied to one model. On this set Luna is the cheap and fast
+setting, and DeepSeek the more thorough one.
+
 ### D3o: our own deep base prompt (registered 2026-11-14, before it runs)
 
 D3m's recall gain could come from Mira's prompt or from the forced-submission cap, and D1c
