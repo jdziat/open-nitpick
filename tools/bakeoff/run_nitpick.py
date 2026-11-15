@@ -89,7 +89,7 @@ def parse(stdout: str):  # runs recorded before review -format json existed
     return comments
 
 
-def review(case, repos, out, model, timeout, config, binary):
+def review(case, repos, out, model, timeout, config, binary, command="review"):
     repo = repos / case
     t0 = time.time()
     env = dict(os.environ, LLM_PROVIDER="openrouter", LLM_MODEL=model, NITPICK_NO_USER_CONFIG="1")
@@ -97,7 +97,7 @@ def review(case, repos, out, model, timeout, config, binary):
     dest.mkdir(parents=True, exist_ok=True)
     try:
         run = subprocess.run(
-            [binary, "review", "-repo", str(repo), "-base", "HEAD~1", "-head", "HEAD", "-dry-run", "-no-linters",
+            [binary, command, "-repo", str(repo), "-base", "HEAD~1", "-head", "HEAD", "-dry-run", "-no-linters",
              "-format", "json"]
             + (["-config", str(config)] if config else []),
             capture_output=True, text=True, env=env, timeout=timeout,
@@ -122,11 +122,19 @@ def review(case, repos, out, model, timeout, config, binary):
          "citation": f.get("citation", "")}
         for f in report["findings"]
     ]
+    # What a later stage held back, kept beside the posted comments so the
+    # drafted set can be rebuilt and scored from the same run.
+    withheld = [] if failed else [
+        {"title": f["title"], "path": f["path"], "line": f["line"], "body": f["rationale"],
+         "severity": f["severity"], "class": f["class"], "confidence": f.get("confidence"),
+         "citation": f.get("citation", ""), "withheld_by": f.get("withheld_by", ""), "reason": f.get("reason", "")}
+        for f in report.get("withheld") or []
+    ]
     result = {
-        "result": {"comments": comments},
+        "result": {"comments": comments, "withheld": withheld},
         "duration_seconds": seconds,
         "manifest": {"reviewer": "open-nitpick", "model": model, "version": nitpick_version(binary),
-                     "config": str(config) if config else None},
+                     "config": str(config) if config else None, "command": command},
     }
     (dest / "status.json").write_text(json.dumps(status))
     (dest / "result.json").write_text(json.dumps(result, indent=2))
@@ -148,17 +156,19 @@ def main():
     ap.add_argument("--only", default="")
     ap.add_argument("--config", type=Path, default=None, help="a .nitpick.yaml to review under")
     ap.add_argument("--binary", default="nitpick", help="the nitpick binary to run")
+    ap.add_argument("--command", default="review", help="the subcommand to review with, such as deep-review")
     args = ap.parse_args()
     selection = json.loads((args.inputs / "selection.json").read_text())
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "run.json").write_text(json.dumps({
         "selection": selection, "repeats": 1, "model": args.model, "reviewer": "open-nitpick",
         "version": nitpick_version(args.binary), "config": str(args.config) if args.config else None,
+        "command": args.command,
     }))
     only = {x for x in args.only.split(",") if x}
     cases = [c["case"] for c in selection["cases"] if not only or c["case"] in only]
     with concurrent.futures.ThreadPoolExecutor(args.concurrency) as pool:
-        list(pool.map(lambda c: review(c, args.repos, args.out, args.model, args.timeout, args.config, args.binary), cases))
+        list(pool.map(lambda c: review(c, args.repos, args.out, args.model, args.timeout, args.config, args.binary, args.command), cases))
 
 
 if __name__ == "__main__":

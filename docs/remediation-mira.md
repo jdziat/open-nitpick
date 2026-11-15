@@ -1117,7 +1117,8 @@ When `max_tokens` is unset, open-nitpick sends a reasoning model on OpenRouter a
 DeepSeek V4.1 Flash spent the whole cap thinking on most of our single-call reviews. Each
 of those calls came back empty and was sent again with reasoning off
 (`internal/llm/structured.go:201`). Mira has the same cap and the same fallback
-(`mira/llm/base.py:217`), and its loop seldom reached it. Counted from the stored logs:
+(`mira/llm/base.py:217`), and its loop seldom reached it. Counted from the stored logs by
+`tools/bakeoff/fallbacks.py`:
 
 | arm | review calls a pass | sent again with reasoning off, each pass |
 |---|---:|---|
@@ -1163,6 +1164,60 @@ smoke run of R12 on three pull requests checks the settings first and is not sco
   off is reported and not ranked.
 - **Reported with it:** those fallbacks for each pass, median review time, comments per
   review, and model spend for each pass.
+
+## Deep review (registered 2026-11-14)
+
+`nitpick review` stays as it is. `nitpick deep-review` is a second mode that reviews the
+way Mira does and costs more. The differences it closes, each read from Mira's source and
+stored runs:
+
+| | Mira | `nitpick review` | `nitpick deep-review` |
+|---|---|---|---|
+| Shape | a general loop and a security loop per pull request, in parallel, up to 10 tool turns each (`core/passes.py:365`) | one call per batch of 6 files or 60,000 tokens, no tools | a general agent and a security agent per batch of up to 60 files or 120,000 tokens, in parallel, up to 10 turns each with `read_file` and `grep_repo` (`internal/review/deep.go`) |
+| Sampling | temperature 0.2, effort medium (`config.py:60`) | the model's own: temperature 0, effort unset | `review.deep.temperature` 0.2 and `review.deep.reasoning` medium |
+| Selection | confidence floor 0.7, cap of 5 on suggestions and nitpicks (`config.py:117-122`), then a critique grading each draft proven, plausible or unsupported (`core/passes.py:930`) | model triage | the same floor, cap and critique, with Mira's keep rule (`internal/review/deepselect.go`) |
+
+The security agent extends the review prompt with a security focus
+(`internal/prompt/templates/deep_security.md`), so both agents file in one shape. An agent
+that stops early or runs out of turns is asked to submit what it has; one failing does not
+cost the others' findings; a batch every agent failed is reviewed by the ordinary call.
+Reasoning replay between turns waits on `nocturnium/llm-go-sdk`, whose v6.15.0 still drops
+an assistant turn's reasoning; Mira's replay ablation above found it trades recall for
+precision at about the same F1.
+
+The loop: each stage is registered here before it runs, measured with three passes on the
+20 tuning pull requests paired against R1, R10 and Mira, kept only if it meets its
+conditions, and the funnel (drafted, after the filter, posted, each scored) decides the next
+stage. The claim is made on the held-out set; both splits have been read, so a fresh corpus
+remains the stronger test.
+
+### D0: the mode (built 2026-11-14)
+
+`nitpick deep-review`, the `review.deep` configuration, and per-agent accounting of turns,
+lookups, forced submissions, reasoning fallbacks and tokens. `-format json` now lists
+withheld findings with the stage that held them, and `tools/bakeoff/deep_funnel.py`
+rebuilds the drafted and after-filter stages from one run. Every guard test was seen to fail
+when its behaviour was broken. A smoke review of keycloak-4 ran both agents to their 10 turns
+(about 19 lookups each, no reasoning fallback), drafted 3 findings, kept 1, in 91 seconds.
+
+### D1: deep review at its defaults (registered 2026-11-14, before it runs)
+
+Two arms, three passes each on the 20 tuning pull requests, DeepSeek V4.1 Flash:
+
+- **D1:** `nitpick deep-review` at its defaults.
+- **D1g:** the same with `review.deep.agents: [general]`, which measures the security agent.
+
+Both are paired against R1, R10 and Mira's two default passes, at the posted stage and, from
+the same runs, at the drafted and after-filter stages.
+
+- **Ship to the held-out gate:** D1's F1 above Mira's 0.514.
+- **Otherwise the funnel picks the next stage:** drafts below Mira's drafts (F1 0.538,
+  precision 50.6%, recall 57.4%) send the next stage to the agents; drafts at or above Mira's
+  with posted F1 below send it to the selection.
+- **Validity:** an arm with more than 5% of its agent runs failed, or of its forced
+  submissions sent again without reasoning, is reported and not ranked.
+- **Reported with it:** calls, turns, lookups and tokens for each review, model spend, and
+  median review time.
 
 ### What this means for the goal
 
