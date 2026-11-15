@@ -8,7 +8,9 @@ precision and recall between the arms is reported with a 95% interval. Pairing
 by pull request matters: the pull requests differ far more from each other than
 two runs of one reviewer do. Counts are the scorer's raw true, false and missed
 comments over every golden category, so the rates differ slightly from the
-Core-profile figures in scores.json.
+Core-profile figures in scores.json. `--profile core` (or `strict`) gives the upstream
+profile's counts instead: a golden comment outside the profile is dropped from true
+positives and misses, and false positives are unchanged, as in upstream's score_tools.
 
     python3 tools/bakeoff/compare.py --scores /tmp/bakeoff/scores-ALL/scores.json \\
         --arm base=nitpick-A1,nitpick-A2 --arm new=r1-p1,r1-p2,r1-p3
@@ -17,6 +19,33 @@ import argparse
 import json
 import random
 from pathlib import Path
+
+PROFILES = {
+    "all": None,
+    "core": {"bug", "security", "concurrency", "data", "api", "perf", "test_gap", "doc_defect"},
+    "strict": {"bug", "security", "concurrency", "data", "api"},
+}
+
+
+def golden_categories(directory):
+    """Golden comment text to its category, as upstream's _load_golden_categories builds it."""
+    lookup = {}
+    for path in Path(directory).glob("*.json"):
+        for entry in json.loads(path.read_text()):
+            for g in entry.get("comments", []):
+                if g.get("comment") and g.get("category"):
+                    lookup[g["comment"]] = g["category"]
+    return lookup
+
+
+def label_counts(verdict, profile, lookup):
+    """One scored label's (tp, fp, fn), restricted to a profile's categories when one is given."""
+    if profile is None:
+        return verdict["tp"], verdict["fp"], verdict["fn"]
+    def inside(entry):
+        return (entry.get("category") or lookup.get(entry.get("golden_comment", ""), "")) in profile
+    return (sum(inside(t) for t in verdict["true_positives"]), verdict["fp"],
+            sum(inside(f) for f in verdict["false_negatives"]))
 
 
 def load(paths):
@@ -27,13 +56,14 @@ def load(paths):
     return evals
 
 
-def counts(evals, labels):
+def counts(evals, labels, profile=None, lookup=None):
     """Per pull request (tp, fp, fn) summed over the arm's passes."""
     out = {}
     for case, per in evals.items():
         if not all(label in per for label in labels):
             continue
-        out[case] = tuple(sum(per[label][k] for label in labels) for k in ("tp", "fp", "fn"))
+        rows = [label_counts(per[label], profile, lookup) for label in labels]
+        out[case] = tuple(sum(row[i] for row in rows) for i in range(3))
     return out
 
 
@@ -53,6 +83,10 @@ def main():
     ap.add_argument("--arm", action="append", required=True, help="name=label,label,...")
     ap.add_argument("--resamples", type=int, default=10000)
     ap.add_argument("--seed", type=int, default=20261113)
+    ap.add_argument("--profile", choices=sorted(PROFILES), default="all",
+                    help="which golden categories count; all keeps every earlier figure")
+    ap.add_argument("--golden", default="/tmp/bakeoff/bench/offline/golden_comments",
+                    help="the golden_comments directory the categories come from")
     args = ap.parse_args()
     if len(args.arm) != 2:
         ap.error("give exactly two --arm values")
@@ -61,7 +95,9 @@ def main():
     for spec in args.arm:
         name, labels = spec.split("=", 1)
         arms.append((name, labels.split(",")))
-    a, b = (counts(evals, labels) for _, labels in arms)
+    profile = PROFILES[args.profile]
+    lookup = golden_categories(args.golden) if profile else None
+    a, b = (counts(evals, labels, profile, lookup) for _, labels in arms)
     cases = sorted(set(a) & set(b))
     if not cases:
         raise SystemExit("no pull request is scored for both arms")
