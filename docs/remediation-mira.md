@@ -1776,6 +1776,37 @@ change a person asked for, so a real defect a tool found that nobody commented o
 false, and "false" is likely to be overstated for every arm. The same corpus gives the same bias to all
 three, which is why the order between them is the reading and the level is not.
 
+#### Selection replay on the stored drafts: nothing built from the drafts transfers (unregistered, no model calls)
+
+`tools/bakeoff/selection_replay.py` replays rules on the drafted sets of D1c and D3m (tuning), D4a
+(held-out) and D1c and D3m (fresh), from the judge's labels under Sol. The share of labelled drafts
+that were true, by what a rule could read:
+
+| | tuning, D1c and D3m | held-out | fresh, D1c and D3m |
+|---|---|---|---|
+| severity error or critical | 83% and 78% | 47% | 8% and 9% |
+| confidence 0.9 or more | 78% and 91% | 60% | 1 of 3 and 0 of 2 |
+| a second agent filed it | 68% against 28%, 54% against 28% | 46% against 25% | 22% against 15%, 18% against 13% |
+
+Only agreement keeps its direction on every corpus, and its lift falls from 1.9 to 2.4 times on
+the tuning set to 1.4 to 1.5 times on the fresh one. Rules built from agreement, severity and
+confidence were then replayed as a replacement for today's floor, critique and cap. The F1 below
+is estimated from the labels, which puts today's posted sets at 0.401, 0.469, 0.471, 0.050 and 0.079
+against the measured 0.416, 0.486, 0.494, 0.056 and 0.099, so it ranks rules and does not replace
+scoring one.
+
+| estimated F1 | tuning D1c | tuning D3m | held-out | fresh D1c | fresh D3m |
+|---|---|---|---|---|---|
+| posted today | 0.401 | 0.469 | 0.471 | 0.050 | 0.079 |
+| floor 0.7 alone, no critique | 0.390 | 0.443 | 0.453 | 0.100 | 0.138 |
+| best agreement rule on that corpus | 0.413 | 0.414 | 0.448 | 0.060 | 0.074 |
+
+The best agreement rule on each corpus, picked on that corpus and so flattering it, differs from
+today's by +0.012, -0.055, -0.023, +0.010 and -0.005. Dropping the critique costs 0.011 to 0.026
+on the Martian sets and gains 0.050 and 0.059 on the fresh one. No selection rule from these
+properties is carried further. A selection change would need a signal that separates true from false
+on both kinds of corpus, which none of these does.
+
 ### D4b: the held-out gate for Mira's adapted prompts on the build at HEAD (registered 2026-11-15, before it runs)
 
 F7 left one leg of the Mira-prompt question unmeasured. D3m has been run on the tuning set (0.486
@@ -1791,6 +1822,13 @@ items restates a golden comment on the tuning set, so a result above Mira's on t
 count towards beating it; the fresh corpus is the clean reading, and D3m was 0.031 below Mira there.
 D4b is reported whatever it shows, and it completes the three corpora for the owner's decision on
 the prompts.
+
+*Not run, 2026-11-15.* The first attempt failed on every review within seconds: OpenRouter
+returned 403 "Key limit exceeded (monthly limit)", naming a limit of $400.00 with $400.01 used,
+resetting 2026-12-01. The key's own endpoint reported $169 left of a weekly $400, which resets on
+the 16th, and small requests answered a minute later, so which limit is real is not known. The
+driver was stopped with no spend and the aborted run directories were deleted. D4b waits for the
+owner to say whether the key may be used further.
 
 ### What this means for the goal
 
@@ -1813,6 +1851,9 @@ yet beat Mira.
 - F7 repeated the comparison on 30 pull requests from other repositories. The order held
   (Mira above D3m above D1c, under all three judges), no arm reached Mira (D3m -0.031, D1c
   -0.074 under Sol), and the adoption condition for Mira's prompts failed by 0.011. Our prompts stay.
+- Selection from the drafts' own properties does not transfer either (replay above): agreement
+  keeps its direction but shrinks, and severity and confidence stop separating true from false on
+  the fresh corpus.
 - The selection stages (floor, critique, cap) raised F1 on the Martian set and lowered it on the
   fresh one: the drafted sets there score 0.172 and 0.141, above Mira's posted 0.130, and the
   posted ones 0.099 and 0.056. What our agents find is not the limit on that corpus. What the
