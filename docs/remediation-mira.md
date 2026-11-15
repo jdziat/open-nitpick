@@ -1715,6 +1715,67 @@ comments. No prompt, filter or default changes because of what it contains. Each
 once per judge. Mira's runs are frozen when they finish, like the others. The estimate is $60,
 and the work stops and reports if the key's weekly usage passes $300 (it was $223 on the 15th).
 
+#### F7 result: the order holds, no arm reaches Mira, and our selection stages do not transfer
+
+The corpus came out at 30 pull requests from 28 repositories (six per language, none of the
+five Martian repositories) with 94 golden comments: 68 in core categories (bug 25, doc_defect
+21, test_gap 11, concurrency 4, api 4, data 2, perf 1) and 26 outside them (style 20,
+speculative 6). 53 are rated Low and 4 High. 15 further candidates were skipped for having no
+golden comment in a core category and one for a reviewed state over the size rule. The Martian
+set is mostly bugs rated Medium or High, so this is a different kind of corpus. Mira ran with
+its arm A settings, D1c and D3m as measured on the tuning set. All 270 reviews finished, and one
+D3m review was re-run once after its critique returned no grades.
+
+Under Sol, three passes of 30 pull requests, raw counts over every golden category:
+
+| | posted precision | posted recall | posted F1 | posted a review | empty reviews | drafted F1 |
+|---|---|---|---|---|---|---|
+| Mira | 27.6% | 8.5% | 0.130 | 0.92 | 35 of 90 | |
+| D3m | 19.0% | 6.7% | 0.099 | 1.10 | 30 of 90 | 0.172 |
+| D1c | 24.3% | 3.2% | 0.056 | 0.40 | 64 of 90 | 0.141 |
+
+| posted F1, paired | Sol | Terra | Luna |
+|---|---|---|---|
+| D1c minus Mira | -0.074 (-0.155 to +0.006) | -0.079 (-0.161 to +0.002) | -0.072 (-0.155 to +0.014) |
+| D3m minus Mira | -0.031 (-0.098 to +0.031) | -0.031 (-0.096 to +0.026) | -0.037 (-0.104 to +0.022) |
+| D3m minus D1c | +0.043 (-0.026 to +0.112) | +0.048 (-0.025 to +0.121) | +0.035 (-0.043 to +0.106) |
+
+Mira's F1 is 0.135 under Terra and 0.141 under Luna. The core profile puts Mira at 0.152, D3m at
+0.119 and D1c at 0.075 under Sol, in the same order, with every interval across zero. The only
+interval that excludes zero, under Sol and Terra, is D1c's recall against Mira's: 5.3 points
+lower (-11.0 to -0.3 under Sol). Mira matched bug 11 of 75, concurrency 4 of 12, data 4 of 6 and
+api 3 of 12, and none of the 96 test or documentation comments, which its prompt tells the
+reviewer not to file.
+
+**The registered reading.** Mira minus D1c is +0.074 against +0.065 earlier: it holds. D3m minus
+D1c is +0.043 against +0.070: it holds, with its interval across zero as before. D3m minus Mira is
+-0.031 against +0.005: the sign does not repeat, so it does not hold. The adoption condition needs
+D3m minus D1c of at least +0.03 and D3m minus Mira of at least -0.02. The first is met and the
+second is not, so the adoption case falls away and our prompts stay. No arm's posted F1 exceeds
+Mira's, so beating Mira is claimed for none.
+
+**What else the corpus shows** (read after the fact, not registered). Every score is a quarter or
+less of its Martian value: Mira 0.130 against 0.481 and 0.547, D3m 0.099 against 0.486, D1c 0.056
+against 0.416 and D4a's 0.494. And the selection stages, which raised F1 on the Martian set, lower it
+here. D3m's posted F1 was 0.486 against 0.444 drafted on the tuning set, and D4a's 0.494 against
+0.415 on the held-out set; here the drafted sets score 0.172 for D3m and 0.141 for D1c, both above Mira's
+posted 0.130, and the posted sets 0.099 and 0.056. D1c posts 0.40 findings a review and drafts
+2.28, and 64 of its 90 reviews are empty. The signals the stages use stop separating the true
+findings from the rest:
+
+| true findings among, under Sol | D1c | D3m | D3m on the tuning set |
+|---|---|---|---|
+| posted | 7 of 35 (20%) | 15 of 96 (16%) | 54% |
+| held by the critique as plausible | 10 of 37 (27%) | 15 of 98 (15%) | 11% |
+| held by the floor | 14 of 118 (12%) | 15 of 123 (12%) | 30% |
+| confidence 0.8 or more | 7 of 41 (17%) | 3 of 35 (9%) | 57% |
+
+A finding the critique withheld is as likely to be true as one it posted, and confidence above 0.8
+is no better than 0.7. That is a statement about this corpus only: a golden comment here is a
+change a person asked for, so a real defect a tool found that nobody commented on counts as
+false, and "false" is likely to be overstated for every arm. The same corpus gives the same bias to all
+three, which is why the order between them is the reading and the level is not.
+
 ### What this means for the goal
 
 Deep review is built: two agents a batch that read the repository over up to ten turns,
@@ -1733,8 +1794,13 @@ yet beat Mira.
   anything else here, since Mira's authors measure themselves on this benchmark.
 - A floor of 0.6 did not help live (D5f 0.412 against D1c's 0.416). The offline estimates
   that suggested it (F6, F6m) left the critique out.
-- F7 repeats the comparison on pull requests from other repositories, before anything is
-  adopted.
+- F7 repeated the comparison on 30 pull requests from other repositories. The order held
+  (Mira above D3m above D1c, under all three judges), no arm reached Mira (D3m -0.031, D1c
+  -0.074 under Sol), and the adoption condition for Mira's prompts failed by 0.011. Our prompts stay.
+- The selection stages (floor, critique, cap) raised F1 on the Martian set and lowered it on the
+  fresh one: the drafted sets there score 0.172 and 0.141, above Mira's posted 0.130, and the
+  posted ones 0.099 and 0.056. What our agents find is not the limit on that corpus. What the
+  stages then keep is, and it needs a measure that holds on both.
 
 #### Before deep review, judged by Sonnet 4.5
 
@@ -1823,6 +1889,14 @@ Mira on the held-out split at the same time as open-nitpick, in the same session
   generalize. No pitfall list for the benchmark's languages was written for that reason, since
   the choice of items would be steered by the comments already read. A corpus neither the
   prompts nor the tool have seen is the test that would settle it.
+- The fresh corpus (F7) is 30 pull requests, each drawn from the 75 most-commented merged pull
+  requests, with 3 to 25 comments, of its week and language. Its golden comments are review
+  threads GitHub marked outdated: a later commit changed the lines, which does not show that the
+  comment was the reason. One model assigned the categories. 58 of its 94 comments are test,
+  documentation, style or speculative, and 26 are outside the core profile. Its intervals include zero, so it
+  reads as an order and not as a margin. The classifier, the corpus builder and every arm are
+  recorded in `tools/bakeoff/fresh_corpus.py` and the frozen directory
+  `bakeoff-frozen/2026-11-15-fresh`.
 - The benchmark's golden comments are sparse and human-curated, so a real defect
   nobody labelled counts against the tool that reports it. A blind grade of 48
   unmatched held-out comments sized it: 27% of open-nitpick's and 61% of Mira's
