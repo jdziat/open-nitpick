@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/review"
 )
 
@@ -72,6 +73,36 @@ func TestTheJSONReportListsWithheldFindingsWithTheirStageAndReason(t *testing.T)
 	if len(got.Withheld) != 1 || got.Withheld[0].Title != "t" || got.Withheld[0].WithheldBy != "the deep-review filter" ||
 		!strings.Contains(got.Withheld[0].Reason, "0.60") || len(got.Findings) != 0 {
 		t.Errorf("withheld = %+v, findings = %+v; want the one withheld finding with its stage and reason", got.Withheld, got.Findings)
+	}
+}
+
+// A finding an expert re-rated below the gate and one it refuted are told apart:
+// the first carries the level it was moved to and the entry the expert cited, and
+// the second carries neither.
+func TestTheJSONReportTellsARefutationFromARerating(t *testing.T) {
+	f := review.Finding{Path: "a.go", Line: 3, Severity: "warning", Class: "correctness", Title: "t", Rationale: "r"}
+	report := &review.Report{Overruled: []review.Overruled{
+		{Finding: f, Expert: "sql expert", Reason: "the query is parameterised", Cited: "entry-7"},
+		{Finding: f, Expert: "style expert", Reason: "real, but minor", Revised: config.SeverityNit, Cited: "entry-9"},
+	}}
+	var buf bytes.Buffer
+	if err := writeJSONReport(&buf, resultClean, report); err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Withheld []map[string]any `json:"withheld"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("not json: %v\n%s", err, buf.String())
+	}
+	if len(got.Withheld) != 2 {
+		t.Fatalf("withheld = %v, want both", got.Withheld)
+	}
+	if _, has := got.Withheld[0]["revised"]; has || got.Withheld[0]["cited"] != "entry-7" {
+		t.Errorf("a refutation = %v, want a citation and no revised level", got.Withheld[0])
+	}
+	if got.Withheld[1]["revised"] != "nit" || got.Withheld[1]["cited"] != "entry-9" {
+		t.Errorf("a re-rating = %v, want the level it was moved to and its citation", got.Withheld[1])
 	}
 }
 

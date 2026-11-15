@@ -46,6 +46,15 @@ type jsonWithheld struct {
 	jsonFinding
 	WithheldBy string `json:"withheld_by"`
 	Reason     string `json:"reason"`
+
+	// Revised is the severity an expert moved the finding to, when that put it
+	// below what is published. It is absent for a finding that was refuted or
+	// held back by a filter, and it is what tells the two apart: an expert that
+	// agreed the defect is real and rated it low is not one that refuted it.
+	Revised string `json:"revised,omitempty"`
+
+	// Cited is the knowledge entry the expert named as deciding its verdict.
+	Cited string `json:"cited,omitempty"`
 }
 
 func toJSONFinding(f review.Finding) jsonFinding {
@@ -67,7 +76,10 @@ func writeJSONReport(w io.Writer, result actionResult, report *review.Report) er
 			out.Findings = append(out.Findings, toJSONFinding(f))
 		}
 		for _, o := range report.Overruled {
-			out.Withheld = append(out.Withheld, jsonWithheld{jsonFinding: toJSONFinding(o.Finding), WithheldBy: o.Expert, Reason: o.Reason})
+			out.Withheld = append(out.Withheld, jsonWithheld{
+				jsonFinding: toJSONFinding(o.Finding), WithheldBy: o.Expert, Reason: o.Reason,
+				Revised: string(o.Revised), Cited: o.Cited,
+			})
 		}
 	}
 	enc := json.NewEncoder(w)
