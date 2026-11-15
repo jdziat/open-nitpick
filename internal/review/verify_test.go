@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -302,6 +305,57 @@ func TestACancelledReviewDoesNotResendACheckerTurn(t *testing.T) {
 	got := e.verifyOne(ctx, "system", newRepoTools("", e.Provider, vcs.Ref{}), f, nil)
 	if got.failed != "cancelled" || checker.calls != 1 {
 		t.Errorf("outcome = %+v after %d calls, want one call and a cancelled check", got, checker.calls)
+	}
+}
+
+// failingLLM fails its first calls with the errors it was given, in order, and
+// answers every call after them.
+type failingLLM struct {
+	errs  []error
+	calls int
+}
+
+func (f *failingLLM) GenerateContent(context.Context, []llms.Message, ...llms.CallOption) (*llms.Response, error) {
+	f.calls++
+	if f.calls <= len(f.errs) {
+		return nil, f.errs[f.calls-1]
+	}
+	r := verdict(verdictConfirmed, "app.go:4 discards the error")
+	return &r, nil
+}
+
+// sdkLookupFailure wraps a DNS failure the way the SDK reported one on a
+// held-out deep review, so the test reads the error chain a live run produced.
+func sdkLookupFailure(dns *net.DNSError) error {
+	return fmt.Errorf("openai: generate content: request failed after 0 retries: %w",
+		&url.Error{Op: "Post", URL: "https://openrouter.ai/api/v1/chat/completions",
+			Err: &net.OpError{Op: "dial", Net: "tcp", Err: dns}})
+}
+
+// A DNS lookup that timed out is a blip the SDK does not resend. Left to it,
+// one ended both agents of a held-out deep review on their first turn; here it
+// costs one resend.
+func TestATurnLostToADNSTimeoutIsSentAgain(t *testing.T) {
+	model := &failingLLM{errs: []error{sdkLookupFailure(&net.DNSError{
+		Err: "read udp 127.0.0.1:35468->127.0.0.53:53: i/o timeout", Name: "openrouter.ai", IsTimeout: true})}}
+	resp, err := generateBounded(context.Background(), model, nil, nil, time.Minute)
+	if err != nil || resp == nil {
+		t.Fatalf("generateBounded = %v, %v; want the answer to the resend", resp, err)
+	}
+	if model.calls != 2 {
+		t.Errorf("calls = %d, want the timed-out one and one resend", model.calls)
+	}
+}
+
+// A host that does not resolve is configuration, not a blip, so the lookup
+// failure comes back after one call instead of costing a second.
+func TestAHostThatDoesNotResolveIsNotSentAgain(t *testing.T) {
+	model := &failingLLM{errs: []error{sdkLookupFailure(&net.DNSError{
+		Err: "no such host", Name: "openrouter.example", IsNotFound: true})}}
+	_, err := generateBounded(context.Background(), model, nil, nil, time.Minute)
+	var dns *net.DNSError
+	if !errors.As(err, &dns) || model.calls != 1 {
+		t.Errorf("err = %v after %d calls; want the lookup failure after one call", err, model.calls)
 	}
 }
 

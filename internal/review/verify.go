@@ -3,7 +3,9 @@ package review
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -54,8 +56,10 @@ const (
 var verifyCallTimeout = 90 * time.Second
 
 // generateBounded asks for one turn under its own deadline and sends it again
-// once if that deadline, not the caller's, ended it. A second stall is
-// returned as the error it is.
+// once if the turn timed out while the caller is still waiting: on that
+// deadline, or on one the network reports, such as a DNS lookup that timed
+// out. The SDK resends no DNS failure, and one ended a held-out deep review's
+// agents on their first turn. A second timeout is returned as the error it is.
 func generateBounded(ctx context.Context, llm interface {
 	GenerateContent(context.Context, []llms.Message, ...llms.CallOption) (*llms.Response, error)
 }, msgs []llms.Message, opts []llms.CallOption, timeout time.Duration) (*llms.Response, error) {
@@ -64,13 +68,20 @@ func generateBounded(ctx context.Context, llm interface {
 		callCtx, cancel := context.WithTimeout(ctx, timeout)
 		var resp *llms.Response
 		resp, err = llm.GenerateContent(callCtx, msgs, opts...)
-		stalled := callCtx.Err() != nil && ctx.Err() == nil
+		timedOut := callCtx.Err() != nil || networkTimeout(err)
 		cancel()
-		if err == nil || !stalled {
+		if err == nil || ctx.Err() != nil || !timedOut {
 			return resp, err
 		}
 	}
 	return nil, err
+}
+
+// networkTimeout reports an error the network stack marks as a timeout. A host
+// that does not resolve is not one, and resending it would change nothing.
+func networkTimeout(err error) bool {
+	var ne net.Error
+	return errors.As(err, &ne) && ne.Timeout()
 }
 
 // lookupTools are the two functions that read the repository, shared by the
