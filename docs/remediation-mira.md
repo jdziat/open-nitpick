@@ -1278,6 +1278,31 @@ under the old judge now means the same quantity rescored by GPT-6.1 Sol.
 A two-case smoke (calcom-1, keycloak-4) ran all three. On Mira's comments, Sol and Luna
 matched Sonnet's counts and Terra counted one fewer true positive on calcom-1.
 
+### D3m: Mira's agent prompts (registered 2026-11-14, before it runs)
+
+D2r's drafts were 34.4% precise and recalled 47.5% (Sonnet judge), against 50.6% and 57.4% for
+Mira's drafts from the same model, loop shape and selection rules. The largest difference
+left is what the agents are told. Ours extends the review prompt, written for one call;
+Mira's tells the agent to file only at confidence 0.7 or more, to trace a new value to the
+code that consumes it, to treat removed lines as a specification, to follow a changed
+signature to every caller and implementer, and not to speculate past what it can cite.
+
+D3m is the D1 build with both agents' system prompts replaced by Mira's general and security
+prompts, adapted to the findings schema (field names, severity scale, class list; Apache
+License 2.0, `/tmp/bakeoff/d3m/adapt.py` makes the adaptation), built in a worktree so the
+repository is unchanged unless the stage is kept. Because D1's forced submissions came back
+empty at the 16,384-token cap 16% to 34% of the time, the forced submission in this build
+also gets a 65,536-token cap and a 10-minute deadline; the reasoning-off retry stays as the
+last resort. A two-case smoke still had 1 of 3 forced submissions run out at 65,536.
+
+Three passes on the 20 tuning pull requests, scored by GPT-6.1 Sol, Terra and Luna, paired
+against D1 and Mira under the same judge.
+
+- **Keep, and write our own prompts to this structure:** drafted precision up 8 points or
+  more over D1's drafts under Sol, with drafted recall not lower.
+- **Ship to the held-out gate:** posted F1 above Mira's under Sol.
+- **Validity:** D1's. The forced-submission fallbacks are reported either way.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
