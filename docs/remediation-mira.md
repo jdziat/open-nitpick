@@ -1110,6 +1110,60 @@ comments), and our original build with Sonnet 4.6 at F1 0.390 (precision 34.9%, 
 above. A stronger model does not close the gap for the original build. R10 with Sonnet 4.6 has
 not been run.
 
+### The output cap took the reasoning out of most of our reviews (found 2026-11-14)
+
+When `max_tokens` is unset, open-nitpick sends a reasoning model on OpenRouter a cap of
+16,384 output tokens (`internal/llm/client.go:444`), and reasoning counts against it.
+DeepSeek V4.1 Flash spent the whole cap thinking on most of our single-call reviews. Each
+of those calls came back empty and was sent again with reasoning off
+(`internal/llm/structured.go:201`). Mira has the same cap and the same fallback
+(`mira/llm/base.py:217`), and its loop seldom reached it. Counted from the stored logs:
+
+| arm | review calls a pass | sent again with reasoning off, each pass |
+|---|---:|---|
+| R1, 6-file batches | 48 | 39, 38, 36 |
+| R9, whole PR | 23 | 19, 19, 20 |
+| R10, whole PR, tool loop | 23 | 7, 7, 7 (forced submissions and review calls together) |
+| R11, R10 with triage off | 23 | 6, 7, 9 (counted the same way) |
+| Mira, default loop | 20 reviews | 1, 0 |
+| Mira, tools off | 20 reviews | 10, 12 |
+| held-out, ours (R1 build) | 85 | 45, 50, 46 |
+| held-out, Mira | 30 reviews | 2, 0, 1 |
+
+Most of our reviews on both sets were written without reasoning, and nearly all of Mira's
+with it. Three readings above depend on that and are reopened:
+
+- R9's "whole-PR batching lowers recall" compared two arms that each lost the reasoning on
+  about four calls in five.
+- The tools-off ablation in "Locating Mira's gain" compared Mira's loop, which reasoned on
+  nearly every call, with a single call that lost its reasoning on about half the pull
+  requests. On that evidence "the tool loop is the source" cannot be told apart from "the
+  reasoning finished".
+- The held-out gap was measured with the reasoning off on more than half of our review
+  calls and almost none of Mira's.
+
+### R12 and R13: room for the reasoning to finish (registered 2026-11-14, before they run)
+
+R13 is R1 with `models.default.max_tokens: 131072` and `models.default.timeout: 20m`
+(`tools/bakeoff/r13-batch-thinking.yaml`). R12 adds R9's whole-PR batching to the same two
+settings (`tools/bakeoff/r12-whole-thinking.yaml`). Both use the R1 binary, model, prompt and
+triage, with verify off, three passes each on the 20 tuning pull requests. R13 against R1
+measures what finished reasoning is worth. R12 against R13 is the test R9 was meant to be:
+whole-PR batching with the reasoning intact. The model's output limit is 943,718 tokens and
+output costs $0.50 a million, so a call that uses the whole new cap costs about 7 cents. A
+smoke run of R12 on three pull requests checks the settings first and is not scored.
+
+- **Ship to a fresh-corpus gate (each arm):** precision up 10 points or more against R1,
+  recall down 3 or fewer, and F1 at or above Mira's 0.514, the conditions R9 and R10 had.
+- **Kill:** any of the three fails.
+- **Batching reading:** R12 minus R13 on F1, with its interval. A positive difference with an
+  interval that clears zero means whole-PR batching helps once the reasoning finishes, and
+  R9's reading is withdrawn.
+- **Validity:** an arm with more than 5% of its review calls still sent again with reasoning
+  off is reported and not ranked.
+- **Reported with it:** those fallbacks for each pass, median review time, comments per
+  review, and model spend for each pass.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
