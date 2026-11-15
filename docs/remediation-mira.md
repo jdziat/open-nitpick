@@ -1607,8 +1607,17 @@ Mira on the held-out split at the same time as open-nitpick, in the same session
 
 ## Limits
 
-- One judge model scores everything. The plan does not test a second judge, and
-  a different judge could move both tools.
+- Since 2026-11-14 three judges score every arm (GPT-6.1 Sol, Terra and Luna), and they agree
+  on the order of the arms. Every figure before that was scored by one judge, Sonnet 4.5, and
+  those stay as history.
+- The 20 tuning and 30 held-out pull requests have been read by the person writing the
+  prompts, and their golden comments with them. Text written for the deep agents is not clean
+  of that. `deep_security.md` was written after reading Mira's security prompt, whose items
+  include classes of defect the benchmark labels, and `deep_review.md` follows the structure of
+  Mira's prompt, which D3m showed carries recall. A gain from either is not shown to
+  generalize. No pitfall list for the benchmark's languages was written for that reason, since
+  the choice of items would be steered by the comments already read. A corpus neither the
+  prompts nor the tool have seen is the test that would settle it.
 - The benchmark's golden comments are sparse and human-curated, so a real defect
   nobody labelled counts against the tool that reports it. A blind grade of 48
   unmatched held-out comments sized it: 27% of open-nitpick's and 61% of Mira's
