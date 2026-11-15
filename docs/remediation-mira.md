@@ -1278,6 +1278,39 @@ under the old judge now means the same quantity rescored by GPT-6.1 Sol.
 A two-case smoke (calcom-1, keycloak-4) ran all three. On Mira's comments, Sol and Luna
 matched Sonnet's counts and Terra counted one fewer true positive on calcom-1.
 
+#### Rescored under the new judges
+
+Every compared run, scored again from the frozen files under GPT-6.1 Sol, Terra and Luna.
+The last column is each arm's F1 minus Mira's, with the 95% interval from the paired
+bootstrap over pull requests. Mira's own F1 moved by 0.012 across the three judges, and no
+judge changes the order of the arms.
+
+Tuning set, 20 pull requests, Sol (primary):
+
+| arm | precision | recall | F1 | TP, FP | F1 minus Mira |
+|---|---:|---:|---:|---|---|
+| Mira, default (2 passes) | 69.4% | 36.8% | 0.481 | 50, 22 | |
+| R1, 6-file batches | 27.6% | 42.6% | 0.335 | 87, 228 | -0.146 (-0.223, -0.052) |
+| R10, whole PR, tool loop | 43.5% | 39.2% | 0.412 | 80, 104 | -0.068 (-0.150, +0.019) |
+| R11, R10 with triage off | 40.2% | 43.1% | 0.416 | 88, 131 | -0.065 (-0.153, +0.037) |
+| D1, deep review | 56.3% | 32.8% | 0.415 | 67, 52 | -0.066 (-0.148, +0.010) |
+| D1g, general agent only | 53.3% | 31.4% | 0.395 | 64, 56 | -0.086 (-0.180, +0.010) |
+| D2r, D1 with reasoning replayed | 48.8% | 30.9% | 0.378 | 63, 66 | -0.102 (-0.201, -0.002) |
+
+F1 under the other two judges: Terra has Mira 0.469, R1 0.342, R10 0.407, R11 0.421, D1 0.415,
+D1g 0.395, D2r 0.366. Luna has Mira 0.478, R1 0.352, R10 0.441, R11 0.431, D1 0.430, D1g 0.410,
+D2r 0.382. Held-out set, 30 pull requests, three passes each, Mira against the R1 build:
+
+| judge | Mira precision, recall, F1 | R1 build precision, recall, F1 | F1 difference |
+|---|---|---|---|
+| Sol | 66.2%, 46.7%, 0.547 | 36.3%, 52.1%, 0.428 | -0.120 (-0.180, -0.062) |
+| Terra | 67.9%, 47.0%, 0.555 | 38.1%, 54.6%, 0.449 | -0.106 (-0.168, -0.047) |
+| Luna | 72.2%, 49.5%, 0.588 | 38.8%, 55.2%, 0.455 | -0.132 (-0.186, -0.073) |
+
+The three arms that read the repository and filter (D1, D1g, D2r) kept the precision and lost
+recall, as before. The security agent helps (D1 over D1g, 0.415 against 0.395), and replaying
+reasoning hurts (D2r below D1), under every judge.
+
 ### D3m: Mira's agent prompts (registered 2026-11-14, before it runs)
 
 D2r's drafts were 34.4% precise and recalled 47.5% (Sonnet judge), against 50.6% and 57.4% for
@@ -1302,6 +1335,36 @@ against D1 and Mira under the same judge.
   more over D1's drafts under Sol, with drafted recall not lower.
 - **Ship to the held-out gate:** posted F1 above Mira's under Sol.
 - **Validity:** D1's. The forced-submission fallbacks are reported either way.
+
+#### D3m result: at Mira's F1, by a different route
+
+Three passes on the 20 tuning pull requests, scored by all three judges. One review
+(discourse-4, pass 1) came back incomplete: its critique was cut at the output cap and
+returned no grades. It was re-run once.
+
+| judge | D3m precision, recall, F1 | Mira F1 | D3m minus Mira, F1 | D3m minus D1, F1 |
+|---|---|---:|---|---|
+| Sol | 56.5%, 42.6%, 0.486 | 0.481 | +0.005 (-0.064, +0.088) | +0.071 (+0.013, +0.143) |
+| Terra | 54.8%, 42.2%, 0.476 | 0.469 | +0.008 (-0.060, +0.090) | +0.062 (+0.002, +0.136) |
+| Luna | 57.0%, 44.1%, 0.497 | 0.478 | +0.019 (-0.060, +0.113) | +0.067 (+0.001, +0.144) |
+
+D3m is the first arm whose F1 is not below Mira's, and the interval says it is level with it,
+not above it. It gets there with 13 points less precision (-24.1 to -2.9 under Sol, which
+excludes zero) and 5.9 points more recall (-2.1 to +14.5). Against D1 the gain is recall: +9.8
+points (+4.0 to +16.7), with precision unchanged (+0.2).
+
+Drafts, Sol. D3m's drafts are 36.0% precise with 57.8% recall, D1's 34.4% and 51.0%, Mira's
+44.2% and 50.7%. The registered condition for writing our own prompts to Mira's structure
+was drafted precision up 8 points over D1's with recall not lower, and it fails: precision is
+up 1.5 points (-5.4 to +8.1), recall up 6.9 (+0.5 to +13.8). Mira's prompts did not make the
+agents more precise. The registered ship condition, posted F1 above Mira's under Sol, holds
+as a point comparison (0.486 against 0.481) and not as an interval.
+
+Two things changed from D1, the prompts and the forced-submission cap, so this result cannot
+say which one carried the recall. D1c separates them. Validity: 5 of D3m's 98 forced
+submissions (5.1%; 2.9%, 6.3% and 6.5% by pass) were sent again without reasoning, which is
+3.6% of its agent runs, against a registered limit of 5% that the strict reading puts just
+over. D1's were 13% to 26% of its agent runs.
 
 ### D1c: the repository build (registered 2026-11-14, before it runs)
 
