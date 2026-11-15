@@ -1614,6 +1614,15 @@ nothing by itself: shipping text adapted from Mira's prompts is the owner's deci
 licence and attribution and for the contamination limit below. It is reported for that
 decision, whatever it shows.
 
+#### F6m result: Mira's adapted prompts with a 0.6 floor are above Mira on the tuning set
+
+On D3m, the sets a floor of 0.6 would post scored F1 0.510 under Sol, against 0.486 for the
+same passes as posted (+0.024, interval -0.008 to +0.059), with recall up 6.4 points (+2.8 to
++10.1) and precision down 3.3 (-6.2 to -0.2). Against Mira's two passes that is +0.029
+(-0.043 to +0.115). The floor costs D3m less precision than D1c because what it lets in is
+both fewer and truer: 13 true of 34 scored for D3m, against 16 of 55 for D1c. The same gain
+on our own prompt (F6, D1c) leaves it at 0.440, below Mira's 0.481.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
