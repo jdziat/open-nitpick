@@ -97,12 +97,44 @@ func (t *repoTools) fileBytes(ctx context.Context, path string) ([]byte, error) 
 		if resolved != root && !strings.HasPrefix(resolved, root+string(filepath.Separator)) {
 			return nil, errors.New("path leaves the checkout")
 		}
+		// Checked on the resolved path, so a link inside the tree cannot name a
+		// file the tools refuse by its own name.
+		rel, err := filepath.Rel(root, resolved)
+		if err != nil || t.private(ctx, rel) {
+			return nil, errors.New("not a file the review may read")
+		}
 		return os.ReadFile(resolved)
 	}
 	if t.provider == nil {
 		return nil, errors.New("no source to read")
 	}
 	return t.provider.FileContent(ctx, t.ref, path)
+}
+
+// private reports whether a path inside the checkout is one the tools must not
+// return: anything under .git, which holds the checkout's own configuration and,
+// in a CI checkout, the token the job pushes with, and anything git ignores,
+// which is where a working tree keeps .env files and local keys. The text the
+// tools are driven by is a pull request's diff and description, which its author
+// controls, so a file the tools can read is a file a finding can publish. Tracked
+// files, and new files that are not ignored yet, stay readable: a review of
+// uncommitted changes needs them. Anything git cannot answer about is refused.
+func (t *repoTools) private(ctx context.Context, rel string) bool {
+	for _, segment := range strings.Split(filepath.ToSlash(rel), "/") {
+		if strings.EqualFold(segment, ".git") {
+			return true
+		}
+	}
+	ctx, cancel := context.WithTimeout(ctx, toolGrepTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "check-ignore", "-q", "--", filepath.ToSlash(rel))
+	cmd.Dir = t.root
+	// Exit 1 is git saying the path is not ignored. Exit 0 says it is, and any
+	// other outcome means git could not tell, which is refused.
+	err := cmd.Run()
+	var exit *exec.ExitError
+	notIgnored := errors.As(err, &exit) && exit.ExitCode() == 1
+	return !notIgnored
 }
 
 // grep searches the checkout's tracked files with an extended regular

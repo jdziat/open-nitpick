@@ -444,3 +444,79 @@ func TestGrepSearchesTrackedFilesAndCannotBeGivenAnOption(t *testing.T) {
 		t.Errorf("grep without a checkout = %q, want it to say search is unavailable", got)
 	}
 }
+
+// A checkout's own configuration holds the token a CI job pushes with, and the
+// tools are driven by text a pull request's author wrote, so a file the tools can
+// read is a file a finding can publish. Nothing under .git is returned, by its
+// own name or through a link inside the tree.
+func TestTheToolsNeverReturnAnythingUnderTheGitDirectory(t *testing.T) {
+	root := gitRepo(t, map[string]string{"app.go": "package app\n"})
+	secret := "AUTHORIZATION: basic c2VjcmV0LXRva2Vu"
+	cfg := filepath.Join(root, ".git", "config")
+	f, err := os.OpenFile(cfg, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString("[http \"https://github.com/\"]\n\textraheader = " + secret + "\n"); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+	if err := os.Symlink(cfg, filepath.Join(root, "innocent.txt")); err != nil {
+		t.Skip("symlinks unavailable")
+	}
+	tools := newRepoTools(root, nil, vcs.Ref{})
+	for _, path := range []string{".git/config", "./.git/config", ".GIT/config", "innocent.txt"} {
+		if got := tools.read(context.Background(), path, 1, 50); strings.Contains(got, secret) || !strings.HasPrefix(got, "no such file") {
+			t.Errorf("read(%q) = %q, want the file refused", path, got)
+		}
+	}
+	if got := tools.read(context.Background(), "app.go", 1, 5); !strings.Contains(got, "package app") {
+		t.Errorf("a tracked file was refused: %q", got)
+	}
+}
+
+// A working tree keeps its secrets in files git ignores, so those are refused
+// too, while a file that is tracked, or new and not ignored, is still read.
+func TestTheToolsRefuseIgnoredFilesAndReadTheRest(t *testing.T) {
+	root := gitRepo(t, map[string]string{"app.go": "package app\n", ".gitignore": ".env\nsecrets/\n"})
+	for path, body := range map[string]string{".env": "API_KEY=hunter2\n", "secrets/key.pem": "PRIVATE KEY\n", "new.go": "package new\n"} {
+		full := filepath.Join(root, path)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tools := newRepoTools(root, nil, vcs.Ref{})
+	for _, path := range []string{".env", "secrets/key.pem"} {
+		if got := tools.read(context.Background(), path, 1, 5); !strings.HasPrefix(got, "no such file") {
+			t.Errorf("read(%q) = %q, want the ignored file refused", path, got)
+		}
+	}
+	for path, want := range map[string]string{"app.go": "package app", "new.go": "package new"} {
+		if got := tools.read(context.Background(), path, 1, 5); !strings.Contains(got, want) {
+			t.Errorf("read(%q) = %q, want it read", path, got)
+		}
+	}
+}
+
+// When git cannot say whether a file is ignored, the file is refused. A checkout
+// whose .git is not a repository is that case, and a tool that read the file
+// anyway would be reading it unchecked.
+func TestTheToolsRefuseAFileWhenGitCannotSayWhetherItIsIgnored(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("visible\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tools := newRepoTools(root, nil, vcs.Ref{})
+	if !tools.canSearch() {
+		t.Fatal("the test checkout was not taken for one")
+	}
+	if got := tools.read(context.Background(), "a.txt", 1, 5); !strings.HasPrefix(got, "no such file") {
+		t.Errorf("read = %q, want a file refused when git cannot answer", got)
+	}
+}
