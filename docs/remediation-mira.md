@@ -1101,6 +1101,15 @@ noise filter and critique) match 39 golden comments and file 38 unmatched. Our o
 triage off matches 32 and files 41. Mira finds about 7 more real findings per pass with
 three fewer wrong comments.
 
+#### Model: Sonnet 4.6, one pass (arm C, tuning set)
+
+Mira with Sonnet 4.6 drafts and posts at F1 0.545 (precision 52.0%, recall 57.4%, 75
+comments), and our original build with Sonnet 4.6 at F1 0.390 (precision 34.9%, recall 44.1%,
+86 comments). Both are one pass, scored with the same judge and the counts that
+`tools/bakeoff/compare.py` uses, which differ from the Core-profile figures in the arm table
+above. A stronger model does not close the gap for the original build. R10 with Sonnet 4.6 has
+not been run.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
