@@ -1259,6 +1259,25 @@ against it.
 - **Ship to the held-out gate:** F1 above Mira's 0.514, as for D1.
 - **Validity:** D1's.
 
+### Judge change (registered 2026-11-14, before any rescored number is read)
+
+Every number above was judged by the upstream benchmark's judge, `anthropic/claude-sonnet-4.5`.
+From here the primary judge is `openai/gpt-6.1-sol`, with `openai/gpt-6.1-terra` and
+`openai/gpt-6-luna` reported beside it, on the maintainer's direction that these track human
+review most closely. Only `--judge-model` changes; the scorer, its prompts and its
+deduplication are the upstream ones. The published competitor rows stay under the old judge
+and are not compared.
+
+Mira is not re-run. Its stored runs, the open-nitpick runs this record compares, and the
+scoring inputs are frozen outside the repository with a SHA-256 manifest and no write
+permission, and every arm is rescored from those files, so a difference between judges is
+the judges' alone. Sonnet-judged numbers above stay as history. A comparison is made only
+between arms scored by one judge, and a ship or kill condition that names a number taken
+under the old judge now means the same quantity rescored by GPT-6.1 Sol.
+
+A two-case smoke (calcom-1, keycloak-4) ran all three. On Mira's comments, Sol and Luna
+matched Sonnet's counts and Terra counted one fewer true positive on calcom-1.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
