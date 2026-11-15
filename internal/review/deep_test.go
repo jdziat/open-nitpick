@@ -315,6 +315,9 @@ func TestWhenEveryDeepAgentFailsTheBatchIsReviewedTheOrdinaryWayAndTheReportSays
 	if got := report.FailedStages(); !slices.Equal(got, want) {
 		t.Errorf("failed stages = %v, want %v", got, want)
 	}
+	if reviewer.ordinarySystem == "" || strings.Contains(reviewer.ordinarySystem, deepPromptMarker) {
+		t.Errorf("the fallback call's system prompt is missing or tells the reviewer it has lookup tools: %.80q", reviewer.ordinarySystem)
+	}
 	if notice := stageNotice(report); !strings.Contains(notice, "without tools (every agent failed)") {
 		t.Errorf("notice = %q, want it to say the batch ran without tools", notice)
 	}
