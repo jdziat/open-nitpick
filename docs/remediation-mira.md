@@ -1224,6 +1224,20 @@ duplicate rule, so two agents filing one defect posted it twice (calcom-1 posted
 `forEach` defect twice on each of two lines). The partial runs were deleted unscored, and D1
 restarted on the build with the rule (`deepDuplicate`, `internal/review/deepselect.go`).
 
+### D2r: D1 with the reasoning replayed (registered 2026-11-14, before it runs)
+
+Mira replays each turn's reasoning to the next; deep review cannot until
+`nocturnium/llm-go-sdk` sends it. D2r is the D1 build compiled against
+`tools/bakeoff/llm-go-sdk-reasoning-replay.patch` (it applies to v6.15.0 and its test passes
+there) through an alternate modfile, so the repository's `go.mod` is unchanged. Everything
+else is D1's defaults. Three passes on the 20 tuning pull requests, run beside D1 and paired
+against it.
+
+- **Keep:** F1 above D1's with precision down 2 points or fewer, which would make the SDK
+  change worth releasing.
+- **Ship to the held-out gate:** F1 above Mira's 0.514, as for D1.
+- **Validity:** D1's.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
