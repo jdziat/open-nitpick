@@ -1282,8 +1282,9 @@ matched Sonnet's counts and Terra counted one fewer true positive on calcom-1.
 
 Every compared run, scored again from the frozen files under GPT-6.1 Sol, Terra and Luna.
 The last column is each arm's F1 minus Mira's, with the 95% interval from the paired
-bootstrap over pull requests. Mira's own F1 moved by 0.012 across the three judges, and no
-judge changes the order of the arms.
+bootstrap over pull requests. Mira's own F1 moved by 0.012 across the three judges. The order
+of the arms is the same under each, except among R10, R11 and D1, which sit within 0.014 of
+each other and swap places.
 
 Tuning set, 20 pull requests, Sol (primary):
 
