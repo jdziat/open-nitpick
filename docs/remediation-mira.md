@@ -1402,6 +1402,20 @@ tuning pull requests, scored by Sol, Terra and Luna, paired against D1c.
 - **Reported with it:** turns, lookups and tokens per review, model spend, forced
   submissions, and drafted recall against D1c's.
 
+### D1h: high reasoning effort (registered 2026-11-14, before it runs)
+
+Mira reviews at medium effort, as does every deep arm so far. The golden comments neither
+tool matched are mostly semantic: a language rule the model has to recall, or a pattern in
+code it has read. D1h is D1c with `review.deep.reasoning: high` and nothing else
+(`/tmp/bakeoff/cfg/d1h-high.yaml`). Three passes on the 20 tuning pull requests, scored by
+Sol, Terra and Luna, paired against D1c. A higher effort runs out of output budget more
+often, so the forced-submission steps are counted.
+
+- **Adopt high as the default:** posted F1 under Sol above D1c's by 0.03 or more.
+- **Otherwise medium stays,** and the cost of the extra thinking is reported.
+- **Several knobs:** D1t and D1h each change one setting. If both are adopted, the
+  combination is run on the tuning set before the held-out gate, not assumed.
+
 ### What this means for the goal
 
 Nothing built here, alone or stacked, beats Mira on this benchmark with this
