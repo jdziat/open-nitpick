@@ -1830,6 +1830,98 @@ the 16th, and small requests answered a minute later, so which limit is real is 
 driver was stopped with no spend and the aborted run directories were deleted. D4b waits for the
 owner to say whether the key may be used further.
 
+### Where the true drafts go, stage by stage (unregistered, no model calls)
+
+`tools/bakeoff/stage_loss.py` reads the scorer's counts under Sol for the drafted, after-filter and
+posted sets of Mira, D1c and D3m on the tuning set, and the confidence each labelled draft reported.
+The first three rows are true and false findings a pass.
+
+| | Mira (2 passes) | D1c | D3m |
+|---|---|---|---|
+| drafted | 34.5, 43.5 | 33.3, 51.0 | 39.3, 70.0 |
+| after the floor, the duplicate rule and the cap | 30.0, 27.0 | 24.3, 28.3 | 34.0, 48.7 |
+| posted, after the critique | 25.0, 11.0 | 22.7, 18.3 | 29.0, 22.3 |
+| true drafts the filter withheld | 13% | 27% | 14% |
+| false drafts the critique removed, of those it saw | 59% | 35% | 54% |
+| labelled drafts reporting under 0.7 | 44 of 155 (28%) | 94 of 250 (38%) | 82 of 325 (25%) |
+| reporting 0.75 or more, of those the floor passed | 58 of 107 (54%) | 116 of 149 (78%) | 117 of 230 (51%) |
+| posted at 0.75 to 0.85 that were true | 24 of 37 (65%) | 32 of 78 (41%) | 33 of 74 (45%) |
+
+D1c's agents draft as many true findings as Mira's, 33.3 against 34.5 a pass, with 7.5 more false
+ones. The gap opens after that. The filter withholds twice the share of D1c's true drafts that it
+withholds of Mira's, and the critique removes a little over half the share of false ones. Both
+stages cut on the confidence the agent reported: the floor at 0.7, and the critique through its keep
+rule, which keeps a finding it graded plausible only at 0.75 or more. The critique graded 4 of
+D1c's 149 labelled drafts unsupported, so what it withholds is a plausible finding under 0.75 or
+below warning, and how much it withholds follows how many drafts report under 0.75. Under our
+prompt 38% of drafts report below the floor and 78% of the rest report 0.75 or more, so the floor
+takes more and the critique less than they do for Mira. With Mira's prompts in the same build
+(D3m) both shares are Mira's, which is the 9.3 points of recall D3m had over D1c.
+
+Moving the two cuts does not recover it. D5f lowered the floor and the critique withheld what it
+let in, and D1c's posted findings at 0.75 to 0.85 are 41% true where Mira's are 65%, so above the
+floor the number carries less for us than it does for Mira.
+
+#### A blind grade of the deep build's unmatched comments (unregistered)
+
+The held-out blind grade above was of the R1 build, where 27% of open-nitpick's unmatched comments
+were real. It had not been repeated on a deep build. The same procedure was run on the tuning set:
+30 of D1c's 55 posted comments that Sol judged unmatched (three passes) and 18 of Mira's 22 (two
+passes), drawn with seed 20261115, shuffled, and split across four graders that had each comment,
+the checkout and the diff, and no label. The graders are Claude subagents, a different family from
+the DeepSeek reviewers. 44 of the 48 verdicts name a file and line. The sample, key and verdicts are
+in `/tmp/bakeoff/grade2`, not in the repository; `build.py` there draws the sample.
+
+| unmatched posted comments, sampled | n | real | partly | not real |
+|---|---:|---:|---:|---:|
+| D1c, deep build | 30 | 20 (67%, 95% interval 49 to 81) | 6 | 4 |
+| Mira | 18 | 11 (61%, 39 to 80) | 6 | 1 |
+
+D1c's unmatched comments are as often real as Mira's, and the intervals overlap. On the R1 build the
+same grade found 27% real, so the deep build's extra false positives are mostly defects the golden
+list does not contain. That changes what the stage comparison above means: D1c's 18.3 false findings
+a pass against Mira's 11.0 are largely a labelling effect, and the gap that costs it F1 is the
+labelled true findings the selection withholds (22.7 posted against Mira's 25.0, from 33.3 drafted
+against 34.5). A selector that removes judge-false findings, as D6v's check does, can raise F1
+against these labels without raising the share of posted comments that are real. D6v's result is
+read as a score against the golden list, and is not claimed as an improvement in review quality.
+Limits: 30 and 18 are small, `partly` is a judgement, and one family of grader read all 48.
+
+### D6v: the repository check as deep review's selection (registered 2026-11-15, before it runs)
+
+The floor and the critique select on a number the agent reports about itself, and the comparison
+above puts D1c's loss to Mira there. The one selector in this record that moved precision by more
+than the variance read the repository instead: R2b's check kept a finding only when a grader with
+`read_file` and `grep_repo` confirmed it, and moved precision by +14.3 points for -4.4 of recall
+on the tuning set and by +8.7 for -6.3 on the held-out set. It was measured on findings drafted
+from the diff alone and has never run on deep review's drafts. The stage is in the build
+(`review.verify`, `internal/review/verify.go`) and runs after the deep selection, so D6v is
+configuration only, `tools/bakeoff/d6v-verify.yaml`: `review.verify: confirmed`,
+`review.deep.confidence_floor: 0` and `review.deep.critique: false`. Every draft that survives the
+duplicate rule and the cap of five low-priority findings is checked, and posted only when the
+check confirms it. The build is HEAD, `6450059`, whose Go code and prompts are those of `d865d18`.
+Three passes on the 20 tuning pull requests, DeepSeek V4.1 Flash in every role, scored by Sol,
+Terra and Luna, paired against D1c and against Mira's two passes.
+
+- **Projection, written before the run:** R2b's check kept 91% of the true findings and 50% of
+  the false ones on the tuning set, and 89% and 63% on the held-out set. At those rates D1c's drafts
+  post 30 true and 26 to 32 false a pass, F1 0.46 to 0.49. Deep drafts were written by an agent
+  with the same tools, so the check may confirm more of them and remove less.
+- **Adopt as the deep selection:** posted F1 under Sol at least 0.03 above D1c's 0.416, the bar
+  D1t and D5f were held to. Otherwise the floor and the critique stay.
+- **Ship to the held-out gate:** adopted, and posted F1 above Mira's 0.481 under Sol as a point
+  comparison, reported with its interval.
+- **Second reading, from the same runs:** the sets `review.verify: not_refuted` would have posted,
+  rebuilt as the posted findings plus those the check could not settle (`deep_funnel.py --stages
+  notrefuted`) and scored by Sol. It replaces `confirmed` only if it clears the same bar and scores
+  above it.
+- **Validity:** D1c's limits on failed agents and on forced submissions sent again without
+  reasoning. An arm in which more than 5% of the checks could not run, so that their findings
+  were posted unchecked, is reported and not ranked.
+- **Reported with it:** the check's verdict counts, the share of true and of false drafts it kept
+  against the projection, and cost and median time a review against D1c's $0.047 to $0.053 and 200
+  to 235 seconds.
+
 ### What this means for the goal
 
 Deep review is built: two agents a batch that read the repository over up to ten turns,
