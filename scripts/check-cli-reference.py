@@ -14,7 +14,7 @@ sections = {
 }
 source = Path('cmd/nitpick/main.go').read_text()
 commands = set(re.findall(r'^\s*case "([a-z][a-z-]+)"', source, re.M)) - {'help'}
-for prefix, path in (('mcp', 'cmd/nitpick/mcp.go'), ('auth', 'cmd/nitpick/auth.go')):
+for prefix, path in (('mcp', 'cmd/nitpick/mcp.go'), ('auth', 'cmd/nitpick/auth.go'), ('learn', 'cmd/nitpick/learnings.go')):
     subcommands = re.findall(r'^\s*case \"([a-z][a-z-]+)\"', Path(path).read_text(), re.M)
     commands.update(f'{prefix} {subcommand}' for subcommand in subcommands)
 inherits = {'fast-review': 'review', 'deep-review': 'review', 'improve': 'review', 'repo-score': 'full-review'}

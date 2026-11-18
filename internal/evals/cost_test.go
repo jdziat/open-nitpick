@@ -788,6 +788,10 @@ func TestUsageReturnedByTheMeterIsACopy(t *testing.T) {
 
 	_, _ = client.LLM.GenerateContent(t.Context(), nil)
 	held := m.Usage()
+	held.PerCall[0].Prompt = 999
+	if got := m.Usage().PerCall[0].Prompt; got != 10 {
+		t.Fatalf("mutating returned usage changed meter prompt to %d", got)
+	}
 
 	_, _ = client.LLM.GenerateContent(t.Context(), nil)
 	if got := held.Calls(); got != 1 {

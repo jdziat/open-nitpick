@@ -432,7 +432,9 @@ func OptionsFromEnv() (Options, error) {
 				EnvFixtures, len(unknown), strings.Join(unknown, ", "), strings.Join(names, ", "))
 		}
 
-		opts.Fixtures = kept
+		if len(kept) > 0 {
+			opts.Fixtures = kept
+		}
 	}
 
 	if raw := strings.TrimSpace(os.Getenv(EnvTimeout)); raw != "" {
@@ -747,6 +749,7 @@ func Run(ctx context.Context, model Model, f Fixture, runIndex int, opts Options
 // RunWithPersona reviews a fixture with an explicit persona, which is how tone
 // and nitpick-level variants are compared.
 func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, opts Options, persona config.Persona) RunResult {
+	ctx = llm.WithResponseSample(ctx, fmt.Sprintf("%s/%s/%d", model.ID, f.Name, runIndex))
 	started := time.Now()
 
 	// The declaration is made before anything that can fail, because it depends
@@ -761,6 +764,9 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	// whole row to n/a. Which of the two a reader sees depended on where in this
 	// function the provider happened to break.
 	cfg := evalConfig(model)
+	if strings.HasPrefix(cfg.Models.Default.Model, "route-file-error: ") {
+		return RunResult{Model: model.ID, Fixture: f.Name, Run: runIndex, Scale: ourSeverityScale(cfg), Err: fmt.Errorf("evaluation route: %s", strings.TrimPrefix(cfg.Models.Default.Model, "route-file-error: "))}
+	}
 	cfg.Persona = persona.Resolve()
 	if opts.Tune != nil {
 		opts.Tune(cfg)
@@ -785,7 +791,7 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 
 	build := opts.buildClient
 	if build == nil {
-		build = llm.Build
+		build = func(spec config.ModelSpec) (*llm.Client, error) { return llm.BuildContext(ctx, spec) }
 	}
 
 	client, err := build(cfg.Models.Default)
@@ -794,20 +800,12 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 		return out
 	}
 
-	// Metering sits under the recorder so both see the same calls: one review
-	// makes several (review, triage, and a repair round-trip when a provider
-	// answers with unparseable JSON), and every one of them is billed.
-	//
-	// It also sits OUTSIDE the resilience wrapper llm.Build installed, because
-	// that wrapper is what a real review runs behind and this harness measures
-	// the shipped path. The price is one call per logical request rather than
-	// one per attempt: a retried request contributes only the attempt that
-	// succeeded, and the attempts a provider may have billed for before it are
-	// invisible. Understated, never overstated, see TokenUsage.Failed.
+	// Retain raw replies alongside per-attempt usage, including calls before a failure.
 	meter := MeterClient(client)
 
 	recorder := &recordingLLM{inner: client.LLM}
 	client.LLM = recorder
+	recorders := []*recordingLLM{recorder}
 
 	// A composite run builds its own roles from the route file and meters
 	// every client it reaches for, so the row's cost is the sum of each
@@ -823,7 +821,7 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 		mmu    sync.Mutex
 	)
 	if model.Composite() {
-		built, err := llm.BuildRoles(cfg)
+		built, err := llm.BuildRolesContext(ctx, cfg)
 		if err != nil {
 			out.Err = fmt.Errorf("route file %s: %w", model.RouteFile, err)
 			out.Duration = time.Since(started)
@@ -836,13 +834,16 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 				return
 			}
 			meters[c] = MeterClient(c)
+			recorded := &recordingLLM{inner: c.LLM}
+			c.LLM = recorded
+			recorders = append(recorders, recorded)
 		}
 		built.Each(meterInto)
 		inner := built.Build
 		built.Build = func(spec config.ModelSpec) (*llm.Client, error) {
 			c, err := inner(spec)
 			if err == nil {
-				meterInto(c)
+				(&llm.Roles{Review: c}).Each(meterInto)
 			}
 			return c, err
 		}
@@ -851,21 +852,10 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 
 	provider := &captureProvider{Local: vcs.NewLocal(dir, io.Discard)}
 
-	engine := &review.Engine{
-		Config: cfg,
-
-		// One model in both roles, which is a deliberate limit on what the
-		// matrix measures: it ranks reviewers, and giving each contender a
-		// different triager would confound the two. The shipped .nitpick.yaml
-		// splits the roles, so no number produced here is a measurement of the
-		// shipped pairing, in particular a model annotated in DefaultModels as
-		// good value was ranked as a REVIEWER and has never been measured
-		// triaging another model's findings.
-		Roles:       roles,
-		Provider:    provider,
-		Log:         cmpLogger(opts.Log),
-		Instruction: securityPersonaInstruction(),
-	}
+	engine := review.NewEngine(cfg, provider, review.NoPolicy("offline fixtures have no forge base"),
+		func(*config.Config) (*llm.Roles, error) { return roles, nil }, cmpLogger(opts.Log))
+	engine.Roles = roles
+	engine.Instruction = securityPersonaInstruction()
 
 	// Retrieval, when the arm asks for it. A failure to build it fails the run
 	// rather than quietly reviewing without: an arm that was supposed to have
@@ -898,7 +888,11 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 		out.Knowledge = report.Knowledge
 	}
 	out.Review = provider.review
-	out.Responses = recorder.captured()
+	mmu.Lock()
+	for _, recorded := range recorders {
+		out.Responses = append(out.Responses, recorded.captured()...)
+	}
+	mmu.Unlock()
 
 	// Read after the review, including when it failed: a run that died at
 	// triage still paid for the review calls that preceded it, and dropping

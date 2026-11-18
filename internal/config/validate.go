@@ -53,6 +53,7 @@ func (c *Config) Validate() error {
 	errs = append(errs, c.Standards.Validate())
 	errs = append(errs, c.Practices.Validate())
 	errs = append(errs, c.Security.validate()...)
+	errs = append(errs, c.Execution.validate())
 
 	for i, ins := range c.Instructions {
 		if strings.TrimSpace(ins.Path) == "" {
@@ -245,6 +246,9 @@ func (s ModelSpec) validate(required bool) []error {
 
 func (r Review) validate() []error {
 	var errs []error
+	if r.Learnings.MaxTokens < 0 || r.Learnings.MaxTokens > 8192 {
+		errs = append(errs, fmt.Errorf("review.learnings.max_tokens must be from 0 to 8192"))
+	}
 
 	// A mention is the origin converse.Command reads the verb relative to, so
 	// a blank one anchors at the start of every comment and reads whatever
@@ -283,6 +287,9 @@ func (r Review) validate() []error {
 	case "", VerifyConfirmed, VerifyNotRefuted:
 	default:
 		errs = append(errs, fmt.Errorf("review.verify %q is not confirmed or not_refuted; leave it empty to turn verification off", r.Verify))
+	}
+	if r.Jev.Threshold < 0 || r.Jev.Threshold > 1 {
+		errs = append(errs, fmt.Errorf("review.jev.threshold must be from 0 to 1, got %v; leave it at 0 to turn the filter off", r.Jev.Threshold))
 	}
 	if r.MaxRounds < 0 {
 		errs = append(errs, fmt.Errorf("review.max_rounds cannot be negative, got %d", r.MaxRounds))
@@ -513,6 +520,11 @@ func (d DeepReview) validate() []error {
 			errs = append(errs, fmt.Errorf("review.deep.agents names %q twice", a))
 		}
 		seen[a] = true
+	}
+	switch d.Prompts {
+	case "", DeepPromptsMira:
+	default:
+		errs = append(errs, fmt.Errorf("review.deep.prompts %q is not %s; leave it empty for this tool's own", d.Prompts, DeepPromptsMira))
 	}
 	if d.MaxTurns < 1 || d.MaxTurns > 30 {
 		errs = append(errs, fmt.Errorf("review.deep.max_turns must be between 1 and 30, got %d", d.MaxTurns))

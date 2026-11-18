@@ -16,11 +16,15 @@ import (
 // and Complete are always present, so an empty findings list can be told from
 // a run that published nothing because it did not finish.
 type jsonReport struct {
-	Result       string         `json:"result"`
-	Complete     bool           `json:"complete"`
-	FailedStages []string       `json:"failed_stages"`
-	Findings     []jsonFinding  `json:"findings"`
-	Withheld     []jsonWithheld `json:"withheld"`
+	Result               string                  `json:"result"`
+	Complete             bool                    `json:"complete"`
+	FailedStages         []string                `json:"failed_stages"`
+	Findings             []jsonFinding           `json:"findings"`
+	Withheld             []jsonWithheld          `json:"withheld"`
+	Usage                usageJSON               `json:"usage"`
+	Learnings            review.LearningsStatus  `json:"learnings"`
+	Execution            review.ExecutionSummary `json:"execution"`
+	ReusedAnalyzerStages int                     `json:"reused_analyzer_stages,omitempty"`
 }
 
 // jsonFinding is one published finding.
@@ -68,9 +72,13 @@ func toJSONFinding(f review.Finding) jsonFinding {
 
 // writeJSONReport prints a finished review as one JSON object.
 func writeJSONReport(w io.Writer, result actionResult, report *review.Report) error {
-	out := jsonReport{Result: string(result), FailedStages: []string{}, Findings: []jsonFinding{}, Withheld: []jsonWithheld{}}
+	out := jsonReport{Result: string(result), FailedStages: []string{}, Findings: []jsonFinding{}, Withheld: []jsonWithheld{}, Usage: usageForJSON(nil)}
 	if report != nil {
-		out.Complete = report.PipelineComplete() && result != resultLimit
+		out.Usage = usageForJSON(report.ModelCalls)
+		out.Learnings = report.Learnings
+		out.Execution = report.Execution
+		out.ReusedAnalyzerStages = report.ReusedAnalyzerStages
+		out.Complete = report.PipelineComplete() && result != resultLimit && result != resultError
 		out.FailedStages = append(out.FailedStages, report.FailedStages()...)
 		for _, f := range report.Findings {
 			out.Findings = append(out.Findings, toJSONFinding(f))

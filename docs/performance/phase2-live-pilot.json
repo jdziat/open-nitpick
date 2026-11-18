@@ -1,0 +1,214 @@
+{
+  "schema_version": 1,
+  "scope": "Registered Phase 2 live CLI pilot; bounded profile on frozen routine input",
+  "status": "STOPPED on registered failure condition; no automatic retry",
+  "completed_samples": 0,
+  "unrun_samples": [
+    "routine-fast-review-1"
+  ],
+  "sample": {
+    "identity": {
+      "id": "routine-review-1",
+      "mode": "review",
+      "config_sha256": "8d26e05fef0a52019e33a445531969f969e02dc49fffcdf6ed913582e0736d7e",
+      "base": "43308568e9b5bcefa2977b2cc471440594cce40f",
+      "head": "37a9b93b7a01dd738bcff345d577411f5dafb72c",
+      "binary_sha256": "9188a76075c545340dccb21d34b6aa8d078cc511cc5bcb6066c55a07a83e076c",
+      "command": [
+        "/home/jdziat/.local/state/open-nitpick/performance-2026-11-18/nitpick-phase2",
+        "review",
+        "-repo",
+        "/home/jdziat/.local/state/open-nitpick/performance-2026-11-18/cli-worktrees/routine",
+        "-config",
+        "/home/jdziat/.local/state/open-nitpick/performance-2026-11-18/phase2-live.yaml",
+        "-base",
+        "43308568e9b5bcefa2977b2cc471440594cce40f",
+        "-head",
+        "37a9b93b7a01dd738bcff345d577411f5dafb72c",
+        "-dry-run",
+        "-no-linters",
+        "-format",
+        "json"
+      ]
+    },
+    "status": "unknown",
+    "reserved_usd": 1,
+    "started_at": "2026-11-18T10:10:45.840715+00:00",
+    "process_id": 3557206,
+    "elapsed_seconds": 0.469017,
+    "exit_code": 2,
+    "complete": false,
+    "reported_cost_usd": 0.0,
+    "unknown_attempts": 2,
+    "new_paid_responses": [],
+    "unresolved_requests": [
+      "697ac940ab4db9294b359f970ac6f90f25731325a6b7b49a48755a719c64ba1a/54/54ebd09c21860172696ffb66ec58853f826e2af9f9e1b8b509f455f0e0400257.json.pending",
+      "697ac940ab4db9294b359f970ac6f90f25731325a6b7b49a48755a719c64ba1a/c9/c9bfc79259bd5e2d7ed2ca366875f03130369c6206590b54c4c0fd522fca44db.json.pending"
+    ],
+    "findings": 0,
+    "skips": 0,
+    "reviewed_files": null,
+    "model_usage": {
+      "schema_version": 1,
+      "metered": true,
+      "tokens_complete": false,
+      "unknown_usage_attempts": 2,
+      "reported_cost_usd": null,
+      "token_semantics": "prompt excludes cache reads and writes; reasoning is a subset of completion",
+      "attempts": [
+        {
+          "provider": "openai",
+          "model": "z-ai/glm-5.3-flash",
+          "role": "review",
+          "started_at": "2026-11-18T10:10:45.972159315Z",
+          "duration_ms": 241,
+          "failed": true,
+          "usage": null
+        },
+        {
+          "provider": "openai",
+          "model": "z-ai/glm-5.3-flash",
+          "role": "review",
+          "started_at": "2026-11-18T10:10:46.219311697Z",
+          "duration_ms": 44,
+          "failed": true,
+          "usage": null
+        }
+      ]
+    },
+    "artifacts_sha256": {
+      "stdout.json": "e70ad5e475da72f5adb0750effd53a073bce5975fc18ca9be8adcb643af7e49e",
+      "stderr.log": "5eea7c00fa66552c042fb68969042987434cf0b65b18ed361758e2029f3bd2cc"
+    },
+    "failure": "HTTP 400 before usable model output: reasoning is mandatory for z-ai/glm-5.3-flash; this profile requested off. Two calls, no usage/cost reported; $1 remains reserved. No automatic retry.",
+    "pilot_status": "stopped on registered failure condition; routine-fast-review-1 NOT RUN"
+  },
+  "funding": {
+    "approved_total_usd": 100,
+    "reported_new_cost_usd_lower_bound": 0,
+    "unpriced_attempts": 3,
+    "reservation_retained_usd": 2,
+    "reported_new_spend_usd": 0.00772971
+  },
+  "finding": "OpenRouter rejects z-ai/glm-5.3-flash with reasoning off (HTTP 400: reasoning is mandatory). Public supported_parameters metadata alone did not disclose that constraint. A revised profile must use a supported reasoning setting, be registered separately, and retain the old request intents.",
+  "baseline_claims": "Neither failed pilot established a latency, quality, completion or cost baseline. Rejection times are not review timings. Keep $2 reserved for three unpriced attempts; no automatic follow-on calls.",
+  "receipt_sha256": "a852c7f2f28fdf7ad4b5f0b12ec4cb106ec3b229897ff305247647edbcc35bdb",
+  "duplicate_invocation_control": {
+    "new_provider_attempts": 0,
+    "budget_and_request_files_unchanged": true,
+    "proof_sha256": "b1b2a5cf484feb276a55583482dd78220f8669717fc565a02fcef38f96fde0b7"
+  },
+  "corrected_pilot": {
+    "status": "STOPPED on separately registered first-incomplete condition",
+    "sample": {
+      "identity": {
+        "id": "corrected-fast-review-1",
+        "mode": "fast-review",
+        "config_sha256": "0dd56efa85923fe244e065d582bd16e46fe70342b3b0fd70e45942372690cbd5",
+        "base": "43308568e9b5bcefa2977b2cc471440594cce40f",
+        "head": "37a9b93b7a01dd738bcff345d577411f5dafb72c",
+        "binary_sha256": "ddf58171172cde444c70a5c4eeee11fa37a3bde9ae4409d0d05944f415b89d29",
+        "command": [
+          "/home/jdziat/.local/state/open-nitpick/performance-2026-11-18/nitpick-phase2",
+          "fast-review",
+          "-repo",
+          "/home/jdziat/.local/state/open-nitpick/performance-2026-11-18/cli-worktrees/routine",
+          "-config",
+          "/home/jdziat/.local/state/open-nitpick/performance-2026-11-18/phase2-live-corrected.yaml",
+          "-base",
+          "43308568e9b5bcefa2977b2cc471440594cce40f",
+          "-head",
+          "37a9b93b7a01dd738bcff345d577411f5dafb72c",
+          "-dry-run",
+          "-no-linters",
+          "-format",
+          "json"
+        ]
+      },
+      "status": "unknown",
+      "reserved_usd": 1,
+      "started_at": "2026-11-18T11:20:26.616669+00:00",
+      "process_id": 212511,
+      "elapsed_seconds": 0.368632,
+      "exit_code": 2,
+      "complete": false,
+      "reported_cost_usd": 0.0,
+      "unknown_attempts": 1,
+      "new_paid_responses": [],
+      "unresolved_requests": [
+        "697ac940ab4db9294b359f970ac6f90f25731325a6b7b49a48755a719c64ba1a/f8/f8718487b4c36ad29d444ceaaa12d5e2ccd8bbcb3c17629fb03cbebbc54d3955.json.pending"
+      ],
+      "findings": 0,
+      "skips": 0,
+      "reviewed_files": null,
+      "model_usage": {
+        "schema_version": 1,
+        "metered": true,
+        "tokens_complete": false,
+        "unknown_usage_attempts": 1,
+        "reported_cost_usd": null,
+        "token_semantics": "prompt excludes cache reads and writes; reasoning is a subset of completion",
+        "attempts": [
+          {
+            "provider": "openai",
+            "model": "z-ai/glm-5.3-flash",
+            "role": "review",
+            "started_at": "2026-11-18T11:20:26.719791612Z",
+            "duration_ms": 236,
+            "failed": true,
+            "usage": null
+          }
+        ]
+      },
+      "artifacts_sha256": {
+        "stdout.json": "3486cbfa5b817b843c6ef2bbd287c209c57de4f165d0c77532b9b410832a05b2",
+        "stderr.log": "6cda2ea0c567057dd5ea38c11b742b318039d286ac4bdbd05273035b0243463d"
+      },
+      "failure": "HTTP 400: reasoning is mandatory. The fast-review recipe forces reasoning off after the explicit low configuration is loaded. No usable output; cost remains unknown.",
+      "pilot_status": "Stopped after first incomplete corrected job, as registered. corrected-review-1 NOT RUN."
+    },
+    "receipt_sha256": "be82097fac2041252edef4012d6587f464e084a8c847ad5aa66a327aec45d39f",
+    "unrun_samples": [
+      "corrected-review-1"
+    ],
+    "configuration_observation": "Changing config reasoning to low does not change the fast-review recipe, which deliberately disables reasoning. This provider/model is incompatible with that recipe. No fast-review default changed."
+  },
+  "compatibility_sample": {
+    "id": "compat-review-low-1",
+    "status": "COMPLETE, N=1 compatibility and cost observation; not a latency, quality or p95 baseline",
+    "elapsed_seconds": 43.465447,
+    "reported_cost_usd": 0.00772971,
+    "unknown_attempts": 0,
+    "per_role": [
+      {
+        "role": "review",
+        "model": "z-ai/glm-5.3-flash",
+        "cost": 0.00183245,
+        "duration_ms": 4384
+      },
+      {
+        "role": "review",
+        "model": "z-ai/glm-5.3-flash",
+        "cost": 0.00217996,
+        "duration_ms": 30155
+      },
+      {
+        "role": "triage",
+        "model": "qwen/qwen3.8-27b",
+        "cost": 0.0037173,
+        "duration_ms": 8748
+      }
+    ],
+    "receipt_sha256": "0c6760bc12ef624e1e4cf64bd0a3455dbfac7a509e1eeb71aebc082a1062fbf0",
+    "network_denied_replay": {
+      "binary": "nitpick-phase2 (older)",
+      "ip_sockets": "denied by seccomp",
+      "exit_code": 0,
+      "model_calls": 0,
+      "new_cache_entries": 0,
+      "findings_identical": true,
+      "stdout_sha256": "7cda2149a760945fc532d4612626ece53e5b0c19e92befb61082b51cb041d171"
+    },
+    "fast_review": "NOT RUN: incompatible with this model; no retry"
+  }
+}

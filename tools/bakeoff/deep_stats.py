@@ -17,9 +17,7 @@ import re
 import statistics
 from pathlib import Path
 
-# OpenRouter's price for deepseek/deepseek-v4.1-flash-1017 on 2026-11-14, dollars per million tokens.
-# A run on another model passes its own with --price-in and --price-out.
-PRICE_IN, PRICE_OUT = 0.038, 0.50
+from usage_report import summarize_usage
 
 FIELD = re.compile(r'(\w+)=("[^"]*"|\S+)')
 
@@ -28,7 +26,7 @@ def fields(line):
     return {k: v.strip('"') for k, v in FIELD.findall(line)}
 
 
-def summarize(run, price_in=PRICE_IN, price_out=PRICE_OUT):
+def summarize(run, price_in=None, price_out=None):
     agents = failed = forced = reasoning_low = reasoning_off = turns = lookups = 0
     prompt = completion = 0
     times = []
@@ -60,15 +58,20 @@ def summarize(run, price_in=PRICE_IN, price_out=PRICE_OUT):
     if reviews == 0:
         return f"{run}: no finished reviews ({pending} in progress)"
     started = agents + failed
-    spend = prompt / 1e6 * price_in + completion / 1e6 * price_out
+    spend = (prompt / 1e6 * price_in + completion / 1e6 * price_out) if price_in is not None and price_out is not None else None
+    usage = summarize_usage(run)
+    failed_rate = f"{failed / started:.1%}" if started else "unknown"
+    off_rate = f"{reasoning_off / started:.1%}" if started else "unknown"
+    forced_rate = f"{reasoning_off / forced:.1%}" if forced else "unknown"
     return (
-        f"{run}: {reviews} reviews, {started} agent runs, {failed} failed ({failed / max(started, 1):.1%}), "
+        f"{run}: {reviews} reviews, {started} agent runs, {failed} failed ({failed_rate}), "
         f"{forced} forced, {reasoning_low} stepped down to low effort, "
-        f"{reasoning_off} sent again without reasoning ({reasoning_off / max(started, 1):.1%} of agent runs, "
-        f"{reasoning_off / max(forced, 1):.1%} of forced submissions); "
+        f"{reasoning_off} sent again without reasoning ({off_rate} of agent runs, "
+        f"{forced_rate} of forced submissions); "
         f"per review {turns / reviews:.1f} turns, {lookups / reviews:.1f} lookups, "
-        f"{prompt / reviews / 1000:.0f}k prompt and {completion / reviews / 1000:.0f}k completion tokens, "
-        f"${spend / reviews:.4f}; median {statistics.median(times):.0f}s"
+        f"partial agent+critique usage {prompt / reviews / 1000:.0f}k prompt and {completion / reviews / 1000:.0f}k completion tokens, "
+        + (f"partial estimate ${spend / reviews:.4f}" if spend is not None else "unpriced")
+        + f"; median {statistics.median(times):.0f}s; full metering {usage['metered_reviews']}/{usage['completed_reviews']} reviews"
         + (f"; {pending} still in progress" if pending else "")
     )
 
@@ -76,8 +79,8 @@ def summarize(run, price_in=PRICE_IN, price_out=PRICE_OUT):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("runs", nargs="+", type=Path)
-    ap.add_argument("--price-in", type=float, default=PRICE_IN, help="dollars per million prompt tokens")
-    ap.add_argument("--price-out", type=float, default=PRICE_OUT, help="dollars per million completion tokens")
+    ap.add_argument("--price-in", type=float, default=None, help="dollars per million prompt tokens")
+    ap.add_argument("--price-out", type=float, default=None, help="dollars per million completion tokens")
     args = ap.parse_args()
     for run in args.runs:
         print(summarize(run, args.price_in, args.price_out))

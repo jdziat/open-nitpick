@@ -648,3 +648,11 @@ checks anchors, self-credit, and that no keyword is a token of the change, and
 nothing more. A number from it is a measurement of this corpus by this
 instrument, and the sentence that reports it should say so. Its first spend is
 recorded in [Findings](findings.md#related-context-on-the-multi-file-corpus).
+
+The [selected execution pilot](guide/execution-evidence.md) establishes only
+whether named checks ran on exact snapshots. A passing build or test does not
+establish semantic repair or refute a behavioral finding. The offline feasibility
+sampler leaves unknown human labels unknown and reports sensitivity bounds;
+its `precision_ceiling` is optimistic, not measured precision. Quality promotion
+still requires the registered G1/G2/G3 protocol, frozen thresholds and funded
+human adjudication described in the revised remediation plan.

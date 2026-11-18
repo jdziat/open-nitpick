@@ -1,0 +1,1204 @@
+{
+  "schema_version": 1,
+  "scope": "Phase 3 item 3: triage, critique and repository-verification checkpoint component; linter checkpointing and live lost-work savings remain open",
+  "status": "Local model and eligible analyzer checkpoints implemented; full Phase3 per-mode latency/token/cost acceptance remains open",
+  "analysis_record_version": 1,
+  "stage_key_version": 2,
+  "compatibility": "Compatible version-1 batch analysis is retained; new stage keys have their own version so a stage schema change does not discard old paid analysis.",
+  "reuse_contract": [
+    "config policy, review head, model spec, stage, full system prompt and request, effective options/schemas/tools/toolchoice",
+    "verification additionally binds backend/ref access and revalidates every original bounded file-read/search output with a saved SHA256 trace",
+    "empty/malformed stored answers are rejected before reuse counters or current checkpoints change",
+    "invalid verdicts, transient lookup errors, interrupted checks and empty triage/critique replies are not saved",
+    "standing-only open-comment checks always remain fresh",
+    "batch analysis takes priority over stage results when the checkpoint fills"
+  ],
+  "mutations": {
+    "source": [
+      {
+        "path": "internal/review/deepselect.go",
+        "sha256": "1f0da3f8978883a45c62eee82ac7a939fbe0b72bb61442ca07023940ba9ea88c"
+      },
+      {
+        "path": "internal/review/engine.go",
+        "sha256": "c8a89c592275408e324a8c81190173a61f54867a246c23d0ff927a9b60794f12"
+      },
+      {
+        "path": "internal/review/progress.go",
+        "sha256": "e9245c6dea34abc4cc035d5e7a75324f6163932ed61502d6e4d6eec28478bcb1"
+      },
+      {
+        "path": "internal/review/repotools.go",
+        "sha256": "11600ee43ce5086ef1f781f601540bcd5ca85122fe1a0a110098cd60e990cd9e"
+      },
+      {
+        "path": "internal/review/verify.go",
+        "sha256": "d404c34823fa7c03e58b806c6ba56a4f1ee37d9f73108c00f13523b6d11235cd"
+      }
+    ],
+    "cases": [
+      {
+        "name": "malformed-verdict-cached",
+        "path": "internal/review/verify.go",
+        "test": "^TestResumeRetriesMalformedVerificationBeforeSavingAValidVerdict$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.577,
+        "log_sha256": "7f22e3535e7eb2674bfab93f2285b1031c7a495176b6d0481364af196b8d2780"
+      },
+      {
+        "name": "skip-evidence-revalidation",
+        "path": "internal/review/verify.go",
+        "test": "^TestResumeRechecksEveryVerificationLookupBeforeReusingItsVerdict$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.634,
+        "log_sha256": "8c329e7e0176bcff5ef30860dd123e9e3f0bcd64e45158eb1b070da1b0888eb8"
+      },
+      {
+        "name": "ignore-final-lookups",
+        "path": "internal/review/verify.go",
+        "test": "^TestResumeRechecksEveryVerificationLookupBeforeReusingItsVerdict$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.73,
+        "log_sha256": "cb882080f3d3c5678889c70b328cc8803f842f2f4636b8e3ae7a064ac8d9a601"
+      },
+      {
+        "name": "ignore-revalidation-failure-cancellation",
+        "path": "internal/review/verify.go",
+        "test": "^TestVerificationTraceRejectsIncompleteCancelledOrFailedRevalidation$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.705,
+        "log_sha256": "71f33e36cb5f737de617a402213336d4a13e6efedfbc521e3f2bf26f1f57ae10"
+      },
+      {
+        "name": "accept-incomplete-trace",
+        "path": "internal/review/verify.go",
+        "test": "^TestVerificationTraceRejectsIncompleteCancelledOrFailedRevalidation$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.709,
+        "log_sha256": "2293bce02da14cba61c0e68ab715551e27bcd45b674421087c6bb00ca4f30a88"
+      },
+      {
+        "name": "omit-effective-options",
+        "path": "internal/review/progress.go",
+        "test": "^TestStageKeyIncludesEffectiveToolsAndCallOptions$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.569,
+        "log_sha256": "d0e963efcfa2fee70c102c0d03eab06297aea8a5feb45f23db620e1d23ba0a7a"
+      },
+      {
+        "name": "omit-head",
+        "path": "internal/review/progress.go",
+        "test": "^TestResumeDoesNotServeAVerdictAcrossHeads$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.741,
+        "log_sha256": "c15f5e8c286e2161d76e6f65ee3a097c831ad693b93b57acc2851e5a37977d4c"
+      },
+      {
+        "name": "omit-stage",
+        "path": "internal/review/progress.go",
+        "test": "^TestResumeDoesNotServeAVerdictAcrossHeads$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.699,
+        "log_sha256": "e039d70731e9cd76834d1d0d3ef05e780e1cebaa4bc61f5ec6f8cb9be34b776d"
+      },
+      {
+        "name": "ignore-standing-comments",
+        "path": "internal/review/progress.go",
+        "test": "^TestStageKeyIsEmptyForAFileInScopeOnlyToRecheckAComment$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.604,
+        "log_sha256": "ca567b46ac0960b52fd2380cddb1882ce9e3afb5fd5d58354e43cffc94610669"
+      },
+      {
+        "name": "save-failed-check",
+        "path": "internal/review/verify.go",
+        "test": "^TestAFailedVerificationLeavesNoCheckpointEntry$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.541,
+        "log_sha256": "4e665ad3adf458e74e05a38139adb81507cda42699a56333244c97379936109e"
+      },
+      {
+        "name": "drop-analysis-priority",
+        "path": "internal/review/progress.go",
+        "test": "^TestProgressLimitKeepsAnalysisBeforeStageResults$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.658,
+        "log_sha256": "0d602b47fd151f3f4426442fa56b028f0960b09b15f3d51b7326727af32529fb"
+      },
+      {
+        "name": "ignore-semantic-validation",
+        "path": "internal/review/progress.go",
+        "test": "^TestResumeRetriesEmptyStoredTriageAnswers$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.645,
+        "log_sha256": "e1329f31832af8614754c3c806a8916e226421ac558c741255441c6391dac7bf"
+      },
+      {
+        "name": "save-empty-triage",
+        "path": "internal/review/engine.go",
+        "test": "^TestResumeAsksTriageAgainAfterAnEmptyAnswer$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.765,
+        "log_sha256": "e5f243db44a567c899386f6ae8951cbb1aaf3e90cf095a2b27546680eef20650"
+      },
+      {
+        "name": "disable-verification-reuse",
+        "path": "internal/review/verify.go",
+        "test": "^TestResumeReusesTriageAndVerificationWithoutAnyNewModelCall$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.745,
+        "log_sha256": "772e6be55d0d22f7d55a38878552db5e1d338ecdb3c0b121990098fab37a8c50"
+      },
+      {
+        "name": "disable-critique-save",
+        "path": "internal/review/deepselect.go",
+        "test": "^TestResumeReusesCritiqueAndRetriesEmptyStoredGrades$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.928,
+        "log_sha256": "04ba34b8a4ac34b06b4f143fb7e2eb190afc2a12e7fd4fefff0c25fe5ee9e217"
+      },
+      {
+        "name": "ignore-lookup-failures",
+        "path": "internal/review/repotools.go",
+        "test": "^TestVerificationTraceRejectsIncompleteCancelledOrFailedRevalidation$",
+        "detected_by_failing_test": true,
+        "exit": 1,
+        "seconds": 2.623,
+        "log_sha256": "107421c058dfbabd8581f87b0110c66d32f5c7c664453bedaa64de9281b94e51"
+      }
+    ],
+    "test_sha256": "d4e52eb8a96dd92c186fd435b41d9a8e26f348374711311c3550e23c645c0a9f"
+  },
+  "verification": {
+    "dependent_race": {
+      "command": "go test -race -p 1 ./internal/review ./internal/vcs ./cmd/nitpick",
+      "exit": 0,
+      "log_sha256": "fa20ac7d014a6c09305a8ef276bc3a5b729f8b4f69337ac570cd8002eb669968"
+    },
+    "scoped_eval_vet": "passed",
+    "scoped_golangci_lint": "passed, 0 issues",
+    "scoped_no_model_slop": {
+      "files": 10,
+      "tells": 0,
+      "log_sha256": "0dd0a68bf506ffa9731fcac03f66fc909921c002fd565906ae98b65525e3a51c"
+    }
+  },
+  "limits": [
+    "No live lost-work/tail-latency/cost improvement is claimed.",
+    "External linter outcomes are not checkpointed."
+  ],
+  "linters": {
+    "implementation": "Whole completed analyzer sets persist ordered findings and full coverage metadata alongside model-stage progress. Findings include all 11 engine-owned fields and preserve an explicit zero confidence. Empty findings are reusable only with proved ran/no-target statuses. Failed or unproved skipped stages rerun.",
+    "separate_accounting": "Report.ReusedAnalyzerStages and JSON reused_analyzer_stages count local stages. Report.ReusedRequests remains model results only. Under the forge progress size limit, paid model results outrank local analyzer output.",
+    "scope": "Opt-in resume on incremental reviews with a prior progress carrier; no default recipe or model change. Same complete diff, head, policy and stable analyzer input identity required. Inputs are rechecked after execution before saving.",
+    "eligible": "Isolated native Ruff, or native golangci-lint in module mode with cgo off, bounded -tags/-mod flags, a local toolchain and tracked in-tree replacement modules. Native executable content, analyzer policy and effective environment are bound; application binary version is not.",
+    "fallbacks": [
+      "Dirty/untracked/ignored files, tracked symlinks/submodules or hidden Git assume-unchanged/skip-worktree flags",
+      "Unavailable/non-native/unsupported analyzers or external configuration/rules",
+      "Go workspaces, untracked or external local module replacements, cgo, overlays/modfiles/toolexec/pkgdir flags",
+      "External cache/package drivers, including automatic gopackagesdriver discovery on PATH"
+    ],
+    "ruff_output_policy": "Eligible checkpoint runs disable Ruff native caching so .ruff_cache cannot change the input identity. Resume-disabled analysis retains its existing native cache behavior. An existing ignored .ruff_cache makes the checkout ineligible and analysis runs fresh.",
+    "toolchain": "Identity probing uses the same analyzerEnv(GOTOOLCHAIN=local) and binary resolution as actual Go execution, so repository toolchain hints cannot trigger a download.",
+    "component_review": {
+      "reviewer": "CTO agent persona",
+      "status": "GO for the linter checkpoint only",
+      "closed_blockers": [
+        "Hidden source changes via Git index flags",
+        "External Go flags/drivers, including automatic PATH driver discovery",
+        "Ambient toolchain downloading during identity probing"
+      ],
+      "not_approved": "Whole-program readiness"
+    },
+    "guards": {
+      "mutation_count": 27,
+      "all_detected": true,
+      "mutations": [
+        {
+          "name": "integration",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "e5b7baaf51a9b538a43f4616a59a12644bbc49e783696e61dbe7bd7a0068b23d"
+        },
+        {
+          "name": "finding-provenance",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "99dfbc235641208f056286ded8df8c184489870837e061f140266f33bc7bebcd"
+        },
+        {
+          "name": "explicit-zero-confidence",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "b927a2415794bd370eb834868777c6989432126c085cd7c3908398e4b0b258c8"
+        },
+        {
+          "name": "coverage-metadata",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "c844b63e676e870459774903ec8552292f055f4638921eb85c5e92d1ca56b975"
+        },
+        {
+          "name": "failed-status",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "45d2a3a8ae433610284a260772519026cf8cec72975da31e8443e777813c4b06"
+        },
+        {
+          "name": "head-bound",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "78d264c2d79bbd5fa0dad392f60ba732050c953728cf82616fb61f84315e162b"
+        },
+        {
+          "name": "policy-bound",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "8904a701157c2294019a605732598db3cdeea0f39f5654ab7cf71168b48a48da"
+        },
+        {
+          "name": "diff-bound",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "37ea7398371887c7ab3d824f98efd813ec884ffa02dc34a941a28532ee74f02c"
+        },
+        {
+          "name": "identity-bound",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "93efa751af222b44189e4d696e65c35aea7c1390f2b5da3f957b095c3299d177"
+        },
+        {
+          "name": "post-run-stability",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "f3cd1b4ed549437fa99b00c13ab918eae218b4d0e7348c37836c02cd4a7c17e4"
+        },
+        {
+          "name": "paid-priority",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "5ce6784228e5e94a3d6d48b94e75f4d19c483e48cab6bf80df1bb0181d8e01aa"
+        },
+        {
+          "name": "request-accounting",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "51996c15ce11d86efb29174681e674b2271c6dd7e74c1cf72f91edc1964e59be"
+        },
+        {
+          "name": "tool-content",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "28da48eb7399994cd39ae5a88dff9ca47c6fbe0ead4c0a150b77159371d3359c"
+        },
+        {
+          "name": "analyzer-policy",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "bc801f8696ad00c534e1ea8f634264741ed2f9f30a76d2a4cacfa0580c3dd9ae"
+        },
+        {
+          "name": "analyzer-environment",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "d80ac97699bcfbb82a0611c5edc1668136998fde4a71578dd38336145179bcf3"
+        },
+        {
+          "name": "dirty-inputs",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "d2b20b8cb3b82e5cbc64733d663eb257cdd94b7068970b6e71831057d94a95ec"
+        },
+        {
+          "name": "ignored-inputs",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "7d37aeb6477651d6b04f8f33a537df9adb5424e47433813be4932fef02b8234d"
+        },
+        {
+          "name": "script-inputs",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "ffd59f1a364a6af979bf47901acfad888b16892eda90f0026825d45e780e0d41"
+        },
+        {
+          "name": "external-ruff-config",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "537dad15abdced5ec9829a6bdb1d0c8a2bc4b9efe7c76a90b435f4b73e8ce218"
+        },
+        {
+          "name": "persisted-go-flags",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "3609d807d45b452dcda518bb324e705b1b2cee9261473b19cf9b5d352ac6650d"
+        },
+        {
+          "name": "ruff-native-cache",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "4c87a197a13255227e07bfc4579684ec3844e77018288de97bc11f75a1332b9d"
+        },
+        {
+          "name": "hidden-source-flags",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "260798aea694454e086e5e8312a7126320b8cb4d78656fe7c6dce4a78f326a6b"
+        },
+        {
+          "name": "unbound-go-flags",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "c3c2beb201a3d51bd0fa3f39c810fcedab631a689c8ea3d75fdb6c06a92ca0ba"
+        },
+        {
+          "name": "external-go-drivers",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "c15399ea1c67100b463ab9b9bb2056a7508b0272ec67968101d2294dd8ea493d"
+        },
+        {
+          "name": "local-toolchain",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "9e42803d19156f1d0ffe3c27c31e75f2b6f70fdcee35d9f2c2b1bd00f8f4d118"
+        },
+        {
+          "name": "auto-package-driver",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "9710e16b026f5b3e87e6be41c440c3bc386a9af825ca65bf0994f539a981e1a9"
+        },
+        {
+          "name": "untracked-local-module",
+          "exit_code": 1,
+          "mutation_detected": true,
+          "log_sha256": "59f8a256489ecf0fa332611e8f000cae264a7a98f92cea093aeddef66012571e"
+        }
+      ]
+    },
+    "sources_sha256": {
+      "internal/review/linter_progress.go": "5e9fd647b39cfa7ba2cbc37a3e54b277ca85d2686e621411cacfa22e7b36acb7",
+      "internal/review/linter_progress_test.go": "7e57e73c2cf62585c405d34d7b319aa8a6239897b892e54e0a97e841071edd2b",
+      "internal/review/engine.go": "55af50c1113aea93d9fd3bdac6c5697cce67fa1df73cbf79c125ef0ad634d3ed",
+      "internal/linters/checkpoint.go": "edb638e61bbc4e678e86af825b44488a443c69d7016192ebfe2d61a370cd893d",
+      "internal/linters/checkpoint_test.go": "3e094cc405b28b94dd75ef6902589ae70088039af1ee668c0ddb289547ffb74e",
+      "internal/linters/checkpoint_benchmark_test.go": "8e06f16465bac3ee1947669ce29cb50b0ea1115d47a519592d3c612d235c693f",
+      "internal/linters/runners.go": "1fb714cf3634c2fe39cdab67500c5f665372ab52c1d1acb6401f0abc22cb1251",
+      "cmd/nitpick/jsonreport.go": "4bc98a095eaabd50fc02a4f288e0a975a9b9e41e30d51ba7323336eac0f4076e"
+    },
+    "gates": {
+      "linter-checkpoint-race-final.log": {
+        "sha256": "d0d9895bb673c96569d0527a18cb0e1d91ef2e38985cc5a7a56e49fff1deb712",
+        "result": "pass"
+      },
+      "linter-checkpoint-vet-final.log": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "result": "pass"
+      },
+      "linter-checkpoint-lint-final.log": {
+        "sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47",
+        "result": "pass"
+      },
+      "linter-checkpoint-standards-final.log": {
+        "sha256": "9fabc43306c36bf5b9341543ad953e70034ca0b811084d220ea51c2aea64ebb9",
+        "result": "pass"
+      },
+      "linter-checkpoint-docs-final.log": {
+        "sha256": "a602bfa1f5d9bca640c0e8cdae992b17aafe03eedb184b6517e967a43f8f6ade",
+        "result": "pass"
+      },
+      "linter-checkpoint-agents-final.log": {
+        "sha256": "40b83147c6e79b3e80865232136e7c0f6df89b744bfb4009550f993c1552ec42",
+        "result": "pass"
+      },
+      "linter-checkpoint-commits-final.log": {
+        "sha256": "2383872abc5324b5262fb565640cd5ce4e0e7fe8fde403c2edcf69bae483eaa9",
+        "result": "pass"
+      },
+      "free_slop": {
+        "result": "0 tells across five new files; no model pass"
+      }
+    },
+    "source_hash_note": "Guard mutation receipts precede renaming testing.TB helper parameters from t to tb, required by measured standards; assertions and production behavior are unchanged. Standards and generation checks passed afterward."
+  },
+  "local_analyzer_experiment": {
+    "status": "measured",
+    "new_provider_spend_usd": 0,
+    "receipt": {
+      "identity": {
+        "binary_sha256": "791cd1cbb7f78c0f68c6f8257706194daec174943abb0924b32cddbdfb95d6fe",
+        "command": [
+          "/home/jdziat/.local/state/open-nitpick/performance-2026-11-18/linter-checkpoint.test",
+          "-test.run=^$",
+          "-test.bench=^BenchmarkFrozenAnalyzerCheckpointResume$",
+          "-test.benchtime=20x",
+          "-test.count=1"
+        ],
+        "ruff_sha256": "fef5ab1d39e0c8368a3ef2511f33083f372943ac76fe4bb2831f312d0cd9a5bd"
+      },
+      "exit_code": 0,
+      "artifacts": {
+        "linter-checkpoint-benchmark.log": "b52051882e38dc4813b6d2ec31f8d389e11c315f2a450207ccf8f942e22b991f",
+        "linter-checkpoint-samples/analyzer-checkpoint.json": "6c74cc86e3dfd1e02f71cd9bda700a5cf00e48d2abdaee4ed10d2a0d0539ae05"
+      }
+    },
+    "arms": {
+      "resume disabled": {
+        "n": 20,
+        "median_ms": 34.5133895,
+        "p95_ms": 40.748042,
+        "analyzer_invocations": 20,
+        "scripted_model_calls": 20,
+        "reused_analyzer_stages": 0,
+        "reused_scripted_requests": 0
+      },
+      "resume enabled fresh": {
+        "n": 20,
+        "median_ms": 143.3481225,
+        "p95_ms": 171.621706,
+        "analyzer_invocations": 20,
+        "scripted_model_calls": 20,
+        "reused_analyzer_stages": 0,
+        "reused_scripted_requests": 0
+      },
+      "resume enabled reused": {
+        "n": 20,
+        "median_ms": 73.908519,
+        "p95_ms": 80.10172,
+        "analyzer_invocations": 0,
+        "scripted_model_calls": 0,
+        "reused_analyzer_stages": 20,
+        "reused_scripted_requests": 20
+      }
+    },
+    "ordered_metadata_sha256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+    "samples": [
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 37110379,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 155491759,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 75908453,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 40748042,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 156884292,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 71652674,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 37013798,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 142832674,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 45173932,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 33990900,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 171621706,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 62073807,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 31861701,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 121617190,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 61788793,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 41869702,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 150964217,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 72493611,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 30668870,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 151313071,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 42948112,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 33474765,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 133556479,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 75109425,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 32153324,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 116304491,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 70571144,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 36870576,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 124577577,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 86908873,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 35874157,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 132864333,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 45181982,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 29563449,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 156194805,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 77606868,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 37355591,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 135278714,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 76027534,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 30294646,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 154063606,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 75928812,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 35162071,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 184644144,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 72754814,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 35035879,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 143863571,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 75062224,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 31154974,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 120755002,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 80101720,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 32866690,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 129943955,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 75130185,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 31802010,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 119562761,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 77482996,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume disabled",
+        "DurationNS": 36596674,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": null
+      },
+      {
+        "Arm": "resume enabled fresh",
+        "DurationNS": 155228945,
+        "AnalyzerInvocations": 1,
+        "ModelCalls": 1,
+        "ReusedAnalyzerStages": 0,
+        "ReusedModelRequests": 0,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b",
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      },
+      {
+        "Arm": "resume enabled reused",
+        "DurationNS": 45094201,
+        "AnalyzerInvocations": 0,
+        "ModelCalls": 0,
+        "ReusedAnalyzerStages": 1,
+        "ReusedModelRequests": 1,
+        "MetadataSHA256": "673e4532820c87f53d898a7c10600d3044635a5422a293d7e133ba212acf9625",
+        "IdentityChecks": [
+          "a1e720dd1c850a0004642e7c345b3b044869cf8d54fdc5d9738989efee9afc2b"
+        ]
+      }
+    ],
+    "scope": "In-process engine with real installed Ruff and scripted model replies; not independent CLI/MCP transport, provider latency or paid-provider cost measurements.",
+    "fixture": "Clean frozen Python fixture; separate identical baseline checkout retains default Ruff caching. Resumable checkout disables native Ruff cache only when admitted for a snapshot. Paired fresh/reused ordering is causal, not randomized.",
+    "result": "Repeat avoids all analyzer and scripted-model calls. Identity checking is more expensive than rerunning this tiny Ruff case: repeat median 73.91 ms versus resume-disabled 34.51 ms (+39.40 ms); fresh resumable median 143.35 ms. Retain as an opt-in repeat-work mechanism, not as a latency improvement.",
+    "timing_source_limit": "Measured native Ruff path includes the fixed hidden Git flags and local toolchain/flag admission. Subsequent changes only added Go driver auto-discovery and tracked replacement-module bounds, then removed a redundant Go path check. Ruff execution/keying and engine checkpoint semantics were unchanged. The exact measured binary remains retained under its receipt hash."
+  },
+  "unmet_acceptance": [
+    "Independent CLI/MCP and per-mode transports",
+    "Provider-priced per-role cost/token measurements and repeat-run savings",
+    "Full-mode completion/quality and external study evidence"
+  ]
+}

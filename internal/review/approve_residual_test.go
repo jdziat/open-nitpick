@@ -379,6 +379,7 @@ func TestCleanApproveHeldWhenResidualPriorReadFails(t *testing.T) {
 	report, err := newEngine(t, model, provider, func(c *config.Config) {
 		c.Review.Approve.Enabled = true
 		c.Review.Approve.Residual.Enabled = true
+		c.Review.Approve.Residual.MaxSeverity = config.SeverityError
 		c.Review.Incremental = false
 	}).Review(context.Background(), vcs.Ref{})
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jdziat/open-nitpick/internal/llm"
 	"regexp"
 	"slices"
 	"sort"
@@ -234,6 +235,7 @@ func deepCritiqueKeeps(evidence string, f Finding) bool {
 // anything: every finding is kept and the stage is reported as not run. Once it
 // returns grades, a finding it left ungraded is withheld, as Mira does.
 func (e *Engine) deepCritique(ctx context.Context, findings []Finding, plan *bundle.Plan) ([]Finding, []Overruled, *StageStatus) {
+	ctx = llm.WithCallRole(ctx, "deep_critique")
 	system, err := prompt.DeepCritique()
 	if err != nil {
 		return findings, nil, &StageStatus{Stage: "critique", Reason: "unavailable"}
@@ -248,6 +250,13 @@ func (e *Engine) deepCritique(ctx context.Context, findings []Finding, plan *bun
 		{Role: llms.RoleUser, Content: critiqueRequest(findings, filesByPath(plan))},
 	}
 
+	key := e.stageKeyFor("critique", client, system, msgs[1].Content, findingPaths(findings), opts...)
+	if grades, reused := loadStageChecked[[]critiqueGrade](e.progress, key, rankStage, func(grades []critiqueGrade) bool {
+		return len(grades) > 0
+	}); reused {
+		e.log().Info("reusing completed deep-review critique", "findings", len(findings))
+		return applyGrades(findings, grades)
+	}
 	resp, err := e.generateDeep(ctx, client, msgs, opts, deepCallTimeout)
 	var grades []critiqueGrade
 	var ok bool
@@ -279,7 +288,13 @@ func (e *Engine) deepCritique(ctx context.Context, findings []Finding, plan *bun
 		e.log().Warn("the critique returned no grades; keeping every finding", "findings", len(findings))
 		return findings, nil, &StageStatus{Stage: "critique", Reason: "no grades"}
 	}
+	saveStage(e.progress, key, rankStage, grades)
+	return applyGrades(findings, grades)
+}
 
+// applyGrades keeps or withholds each finding by its grade. A finding with no
+// grade is withheld, as it was before the grades could be reused.
+func applyGrades(findings []Finding, grades []critiqueGrade) ([]Finding, []Overruled, *StageStatus) {
 	byNumber := make(map[int]critiqueGrade, len(grades))
 	for _, g := range grades {
 		if g.Number >= 0 && g.Number < len(findings) {
@@ -355,4 +370,12 @@ func clip(s string, n int) string {
 		return s
 	}
 	return s[:n] + "…"
+}
+
+func findingPaths(findings []Finding) []string {
+	paths := make([]string, len(findings))
+	for i, f := range findings {
+		paths[i] = f.Path
+	}
+	return paths
 }

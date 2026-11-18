@@ -1013,6 +1013,9 @@ func TestCorroborationJudgesTheRecordedFindingsAndRunsNoReview(t *testing.T) {
 	}
 	for _, ask := range judge.asked {
 		if ask.fixture != "go-nil-deref" {
+			if len(ask.findings) != 0 {
+				t.Errorf("silent group %s contains findings: %+v", ask.fixture, ask.findings)
+			}
 			continue
 		}
 		if !reflect.DeepEqual(ask.findings, findings) {

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -133,11 +132,8 @@ func TestGitHubUsesTheRefreshingTransportWithoutAStaticToken(t *testing.T) {
 	if requests == 0 {
 		t.Fatal("no request reached the fake API")
 	}
-	if !transport.used && requests == 0 {
-		t.Fatal("the API call reached neither the installation transport nor the server; the client wiring changed")
-	}
-	if requests == 0 {
-		t.Log("the transport served the request itself; the server was not contacted, which is fine for this test")
+	if !transport.used {
+		t.Fatal("the API call bypassed the installation transport")
 	}
 }
 
@@ -153,7 +149,11 @@ func TestPrivateKeyPaddingIsStrippedLikeTheWorkflowStep(t *testing.T) {
 	// newline or padding the shell adds must not break parsing, which is
 	// why the key is stored as raw bytes.
 	app := &appCredentials{appID: 1, installation: 2, privateKeyPEM: []byte(strings.TrimRight(testKey, "\n") + "\n")}
-	if _, _, err := app.providerOptions("", "", ""); err != nil && !errors.Is(err, err) {
-		t.Fatalf("unexpected error class: %v", err)
+	opts, _, err := app.providerOptions("", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := opts.Installations.(*ghinstallation.Transport); !ok {
+		t.Fatalf("padded key produced %T, want installation transport", opts.Installations)
 	}
 }

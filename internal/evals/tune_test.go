@@ -153,7 +153,7 @@ func runLevels(
 ) ([]scored, []DumpSample) {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	out := make([]scored, len(levels))
 	for i, l := range levels {
@@ -504,7 +504,7 @@ func TestJudgeModelsScoresFixtureReviews(t *testing.T) {
 		"are the judge's opinion and are NOT re-derivable from it without a judging pass "+
 		"(`make rejudge REJUDGE=%s`).", dumpPath, dumpPath)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	persona := config.DefaultPersona()
 
 	type job struct {
@@ -825,7 +825,7 @@ func reportJudgedModels(
 	//
 	var mismatched []string
 	for _, r := range rows {
-		if r.cross.HaveSecond && !r.cross.SameStimulus() {
+		if !r.cross.HaveSecond || !r.cross.SameStimulus() {
 			mismatched = append(mismatched, r.model)
 		}
 	}
@@ -1057,7 +1057,7 @@ func reportJudgedModels(
 // it on adherence to a document only its opponent was given. Treat the tone and
 // scope components of its grade as a measure of house-style fit, not quality.
 func TestBenchmarkAgainstIncumbent(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if !IncumbentAvailable(ctx) {
 		t.Skip("incumbent CLI not installed or not authenticated; run 'incumbent auth login'")
@@ -1322,7 +1322,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 // already cached. The free CLI allowance is small enough that a single pass is
 // unlikely to finish, which is exactly why this is separate from scoring.
 func TestCollectIncumbentCachesMissingReviews(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if !IncumbentAvailable(ctx) {
 		t.Skip("incumbent CLI not installed or not authenticated")
@@ -1363,7 +1363,7 @@ func TestCollectIncumbentCachesMissingReviews(t *testing.T) {
 func runVoiceAxis(t *testing.T, judge *Judge, model Model, opts Options, dump *Dump) {
 	t.Helper()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	variants := voiceVariants()
 
 	out := make([]scored, len(variants))
@@ -1450,7 +1450,7 @@ func corroborateVariants(
 	t.Helper()
 
 	notes := map[string][]string{}
-	panel := corroborate(context.Background(), t, judge, config.DefaultPersona(), personas, samples, notes)
+	panel := corroborate(t.Context(), t, judge, config.DefaultPersona(), personas, samples, notes)
 
 	for i := range results {
 		results[i].notes = append(results[i].notes, notes[contenderLabel(results[i].model, results[i].variant)]...)

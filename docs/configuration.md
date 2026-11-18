@@ -1161,3 +1161,35 @@ token needs Pull requests write, which posting reviews already needs.
 `review.skip_markers` lists the phrases that, in a pull request's title,
 body or head commit message, ask for no review. The default is
 `["[skip review]", "[skip nitpick]"]`; the match is case-insensitive.
+
+## Not paying twice for the same request
+
+Set `NITPICK_LLM_CACHE_DIR` to an operator-owned directory. Successful responses
+are reused across runs and nitpick versions when the provider endpoint, account,
+model, messages and call options match. A different prompt or model setting asks
+again. Separate workers and processes coordinate through a file lock.
+
+The cache records an intent before contacting the provider. If a process dies,
+the connection fails, or the response is unusable, the same request cannot be
+submitted automatically again. This prevents an uncertain purchase from being
+silently repeated; it cannot prove whether the provider charged for it. An
+uncertain attempt also stops fallback to another model. Completed answers remain
+usable even though their dispatch records are retained.
+
+Inspect the recorded request and reconcile provider activity before authorizing
+one retry. Set `NITPICK_LLM_RETRY_REQUEST=request-hash:unique-approval-token` for
+that request. The token is consumed once, including when that retry fails. A
+changed prompt or corrected call option has a different request hash.
+
+Independent evaluation samples need distinct identities. The evaluation harness
+assigns one per model, fixture and run index, so a rerun of the same sample can
+resume without conflating it with another sample. A positive-temperature request
+without a sample identity is refused while the cache is enabled. Streaming,
+embeddings and the separate Jev endpoint are not replayed by this cache.
+
+This is an environment setting rather than repository configuration. The
+directory contains responses, usage, tool arguments and any source excerpts in
+those answers; request messages are hashed rather than stored. Keep it private
+to the operator. Cache hashes detect damage, but anyone who can write the
+directory can replace its answers. Reusing a provider model alias reuses the
+purchased answer even if the provider later updates that alias.

@@ -1,5 +1,9 @@
 # GitHub Actions and other CI
 
+The optional [selected execution pilot](guide/execution-evidence.md) attaches
+baseline/candidate evidence to authorized fix proposals. It is operator-enabled
+and does not change the default review or approval policy.
+
 Running the reviewer on a runner rather than from a terminal: the Action and
 the workflow it goes in, the inputs and permissions it needs, what an
 incremental review is, what a fork changes, and the same review as a plain CLI

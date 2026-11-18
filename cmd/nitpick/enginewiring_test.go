@@ -28,13 +28,10 @@ func TestEveryReviewingEngineResolvesItsPolicy(t *testing.T) {
 		t.Fatalf("root: %v", err)
 	}
 
-	// The two that review no pull request. A tree review changes every file by
-	// construction and its operator is the policy's author; the eval harness
-	// reviews fixtures with no forge behind them.
+	// Tree reviews and security scans use the operator's policy directly.
 	exempt := map[string]string{
 		filepath.Join(root, "cmd", "nitpick", "fullreview.go"): "a tree review, whose operator wrote the policy",
 		filepath.Join(root, "cmd", "nitpick", "security.go"):   "a tree security scan, whose operator wrote the policy",
-		filepath.Join(root, "internal", "evals", "harness.go"): "fixtures, with no forge and no base revision",
 	}
 	used := map[string]bool{}
 
@@ -277,9 +274,7 @@ func TestEveryReviewingEngineIsOfferedTheStandards(t *testing.T) {
 	// covered rather than excused, and naming it here would be an exemption
 	// the scan never reaches: a claim nobody checks, which is what the policy
 	// scan above learned the same way.
-	exempt := map[string]string{
-		filepath.Join(root, "internal", "evals", "harness.go"): "fixtures, with no forge and no base revision",
-	}
+	exempt := map[string]string{}
 	used := map[string]bool{}
 
 	var missing []string

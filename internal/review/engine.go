@@ -64,6 +64,14 @@ type Engine struct {
 	// ModelUsage reads the optional per-run provider usage meter after model work.
 	ModelUsage func() []practices.ModelUsage
 
+	// ModelCalls retains provider attempts separately from model aggregates.
+	ModelCalls func() []llm.CallRecord
+
+	// ObserveCall includes non-SDK model requests in the same accounting log.
+	ObserveCall func(llm.CallRecord)
+	learnings   *learningsRun
+	executions  *executionRun
+
 	Config   *config.Config
 	Roles    *llm.Roles
 	Provider vcs.Provider
@@ -101,6 +109,7 @@ type Engine struct {
 	// into the Report.
 	routeDecisions      []RouteDecision
 	assessedDesignTasks []string
+	lookups             *repoTools
 
 	// priorReadErr is the last PriorReview failure from this run, so residual
 	// can hold COMMENT without a second forge round trip after incremental
@@ -131,6 +140,10 @@ type Engine struct {
 
 	// Full bypasses result reuse on an explicit operator request.
 	Full bool
+
+	// Decider answers the review.jev stage. Nil, the default, builds a client
+	// from review.jev and the operator's OpenRouter key; a test supplies its own.
+	Decider Decider
 
 	// RepoRoot is the git checkout review.verify searches and reads. Empty
 	// means there is none, and verification then reads files through the
@@ -423,6 +436,8 @@ const (
 
 // Report is the outcome of a review.
 type Report struct {
+	// Execution retains claim-bound receipts, including unsuccessful attempts.
+	Execution ExecutionSummary
 	// Elapsed measures pipeline work before the result is returned.
 	Elapsed time.Duration
 	// FastReview identifies a bounded diff-only pass. Its receipt names the
@@ -440,15 +455,21 @@ type Report struct {
 	DesignExecution *DesignExecution `json:"-"`
 	// AssessedDesignTasks identifies package requests that completed successfully.
 	AssessedDesignTasks []string
-	// Progress carries successful model results; downstream checks run again.
+	// Progress carries reusable model responses, with verification lookup receipts.
 	Progress json.RawMessage
-	// ReusedRequests counts model requests recovered from an earlier review.
+	// ReusedRequests counts completed model results recovered from an earlier review.
 	ReusedRequests int
+	// ReusedAnalyzerStages counts complete deterministic stages restored separately.
+	ReusedAnalyzerStages int
 
 	// Practices records selected engineering checks alongside the code review.
 	Practices *practices.Report
 	// ModelUsage retains reported usage independently of findings and gating.
 	ModelUsage []practices.ModelUsage
+
+	// ModelCalls is nil when no per-attempt meter was installed, and empty
+	// when an installed meter observed no model calls.
+	ModelCalls []llm.CallRecord
 	// PullRequest pins the metadata used for commit and title checks.
 	PullRequest *vcs.PullRequest
 	// AnalyzerFindings preserves deterministic evidence before model triage.
@@ -504,6 +525,9 @@ type Report struct {
 	// retrieval, and scoring it as the retrieval-on treatment measures the
 	// control twice.
 	Knowledge KnowledgeStatus
+
+	// Learnings describes the accepted repository overlay for this run.
+	Learnings LearningsStatus
 
 	// Standards is what the convention measurement did on this run: off,
 	// active or skipped, with a reason.
@@ -660,10 +684,12 @@ type StageStatus struct {
 // and evals and the tree scorecard both phrase this one as a count of files.
 func (r *Report) Complete() bool { return len(r.Incomplete) == 0 }
 
-// PipelineComplete reports whether the selected policy's required work completed.
-// Engineering profiles use per-check completion requirements; ordinary reviews
-// require every planned file and stage. Optional failures remain in the report.
+// PipelineComplete reports whether every planned file and stage completed.
+// Passing the required practices does not erase a failed model stage.
 func (r *Report) PipelineComplete() bool {
+	if !r.Complete() || len(r.Stages) != 0 {
+		return false
+	}
 	if r.Practices != nil {
 		return r.Practices.ExitCode() != 2
 	}
@@ -751,6 +777,10 @@ func (r *Report) Failed(failOn config.Severity) bool {
 
 // Review runs the full pipeline and publishes the result.
 func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
+	ctx = llm.WithCallRole(ctx, "review")
+	if e.ObserveCall != nil {
+		ctx = llm.WithCallObserver(ctx, e.ObserveCall)
+	}
 	started := time.Now()
 	if err := e.validate(); err != nil {
 		return nil, err
@@ -768,6 +798,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		ref = ref.At(pr.HeadSHA)
 		ref.Base = pr.BaseSHA
 	}
+	e.lookups = newRepoTools(e.RepoRoot, e.Provider, ref)
 
 	raw, err := e.Provider.Diff(ctx, ref)
 	if err != nil {
@@ -836,6 +867,14 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	e = next
 
 	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA, PullRequest: pr, FastReview: e.FastReview, FastLimit: e.FastLimit}
+	e.executions = &executionRun{enabled: e.Config.Execution.Enabled}
+	defer func() { report.Execution = e.executions.snapshot() }()
+	if err := e.loadLearnings(ctx, ref, pr); err != nil {
+		report.Learnings = e.learnings.snapshot()
+		report.Incomplete = append(report.Incomplete, ".nitpick/learnings/manifest.json")
+		return report, fmt.Errorf("accepted repository learnings: %w", err)
+	}
+	defer func() { report.Learnings = e.learnings.snapshot() }()
 	defer func() { report.Routes = e.routeDecisions }()
 	defer func() { report.Elapsed = time.Since(started) }()
 
@@ -1012,7 +1051,10 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// configuration reads its ignore list and would go quiet on exactly the
 	// paths the change asked it to.
 	if runner := e.linters(); runner != nil {
-		lint, err := runner.Run(ctx, files)
+		lint, err, reused := e.runLinters(ctx, runner, files)
+		if reused {
+			report.ReusedAnalyzerStages++
+		}
 		report.AnalyzerFindings = append([]Finding(nil), lint...)
 		if err != nil {
 			// Preserve findings even when strict mode requires a failed exit.
@@ -1129,9 +1171,16 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// Its withheld findings join the expert ones, so a reader sees one list of
 	// what was held back and why.
 	var unverified []Overruled
-	findings, unverified, verifyFailures := e.verifyFindings(ctx, ref, findings, plan)
+	findings, unverified, evidence, verifyFailures := e.verifyFindings(ctx, ref, findings, plan)
 	report.Stages = append(report.Stages, verifyFailures...)
 	overruled = append(overruled, unverified...)
+	// The decision model, when asked for, follows the check and is shown what the
+	// check read. It sees only what the check kept, so it is never paid to score
+	// a finding that has already been withheld.
+	var scored []Overruled
+	findings, scored, jevFailures := e.jevFilter(ctx, ref, pr, findings, plan, evidence)
+	report.Stages = append(report.Stages, jevFailures...)
+	overruled = append(overruled, scored...)
 	findings = append(findings, advisories...)
 
 	// After every pass that can raise a severity, and before the gate reads
@@ -1468,15 +1517,14 @@ func (e *Engine) narrowToChangedSince(ctx context.Context, ref vcs.Ref, pr *vcs.
 }
 
 // superseded resolves the earlier comments this run has outgrown: on an
-// incremental run, a comment whose lines changed since the earlier review
-// (its file was re-read, or the forge no longer places it on the diff) and
-// whose finding this run did not make again. A comment on a file this run
+// incremental run, a comment whose file was re-read and whose finding this
+// run did not make again. A comment on a file this run
 // did not re-read is left alone, since nothing was checked; so is every
 // comment when the earlier revision could not be compared. Each resolved
 // thread gets a reply saying why, so a reader is not left with a silent
 // close.
 func (e *Engine) superseded(ctx context.Context, ref vcs.Ref, prior *vcs.PriorReview, inc *Incremental, findings, withheld []Finding, skipped []bundle.Skip) []vcs.PriorComment {
-	if !e.Config.Review.ResolveSuperseded || prior == nil || inc == nil || inc.Since == "" {
+	if e.Config == nil || !e.Config.Review.ResolveSuperseded || prior == nil || inc == nil || inc.Since == "" {
 		return nil
 	}
 	resolver, ok := e.Provider.(vcs.ThreadResolver)
@@ -1501,7 +1549,7 @@ func (e *Engine) superseded(ctx context.Context, ref vcs.Ref, prior *vcs.PriorRe
 		if c.ID == 0 || recurred[c.Fingerprint] || excluded[c.Path] {
 			continue
 		}
-		if c.Line == 0 || reread[c.Path] {
+		if reread[c.Path] {
 			candidates = append(candidates, c)
 			ids = append(ids, c.ID)
 		}
@@ -1575,15 +1623,7 @@ func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prio
 		if c.ID == 0 || done[c.ID] || excluded[c.Path] {
 			continue
 		}
-		// Clean approve may close a comment the forge no longer places, even
-		// off the reread set: nothing remains to re-check. Residual must not:
-		// that would clear a prior warning the judge never saw on a file this
-		// run did not read.
-		if residual {
-			if !reread[c.Path] {
-				continue
-			}
-		} else if c.Line != 0 && !reread[c.Path] {
+		if !reread[c.Path] {
 			continue
 		}
 		candidates = append(candidates, c)
@@ -1943,6 +1983,7 @@ func (e *Engine) analyzeBatch(ctx context.Context, base, prContext string, b bun
 // analyzeBatchWith reviews a batch with one client, under the prompt built
 // for it.
 func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base, prContext string, b bundle.Batch, style bool) ([]Finding, error) {
+	ctx = llm.WithCallRole(ctx, "review")
 	var body strings.Builder
 
 	if prContext != "" {
@@ -1950,7 +1991,11 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 		body.WriteString("\n")
 	}
 	body.WriteString("Review the following changes.\n\n")
-	body.WriteString(bundle.RenderBatch(b))
+	rendered := bundle.RenderBatch(b)
+	body.WriteString(rendered)
+	if b.DesignTask == "" {
+		rendered = ""
+	}
 
 	// After the diff, not before it. The change is what the model is being
 	// asked about, and reference material placed first reads as the subject.
@@ -1964,6 +2009,7 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 	}
 
 	hits := e.retrieveKnowledge(ctx, b, style)
+	body.WriteString(e.retrieveLearnings(b, style))
 	if len(hits) > 0 {
 		body.WriteString(knowledgeSection(hits))
 		// pool beside entries, at the level an operator runs at. A pool at or
@@ -2055,7 +2101,7 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 
 	var taskContext *TaskContext
 	if b.DesignTask != "" {
-		taskContext = &TaskContext{ID: strings.Join(b.DesignTaskIDs(), "+"), Text: bundle.RenderBatch(b), Lines: map[string]int{}, Spans: map[string][]bundle.SourceSpan{}}
+		taskContext = &TaskContext{ID: strings.Join(b.DesignTaskIDs(), "+"), Text: rendered, Lines: map[string]int{}, Spans: map[string][]bundle.SourceSpan{}}
 		for _, entry := range b.Entries {
 			if len(entry.SourceSpans) > 0 {
 				taskContext.Spans[entry.File.Path] = slices.Clone(entry.SourceSpans)
@@ -2086,17 +2132,11 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 	return out, nil
 }
 
-// normalizeClass maps a model-supplied class onto the closed taxonomy the
-// nitpick filter operates on.
-//
-// The schema constrains it to an enum, but JSON-mode providers do not enforce
-// enums, so an unexpected value still arrives. Unknown values become
-// maintainability: visible at normal and above, filtered at the strict levels,
-// and never silently promoted into the defect classes that drive gating.
+// normalizeClass canonicalizes known aliases and preserves unfamiliar classes.
 func (e *Engine) normalizeClass(f Finding) string {
 	normalized, ok := config.Class(f.Class).Normalize()
 	if !ok {
-		e.log().Warn("unrecognized finding class; treating as maintainability",
+		e.log().Warn("preserving unrecognized finding class",
 			"class", f.Class, "path", f.Path, "title", f.Title)
 	}
 	return string(normalized)
@@ -2262,6 +2302,7 @@ func (e *Engine) filterAnchors(findings []Finding, files diff.Files) ([]Finding,
 // When triage fails the run continues with locally deduped findings: a
 // duplicated review is worth more than no review.
 func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Finding) (string, []Finding, []Overruled, error) {
+	ctx = llm.WithCallRole(ctx, "triage")
 	findings = dedupe(findings)
 	e.log().Info("triaging", "findings", len(findings), "model", e.Roles.Triage.String())
 
@@ -2301,7 +2342,20 @@ func (e *Engine) triage(ctx context.Context, pr *vcs.PullRequest, findings []Fin
 		return "", nil, nil, err
 	}
 
-	result, err := llm.Extract[TriageResult](ctx, e.Roles.Triage, msgs, schema)
+	// The request is the whole input to the answer, so a hit is the answer a
+	// live call would have been asked for. A failed call is never saved.
+	key := e.stageKeyFor("triage", e.Roles.Triage, base, msgs[1].Content, findingPaths(findings), append(e.Roles.Triage.CallOptions(), schema)...)
+	result, reused := loadStageChecked[TriageResult](e.progress, key, rankStage, hasTriageAnswer)
+	if reused {
+		e.log().Info("reusing completed triage", "findings", len(findings))
+	} else {
+		result, err = llm.Extract[TriageResult](ctx, e.Roles.Triage, msgs, schema)
+		// An answer with nothing in it is what a flaky provider returns, and
+		// saving it would replay the failure on every retry.
+		if err == nil && hasTriageAnswer(result) {
+			saveStage(e.progress, key, rankStage, result)
+		}
+	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return "", nil, nil, err
@@ -2635,6 +2689,10 @@ func renderedFiles(plan *bundle.Plan) map[string]string {
 
 // publish renders and delivers the review.
 func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files diff.Files) error {
+	report.Learnings = e.learnings.snapshot()
+	if e.ModelCalls != nil {
+		defer func() { report.ModelCalls = e.ModelCalls() }()
+	}
 	report.Routes = e.routeDecisions
 	report.Progress, report.ReusedRequests = e.progress.snapshot(report.Head)
 	if e.ModelUsage != nil {
@@ -2707,6 +2765,13 @@ func (e *Engine) reviewPrompt() (string, error) {
 // is shared, the model-family layer is the client's own. A nil client is
 // the configured review model, for callers that only want the text.
 func (e *Engine) reviewPromptFor(client *llm.Client) (string, error) {
+	return e.reviewPromptBase(client, "")
+}
+
+// reviewPromptBase is reviewPromptFor with the base text replaced when base is
+// not empty. Every layer after the base, the voice, persona, model notes and
+// instructions, is applied as it is for the ordinary prompt.
+func (e *Engine) reviewPromptBase(client *llm.Client, base string) (string, error) {
 	if e.FastReview {
 		p, err := prompt.Build(prompt.NameFastReview, prompt.Options{Run: e.Instruction})
 		if err != nil {
@@ -2727,6 +2792,7 @@ func (e *Engine) reviewPromptFor(client *llm.Client) (string, error) {
 		slopText = prompt.SlopGuidance()
 	}
 	p, err := prompt.Build(prompt.NameReview, prompt.Options{
+		Override:    base,
 		PersonaText: prompt.Persona(e.Config.Persona),
 		ModelText:   modelText,
 		SlopText:    slopText,
@@ -3034,6 +3100,9 @@ func (n noPolicy) ResolvePolicy(context.Context, vcs.Ref, *vcs.PullRequest, []st
 func (n noPolicy) Reason() string { return n.reason }
 
 func (e *Engine) incompleteDesignReview(ctx context.Context, ref vcs.Ref, report *Report, findings []Finding, stage string, err error) (*Report, error) {
+	if e.ModelCalls != nil {
+		report.ModelCalls = e.ModelCalls()
+	}
 	report.Findings, report.Counts = findings, counts(findings)
 	report.Stages = append(report.Stages, StageStatus{Stage: stage, Reason: errorKind(err)})
 	if e.ModelUsage != nil {

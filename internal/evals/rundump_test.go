@@ -420,6 +420,7 @@ func TestATruncatedTailCostsTheTailAndNotTheFile(t *testing.T) {
 // the only copy of a held-out run") is not weaker at close time, and os.Rename
 // is silent.
 func TestAFinishedRunIsNotRenamedOverAnother(t *testing.T) {
+	t.Setenv(EnvDump, "")
 	dir := t.TempDir()
 
 	dump, path, err := openRunDumpAt(dir, "benchmark", HeldOutFixtures(), time.Now().UTC(), os.Getpid())

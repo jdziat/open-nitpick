@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"fmt"
+	"time"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
@@ -63,7 +64,17 @@ func (e *Embedder) Embed(ctx context.Context, texts []string) ([][]float32, erro
 	if len(texts) == 0 {
 		return nil, nil
 	}
+	started := time.Now().UTC()
 	resp, err := e.llm.Embed(ctx, texts, llms.WithEmbedModel(e.spec.Model))
+	if observe, _ := ctx.Value(callObserverKey{}).(func(CallRecord)); observe != nil {
+		record := CallRecord{Provider: e.spec.Provider, Model: e.spec.Model, Role: "embedding", StartedAt: started,
+			DurationMS: time.Since(started).Milliseconds(), Failed: err != nil}
+		if resp != nil && resp.Usage.PromptTokens > 0 {
+			usage := llms.Usage{PromptTokens: resp.Usage.PromptTokens, TotalTokens: resp.Usage.TotalTokens}
+			record.Usage = &usage
+		}
+		observe(record)
+	}
 	if err != nil {
 		return nil, err
 	}

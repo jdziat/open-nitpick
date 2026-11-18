@@ -8,8 +8,26 @@ import (
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/jdziat/open-nitpick/internal/execution"
 	"github.com/jdziat/open-nitpick/internal/review"
 )
+
+func TestJSONRetainsUnavailableAndSuccessfulExecutionReceipts(t *testing.T) {
+	for _, status := range []execution.Status{execution.Passed, execution.Unavailable} {
+		report := &review.Report{Execution: review.ExecutionSummary{State: "recorded", Receipts: []review.ExecutionReceipt{{FindingSHA256: strings.Repeat("a", 64), Kind: "go_build_failure", Status: status, Result: &execution.Result{Status: status, SnapshotSHA256: "source-hash", PolicySHA256: "policy-hash", OutputSHA256: "output-hash", Runtime: "runc"}}}}}
+		var out bytes.Buffer
+		if err := writeJSONReport(&out, resultClean, report); err != nil {
+			t.Fatal(err)
+		}
+		var receipt jsonReport
+		if err := json.Unmarshal(out.Bytes(), &receipt); err != nil {
+			t.Fatal(err)
+		}
+		if len(receipt.Execution.Receipts) != 1 || receipt.Execution.Receipts[0].Status != status || receipt.Execution.Receipts[0].Result.PolicySHA256 != "policy-hash" {
+			t.Fatalf("execution receipt was dropped: %s", out.String())
+		}
+	}
+}
 
 // A run with nothing to report and a run that did not finish must not print the
 // same thing, so the report always carries result and complete, and an empty

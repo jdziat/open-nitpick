@@ -20,10 +20,12 @@ result.
 """
 import argparse
 import concurrent.futures
+import hashlib
 import html
 import json
 import os
 import re
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -132,10 +134,18 @@ def review(case, repos, out, model, timeout, config, binary, command="review"):
     ]
     result = {
         "result": {"comments": comments, "withheld": withheld},
+        "usage": report.get("usage") if report else None,
         "duration_seconds": seconds,
         "manifest": {"reviewer": "open-nitpick", "model": model, "version": nitpick_version(binary),
                      "config": str(config) if config else None, "command": command},
     }
+    result["manifest"]["artifacts_sha256"] = {
+        p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in (dest / "stderr.txt", dest / "stdout.txt") if p.is_file()
+    }
+    if config:
+        result["manifest"]["config_sha256"] = hashlib.sha256(config.read_bytes()).hexdigest()
+    result["manifest"]["binary_sha256"] = hashlib.sha256(Path(binary).read_bytes()).hexdigest()
     (dest / "status.json").write_text(json.dumps(status))
     (dest / "result.json").write_text(json.dumps(result, indent=2))
     print(json.dumps({"case": case, "exit": code, "findings": len(comments), "seconds": round(seconds)}), flush=True)
@@ -158,6 +168,7 @@ def main():
     ap.add_argument("--binary", default="nitpick", help="the nitpick binary to run")
     ap.add_argument("--command", default="review", help="the subcommand to review with, such as deep-review")
     args = ap.parse_args()
+    args.binary = str(Path(shutil.which(args.binary) or args.binary).resolve(strict=True))
     selection = json.loads((args.inputs / "selection.json").read_text())
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "run.json").write_text(json.dumps({

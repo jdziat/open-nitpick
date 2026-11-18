@@ -3,8 +3,26 @@ package main
 import (
 	"testing"
 
+	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/internal/practices"
+	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/jdziat/open-nitpick/internal/standards"
 )
+
+func TestUnknownSelectedAnalyzerCannotProveNoApplicablePaths(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Linters.Enabled = []string{"golangci-lnit"}
+	check := reviewAnalyzerCheck([]standards.File{{Path: "app.go", Src: []byte("package app\n")}}, &review.Report{}, cfg)
+	if check.State != practices.Unavailable {
+		t.Fatalf("unknown analyzer was treated as completed or inapplicable: %+v", check)
+	}
+	cfg.Linters.Enabled = []string{"ruff"}
+	check = reviewAnalyzerCheck([]standards.File{{Path: "app.go", Src: []byte("package app\n")}}, &review.Report{}, cfg)
+	if check.State != practices.NotApplicable {
+		t.Fatalf("known Python analyzer over Go paths should be inapplicable: %+v", check)
+	}
+}
 
 // A dependency bump edits go.mod and go.sum and nothing else. Treating its
 // go.mod as a boundary change left the required design-boundaries check

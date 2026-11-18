@@ -975,6 +975,9 @@ func (c *Client) Fallback() *Client {
 // to be cut in the same place. A refused credential or a cancelled context
 // are none of a second model's business.
 func ShouldEscalate(err error) bool {
+	if errors.Is(err, ErrRecordedAttempt) {
+		return false
+	}
 	if err == nil {
 		return false
 	}

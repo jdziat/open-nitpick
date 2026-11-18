@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/review"
@@ -20,6 +21,43 @@ func TestSecurityRejectsNoLintersFlag(t *testing.T) {
 	err := runSecurity(context.Background(), []string{"-no-linters"})
 	if err == nil || !strings.Contains(err.Error(), "no-linters") {
 		t.Fatalf("want rejection of -no-linters, got %v", err)
+	}
+}
+
+func TestSecurityAnalyzerCancellationReturnsTheCancellation(t *testing.T) {
+	root, bin := t.TempDir(), t.TempDir()
+	if output, err := exec.Command("git", "init", "-q", root).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	marker := filepath.Join(t.TempDir(), "started")
+	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("text\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	script := "#!/bin/sh\n: > '" + marker + "'\nexec sleep 30\n"
+	if err := os.WriteFile(filepath.Join(bin, "gitleaks"), []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		for ctx.Err() == nil {
+			if _, err := os.Stat(marker); err == nil {
+				cancel()
+				return
+			}
+			time.Sleep(time.Millisecond)
+		}
+	}()
+	cfg := config.Defaults()
+	cfg.Linters.Enabled = []string{"gitleaks"}
+	_, _, err := securityAnalyzersOnly(ctx, root, cfg, nil, newLogger(false, "text"))
+	cancel()
+	<-stopped
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled analyzer returned %v", err)
 	}
 }
 
@@ -40,6 +78,14 @@ func TestSecurityFailOnNoneRequiresLoudWaiver(t *testing.T) {
 	got, err := resolveSecurityFailOn(cfg, "", true)
 	if err != nil || got != config.SeverityNone {
 		t.Fatalf("waiver should allow none: got %v err %v", got, err)
+	}
+}
+
+func TestSecurityFailOnFlagNoneIgnoresCaseWhenRequiringWaiver(t *testing.T) {
+	cfg := config.Defaults()
+	_, err := resolveSecurityFailOn(cfg, " None ", false)
+	if err == nil || !strings.Contains(err.Error(), "allow-clean-with-no-gate") {
+		t.Fatalf("a case variant of none must still need the waiver, got %v", err)
 	}
 }
 

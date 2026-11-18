@@ -284,6 +284,9 @@ func resolveSecurityFailOn(cfg *config.Config, flag string, allowNone bool) (con
 		if !failOn.Valid() {
 			return "", fmt.Errorf("invalid -fail-on %q", flag)
 		}
+		// Later gates compare against the canonical value, so " None " must not
+		// slip past the waiver check that compares to "none".
+		failOn = config.Severity(failOn.String())
 	}
 	if failOn == config.SeverityNone && !allowNone {
 		return "", fmt.Errorf("security.fail_on none requires -allow-clean-with-no-gate (or MCP allow_clean_with_no_gate)")
@@ -416,6 +419,9 @@ func securityAnalyzersOnly(ctx context.Context, repo string, cfg *config.Config,
 	}
 	set := linters.New(repo, cfg, log)
 	found, runErr := set.Run(ctx, files)
+	if err := ctx.Err(); err != nil {
+		return nil, tree, err
+	}
 	report := &review.Report{
 		Findings:         found,
 		AnalyzerFindings: append([]review.Finding(nil), found...),

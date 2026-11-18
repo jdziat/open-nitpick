@@ -1,8 +1,9 @@
 # STRATEGY
 
 > Updated 2026-11-17 from `revised-plan.md`, which passed adversarial review
-> for planning scope only. The plan is proposed work, not implementation
-> approval.
+> for planning scope only. The user subsequently approved implementation and
+> trusted-corpus Docker execution. Quality promotion still requires the frozen
+> studies and budgets described in the plan.
 
 ## Problem
 
@@ -83,6 +84,12 @@ intended effect. A safety invariant break is a fail; incomplete or overlapping
 results are inconclusive; both block promotion.
 
 ## Next
+
+Implementation now includes the accounting receipts, trusted-base learnings,
+thread/approval safety guards, optional fix checks, and a registered build-claim
+execution pilot. `runc` is approved for hand-picked examples; no gVisor
+installation is required for that scope. See `docs/remediation-implementation.md`
+for current validation and the studies that have not run.
 
 0. Re-ingest this checkout into Semanta before relying on hosted code retrieval.
    The 2026-11-17 pulse reports drift 87, stale freshness, and no embedded

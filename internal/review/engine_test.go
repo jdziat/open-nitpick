@@ -488,11 +488,15 @@ func TestTriageFailureStillPublishesFindings(t *testing.T) {
 		"Review the following changes": reviewOut,
 		"triaging findings":            "this is not json and never will be",
 	}}
-	engine := newEngine(t, model, &stubProvider{diff: engineDiff}, nil)
+	provider := &stubProvider{diff: engineDiff}
+	engine := newEngine(t, model, provider, nil)
 
 	report, err := engine.Review(context.Background(), vcs.Ref{})
 	if err != nil {
 		t.Fatalf("Review should survive a triage failure: %v", err)
+	}
+	if provider.published == nil || len(provider.published.Comments) != 1 {
+		t.Fatalf("triage failure lost the published finding: %+v", provider.published)
 	}
 	if len(report.Findings) != 1 {
 		t.Errorf("findings = %+v, want the review findings to survive", report.Findings)
@@ -697,7 +701,7 @@ func TestEngineValidatesWiring(t *testing.T) {
 	cases := map[string]*Engine{
 		"no config":   {Roles: &llm.Roles{}, Provider: &stubProvider{}},
 		"no models":   {Config: config.Defaults(), Provider: &stubProvider{}},
-		"no provider": {Config: config.Defaults(), Roles: &llm.Roles{}},
+		"no provider": {Config: config.Defaults(), Roles: &llm.Roles{Review: &llm.Client{}, Triage: &llm.Client{}}},
 	}
 
 	for name, e := range cases {

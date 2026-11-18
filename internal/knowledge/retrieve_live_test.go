@@ -21,9 +21,10 @@ func TestLiveRetrievalRanksTheRightEntry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Corpus: %v", err)
 	}
-	raw, err := os.ReadFile("index.json")
+	model := os.Getenv("EMBED_PROVIDER") + "/" + os.Getenv("EMBED_MODEL")
+	raw, err := SelectIndex(model)
 	if err != nil {
-		t.Fatalf("read index: %v", err)
+		t.Fatalf("SelectIndex: %v", err)
 	}
 	ix, err := LoadIndex(raw, entries)
 	if err != nil {

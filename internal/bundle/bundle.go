@@ -292,6 +292,8 @@ func AssembleReserving(ctx context.Context, cfg *config.Config, files diff.Files
 	// nothing reviewed has reached: six files at max_files=3 with the first
 	// three generated review nothing and report success.
 	entries := make([]Entry, 0, len(files))
+	fullFetch, stopPrefetch := prefetchFullFiles(ctx, cfg, files, fetch, func() int { return len(entries) })
+	defer stopPrefetch()
 	for _, f := range files {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -314,7 +316,7 @@ func AssembleReserving(ctx context.Context, cfg *config.Config, files diff.Files
 		}
 
 		if cfg.Review.IncludeFullFiles && fetch != nil {
-			content, skip := fetchContent(ctx, fetch, f)
+			content, skip := fetchContent(ctx, fullFetch, f)
 			switch {
 			case skip != "":
 				// Not fatal: review the diff without the full file. Recorded as degraded,

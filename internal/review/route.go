@@ -115,6 +115,7 @@ type classification struct {
 // (not the full files, not the related context), because the question is what
 // the change is, and the diff is the change.
 func (e *Engine) classify(ctx context.Context, b bundle.Batch) ([]string, error) {
+	ctx = llm.WithCallRole(ctx, "routing")
 	if e.Roles.Router == nil {
 		return nil, fmt.Errorf("routes match on kinds and no router is configured")
 	}

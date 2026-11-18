@@ -1075,13 +1075,7 @@ func TestUnresolvedWithoutAReasonCannotClaimCompletedValidation(t *testing.T) {
 	}
 }
 
-// A reason cannot escape the <sub> that holds it, by newline or by markup.
-//
-// The expert wrote this text after reading a diff the change's author
-// controls, which is the same provenance validationRequest flattens Title and
-// Rationale for. Flattening alone is not enough: a `</sub>` closes the element
-// and everything after it renders as live HTML in a comment posted under this
-// tool's name.
+// Expert reasons quote untrusted input and must remain inert when posted.
 func TestAnUnresolvedReasonCannotEscapeItsElement(t *testing.T) {
 	got := renderComment(Finding{
 		Path: "a.go", Line: 1, Severity: "error", Title: "Real", Source: "reviewer",

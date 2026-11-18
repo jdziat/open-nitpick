@@ -27,6 +27,49 @@ from "could not run" (2). Use `-dry-run` with
 | Configure a provider, editor integration, or a new repository | [`auth`](#auth), [`mcp`](#mcp), or [`init`](#init) |
 | Inspect configuration or generated reference material | [`explain-config`](#explain-config) or [`config-reference`](#config-reference) |
 
+## `learn`
+
+Propose and individually accept repository references. A draft is inactive;
+acceptance prints one accepted entry to stdout for a normal reviewed policy change.
+Only the trusted base revision can activate it. Repository configuration cannot
+enable `review.learnings` or redirect its repository identity.
+
+### `learn draft`
+
+```sh
+nitpick learn draft -input feedback.json -scripted-entry entry.json > draft.json
+nitpick learn draft -input feedback.json -provider openai -model gpt-4.1 -allow-provider-feedback > draft.json
+```
+
+Feedback names the repository, source URL and revision, evidence date,
+classification, rationale, and quoted thread text. Resolved status alone is
+insufficient. Bot-generated events are rejected. Thread text is redacted and
+bounded before a model call; the drafting model has no tools. Drafts retain
+the source excerpt hash and usage records instead of the original thread body.
+
+| Flag | Meaning |
+| --- | --- |
+| `-input` | JSON feedback file. |
+| `-scripted-entry` | Operator-authored entry JSON; makes no model call. |
+| `-provider`, `-model` | Explicit model selection for a generated draft. |
+| `-config` | Operator model configuration. |
+| `-allow-provider-feedback` | Consent to send redacted feedback to that provider. |
+
+### `learn accept`
+
+Review the complete draft and supply its entry's `content_hash`. Editing the
+entry changes that hash and requires another review. The command emits one
+accepted entry; combine entries in a version-1
+`.nitpick/learnings/manifest.json` through a reviewed change. It does not push
+or activate policy.
+
+| Flag | Meaning |
+| --- | --- |
+| `-input` | One reviewed draft JSON. |
+| `-reviewed-hash` | Exact `content_hash` of the entry reviewed. |
+| `-repository` | Explicit target owner/repository; must match the draft. |
+| `-local-operator` | Attribute acceptance to the authenticated OS user. Without it, current GitHub write, maintain, or admin permission is required. |
+
 ## `review`
 
 ```sh

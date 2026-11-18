@@ -1215,7 +1215,10 @@ func repoPath(repoRoot, module, reported string) string {
 }
 
 // ruff runs the Python linter.
-type ruff struct{ cfg analyzerConfig }
+type ruff struct {
+	cfg        analyzerConfig
+	checkpoint bool
+}
 
 func (r *ruff) Name() string { return "ruff" }
 
@@ -1265,6 +1268,9 @@ func (r *ruff) Run(ctx context.Context, repoRoot string, files []string) ([]Find
 	// --isolated and --config are mutually exclusive: ruff 0.16.1 exits 2 with
 	// "cannot be used with `--isolated`".
 	args := []string{"check"}
+	if r.checkpoint {
+		args = append(args, "--no-cache")
+	}
 	if r.cfg.Ref == "" {
 		args = append(args, "--isolated")
 	} else {

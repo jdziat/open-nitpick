@@ -49,6 +49,9 @@ type Config struct {
 	// Security configures the tree security scan (`nitpick security`).
 	Security Security `yaml:"security"`
 
+	// Execution attaches optional check evidence to fix proposals.
+	Execution Execution `yaml:"execution"`
+
 	// Source records where the configuration was loaded from. It is empty when
 	// only built-in defaults were used.
 	Source string `yaml:"-"`
@@ -530,6 +533,16 @@ type Review struct {
 	// docs/remediation-mira.md, stage R2b, has the measurement.
 	Verify VerifyMode `yaml:"verify"`
 
+	// Jev adds an optional second opinion on each model finding, from TypeSafe's
+	// Jev decision model through OpenRouter, and withholds the findings it
+	// rates unlikely to be defects. Off unless jev.threshold is set. It runs
+	// after review.verify and is meant to follow it: the checker's lookups are
+	// sent along as evidence. See JevFilter.
+	//
+	// A repository's own .nitpick.yaml cannot set it: turning it on sends
+	// source code to a third party and spends the operator's OpenRouter key.
+	Jev JevFilter `yaml:"jev"`
+
 	// Deep configures nitpick deep-review: several agents read each pull
 	// request with the repository open, over many turns, and what they file
 	// passes a confidence floor and a critique before it is posted.
@@ -620,6 +633,10 @@ type Review struct {
 	// report the reference, and a reviewer that invents defects out of a style
 	// guide is worse than one that misses them.
 	Knowledge bool `yaml:"knowledge"`
+
+	// Learnings attaches operator-reviewed repository references from the
+	// trusted base, independently of embedded-corpus retrieval.
+	Learnings Learnings `yaml:"learnings"`
 
 	// Standards hands the reviewer the conventions this repository was measured
 	// to follow, counted at the base revision.
@@ -1521,6 +1538,13 @@ type DeepReview struct {
 	// cites, and withholds the ones the code does not support. Default on.
 	Critique bool `yaml:"critique"`
 
+	// Prompts names the instructions the agents review under. Empty, the
+	// default, keeps this tool's own. "mira" replaces them with the general and
+	// security prompts of Mira (https://github.com/miracodeai/mira, Apache
+	// License 2.0), adapted to this tool's findings; see NOTICE for what was
+	// changed. The two do not differ in the schema, the tools or the selection.
+	Prompts string `yaml:"prompts"`
+
 	// MaxFilesPerRequest replaces review.max_files_per_request, so a pull
 	// request is read as a whole. Default 60.
 	MaxFilesPerRequest int `yaml:"max_files_per_request"`
@@ -1532,11 +1556,47 @@ type DeepReview struct {
 	TokenBudgetPerRequest int `yaml:"token_budget_per_request"`
 }
 
+// DeepPromptsMira selects Mira's prompts, adapted, for the deep-review agents.
+const DeepPromptsMira = "mira"
+
 // Deep review agent names.
 const (
 	DeepAgentGeneral  = "general"
 	DeepAgentSecurity = "security"
 )
+
+// JevFilter configures the optional Jev decision-model filter.
+//
+// Each model finding is sent to Jev with the pull request's description, the
+// claim and its cited code, what the repository check read, and the file. Jev
+// gives a probability for bug, error, warning, info and noise, and a finding
+// whose bug plus error probability is under Threshold is withheld with the
+// reason. Analyzer findings are not sent.
+//
+// This sends source code to OpenRouter, so it is off by default and a
+// repository file cannot turn it on. A request that fails keeps its finding and
+// says so in the stage list. On 100 findings that agents graded, the check
+// followed by Jev at 0.3 withheld 29 of 42 not-real findings against 25 for the
+// check alone. On deep review's drafts for 30 unseen pull requests it lowered
+// F1 by 0.033 (0.002 to 0.073), so it is not recommended there
+// (docs/remediation-mira.md).
+type JevFilter struct {
+	// Threshold is the lowest bug plus error probability a finding may have and
+	// be kept, from 0 to 1. Zero, the default, turns the filter off. 0.3 is the
+	// value the measurement above used.
+	Threshold float64 `yaml:"threshold"`
+
+	// Model is the decision model as OpenRouter names it. Empty means
+	// ~typesafe/jev-latest.
+	Model string `yaml:"model"`
+
+	// APIKeyEnv names the environment variable holding the OpenRouter key.
+	// Empty means OPENROUTER_API_KEY.
+	APIKeyEnv string `yaml:"api_key_env"`
+}
+
+// Enabled reports whether the filter runs.
+func (j JevFilter) Enabled() bool { return j.Threshold > 0 }
 
 // VerifyMode says which findings survive repository verification.
 type VerifyMode string

@@ -2,6 +2,7 @@ package review
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/internal/llm"
 	"github.com/jdziat/open-nitpick/internal/prompt"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
@@ -46,6 +48,11 @@ const (
 
 	// verifyExpert is how a withheld finding is attributed to a reader.
 	verifyExpert = "a repository check"
+
+	// verifyEvidenceBytes bounds the lookups kept for a later stage. It is a
+	// ceiling on what review.jev is sent about one finding, not on what the
+	// checker may read.
+	verifyEvidenceBytes = 9000
 )
 
 // verifyCallTimeout bounds one checker turn, and is a variable so a test can
@@ -124,6 +131,38 @@ func runLookup(ctx context.Context, tools *repoTools, name string, args map[stri
 	return "", false
 }
 
+// lookupTurn joins reads from the leading lookup group before the caller
+// appends their answers. A submission remains a boundary: later calls cannot
+// run before its verdict or budget decision.
+func lookupTurn(ctx context.Context, tools *repoTools, calls []llms.ToolCall, limit int) []string {
+	n := 0
+	for _, call := range calls {
+		if n >= limit || call.Function == nil ||
+			(call.Function.Name != "read_file" && call.Function.Name != "grep_repo") {
+			break
+		}
+		n++
+	}
+	answers := make([]string, n)
+	var workers sync.WaitGroup
+	next := make(chan int, n)
+	for i := range n {
+		next <- i
+	}
+	close(next)
+	for range min(4, n) {
+		workers.Go(func() {
+			for i := range next {
+				args := map[string]any{}
+				_ = json.Unmarshal([]byte(calls[i].Function.Arguments), &args)
+				answers[i], _ = runLookup(ctx, tools, calls[i].Function.Name, args)
+			}
+		})
+	}
+	workers.Wait()
+	return answers
+}
+
 // keepAfterVerify is the rule that turns a verdict into a decision. It lives
 // here, in code, so moving the dial is a change a test can see. A verdict
 // outside the vocabulary has not checked anything, so it keeps the finding.
@@ -143,27 +182,37 @@ type verifyOutcome struct {
 	verdict string
 	reason  string
 	failed  string // set when the check could not run; the finding is kept
+	// submitted requires a supported verdict; malformed replies must be retried.
+	submitted bool
+	lookups   []verdictLookup
+	complete  bool
+
+	// evidence is what the checker looked up, each call followed by its result,
+	// for a later stage that judges the finding from the same facts. Empty when
+	// it looked nothing up.
+	evidence string
 }
 
 // verifyFindings checks the model findings in the list and returns what is
-// kept, what was withheld with its reason, and a stage status when a check
+// kept, what was withheld with its reason, what the checker looked up for each
+// finding it checked (keyed by findingKey), and a stage status when a check
 // could not run.
 //
 // A check that errors keeps its finding: an outage costs precision, which the
 // stage status shows, where dropping the finding would cost recall nobody is
 // told about.
-func (e *Engine) verifyFindings(ctx context.Context, ref vcs.Ref, findings []Finding, plan *bundle.Plan) ([]Finding, []Overruled, []StageStatus) {
+func (e *Engine) verifyFindings(ctx context.Context, ref vcs.Ref, findings []Finding, plan *bundle.Plan) ([]Finding, []Overruled, map[string]string, []StageStatus) {
 	mode := e.Config.Review.Verify
 	if mode == "" || len(findings) == 0 {
-		return findings, nil, nil
+		return findings, nil, nil, nil
 	}
 	client := e.Roles.Validator()
 	system, err := prompt.Verify()
 	if client == nil || err != nil {
 		e.log().Error("verification unavailable; publishing unchecked", "error", err)
-		return findings, nil, []StageStatus{{Stage: "verify", Reason: "unavailable"}}
+		return findings, nil, nil, []StageStatus{{Stage: "verify", Reason: "unavailable"}}
 	}
-	tools := newRepoTools(e.RepoRoot, e.Provider, ref)
+	tools := e.repositoryTools(ref)
 	if !tools.canSearch() {
 		e.log().Warn("verification has no git checkout to search; the checker can read files but not grep")
 	}
@@ -191,7 +240,8 @@ func (e *Engine) verifyFindings(ctx context.Context, ref vcs.Ref, findings []Fin
 				outcomes[i] = verifyOutcome{failed: errorKind(ctx.Err())}
 				return
 			}
-			outcomes[i] = e.verifyOne(ctx, system, tools, findings[i], files[findings[i].Path])
+			outcomes[i] = e.verifyCached(ctx, ref, system, tools, findings[i], files[findings[i].Path])
+			outcomes[i] = e.executeClaim(ctx, ref, findings[i], outcomes[i])
 		}(i)
 	}
 	wg.Wait()
@@ -205,8 +255,12 @@ func (e *Engine) verifyFindings(ctx context.Context, ref vcs.Ref, findings []Fin
 		refutedN   int
 		uncertainN int
 	)
+	evidence := map[string]string{}
 	for i, f := range findings {
 		o := outcomes[i]
+		if o.evidence != "" {
+			evidence[findingKey(f)] = o.evidence
+		}
 		switch {
 		case f.FromAnalyzer:
 			kept = append(kept, f)
@@ -244,33 +298,119 @@ func (e *Engine) verifyFindings(ctx context.Context, ref vcs.Ref, findings []Fin
 	if failure != "" {
 		stages = append(stages, StageStatus{Stage: "verify", Reason: failure})
 	}
-	return kept, withheld, stages
+	return kept, withheld, evidence, stages
 }
+
+// storedVerdict is the part of a check worth keeping: what the checker
+// decided and the facts it looked up.
+type storedVerdict struct {
+	Verdict  string          `json:"verdict"`
+	Reason   string          `json:"reason"`
+	Evidence string          `json:"evidence,omitempty"`
+	Lookups  []verdictLookup `json:"lookups,omitempty"`
+	Complete bool            `json:"complete"`
+}
+
+type verdictLookup struct {
+	Tool      string `json:"tool"`
+	Arguments string `json:"arguments"`
+	Digest    string `json:"digest"`
+}
+
+func lookupDigest(result string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(bound(result))))
+}
+
+func (stored storedVerdict) matches(ctx context.Context, tools *repoTools) bool {
+	if !stored.Complete || !validVerdict(stored.Verdict) {
+		return false
+	}
+	failures := tools.failures.Load()
+	for _, lookup := range stored.Lookups {
+		args := map[string]any{}
+		if json.Unmarshal([]byte(lookup.Arguments), &args) != nil {
+			return false
+		}
+		result, ok := runLookup(ctx, tools, lookup.Tool, args)
+		if !ok || lookupDigest(result) != lookup.Digest {
+			return false
+		}
+	}
+	return ctx.Err() == nil && failures == tools.failures.Load()
+}
+
+// verifyCached answers from an earlier run's check when the same finding is
+// put to the same checker at the same head, and otherwise runs it. Only a
+// check that ended in a submitted verdict is kept: a failure, or a checker that
+// stopped without one, is exactly what a retry exists to repeat.
+func (e *Engine) verifyCached(ctx context.Context, ref vcs.Ref, system string, tools *repoTools, f Finding, file *diff.File) verifyOutcome {
+	client := e.Roles.Validator()
+	identity, err := json.Marshal([]any{ref, tools.ref, tools.canSearch(), verifyRequest(f, file)})
+	key := ""
+	if err == nil {
+		key = e.stageKeyFor("verify", client, system, string(identity), []string{f.Path}, verifyOptions(client, tools)...)
+	}
+	stored, reused := loadStageChecked[storedVerdict](e.progress, key, rankVerify, func(s storedVerdict) bool {
+		return s.matches(ctx, tools)
+	})
+	if reused {
+		e.log().Info("reusing completed verification", "path", f.Path, "line", f.Line)
+		return verifyOutcome{verdict: stored.Verdict, reason: stored.Reason, evidence: stored.Evidence, submitted: true, complete: true, lookups: stored.Lookups}
+	}
+	outcome := e.verifyOne(ctx, system, tools, f, file)
+	if outcome.failed == "" && outcome.submitted && outcome.complete {
+		saveStage(e.progress, key, rankVerify, storedVerdict{Verdict: outcome.verdict, Reason: outcome.reason, Evidence: outcome.evidence, Lookups: outcome.lookups, Complete: true})
+	}
+	return outcome
+}
+
+func verifyOptions(client *llm.Client, tools *repoTools) []llms.CallOption {
+	return append(client.NoReasoningOptions(),
+		llms.WithTools(verifyTools(tools.canSearch())), llms.WithToolChoiceAuto())
+}
+
+func validVerdict(v string) bool {
+	return v == verdictConfirmed || v == verdictRefuted || v == verdictUncertain
+}
+
+// findingKey names a finding across stages that reorder and drop them.
+func findingKey(f Finding) string { return fmt.Sprintf("%s|%d|%s", f.Path, f.Line, f.Title) }
 
 // verifyOne runs one finding's tool loop.
 func (e *Engine) verifyOne(ctx context.Context, system string, tools *repoTools, f Finding, file *diff.File) verifyOutcome {
+	ctx = llm.WithCallRole(ctx, "verification")
 	ctx, cancel := context.WithTimeout(ctx, verifyTimeout)
 	defer cancel()
 	client := e.Roles.Validator()
-	opts := append(client.NoReasoningOptions(),
-		llms.WithTools(verifyTools(tools.canSearch())), llms.WithToolChoiceAuto())
+	opts := verifyOptions(client, tools)
 
 	msgs := []llms.Message{
 		{Role: llms.RoleSystem, Content: system},
 		{Role: llms.RoleUser, Content: verifyRequest(f, file)},
 	}
 	lookups := 0
+	failures := tools.failures.Load()
+	var trace []verdictLookup
+	var seen strings.Builder
+	// found is what each return carries, so no outcome can forget the lookups.
+	found := func(o verifyOutcome) verifyOutcome {
+		o.evidence = seen.String()
+		o.lookups = trace
+		o.complete = failures == tools.failures.Load() && ctx.Err() == nil
+		return o
+	}
 	for range verifyMaxLookups + 3 {
 		resp, err := generateBounded(ctx, client.LLM, msgs, opts, verifyCallTimeout)
 		if err != nil {
 			e.log().Warn("verification failed; keeping the finding", "path", f.Path, "line", f.Line, "error", err)
-			return verifyOutcome{failed: errorKind(err)}
+			return found(verifyOutcome{failed: errorKind(err)})
 		}
 		if len(resp.ToolCalls) == 0 {
-			return verifyOutcome{verdict: verdictUncertain, reason: "the checker stopped without a verdict"}
+			return found(verifyOutcome{verdict: verdictUncertain, reason: "the checker stopped without a verdict"})
 		}
 		msgs = append(msgs, llms.Message{Role: llms.RoleAssistant, Content: resp.Content, ToolCalls: resp.ToolCalls})
-		for _, call := range resp.ToolCalls {
+		answers := lookupTurn(ctx, tools, resp.ToolCalls, max(0, verifyMaxLookups-lookups))
+		for i, call := range resp.ToolCalls {
 			name, args := "", map[string]any{}
 			if call.Function != nil {
 				name = call.Function.Name
@@ -281,16 +421,23 @@ func (e *Engine) verifyOne(ctx context.Context, system string, tools *repoTools,
 			case "submit_verdict":
 				v, _ := args["verdict"].(string)
 				reason, _ := args["reason"].(string)
-				if v != verdictConfirmed && v != verdictRefuted && v != verdictUncertain {
+				submitted := validVerdict(v)
+				if !submitted {
 					v = verdictUncertain
 				}
-				return verifyOutcome{verdict: v, reason: oneLine(reason)}
+				return found(verifyOutcome{verdict: v, reason: oneLine(reason), submitted: submitted})
 			case "read_file", "grep_repo":
 				lookups++
 				if lookups > verifyMaxLookups {
 					result = "the lookup budget is spent: call submit_verdict now"
 				} else {
-					result, _ = runLookup(ctx, tools, name, args)
+					if i < len(answers) {
+						result = answers[i]
+					} else {
+						result, _ = runLookup(ctx, tools, name, args)
+					}
+					recordLookup(&seen, name, call.Function.Arguments, result)
+					trace = append(trace, verdictLookup{Tool: name, Arguments: call.Function.Arguments, Digest: lookupDigest(result)})
 				}
 			default:
 				result = "unknown tool " + name
@@ -298,7 +445,19 @@ func (e *Engine) verifyOne(ctx context.Context, system string, tools *repoTools,
 			msgs = append(msgs, llms.Message{Role: llms.RoleTool, ToolCallID: call.ID, Content: bound(result)})
 		}
 	}
-	return verifyOutcome{verdict: verdictUncertain, reason: "the checker never submitted a verdict"}
+	return found(verifyOutcome{verdict: verdictUncertain, reason: "the checker never submitted a verdict"})
+}
+
+// recordLookup appends one lookup and its result to the evidence and cuts the
+// evidence back to what a later stage will read. The cut is from the end, so the
+// first lookups, which are the ones that located the code, are the ones kept.
+func recordLookup(b *strings.Builder, name, args, result string) {
+	fmt.Fprintf(b, "%s %s\n%s\n\n", name, args, result)
+	if b.Len() > verifyEvidenceBytes {
+		cut := strings.ToValidUTF8(b.String()[:verifyEvidenceBytes], "")
+		b.Reset()
+		b.WriteString(cut)
+	}
 }
 
 func str(v any) string {

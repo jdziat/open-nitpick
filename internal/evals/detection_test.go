@@ -74,6 +74,7 @@ func degenerateNamed(t *testing.T, want string) func(Fixture) []review.Finding {
 // as detected, and that is a property of two functions in score.go which this
 // test reads directly.
 func TestRecallAndCoverageAreOneReadingOfOneCorpus(t *testing.T) {
+	t.Setenv(EnvSecurity, "")
 	corpus := AllFixtures()
 
 	agg := foldDetection(corpus, halfCalibrated, OurSeverityScale)

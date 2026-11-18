@@ -1,8 +1,12 @@
 # Competitive remediation plan — revised after adversarial review
 
-Status: proposed work, not implementation approval. This document supersedes
+Status: original proposal, subsequently approved for implementation by the user.
+The user also approved Docker runc for hand-picked examples and identified CTO
+signoff as the local agent persona. Study budgets and quality promotion remain
+conditional. This document supersedes
 `docs/plans/2026-11-17-competitive-gaps.md` for discussion. Only this plan is
-being revised; do not commit, stash, reset, or change the existing source work.
+being revised in its original review; implementation work is now authorized.
+Preserve unrelated source work and do not commit, stash, or reset it.
 The user has accepted the learning shape in G3, not every feature or budget.
 
 ## 1. Evidence and corrections

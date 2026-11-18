@@ -1156,7 +1156,7 @@ func TestTheRecordedReasonIsTheRunnersOwn(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
-	got := set.Statuses()
+	got := golangciStatuses(t, set.Statuses())
 	if len(got) != 1 {
 		t.Fatalf("statuses = %+v, want one", got)
 	}

@@ -252,12 +252,18 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	}
 
 	report, err := engine.Review(ctx, ref)
+	if engine.ModelCalls != nil {
+		if report == nil {
+			report = &review.Report{}
+		}
+		report.ModelCalls = engine.ModelCalls()
+	}
 	if err == nil && report.Skipped != "" {
 		fmt.Fprintln(os.Stderr, report.Skipped)
 		actions.setOutputs(resultSkipped, nil)
 		actions.writeSummary(resultSkipped, nil, nil, ref, report.Skipped)
 		if f.format == "json" {
-			return writeJSONReport(os.Stdout, resultSkipped, nil)
+			return writeJSONReport(os.Stdout, resultSkipped, report)
 		}
 		return nil
 	}
@@ -290,12 +296,17 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		actions.writeSummary(resultLimit, report, nil, ref, roundLimitNote(report.Rounds))
 		if f.format == "json" {
 			if werr := writeJSONReport(os.Stdout, resultLimit, report); werr != nil {
-				return werr
+				return errors.Join(errRoundLimit, werr)
 			}
 		}
 		return errRoundLimit
 	default:
-		actions.setOutputs(resultError, nil)
+		actions.setOutputs(resultError, report)
+		if f.format == "json" {
+			if werr := writeJSONReport(os.Stdout, resultError, report); werr != nil {
+				return errors.Join(err, werr)
+			}
+		}
 		return err
 	}
 
@@ -337,6 +348,8 @@ func exitFor(result actionResult) error {
 		return errFindings
 	case resultError:
 		return errIncomplete
+	case resultLimit:
+		return review.ErrRoundLimit
 	default:
 		return nil
 	}
@@ -389,12 +402,14 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 	engine.Models = func(policy *config.Config) (*llm.Roles, error) {
 		usage.reset()
 		roles, err := buildModels(config.WithReviewModelOverrides(policy, nil))
-		if err == nil && (f.profile == "engineering" || policy.Practices.Profile == "engineering") {
+		if err == nil {
 			usage.attach(roles)
 		}
 		return roles, err
 	}
 	engine.ModelUsage = usage.snapshot
+	engine.ModelCalls = usage.calls
+	engine.ObserveCall = usage.observe
 	engine.Instruction = f.instruction
 	engine.Policy = &engineeringReviewPolicy{source: engine.Policy, loaded: cfg, explicit: f.profile == "engineering", selected: func() {
 		engine.Instruction = engineeringPrompt + "\n" + f.instruction
@@ -982,6 +997,9 @@ func runLinters() error {
 
 func truncateTo(s string, n int) string {
 	runes := []rune(s)
+	if n <= 0 {
+		return ""
+	}
 	if len(runes) <= n {
 		return s
 	}

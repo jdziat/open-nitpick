@@ -148,7 +148,7 @@ var unreadable = []string{
 
 // classifySkips splits the planner's skips into the two kinds.
 func classifySkips(report *Report) (routine, unread int) {
-	if report.Plan == nil {
+	if report.Plan == nil || report.DesignExecution != nil {
 		return 0, 0
 	}
 	for _, s := range report.Plan.Skipped {

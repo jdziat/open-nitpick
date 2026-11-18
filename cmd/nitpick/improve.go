@@ -273,7 +273,9 @@ func applyImproveScope(cfg *config.Config) {
 // only by commenting on a pull request could not be scored against the corpus
 // that argues for it existing separately.
 func runImproveCLI(ctx context.Context, args []string) error {
-	return reviewWithScope(ctx, "improve", args, applyImproveScope, nil)
+	return reviewWithScope(ctx, "improve", args, applyImproveScope, func(engine *review.Engine) {
+		engine.Policy = improveScoped{inner: engine.Policy}
+	})
 }
 
 // improveScoped applies the improve scope to whatever policy is resolved.

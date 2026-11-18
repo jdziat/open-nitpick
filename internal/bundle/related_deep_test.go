@@ -1,6 +1,10 @@
 package bundle
 
 import (
+	"go/token"
+	"reflect"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -98,4 +102,83 @@ func TestRelatedRubyResolvesRailsConstants(t *testing.T) {
 	if rubyUnderscore("Billing::RefundV2") != "billing/refund_v2" || rubyUnderscore("HTMLParser") != "html_parser" {
 		t.Errorf("underscore: %q %q", rubyUnderscore("Billing::RefundV2"), rubyUnderscore("HTMLParser"))
 	}
+}
+
+func TestReceiverMethodIndexKeepsExistingHeuristicResults(t *testing.T) {
+	tree := fakeTree{
+		"lib/a.go": "package lib\nfunc (c *Client) Read() {}\nfunc (c PrefixClient) Read() {}\nfunc (c *ClientX) Read() {}\nfunc (c *Client) Write() {}\nfunc (c *Client) hidden() {}\n",
+		"lib/b.go": "package lib\nfunc (c *Client[T]) Read() {}\nfunc (c *Çlient) Read() {}\nfunc\n(c *Client)\tRead() {}\nfunc (c Client ) Write() {}\n",
+	}
+	files := []string{"lib/a.go", "lib/b.go"}
+	for _, receiver := range []string{"Client", "ClientX", "PrefixClient", "Client[T]", "Çlient"} {
+		t.Run(receiver, func(t *testing.T) {
+			c := newRelatedCollector(t.Context(), nil, tree.fetch, tree.list)
+			added := "c.Read(); c.Read(); c.Write(); c.hidden()"
+			got := methodWantRows(c, c.goMethodWants(added, files, receiver))
+			want := methodWantRows(c, referenceReceiverWants(c, added, files, receiver))
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("receiver %s changed lookup\n got %+v\nwant %+v", receiver, got, want)
+			}
+		})
+	}
+}
+
+type methodWantRow struct {
+	File, Name string
+	Uses       int
+	Definition Related
+	Found      bool
+}
+
+func methodWantRows(c *relatedCollector, wants []want) []methodWantRow {
+	rows := make([]methodWantRow, 0, len(wants))
+	for _, w := range wants {
+		content, _ := c.read(w.file)
+		definition, found := w.extract(content, w.name)
+		rows = append(rows, methodWantRow{w.file, w.name, w.uses, definition, found})
+	}
+	slices.SortFunc(rows, func(a, b methodWantRow) int { return strings.Compare(a.File+"."+a.Name, b.File+"."+b.Name) })
+	return rows
+}
+
+// referenceReceiverWants preserves the matcher used before the index so its
+// selection and snippet boundaries remain an independent compatibility oracle.
+func referenceReceiverWants(c *relatedCollector, added string, files []string, typeName string) []want {
+	called := map[string]int{}
+	for _, m := range regexp.MustCompile(`\.([A-Z]\w*)\s*\(`).FindAllStringSubmatch(added, -1) {
+		called[m[1]]++
+	}
+	var wants []want
+	for _, file := range files {
+		content, ok := c.read(file)
+		if !ok {
+			continue
+		}
+		for method, uses := range called {
+			re := regexp.MustCompile("(?m)^func\\s+\\([^)]*\\*?" + regexp.QuoteMeta(typeName) + "\\)\\s+" + regexp.QuoteMeta(method) + "\\(")
+			if re.MatchString(content) {
+				wants = append(wants, want{file: file, name: typeName + "." + method, uses: uses, extract: goMethodDefinition(typeName, method)})
+			}
+		}
+	}
+	return wants
+}
+
+func FuzzReceiverMethodIndexKeepsExistingHeuristic(f *testing.F) {
+	f.Add("func (c *Client) Read() {}\nfunc (c ClientX) Write() {}", "Client")
+	f.Add("func\n(c PrefixClient)\tRead() {}", "Client")
+	f.Add("func (c *Çlient) Read() {}", "Çlient")
+	f.Fuzz(func(t *testing.T, source, receiver string) {
+		if len(source) > 4096 || len(receiver) > 64 || !token.IsIdentifier(receiver) {
+			t.Skip()
+		}
+		tree := fakeTree{"lib/a.go": source}
+		c := newRelatedCollector(t.Context(), nil, tree.fetch, tree.list)
+		added := "x.Read();x.Read();x.Write()"
+		got := methodWantRows(c, c.goMethodWants(added, []string{"lib/a.go"}, receiver))
+		want := methodWantRows(c, referenceReceiverWants(c, added, []string{"lib/a.go"}, receiver))
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("indexed receiver lookup changed selection: got %+v, want %+v", got, want)
+		}
+	})
 }

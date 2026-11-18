@@ -471,6 +471,12 @@ func reviewText(out ReviewOut) string {
 		b.WriteString(" (" + strings.Join(parts, ", ") + ")")
 	}
 	fmt.Fprintf(&b, "; gate %s %s.\n", out.FailOn, map[bool]string{true: "failed", false: "passed"}[out.Failed])
+	if !out.Complete {
+		fmt.Fprintln(&b, "Review incomplete")
+	}
+	if len(out.FailedStages) > 0 {
+		fmt.Fprintf(&b, "Failed stages: %s\n", strings.Join(out.FailedStages, ", "))
+	}
 	findings := append([]Finding(nil), out.Findings...)
 	sort.SliceStable(findings, func(i, j int) bool {
 		ri, rj := config.Severity(findings[i].Severity).Rank(), config.Severity(findings[j].Severity).Rank()

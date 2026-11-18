@@ -9,8 +9,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
+	"github.com/jdziat/open-nitpick/internal/memo"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
@@ -25,14 +27,38 @@ const (
 	toolGrepWidth   = 240
 	toolResultBytes = 6000
 	toolGrepTimeout = 20 * time.Second
+	toolCacheBytes  = 8 << 20
 )
 
 // repoTools is what the verification checker may look at: read-only access to
 // the pull request's files, and search where a git checkout exists.
 type repoTools struct {
-	root     string
-	provider vcs.Provider
-	ref      vcs.Ref
+	root        string
+	provider    vcs.Provider
+	ref         vcs.Ref
+	files       memo.Cache[string, capturedFile]
+	lines       memo.Cache[string, []string]
+	searches    memo.Cache[[2]string, string]
+	grepTimeout time.Duration
+	cacheBytes  atomic.Int64
+	failures    atomic.Uint64
+}
+
+type capturedFile struct {
+	data []byte
+	err  error
+}
+
+func (t *repoTools) retainBytes(size int64) bool {
+	for {
+		used := t.cacheBytes.Load()
+		if size > toolCacheBytes-used {
+			return false
+		}
+		if t.cacheBytes.CompareAndSwap(used, used+size) {
+			return true
+		}
+	}
 }
 
 // newRepoTools reads from root when it is a git checkout, and otherwise from
@@ -43,7 +69,14 @@ func newRepoTools(root string, p vcs.Provider, ref vcs.Ref) *repoTools {
 			root = ""
 		}
 	}
-	return &repoTools{root: root, provider: p, ref: ref}
+	return &repoTools{root: root, provider: p, ref: ref, grepTimeout: toolGrepTimeout}
+}
+
+func (e *Engine) repositoryTools(ref vcs.Ref) *repoTools {
+	if e.lookups != nil {
+		return e.lookups
+	}
+	return newRepoTools(e.RepoRoot, e.Provider, ref)
 }
 
 // canSearch reports whether grep_repo works.
@@ -64,7 +97,14 @@ func (t *repoTools) read(ctx context.Context, path string, start, end int) strin
 	if len(data) > toolReadBytes {
 		return fmt.Sprintf("%s is %d bytes, over the %d byte limit for reading; grep it instead", path, len(data), toolReadBytes)
 	}
-	lines := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
+	lines, err := t.lines.GetIf(ctx, path, func() ([]string, error) {
+		return strings.Split(strings.TrimSuffix(string(data), "\n"), "\n"), nil
+	}, func(lines []string) bool {
+		return t.retainBytes(int64(len(data) + len(lines)*16 + len(path) + 128))
+	})
+	if err != nil {
+		return "no such file: " + path
+	}
 	if start < 1 {
 		start = 1
 	}
@@ -83,6 +123,23 @@ func (t *repoTools) read(ctx context.Context, path string, start, end int) strin
 }
 
 func (t *repoTools) fileBytes(ctx context.Context, path string) ([]byte, error) {
+	result, err := t.files.GetIf(ctx, path, func() (capturedFile, error) {
+		data, loadErr := t.loadFile(ctx, path)
+		if loadErr != nil && !errors.Is(loadErr, vcs.ErrNotFound) && !errors.Is(loadErr, os.ErrNotExist) {
+			return capturedFile{}, loadErr
+		}
+		return capturedFile{data: data, err: loadErr}, nil
+	}, func(file capturedFile) bool {
+		return len(file.data) <= toolReadBytes && t.retainBytes(int64(len(file.data)+len(path)+128))
+	})
+	if err != nil {
+		t.failures.Add(1)
+		return nil, err
+	}
+	return result.data, result.err
+}
+
+func (t *repoTools) loadFile(ctx context.Context, path string) ([]byte, error) {
 	if t.root != "" {
 		full := filepath.Join(t.root, filepath.FromSlash(path))
 		// A symlink in the tree must not lead outside it.
@@ -141,14 +198,32 @@ func (t *repoTools) private(ctx context.Context, rel string) bool {
 // expression. The pattern follows -e and the glob follows --, so neither can
 // be read by git as an option.
 func (t *repoTools) grep(ctx context.Context, pattern, glob string) string {
+	pattern = strings.TrimSpace(pattern)
+	glob = strings.TrimSpace(glob)
+	result, err := t.searches.GetIf(ctx, [2]string{pattern, glob}, func() (string, error) {
+		return t.search(ctx, pattern, glob)
+	}, func(out string) bool {
+		return t.retainBytes(int64(len(out) + len(pattern) + len(glob) + 128))
+	})
+	if err != nil {
+		t.failures.Add(1)
+		if result != "" {
+			return result
+		}
+		return "the search timed out; use a narrower pattern or a path glob"
+	}
+	return result
+}
+
+func (t *repoTools) search(ctx context.Context, pattern, glob string) (string, error) {
 	if !t.canSearch() {
-		return "search is unavailable: there is no git checkout, so read files by path"
+		return "search is unavailable: there is no git checkout, so read files by path", nil
 	}
 	pattern = strings.TrimSpace(pattern)
 	if pattern == "" {
-		return "no pattern given"
+		return "no pattern given", nil
 	}
-	ctx, cancel := context.WithTimeout(ctx, toolGrepTimeout)
+	ctx, cancel := context.WithTimeout(ctx, t.grepTimeout)
 	defer cancel()
 	args := []string{"--no-pager", "grep", "-n", "-E", "-I", "--no-color", "-e", pattern}
 	if g := strings.TrimSpace(glob); g != "" {
@@ -160,13 +235,13 @@ func (t *repoTools) grep(ctx context.Context, pattern, glob string) string {
 	cmd.Stdout, cmd.Stderr = &out, &errOut
 	err := cmd.Run()
 	if ctx.Err() != nil {
-		return "the search timed out; use a narrower pattern or a path glob"
+		return "", ctx.Err()
 	}
 	// git grep exits 1 for "no match", which is an answer and not a failure.
 	var exit *exec.ExitError
 	noMatch := errors.As(err, &exit) && exit.ExitCode() == 1
 	if err != nil && !noMatch {
-		return "the search failed: " + oneLine(strings.TrimSpace(errOut.String()))
+		return "the search failed: " + oneLine(strings.TrimSpace(errOut.String())), err
 	}
 	var lines []string
 	for _, l := range strings.Split(strings.TrimSpace(out.String()), "\n") {
@@ -182,9 +257,9 @@ func (t *repoTools) grep(ctx context.Context, pattern, glob string) string {
 		}
 	}
 	if len(lines) == 0 {
-		return "(no matches)"
+		return "(no matches)", nil
 	}
-	return strings.Join(lines, "\n")
+	return strings.Join(lines, "\n"), nil
 }
 
 // bound caps a tool result at what the checker is given back.

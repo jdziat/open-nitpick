@@ -22,13 +22,17 @@ import json
 import shutil
 from pathlib import Path
 
-SECOND_STAGE = {"the deep-review critique", "a repository check"}
+SECOND_STAGE = {"the deep-review critique", "a repository check", "a decision model"}
 CHECK = "a repository check"
+JEV = "a decision model"
 UNSETTLED = "could not be confirmed against the repository"
 STAGES = {
     "drafted": lambda w: True,
     "afterfilter": lambda w: w.get("withheld_by") in SECOND_STAGE,
     "notrefuted": lambda w: w.get("withheld_by") == CHECK and w.get("reason", "").startswith(UNSETTLED),
+    # What the repository check kept: the posted comments plus what the decision
+    # model withheld, so the arm with and without review.jev come from one run.
+    "afterverify": lambda w: w.get("withheld_by") == JEV,
 }
 
 

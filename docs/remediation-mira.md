@@ -929,6 +929,87 @@ Not tested: other decisions (routing, severity), other question wording or crite
 whole files instead of the checker's evidence. The probe cost $0.02 in total. The probe sent
 public diffs to the same provider as every other call in this work.
 
+### Jev as a decision filter, revisited (unregistered probes, 2026-11-16)
+
+The first probe asked Jev a yes-or-no question about a diff window. It did not use Jev the way
+the model is meant to be used, and this section repeats it with the context a reviewer would have
+and a five-way question. Nothing here was registered before it ran, and the threshold below was
+chosen after the grades were read.
+
+**What Jev was asked.** One choice among `bug`, `error`, `warning`, `info` and `noise`, each with
+a one-line meaning, in that order. The state held the pull request's title and description, the
+changed files, the comment's claim, the reviewer's severity, class, confidence and cited code, what
+the repository check had read and grepped for that comment, the file's diff and the whole file. The
+score is P(bug) + P(error). Each request cost about 0.002 cents.
+
+**Against the Sonnet judge's matched or unmatched labels, 297 R1 comments (95% interval):**
+
+| state and question | AUC |
+|---|---:|
+| yes or no, diff window (the first probe, repeated) | 0.654 (0.59 to 0.72) |
+| yes or no, whole file and the reviewer's facts | 0.668 (0.60 to 0.73) |
+| five-way, diff window, 1 - P(noise) | 0.600 (0.53 to 0.66) |
+| five-way, whole file and facts, P(bug) + P(error) | 0.741 (0.68 to 0.79) |
+| five-way, with the description, the check's lookups and the diff, P(bug) + P(error) | 0.752 (0.69 to 0.80) |
+| the reviewer's own confidence | 0.635 |
+
+Those labels call an unmatched comment wrong, and the blind grade above found about 27% of R1's
+unmatched comments real, so every AUC in the table is biased low.
+
+**Against agent grades.** Ten Claude subagents graded 100 of those comments blind, each with the
+checkout, the pull request's diff and its description, and without labels or scores: 50 sampled
+evenly across Jev's score range, then 50 drawn at random from the rest. Verdicts were real, partly,
+not real or unclear (none were unclear). The first 50 were 15, 14 and 21; the random 50 were 14, 15
+and 21.
+
+| score, against the agent grades | n | AUC |
+|---|---|---:|
+| P(bug) + P(error), real against the rest | 29 against 71 | 0.808 (0.71 to 0.89) |
+| the reviewer's own confidence, real against the rest | 29 against 71 | 0.625 |
+| 1 - P(noise), real and partly against not real | 58 against 42 | 0.755 (0.65 to 0.84) |
+| the reviewer's own confidence, real and partly against not real | 58 against 42 | 0.615 |
+
+On the 100, what each selector keeps, and what it withholds of the 42 not real, 29 real and 29
+partly findings:
+
+| selector | kept | not real withheld | real lost | partly lost | kept precision |
+|---|---:|---:|---:|---:|---:|
+| reviewer confidence at least 0.7 (deep review's floor) | 61 | 20 | 8 | 11 | 0.64 |
+| repository check, confirmed only | 67 | 25 | 3 | 5 | 0.75 |
+| repository check, not refuted | 78 | 19 | 1 | 2 | 0.71 |
+| Jev at least 0.3 | 77 | 16 | 0 | 7 | 0.66 |
+| Jev at least 0.5 | 55 | 22 | 5 | 18 | 0.64 |
+| check confirmed and Jev at least 0.3 | 57 | 29 | 3 | 11 | 0.77 |
+| check not refuted and Jev at least 0.3 | 63 | 27 | 1 | 9 | 0.76 |
+
+Kept precision counts real and partly. The base rate is 0.58. On the random 50 alone the check
+withheld 11 of 21 not real findings and lost 2 of 14 real ones; with Jev at 0.3 after it, 15 of 21
+and 2 of 14.
+
+**Reading.** Jev ranks the agent-graded findings (0.81 for real against the rest) better than the
+reviewer's own confidence does (0.63), and the first probe's conclusion, that it does not help,
+holds for the question and state it used and not for this one. Alone at 0.3 it is a weaker filter
+than the repository check. After the check it withholds 4 more of the 42 not real findings, loses no
+more real ones and loses 6 more partly ones (5 to 11), and kept precision moves from 0.75 to 0.77.
+That is a small gain bought with some partly findings, not a replacement for the check.
+
+**Built as an option.** `review.jev.threshold` (zero, the default, is off) runs after
+`review.verify` and withholds findings whose score is under it, with the score in the reason.
+The check's lookups are handed to Jev as its evidence. A request that fails keeps its finding and
+adds a `jev` entry to the stage list. The key is read from `OPENROUTER_API_KEY` or the variable
+`review.jev.api_key_env` names. The setting is user-config only: it sends source code to OpenRouter
+and spends the operator's key, so a repository's own `.nitpick.yaml` cannot turn it on
+(`docs/trust-model.md`). It is not part of any registered stage and has no ship condition.
+
+**Limits.** One agent family graded, no human checked the verdicts, and `partly` is a judgement.
+The first 50 comments were stratified by an earlier Jev score, so the table's counts are not rates
+for a population, and the threshold of 0.3 was chosen after seeing them. The comments are R1
+findings from a single call, not deep review's drafts, and the deep critique is not in the table.
+The check in the table is `tools/bakeoff/verify_filter.py` with DeepSeek V4.1 Flash, the prototype
+of the Go stage, and its lookups were rerun after a first run lost its verdicts to a write
+error, so the evidence Jev saw came from the first run and the check's verdicts from the second.
+Jev's answers carry sampling noise that was not measured here: one decision a comment.
+
 ### Correction: tool semantics at the posted stage
 
 The tool-semantics line above reported drafts only. At the posted stage, 20 tuning PRs,
@@ -1277,6 +1358,36 @@ under the old judge now means the same quantity rescored by GPT-6.1 Sol.
 
 A two-case smoke (calcom-1, keycloak-4) ran all three. On Mira's comments, Sol and Luna
 matched Sonnet's counts and Terra counted one fewer true positive on calcom-1.
+
+#### Judge calibration (unregistered, 2026-11-16)
+
+The judge was to be the one model, of Sol, Terra, Luna and GPT-4o mini, that scores closest to a
+human. The benchmark's methodology says its judge "has not been formally calibrated against human
+annotations", so there was no data to pick from, and one was built.
+
+The 1,228 match prompts stored from scoring D6v under Sol were sent unchanged, with the scorer's
+own settings, to the other three. Sol, Terra and Luna agreed on 99.1% to 99.7% of them (they split
+on 13 pairs). GPT-4o mini agreed with them 83% of the time and called 29.7% of pairs a match
+against 12.5% to 13.4%. A sample of 60 pairs was labelled: all 13 GPT-6 splits, 37 of the 202
+pairs where only GPT-4o mini differs, and 5 unanimous matches and 5 unanimous non-matches. The
+labels are a majority of three Claude agents that saw only the two texts, not a human's: the owner
+asked for the agents to label them. Two pairs had no majority and were left out; the agents agreed
+on 56 of 60, and on the one pair the owner labelled by hand.
+
+| judge | agreement with the labels, weighted to the 1,228 | 95% interval | pairs differing |
+|---|---:|---|---:|
+| Sol | 0.9962 | 0.9933 to 0.9990 | about 5 |
+| Luna | 0.9952 | 0.9923 to 0.9981 | about 6 |
+| Terra | 0.9942 | 0.9913 to 0.9971 | about 7 |
+| GPT-4o mini | 0.8317 | 0.8288 to 0.8345 | about 207 |
+
+GPT-4o mini was wrong on all 37 sampled pairs where it alone differed, which it matched and the
+labels did not. On the 11 labelled pairs where the three GPT-6 models split, Sol agreed with the
+labels on 7, Luna on 6 and Terra on 5. Sol is the closest and is the judge from here; Sol, Luna and
+Terra are within 1 to 2 pairs of each other, which the intervals do not separate, so the choice of
+Sol over Luna (a twentieth of the cost) rests on it being the registered primary and nominally the
+closest, not on a measured gap. Limits: model labellers, 11 informative pairs, and the pairs come
+from candidates of one arm (D6v) on the tuning set.
 
 #### Rescored under the new judges
 
@@ -1922,6 +2033,352 @@ Terra and Luna, paired against D1c and against Mira's two passes.
   against the projection, and cost and median time a review against D1c's $0.047 to $0.053 and 200
   to 235 seconds.
 
+### D7: Mira's adapted prompts, with the repository check and Jev as the selection (registered 2026-11-16, before it runs)
+
+The owner asked on 2026-11-16 to adopt and adapt Mira's prompts and combine them with the Jev
+filter, to see whether the result beats Mira. D3m put Mira's prompts in this pipeline and reached
+Mira's F1 on the tuning set, not on the fresh one (F7: D3m minus Mira -0.031 under Sol, and the
+condition for adopting the prompts failed by 0.011). D6v, the repository check as the selection,
+is registered above and has no score, because its scoring did not start. Jev, above, ranked
+agent-graded findings better than the reviewer's own confidence, and after the check it withheld
+4 more of 42 not real findings on R1 findings.
+
+**Build.** Working tree `c131b3cdb335ebc6c960257f78c8c47d138527c0` on `89736ff`, uncommitted: the `review.jev` stage, the
+`review.deep.prompts` option and the adapted prompts (`internal/prompt/templates/deep_mira_*.md`,
+attributed in `NOTICE`). The adaptation is a re-do from Mira's templates at `04d3491`, since
+D3m's script was lost with its scratch directory, so D3m's own prompt text is not reproduced
+byte for byte. Changes from Mira's text: names, the severity scale, the category map, the tool
+names and the Mira-only fields; the language footgun lists are not included. The agents'
+prompts keep this tool's voice, persona and tool-note layers after the base.
+`tools/bakeoff/d7-mira-jev.yaml`: `review.deep.prompts: mira`, `review.verify: confirmed`,
+`review.jev.threshold: 0.3`, confidence floor 0, critique off. The threshold was chosen on R1
+findings, not on this corpus. DeepSeek V4.1 Flash in every role, Jev `~typesafe/jev-latest`
+through OpenRouter.
+
+**Contamination, and why the fresh corpus is the test.** Mira's prompts name patterns that match
+golden comments of Martian tuning pull requests: the security prompt's `X-Frame-Options:
+ALLOWALL`, `indexOf` origin check and `postMessage` target-origin patterns match discourse-4's
+three golden comments, and the negative-slice-offset footgun in its Python list matches sentry-1
+and sentry-2's. A tool that carries those prompts is helped on those cases, and the Martian
+tuning and held-out sets have been read. D7 is therefore not run on them, no held-out gate is
+made, and the claim is made on the fresh corpus of F7 only: 30 pull requests from other
+repositories that neither tool has seen. The footgun lists, which are the likeliest carrier of
+this, are the part of Mira's prompt not adopted. The security prompt's patterns are adopted.
+
+**Run.** Three passes on the 30 fresh pull requests from one run each. The stage sets are rebuilt
+from it with `deep_funnel.py`: drafted, after the check (posted plus what Jev withheld) and
+posted. Scored by Sol, with Mira's three stored fresh passes rescored in the same invocation (Mira
+is not re-run) and D3m's stored fresh passes beside them, paired. Amended 2026-11-16, before any D7
+score was read: Terra and Luna are not run, after the judge calibration above picked Sol.
+
+- **Claim "beats Mira":** posted F1 under Sol above Mira's with the paired 95% interval over pull
+  requests excluding zero. A point lead with an interval that includes zero is reported as level.
+- **Recommend as a combination:** posted F1 under Sol at or above Mira's as a point comparison.
+  Below it, the prompts, the check and Jev stay options and none becomes a default.
+- **Keep Jev in the combination:** posted F1 at least 0.01 above the after-check F1, under Sol,
+  from the same drafts. Otherwise Jev is reported as adding nothing on deep drafts.
+- **Fidelity of the re-adaptation:** D7's drafted F1 within 0.03 of D3m's drafted F1 on this
+  corpus, under Sol. Below that the re-adaptation lost something D3m had, and the result is read
+  as that of these prompts and not of D3m's.
+- **Validity:** D1c's limits on failed agents and on forced submissions sent again without
+  reasoning, and more than 5% of checks or Jev requests that could not run. An arm past a limit
+  is reported and not ranked. An incomplete review is re-run once and both runs are reported.
+- **Reported with it:** the check's verdict counts, Jev's score for every finding from the stored
+  logs and a sweep of the threshold from 0.2 to 0.7 (exploratory, not used to choose one), the
+  share of true and false drafts each stage kept, and median time a review.
+
+#### D7 result: the check alone is level with Mira, and Jev lowers F1
+
+Three passes on the 30 fresh pull requests, scored by Sol, with Mira's stored passes and D3m's
+beside them. One review in 15 timed out at the runner's 900 seconds in its first run (`py-1` in all
+three passes, `java-1`, `ts-1` and `rb-5` in one each); each was run once more with 2,400 seconds,
+all finished, and the first runs were not scored.
+
+| arm | precision | recall | F1 | F1 minus Mira (95% interval) |
+|---|---:|---:|---:|---|
+| Mira | 27.6% | 8.5% | 0.130 | |
+| D3m posted | 19.0% | 6.7% | 0.099 | not computed |
+| D3m drafted | 15.5% | 18.8% | 0.170 | not computed |
+| D7 drafted | 12.9% | 16.0% | 0.142 | not computed |
+| D7 after the check (the same drafts, before Jev) | 19.6% | 12.4% | 0.152 | +0.022 (-0.054, +0.096) |
+| D7 posted (check, then Jev at 0.3) | 18.2% | 8.9% | 0.119 | -0.011 (-0.084, +0.060) |
+
+Under the core profile the same differences from Mira are +0.006 (-0.083, +0.096) after the check
+and -0.022 (-0.108, +0.066) posted. After the check minus posted: F1 +0.033 (+0.002, +0.073) and
+recall +3.5 points (+1.0, +7.1).
+
+- **Beats Mira:** no. Posted F1 is 0.119 against 0.130 and the interval includes zero.
+- **Recommend as a combination:** no, for the same reason.
+- **Keep Jev:** no. Posted F1 is 0.033 below the after-check F1, against a bar of 0.01 above it.
+- **Fidelity of the re-adaptation:** met, narrowly. D7's drafted F1 is 0.142 against D3m's 0.170,
+  0.028 under, inside the 0.03.
+- **Validity:** 0 of 278 checks could not run, and 0 of 186 Jev requests failed. Of 228 agent runs,
+  186 ended on a forced submission, 33 of those were sent again at low effort and 17 with reasoning
+  off: 9.1% of forced submissions, 7.5% of agent runs, over the 5% limit on the strict reading. D7 is
+  reported and not ranked, and the result above is a measurement of this build and not a ranking.
+
+What each stage kept, pooled over the three passes: the check kept 35 of 45 matched drafts (78%) and
+144 of 305 unmatched ones (47%), from 278 verdicts (186 confirmed, 52 refuted, 40 uncertain). Jev
+then kept 25 of those 35 matched findings (71%) and 112 of the 144 unmatched (78%), so it withheld
+a larger share of the findings that matched than of those that did not. A sweep of its threshold
+from the stored scores (approximate; at 0.3 it reproduces the scored 0.119) gives F1 0.152 with no
+threshold, 0.137 at 0.2, 0.119 at 0.3, 0.106 at 0.4, 0.102 at 0.5, 0.091 at 0.6 and 0.062 at 0.7:
+no threshold raises F1. Median time a review was 347 seconds, re-runs included.
+
+Jev scored the R1 findings in the section above better than the reviewer's own confidence. On this
+build's findings it does not help, which is the second time a result on one kind of finding did
+not carry to another here. `review.jev` stays an off-by-default option, and its configuration text
+now says so.
+
+The owner asked for the check-only arm to be evaluated as a run of its own. That choice was made
+after this result was read, so the after-check row is a reading chosen from three, and is not
+confirmed by it.
+
+### D7c: check only (registered 2026-11-16, before it runs)
+
+D7 with `review.jev` off: Mira's adapted prompts, the repository check as the selection, floor and
+critique off (`tools/bakeoff/d7c-mira-check.yaml`). The binary is D7's, so the code and prompts are
+the same working tree, and the corpus is the same 30 fresh pull requests with three new passes
+and a 1,800 second limit. Because the arm was chosen after D7 was read and the pull requests are
+the ones it was read on, D7c replicates a chosen arm with fresh draws. It is not a clean test, and
+a claim about Mira needs pull requests nobody has read.
+
+- **Claim "beats Mira":** posted F1 under Sol above Mira's with the paired 95% interval over pull
+  requests excluding zero. A point lead with an interval that includes zero is reported as level.
+- **Replication:** posted F1 within 0.03 of D7's after-check 0.152. Further away, the D7 reading
+  was a draw and is not carried forward.
+- **Validity:** D7's, on the strict reading. D7 was over the 5% limit on reasoning fallbacks, and
+  the same agents run here, so an arm over it is reported and not ranked.
+- **Reported with it:** the check's verdict counts, the share of matched and unmatched drafts kept,
+  and median time a review.
+
+#### D7c result: ahead of Mira at a point, level on the interval, and over the validity limit
+
+Three new passes on the same 30 fresh pull requests, scored by Sol, with Mira's stored passes and
+D7's after-check reading beside them. All 90 reviews finished (median 336 seconds).
+
+| arm | precision | recall | F1 | F1 minus Mira (95% interval) |
+|---|---:|---:|---:|---|
+| Mira | 27.6% | 8.5% | 0.130 | |
+| D7c drafted | 14.9% | 17.0% | 0.159 | not computed |
+| D7c posted (check only) | 20.4% | 14.9% | 0.172 | +0.042 (-0.053, +0.136) |
+| D7 after the check, for comparison | 19.6% | 12.4% | 0.152 | +0.022 (-0.054, +0.096) |
+
+Under the core profile D7c is 0.178 against Mira's 0.152, +0.026 (-0.081, +0.136). D7c minus D7's
+after-check reading is +0.020 (-0.028, +0.070).
+
+- **Claim "beats Mira":** not made. The point lead is +0.042 and the interval includes zero, so it is
+  level.
+- **Replication:** met. D7c's 0.172 is 0.020 from D7's after-check 0.152, inside the 0.03.
+- **Validity:** not met. Of 188 forced submissions, 19 (10.1%; 8.3% of the 228 agent runs) were sent
+  again with reasoning off, and 39 at low effort, over the 5% limit. D7c is reported and not ranked,
+  as D7 was. No check failed to run (286 verdicts: 208 confirmed, 46 refuted, 32 uncertain).
+
+The check kept 42 of 48 matched drafts (88%) and 164 of 275 unmatched ones (60%), and raised F1 from
+0.159 to 0.172. Both D7 readings of the check agree on its direction and are within noise of each
+other. Across the two runs the arm sits 0.022 and 0.042 above Mira's 0.130 at a point, with intervals
+reaching from -0.05 to +0.14 on 30 pull requests, and it is read on the pull requests it was
+chosen on. What this record supports is that Mira's adapted prompts with the repository check are not
+below Mira on this corpus, and not that they are above it.
+
+### LS1: language-server call sites in the prompt (registered 2026-11-16, after the runs started and before any result was read)
+
+The agents find callers with `grep_repo`, which matches text. A language server resolves them: the
+references of a function, method or type, exact for Go and Python where a name is common. The test
+is whether giving the reviewer that, on a sample of Martian items, changes what it finds.
+
+**Build.** An experiment-grade client (`internal/lsp`, a scratch copy outside the repository),
+`gopls` 0.24.0 for Go and `pyright` for Python. Two ways of offering it were tried first. As tools
+the agent may call (`find_references`, `go_to_definition`) it was offered and never called, in 42
+calls over two reviews, with the instruction in the system prompt and after the tools were named
+in the lookup section; called directly with a short prompt the same model uses it at once. So the
+arm tested here does not depend on the agent choosing: before the batch is sent, the engine finds
+the definitions the diff adds and the functions its hunks sit in, asks the server for their
+references (at most 10 symbols and 8 call sites each) and adds them to the batch prompt as a
+"Call sites from the language server" section. TypeScript was not tested: `tsserver` loads one
+project at a time, and the callers in a monorepo like cal.com live in other projects.
+
+**Sample.** Eight Martian tuning pull requests, grafana-1, 2, 4 and 5 (Go) and sentry-1, 2, 4 and 5
+(Python). One of their 28 golden comments names callers, an override or a signature (matched by
+`caller|call site|callsite|invoker|subclass|override|implementer|signature|all usages|other
+places|other callers`, fixed before any run), so the benchmark rewards this little.
+
+**Arms.** One binary, with and without `NITPICK_EXP_LSP_CONTEXT=1`; deep review at its defaults with
+this tool's own prompts; DeepSeek V4.1 Flash in every role; three passes of each; scored by Sol
+over these 8 pull requests only, paired.
+
+- **Helps:** pooled F1 under Sol at least 0.03 above the baseline's, with recall not lower. Any
+  other result is no evidence of help, and on 8 pull requests an interval that includes zero is
+  reported as level.
+- **Reported with it:** F1, precision and recall per arm, recall on the one caller golden comment,
+  the server's start time and median query time, how often a query returned nothing, and the
+  change in review time.
+
+#### LS1 result: the call sites did not help, and the point estimate is lower
+
+Three passes of 8 Martian tuning pull requests (grafana-1, 2, 4, 5 in Go; sentry-1, 2, 4, 5 in
+Python), with and without the language server's call sites in the batch prompt, from one binary,
+scored by Sol. All 48 reviews finished.
+
+| arm | precision | recall | F1 | F1 minus baseline (95% interval) |
+|---|---:|---:|---:|---|
+| baseline | 57.4% | 41.7% | 0.483 | |
+| call sites from the language server | 54.7% | 34.5% | 0.423 | -0.059 (-0.153, +0.045) |
+
+Recall is 7.1 points lower (-20.6, +3.7) and precision 2.7 points lower. By pass the F1 is 0.333,
+0.435 and 0.490 with the call sites against 0.480, 0.490 and 0.478 without, so the third pass is
+level and the loss comes from the first two. By pull request the true findings fell most on sentry-2
+(10 to 5) and rose on grafana-1 (5 to 7). The loss is concentrated: by pass sentry-2 is -2, -3 and 0
+true findings, which is 5 of the net 6 lost, and without it the arms are level (net -1 over 21
+case-passes). The call sites also came with fewer findings, 2.21 a review against 2.58. So the
+direction is not established: what the 8 pull requests show is that nothing was gained.
+
+- **Helps:** no. The registered bar was F1 at least 0.03 above the baseline's with recall not
+  lower; F1 is 0.059 below and recall is lower. The interval includes zero, so the result is "no
+  evidence of help", with a negative point estimate, on 8 pull requests.
+- **The server:** `gopls` 0.24.0 and `pyright` answered all 195 queries with no error, in a median of
+  718 ms, and 18 of them (9%) found nothing, mostly Python methods reached through untyped values.
+  Review time was 219 seconds with the call sites and 211 without, so the cost is small.
+- **Offered as tools it was not used.** `find_references` and `go_to_definition` were offered to the
+  deep-review agents, named in their lookup section and called for in their instructions, and in 42
+  calls over two reviews the agents made none, all to `grep_repo` and `read_file`. A replay of one
+  agent turn against the API with the real system prompt, tool list and diff gave the same, with the
+  instruction repeated in the user message and the tools renamed; a short prompt with the same tools
+  has the model call `find_references` at once. The long prompt and the diff win.
+- **Why little was to be gained.** One of the 28 golden comments in these pull requests concerns
+  callers, an override or a signature. The benchmark rewards call-site analysis very little, so a
+  corpus of defects that depend on callers is what would test the idea, and this one cannot.
+- **Not tested:** TypeScript (`tsserver` loads one project at a time, so callers in other packages
+  of a monorepo are missed unless those projects are open), Java and Ruby. No plan for further
+  languages was written, because the condition for one, a result that helps, was not met.
+
+#### Reasoning step-downs in deep review: the logs, and three fixes that did not help (unregistered, 2026-11-16)
+
+Over 456 agent runs in D7 and D7c (Mira's prompts) and 138 in D6v (this tool's prompts), 82% and 80%
+ended on a forced submission. Every failed forced attempt (108 of them) was `finish=length` with
+empty content: the model spent the 65,536-token budget thinking and wrote nothing, and each failure
+costs about 65,000 tokens. Of the 36 agent runs that fell to reasoning off, 24 were agents that
+stopped before using their turns (25 of all early stops came after one turn with no lookups), and 31
+were the general agent. Step-downs rose with the size of the transcript: 2% under 60,000 prompt
+tokens, 16% to 18% above 140,000. Agents that used all 10 turns fell to reasoning off 4% of the
+time. The general agent fell 13.6% of the time under Mira's prompts (31 of 228) and 2.9% under this
+tool's (2 of 69), on different corpora.
+
+Three fixes were tried on the 12 pull requests with the most step-downs, against an unpatched
+baseline run beside them, 40 agent runs each: Plan A, convert a prose answer with reasoning off;
+Plan B, require a tool call every turn; Plan C, a 65,536-token cap on every turn.
+
+| arm | reasoning off | low effort | failed attempts | completion tokens | median review |
+|---|---:|---:|---:|---:|---:|
+| baseline | 6 | 9 | 15 | 2.30M | 416 s |
+| A, convert prose | 8 | 10 | 18 | 2.32M | 498 s |
+| B, require a tool | 10 | 12 | 22 | 2.52M | 528 s |
+| C, cap every turn | 9 | 11 | 21 | 3.51M | 614 s |
+
+None reduced the step-downs and each made reviews slower. Plan A never ran: `converted` was 0 in all
+40 runs, so the agents that stop early are not answering in prose, and the cause of their early
+stop is not known. At 40 runs per arm the step-down counts do not separate the arms. Lowering
+`review.deep.reasoning` is the lever not tried.
+
+### LS2: language-server call sites on injected caller defects (registered 2026-11-17, before it runs)
+
+LS1 found no gain on Martian items, where 1 of 28 golden comments concerns callers. The owner asked
+to try it on defects it should help with first. Real ones are too few to use: a broad keyword match
+over the 173 Martian and 94 fresh golden comments finds a handful, and few of those are defects in
+callers. So the defects are injected, with ground truth known exactly.
+
+**Cases.** 12 pull requests of one commit each, made on checkouts of the Martian grafana-1 (Go) and
+sentry-1 (Python) trees. A function with 2 to 10 non-test callers in at least 2 other files, found
+by the language server, has its signature changed and nothing else: a required trailing parameter
+added (`retry bool` in Go, `retry` or keyword-only `*, retry` in Python), or its last parameter
+removed. The callers are left as they were. Three Go and three Python functions are easy, a name
+that `git grep -w` finds about as many times as the server finds references (ratio under 1.5), and
+three of each are hard, a common name where text search is noisy (ratio from 4.4 to 634). A rename
+was left out: at the new state the old name has no references to resolve, so a server cannot help
+without indexing the base as well. The callers each server found are the ground truth.
+
+**Arms.** One binary, with and without `NITPICK_EXP_LSP_CONTEXT=1` (the call sites of the functions
+the diff defines, in the prompt, as in LS1); deep review at its defaults with this tool's own
+prompts; DeepSeek V4.1 Flash in every role; two passes of each, 24 reviews an arm.
+
+**Scoring** is by string match, with no judge. A review **flags the defect** when a posted finding
+is anchored within 3 lines of the changed line and names the function or says the signature,
+parameter or argument is wrong. It **names a caller** when a posted finding names the function and
+the path or file name of one of its true callers.
+
+- **Helps:** callers named in at least 6 more of the 24 reviews than the baseline's (0.25), with
+  the defect flagged in no fewer.
+- **Reported with it:** both rates by tier (easy and hard) and language, how many true callers a
+  review names, and the paired counts.
+
+#### LS1 correction (2026-11-17): the Python half was a cold-start artifact, and the corrected result is level
+
+In the LS1 run `pyright` was asked within a second of starting. It answers nothing for about the
+first 30 seconds (0 references at once, 12 after 30 seconds, for a function with 10 callers), and
+the prompt section said "no references the server can resolve", so most Python queries told the
+reviewer that nothing called what the change touched. `gopls` blocks until it has loaded and was not
+affected. The four sentry pull requests were run again, three passes, with the integration asking
+again every 5 seconds, for up to 4 minutes, while an answer was empty: 135 queries, 12 of them never
+answered (9%).
+
+| arm | precision | recall | F1 | F1 minus baseline (95% interval) |
+|---|---:|---:|---:|---|
+| baseline | 57.4% | 41.7% | 0.483 | |
+| call sites, server cold (the run above) | 54.7% | 34.5% | 0.423 | -0.059 (-0.153, +0.045) |
+| call sites, server warm | 62.3% | 39.3% | 0.482 | -0.001 (-0.070, +0.070) |
+
+F1 by pass is 0.489, 0.478 and 0.478. Precision is 4.9 points higher (-3.6, +17.9) and recall 2.4
+lower (-10.0, +4.6); true findings on sentry-2 are 8 against the baseline's 10 (5 cold). The warm
+result is level and the registered bar of +0.03 is still not met. The cost is in the retry: 486
+repeated queries, and each of the 12 symbols the server never answered waited the 4 minutes.
+
+### LS2 result: no gain on injected caller defects, and the first scoring was too strict
+
+Twelve injected signature changes, two passes of each arm, 24 reviews an arm. The first run had the
+cold `pyright` above and was repeated with the warm integration (the baseline did not use a server
+and was not repeated). The first scorer required a finding to name the function and to give a
+caller's full path or its directory and file. The findings name callers by file and line
+(`database.go:196`) and often leave the function name out of the text, so it undercounted both
+arms. It was replaced after the outputs had been read, with a match on any posted finding anchored
+within 3 lines of the changed line that says the signature, parameter or argument is wrong, and on
+a caller named by path or by `file:line`. The corrected scorer is applied to every arm alike, and
+the first scorer's numbers are given beside it.
+
+| arm | flags the defect | names a caller | mean share of callers named |
+|---|---:|---:|---:|
+| baseline | 22 of 24 | 15 of 24 | 0.51 |
+| call sites, server cold (void for Python) | 21 of 24 | 17 of 24 | 0.57 |
+| call sites, server warm | 22 of 24 | 16 of 24 | 0.56 |
+| first scorer: baseline, warm | 18 of 24, 18 of 24 | 9 of 24, 8 of 24 | |
+
+By tier, easy names: the baseline names a caller in 10 of 12 reviews (share 0.83), the warm arm in 10
+of 12 (0.81). Hard names, where text search is noisy: 5 of 12 (0.19) against 6 of 12 (0.31). By
+language, Go 6 of 12 against 5 of 12, Python 9 of 12 (0.61) against 11 of 12 (0.74). Paired by case
+and pass, the warm arm names a caller in 3 reviews where the baseline does not, and the baseline in
+2 where it does not, with 13 in both; the defect is flagged in the same 22 reviews by both.
+
+- **Helps:** no. The registered bar was callers named in 6 more of the 24 reviews; the difference is
+  1.
+- **Why the test could not show it.** The baseline already flags the defect in 22 of 24 reviews and
+  names callers in 15, with `grep_repo`. A change of one signature line is visible in the diff: a
+  removed parameter the body still uses, a new one nothing uses. The reviews that missed it
+  (`NewWorkerPool`, `WriteErrOrFallback`) were not rescued, with the right callers in the prompt
+  in `WriteErrOrFallback`'s case.
+- **Where there is a hint.** On names a text search matches many times, the share of callers named
+  rose from 0.19 to 0.31 (names a caller 5 of 12 to 6 of 12). It is 12 reviews and not tested.
+- **The server's answers, against the callers mined from it at start-up** (the ground truth, so
+  itself incomplete where the server was): 5 of 5 and 2 of 2 callers for the two Go functions with
+  concrete callers, 1 of 4 for `Read` (callers through an interface are not references of the
+  method that implements it), 0 of 3 and 0 of 2 for `List` and `DecryptedValues`, no query at all
+  for `NewWorkerPool`, and for Python 12 against 10, 9 of 9, 2 of 2, 3 of 3, 1 against 9
+  (`redact_source_secrets`) and 38 against 8 (`from_object`, a name shared by many classes).
+- **What was not tested:** a rename or a removal, which needs the base indexed as well; behaviour
+  changes whose callers are not visibly wrong; TypeScript, Java and Ruby.
+
+Across LS1 and LS2 a language server gave no measured gain on Martian items or on defects chosen
+for it. Whether a defect that only the call sites reveal, in a diff that does not show it, would
+change that is not tested here, and no plan for more languages was written.
+
 ### What this means for the goal
 
 Deep review is built: two agents a batch that read the repository over up to ten turns,
@@ -1950,6 +2407,11 @@ yet beat Mira.
   fresh one: the drafted sets there score 0.172 and 0.141, above Mira's posted 0.130, and the
   posted ones 0.099 and 0.056. What our agents find is not the limit on that corpus. What the
   stages then keep is, and it needs a measure that holds on both.
+- On 2026-11-16 the owner adopted Mira's prompts as an option (`review.deep.prompts: mira`, not the
+  default). With the repository check as the selection and no Jev (D7c) the arm scores 0.172 on the
+  fresh corpus against Mira's 0.130 (+0.042, interval -0.053 to +0.136): level with Mira, not ahead,
+  and over the validity limit on reasoning fallbacks (10.1% of forced submissions against 5%). Jev
+  lowered F1 on these drafts (D7). The next test is on pull requests nobody has read.
 
 #### Before deep review, judged by Sonnet 4.5
 

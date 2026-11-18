@@ -57,10 +57,11 @@ func TestCleanReviewDoesNotCallTriage(t *testing.T) {
 // executed has to say so, or "no findings" reads as a clean bill of health.
 func TestCleanReviewStillPublishesItsNotices(t *testing.T) {
 	model := &scriptedLLM{fallback: `{"findings":[]}`}
-	provider := &stubProvider{diff: engineDiff}
+	provider := &stubProvider{diff: incrementalDiff}
 
 	engine := newEngine(t, model, provider, func(cfg *config.Config) {
 		cfg.Review.Summary = true
+		cfg.Review.MaxFiles = 1
 	})
 
 	report, err := engine.Review(context.Background(), vcs.Ref{})
@@ -68,10 +69,12 @@ func TestCleanReviewStillPublishesItsNotices(t *testing.T) {
 		t.Fatalf("Review: %v", err)
 	}
 
-	report.Incomplete = []string{"app.go"}
+	if report.Plan == nil || len(report.Plan.Skipped) == 0 {
+		t.Fatal("file cap left no skipped-file notice to render")
+	}
 
 	rendered := Render(report, nil, engine.Config)
-	if !strings.Contains(rendered.Summary, "incomplete") {
+	if !strings.Contains(rendered.Summary, "exceeded review.max_files: other.go") {
 		t.Errorf("an incomplete clean review published no notice:\n%s", rendered.Summary)
 	}
 }

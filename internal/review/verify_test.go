@@ -400,7 +400,7 @@ func TestAnalyzerFindingsAreNeverChecked(t *testing.T) {
 	checker := &toolLLM{}
 	e, _ := verifyEngine(t, checker, config.VerifyConfirmed)
 	fs := []Finding{{Path: "app.go", Line: 4, Severity: "error", Title: "gosec", FromAnalyzer: true}}
-	kept, withheld, stages := e.verifyFindings(context.Background(), vcs.Ref{}, fs, nil)
+	kept, withheld, _, stages := e.verifyFindings(context.Background(), vcs.Ref{}, fs, nil)
 	if checker.calls != 0 || len(kept) != 1 || len(withheld) != 0 || len(stages) != 0 {
 		t.Errorf("calls %d kept %d withheld %d stages %v, want the analyzer finding kept without a call", checker.calls, len(kept), len(withheld), stages)
 	}

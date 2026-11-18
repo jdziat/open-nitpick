@@ -34,6 +34,7 @@ const residualApproveSchema = `{
 // judgeResidualApprove asks the triage model whether residual findings still
 // allow APPROVE. Failures leave ResidualApprove false (comment).
 func (e *Engine) judgeResidualApprove(ctx context.Context, report *Report) {
+	ctx = llm.WithCallRole(ctx, "approval")
 	if report == nil || e.Config == nil || !residualJudgeEligible(report, e.Config) {
 		return
 	}

@@ -22,6 +22,14 @@ import (
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
 
+func TestEmptyFixtureAllowlistRetainsTheDefaultCorpus(t *testing.T) {
+	t.Setenv(EnvFixtures, " , , ")
+	got, err := OptionsFromEnv()
+	if err != nil || len(got.Fixtures) != len(Fixtures()) {
+		t.Fatalf("empty filter silently removed the corpus: %d fixtures, err %v", len(got.Fixtures), err)
+	}
+}
+
 // TestPlantedDefectsPointAtRealLines validates the corpus itself.
 //
 // Every Defect.Line was hand-counted, and four of five were wrong, one pointed
@@ -3967,14 +3975,6 @@ func TestIncumbentObjectiveSeverityOnTheShippedCache(t *testing.T) {
 	// no cache was edited, and a tuning fixture with a cache that is NOT in this
 	// list would silently move the pinned totals underneath them.
 	//
-	// WHAT THIS COSTS, stated because the number below is quoted elsewhere: the
-	// incumbent's severity reading now covers EIGHT of the sixteen tuning
-	// fixtures, not all of them, and the eight it omits are exactly the warning,
-	// nit and info plants. Its 2/3/2 is therefore a statement about the corpus
-	// as it stood when it was collected, which was already the honest reading
-	// of it, since it was never a cross-tool score, and it is not evidence
-	// about how the incumbent rates the three levels this corpus previously
-	// could not resolve. Answering that takes a collection run.
 	// Every tuning fixture the incumbent has a cached review for. It was the
 	// original eight until the corpus was re-collected over all thirty; leaving
 	// it stale would compute the totals below over a corpus that no longer

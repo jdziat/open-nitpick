@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -14,6 +18,32 @@ import (
 	"github.com/jdziat/open-nitpick/internal/converse"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
+
+func TestCodeownersAtBaseUsesAValidPullRequestRef(t *testing.T) {
+	base := strings.Repeat("a", 40)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch strings.TrimPrefix(r.URL.Path, "/api/v3") {
+		case "/repos/o/r/pulls/7":
+			_ = json.NewEncoder(w).Encode(map[string]any{"base": map[string]string{"sha": base}})
+		case "/repos/o/r/contents/.github/CODEOWNERS":
+			if r.URL.Query().Get("ref") != base {
+				t.Errorf("CODEOWNERS was not read from the base: %s", r.URL)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]string{"type": "file", "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte("*.go @alice\n"))})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	forge, err := vcs.NewGitHub(vcs.GitHubOptions{Token: "test", BaseURL: server.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	owners, found, err := ownersAtBase(t.Context(), forge, vcs.Ref{Owner: "o", Repo: "r", Number: 7}, "app.go")
+	if err != nil || !found || len(owners) != 1 || owners[0] != "@alice" {
+		t.Fatalf("base owners = %v, found=%v, err=%v", owners, found, err)
+	}
+}
 
 type fakeDismissalForge struct {
 	author  string

@@ -142,7 +142,7 @@ func (a actionsEnv) setOutputs(result actionResult, report *review.Report) {
 	if report != nil {
 		// A limited run read nothing, which is not a finished review however
 		// empty its report looks.
-		complete = report.PipelineComplete() && result != resultLimit
+		complete = report.PipelineComplete() && result != resultLimit && result != resultError
 		stages = strings.Join(report.FailedStages(), ",")
 	}
 	if report != nil && report.Rounds != nil {
@@ -197,9 +197,9 @@ func (a actionsEnv) writeSummary(result actionResult, report *review.Report, ren
 		findings := append([]review.Finding(nil), report.Findings...)
 		sort.SliceStable(findings, func(i, j int) bool { return findings[i].Sev().Rank() > findings[j].Sev().Rank() })
 		for _, f := range findings {
-			where := fmt.Sprintf("`%s:%d`", f.Path, f.Line)
+			where := review.PathSpan(fmt.Sprintf("%s:%d", f.Path, f.Line))
 			if ref.Owner != "" && ref.Number > 0 {
-				where = fmt.Sprintf("[`%s:%d`](https://github.com/%s/%s/pull/%d/files)", f.Path, f.Line, ref.Owner, ref.Repo, ref.Number)
+				where = fmt.Sprintf("[%s](https://github.com/%s/%s/pull/%d/files)", review.PathSpan(fmt.Sprintf("%s:%d", f.Path, f.Line)), ref.Owner, ref.Repo, ref.Number)
 			}
 			fmt.Fprintf(&b, "| %s | %s | %s |\n", f.Sev(), where, mdCell(f.Title))
 		}
@@ -278,6 +278,13 @@ func resultFor(report *review.Report, gate config.Severity) actionResult {
 	}
 	if report.Failed(gate) {
 		return resultFindings
+	}
+	for _, findings := range [][]review.Finding{report.Findings, report.AlreadyReported} {
+		for _, finding := range findings {
+			if finding.Sev().AtLeast(gate) {
+				return resultFindings
+			}
+		}
 	}
 	return resultClean
 }

@@ -10,7 +10,6 @@
 package evals
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"sort"
@@ -59,7 +58,7 @@ func TestPromptsDetectPlantedDefects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("options: %v", err)
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// The corpus is named, not just counted. A held-out table and a tuning
 	// table were textually identical, so the generalization number could not be

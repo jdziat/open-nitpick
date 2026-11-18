@@ -89,6 +89,11 @@ func TestAlreadyReportedMatchesByFingerprintOrPlace(t *testing.T) {
 	if alreadyReported(far, prior) {
 		t.Error("the same class twenty lines away is a different finding")
 	}
+	otherClass := reworded
+	otherClass.Class = "resource"
+	if alreadyReported(otherClass, prior) {
+		t.Error("a different class at the same place is a different finding")
+	}
 	if alreadyReported(f, nil) {
 		t.Error("nothing is already reported when nothing is known")
 	}
@@ -113,7 +118,7 @@ func TestStandingFindingsAreRecheckedWithoutDuplicateComments(t *testing.T) {
 		prior: &vcs.PriorReview{Head: "old", Comments: []vcs.PriorComment{
 			{Path: "app.go", Line: 4, Fingerprint: Fingerprint(appFinding), Class: "correctness"},
 		}},
-		changed: []string{"app.go"},
+		changed: []string{"other.go"},
 		ok:      true,
 	}
 
@@ -125,11 +130,11 @@ func TestStandingFindingsAreRecheckedWithoutDuplicateComments(t *testing.T) {
 	if report.Incremental == nil {
 		t.Fatal("expected an incremental note")
 	}
-	if got := strings.Join(report.Incremental.Reviewed, ","); got != "app.go" {
-		t.Errorf("reviewed = %q, want only the changed file that also carries the standing comment", got)
+	if got := strings.Join(report.Incremental.Reviewed, ","); got != "app.go,other.go" {
+		t.Errorf("reviewed = %q, want changed file and separately widened standing file", got)
 	}
-	if got := strings.Join(report.Incremental.Unchanged, ","); got != "other.go" {
-		t.Errorf("unread files = %v, want other.go left out: it neither changed nor carries a standing comment", got)
+	if got := strings.Join(report.Incremental.Unchanged, ","); got != "" {
+		t.Errorf("unread files = %v, want none: changed and standing files were read", got)
 	}
 	if !report.Incremental.Recheck {
 		t.Error("expected Recheck: a standing comment widened the scope")
@@ -145,7 +150,7 @@ func TestStandingFindingsAreRecheckedWithoutDuplicateComments(t *testing.T) {
 		t.Errorf("published head = %q", provider.published.Head)
 	}
 	if !strings.Contains(provider.published.Summary, "already posted") ||
-		!strings.Contains(provider.published.Summary, "or still carrying findings from it") {
+		!strings.Contains(provider.published.Summary, "because findings from the review") {
 		t.Errorf("summary does not disclose the incremental review:\n%s", provider.published.Summary)
 	}
 	if len(provider.published.Comments) != 0 {

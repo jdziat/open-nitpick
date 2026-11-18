@@ -280,6 +280,14 @@ func reviewAnalyzerCheck(files []standards.File, report *review.Report, cfg *con
 	for _, uncovered := range report.Uncovered {
 		c.State, c.Reason = practices.Partial, "analyzer reported incomplete coverage: "+string(uncovered.Reason)
 	}
+	if cfg.Linters.Mode != config.LinterOff {
+		for _, name := range cfg.Linters.Enabled {
+			if _, ok := described[name]; !ok {
+				c.State, c.Reason = practices.Unavailable, "unknown enabled analyzer: "+name
+				break
+			}
+		}
+	}
 	for _, finding := range report.AnalyzerFindings {
 		c.Findings = append(c.Findings, practices.Finding{Rule: finding.Source, Target: practices.Target{Kind: practices.FileTarget, ID: finding.Path, Line: finding.Line}, Title: finding.Title,
 			Rationale: finding.Rationale, Remedy: finding.Suggestion, Severity: finding.Severity, Blocking: true, Sources: []string{finding.Source}})

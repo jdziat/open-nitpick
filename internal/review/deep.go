@@ -75,23 +75,45 @@ lost.`, maxTurns)
 }
 
 // deepAgents builds the configured agents over the review's system prompt.
-// The security agent extends that prompt instead of replacing it, so both
-// agents file findings in the same shape.
-func (e *Engine) deepAgents(system string) ([]deepAgent, error) {
+// Under the default prompts the security agent extends that prompt instead of
+// replacing it, so both agents file findings in the same shape. Under
+// review.deep.prompts: mira each agent has its own prompt, built over the same
+// layers.
+func (e *Engine) deepAgents(client *llm.Client, system string) ([]deepAgent, error) {
 	deep := e.Config.Review.Deep
 	agents := make([]deepAgent, 0, len(deep.Agents))
 	for _, name := range deep.Agents {
-		text := system
-		if name == config.DeepAgentSecurity {
-			focus, err := prompt.DeepSecurity()
-			if err != nil {
-				return nil, err
-			}
-			text = strings.TrimRight(system, "\n") + "\n\n" + focus
+		text, err := e.deepAgentPrompt(client, name, system)
+		if err != nil {
+			return nil, err
 		}
 		agents = append(agents, deepAgent{name: name, system: text + deepToolNote(deep.MaxTurns)})
 	}
 	return agents, nil
+}
+
+// deepAgentPrompt is the system prompt one agent reviews under, before the
+// tool note is appended.
+func (e *Engine) deepAgentPrompt(client *llm.Client, agent, system string) (string, error) {
+	security := agent == config.DeepAgentSecurity
+	if e.Config.Review.Deep.Prompts == config.DeepPromptsMira {
+		base, err := prompt.DeepMiraGeneral()
+		if security {
+			base, err = prompt.DeepMiraSecurity()
+		}
+		if err != nil {
+			return "", err
+		}
+		return e.reviewPromptBase(client, base)
+	}
+	if !security {
+		return system, nil
+	}
+	focus, err := prompt.DeepSecurity()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimRight(system, "\n") + "\n\n" + focus, nil
 }
 
 // deepOutcome says how a batch's deep review went, beyond its findings.
@@ -166,7 +188,8 @@ func (n *deepNotes) stages() []StageStatus {
 // agent could review, for want of a checkout to search or because every agent
 // failed, is left to the ordinary single call. Either way the report says so.
 func (e *Engine) deepReviewBatch(ctx context.Context, client *llm.Client, msgs []llms.Message, classes []string) (Result, deepOutcome) {
-	if !newRepoTools(e.RepoRoot, e.Provider, vcs.Ref{}).canSearch() {
+	tools := e.repositoryTools(vcs.Ref{})
+	if !tools.canSearch() {
 		e.log().Warn("deep-review needs a git checkout to search; reviewing from the diff alone")
 		e.deepNotes.ranWithoutTools("no git checkout to search")
 		return Result{}, deepOutcome{degraded: true}
@@ -177,7 +200,7 @@ func (e *Engine) deepReviewBatch(ctx context.Context, client *llm.Client, msgs [
 		e.deepNotes.ranWithoutTools("no system prompt")
 		return Result{}, deepOutcome{degraded: true}
 	}
-	agents, err := e.deepAgents(msgs[at].Content)
+	agents, err := e.deepAgents(client, msgs[at].Content)
 	if err != nil {
 		e.log().Warn("deep-review agents could not be built; reviewing from the diff alone", "error", err)
 		e.deepNotes.ranWithoutTools("agents could not be built")
@@ -193,7 +216,6 @@ func (e *Engine) deepReviewBatch(ctx context.Context, client *llm.Client, msgs [
 			defer wg.Done()
 			convo := slices.Clone(msgs)
 			convo[at].Content = agent.system
-			tools := newRepoTools(e.RepoRoot, e.Provider, vcs.Ref{})
 			results[i], errs[i] = e.runDeepAgent(ctx, client, agent.name, convo, classes, tools)
 		}()
 	}
@@ -239,6 +261,7 @@ func (r *agentRun) add(u llms.Usage) {
 // fails is asked to submit over the transcript it has, because what it read is
 // in that transcript. Only a first turn that fails outright fails the agent.
 func (e *Engine) runDeepAgent(ctx context.Context, client *llm.Client, name string, msgs []llms.Message, classes []string, tools *repoTools) (Result, error) {
+	ctx = llm.WithCallRole(ctx, "deep_agent")
 	schema, err := findingsSchema(classes)
 	if err != nil {
 		return Result{}, err
@@ -302,7 +325,8 @@ func (e *Engine) runDeepAgent(ctx context.Context, client *llm.Client, name stri
 			break
 		}
 		msgs = append(msgs, llms.Message{Role: llms.RoleAssistant, Content: resp.Content, ToolCalls: resp.ToolCalls, Reasoning: resp.Reasoning})
-		for _, call := range resp.ToolCalls {
+		answers := lookupTurn(ctx, tools, resp.ToolCalls, len(resp.ToolCalls))
+		for i, call := range resp.ToolCalls {
 			fn, args, raw := "", map[string]any{}, ""
 			if call.Function != nil {
 				fn, raw = call.Function.Name, call.Function.Arguments
@@ -323,7 +347,13 @@ func (e *Engine) runDeepAgent(ctx context.Context, client *llm.Client, name stri
 				continue
 			}
 			run.lookups++
-			result, ok := runLookup(ctx, tools, fn, args)
+			var result string
+			ok := i < len(answers)
+			if ok {
+				result = answers[i]
+			} else {
+				result, ok = runLookup(ctx, tools, fn, args)
+			}
 			switch {
 			case !ok:
 				result = "unknown tool " + fn
@@ -389,6 +419,7 @@ type forcedRung struct {
 // reply in prose gets one more request at the same step. The agent is given up
 // only when the ladder runs out or the call itself fails.
 func (e *Engine) forceSubmission(ctx context.Context, client *llm.Client, msgs []llms.Message, ladder []forcedRung, outOfTurns bool, run *agentRun) (Result, error) {
+	ctx = llm.WithCallRole(ctx, "deep_forced_submission")
 	text := forcedSubmitPrompt
 	if outOfTurns {
 		text = "You have used your turns. " + text

@@ -12,6 +12,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -69,7 +71,12 @@ type Client struct {
 
 	// retries receives the SDK's retry callback. Nil on a client built for a
 	// test, which bypasses the resilience wrapper entirely.
-	retries *retryLog
+	retries  *retryLog
+	observed *observedLLM
+
+	// replay answers a request it has already paid for from disk. Nil unless
+	// the operator set EnvResponseCache.
+	replay *replayLLM
 }
 
 // Provider returns the configured provider name.
@@ -127,7 +134,27 @@ func BuildContext(ctx context.Context, spec config.ModelSpec) (*Client, error) {
 	// and the Client needs the resilient client, so the logger cannot be known
 	// yet. It arrives later through setLog.
 	rl := &retryLog{model: spec.Provider + "/" + spec.Model}
-	resilient := resilience.NewResilientClient(client,
+	observed := &observedLLM{inner: client, model: spec.Model}
+	var inner llms.LLM = observed
+	var replay *replayLLM
+	if dir := strings.TrimSpace(os.Getenv(EnvResponseCache)); dir != "" {
+		switch spec.Provider {
+		case ProviderOpenRouter:
+			cfg, err = openRouterConfig(cfg, os.Getenv)
+		case ProviderSynthetic:
+			cfg, err = syntheticConfig(cfg, os.Getenv)
+		}
+		if err != nil {
+			return nil, err
+		}
+		namespace, err := replayNamespace(spec, cfg)
+		if err != nil {
+			return nil, err
+		}
+		replay = newReplayLLM(observed, filepath.Join(dir, namespace))
+		inner = replay
+	}
+	resilient := resilience.NewResilientClient(inner,
 		resilience.WithMaxRetries(maxRetries),
 		resilience.WithOnRetry(rl.observe))
 
@@ -136,7 +163,7 @@ func BuildContext(ctx context.Context, spec config.ModelSpec) (*Client, error) {
 		mode = config.StructuredAuto
 	}
 
-	return &Client{LLM: resilient, Spec: spec, mode: mode, stallRetries: maxRetries, fallback: fallback, retries: rl}, nil
+	return &Client{LLM: resilient, Spec: spec, mode: mode, stallRetries: maxRetries, fallback: fallback, retries: rl, observed: observed, replay: replay}, nil
 }
 
 // NewClientForTest wraps an arbitrary SDK client, bypassing provider
@@ -206,10 +233,12 @@ func (r *Roles) Each(fn func(*Client)) {
 		return
 	}
 	seen := map[*Client]bool{}
-	visit := func(c *Client) {
+	var visit func(*Client)
+	visit = func(c *Client) {
 		if c != nil && !seen[c] {
 			seen[c] = true
 			fn(c)
+			visit(c.Fallback())
 		}
 	}
 	for _, c := range []*Client{r.Review, r.Triage, r.Validate, r.Router} {

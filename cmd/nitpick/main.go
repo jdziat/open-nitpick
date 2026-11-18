@@ -90,6 +90,8 @@ func run() int {
 		err = runProviders()
 	case "knowledge-index":
 		err = runKnowledgeIndex(ctx, os.Args[2:], os.Stdout)
+	case "learn":
+		err = runLearnings(ctx, os.Args[2:], os.Stdout)
 	case "config-reference":
 		err = runConfigRef(os.Args[2:], os.Stdout)
 	case "version", "--version", "-v":
@@ -172,6 +174,8 @@ Usage:
   nitpick auth set <provider>      Store a provider credential in the OS keystore
   nitpick explain-config [flags]   Show the resolved configuration and prompts
   nitpick providers                List available model providers
+  nitpick learn draft|accept [flags]
+                                   Propose and individually accept repository references; activation requires trusted-base policy
   nitpick linters                  List the deterministic analyzers and how each is configured
   nitpick config-reference         Print every configuration key, its type and its default
   nitpick version                  Print the version
