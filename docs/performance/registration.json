@@ -330,5 +330,25 @@
     "idempotence": "Stable job id per (pass, finding id, prompt sha256, model alias); exclusive receipt per job; terminal receipts reused across binary and script versions; per-request response cache keyed by request hash; an unresolved purchase keeps its reservation and never auto-retries.",
     "stop": "Stop on the first HTTP error, missing usage cost, unparseable label, or receipt mismatch. No automatic retry, no model sweep.",
     "open_source_alternative": "Not used for the retained packet: its findings come from this tool on third-party repositories and have no public labels. Public labeled corpora would measure a different task and need a separate registration."
+  },
+  "phase4_llm_label_panel": {
+    "registered_before_purchase": true,
+    "decision": "Operator asked for several models from different providers through OpenRouter to label the retained examples (2026-11-18).",
+    "models": [
+      "anthropic/claude-haiku-5.5",
+      "google/gemini-4-hydrogen",
+      "openai/gpt-6.2-sol",
+      "mistralai/mistral-large-4-0",
+      "qwen/qwen4-max"
+    ],
+    "scope": "Each model labels each of the 15 retained findings once (valid/invalid/uncertain), seeing only the file path and finding text, with the same prompt. Added to the existing deepseek labels, giving six providers.",
+    "label_provenance": "MODEL-GENERATED. Providers differ, so errors are less correlated than two prompts to one model, but the models share training data and see no code. Agreement between them is not ground truth and supports no precision, recall or quality claim.",
+    "budget": {
+      "ceiling_usd": 5,
+      "phase_ceiling_usd": 25,
+      "total_ceiling_usd": 100
+    },
+    "idempotence": "Job id = hash(model, finding id, prompt sha256); exclusive receipt per job; terminal receipts reused across script versions; pending file blocks reruns; no automatic retry. A failed job is recorded and skipped, other models continue.",
+    "stop": "Stop when spend reaches the ceiling or on any unresolved pending job."
   }
 }
