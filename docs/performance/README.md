@@ -142,3 +142,6 @@ observation, not a latency, quality or p95 baseline. Fast-review was not run bec
 this model rejects disabled reasoning. Reported new spend is 0.0077 USD.
 
 [Large-tree smoke](phase6-large-tree-smoke.json) ran the two model-free commands once on the Go standard library (7,711 Go files, 1.9 million lines): standards in 4.2 s and 218 MB peak, slop -no-model in 17.1 s and 401 MB peak, both exiting 0. It is one run per command on a shared host with no spend. It shows the commands scale to that size; it is not a baseline, and the model-backed modes were not run at this scale.
+
+[LLM-generated labels](phase4-llm-labels.json) replace the blank human slots for the 15 retained examples, as the operator approved. Two prompts of deepseek-flash read each finding without the code. Across 30 labels: 10 valid, 2 invalid, 18 uncertain, and the two passes agree on 5 of 15. This is one model family checking itself, not ground truth: it supports no precision, recall or quality claim, and the examples are hand-picked rather than a fresh holdout. Spend was 0.028 USD. The operator-timing and temporal-feedback CSVs measure human editing time and later maintainer feedback, so a model cannot fill them and they stay empty.
+

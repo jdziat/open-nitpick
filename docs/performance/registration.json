@@ -314,5 +314,21 @@
     "stop": "Any incomplete or unpriced result retains reservation and stops further live purchases. No automatic provider retry or model/configuration sweep.",
     "replay": "After a successful complete purchase, replay the same corpus/config using the retained older binary under a kernel filter denying IPv4/IPv6 sockets. Cache miss must fail without another purchase.",
     "acceptance": "Live result and reported per-role usage/cost if provided; exact cached response receipts; network-denied older-binary replay. N=1 compatibility/cost observation, never a provider p95 or quality study."
+  },
+  "phase4_llm_labels": {
+    "registered_before_purchase": true,
+    "decision": "Operator approved LLM-generated labels (or open-source labeled data) in place of human labels, and ~deepseek/deepseek-flash-latest as the model, on 2026-11-18.",
+    "model": "~deepseek/deepseek-flash-latest via OpenRouter, a moving alias; the resolved model id from each response is recorded. List price 0.036 USD per million input, 0.5 per million output.",
+    "scope": "Two independent labelling passes over the 15 retained hand-picked examples in human-review-packet.json, labels valid/invalid/uncertain, each pass sees one finding at a time plus the repository path and no other pass output. Output is stored beside the packet, never inside the human slots.",
+    "label_provenance": "MODEL-GENERATED. These are not human labels and are not independent of model-family errors. They can show whether the model agrees with itself and with its own prior, and they cannot establish ground truth, precision or recall. Any claim built on them must say so.",
+    "budget": {
+      "max_reserved_usd": 1,
+      "phase": "P4",
+      "phase_ceiling_usd": 25,
+      "total_ceiling_usd": 100
+    },
+    "idempotence": "Stable job id per (pass, finding id, prompt sha256, model alias); exclusive receipt per job; terminal receipts reused across binary and script versions; per-request response cache keyed by request hash; an unresolved purchase keeps its reservation and never auto-retries.",
+    "stop": "Stop on the first HTTP error, missing usage cost, unparseable label, or receipt mismatch. No automatic retry, no model sweep.",
+    "open_source_alternative": "Not used for the retained packet: its findings come from this tool on third-party repositories and have no public labels. Public labeled corpora would measure a different task and need a separate registration."
   }
 }
