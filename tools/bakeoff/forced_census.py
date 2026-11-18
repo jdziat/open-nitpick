@@ -31,8 +31,8 @@ def census(lines):
             failed += 1
         elif 'msg="every deep-review agent failed; reviewing the batch from the diff alone"' in line:
             fallbacks += 1
-    forced = [a for a in agents if a["forced"] == "true"]
-    completion = sum(int(a["completion_tokens"]) for a in agents)
+    forced = [a for a in agents if a.get("forced") == "true"]
+    completion = sum(int(a.get("completion_tokens", 0)) for a in agents)
     return {
         "agents": len(agents),
         "agents_lost": failed,

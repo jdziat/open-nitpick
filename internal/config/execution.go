@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"path"
 
 	"github.com/jdziat/open-nitpick/internal/execution"
 )
@@ -81,6 +82,9 @@ func (e Execution) validate() error {
 	for _, claim := range e.Claims {
 		if claim.Kind != "go_build_failure" || claim.CheckIndex < 0 || claim.CheckIndex >= len(e.Checks) || e.Checks[claim.CheckIndex].Kind != "go_build" || claim.Path == "" || claim.Head == "" || !validDigest(claim.FindingSHA256) {
 			return errors.New("execution.claims needs an exact finding, revision, path and go_build profile")
+		}
+		if path.Dir(claim.Path) != e.Checks[claim.CheckIndex].Package {
+			return errors.New("execution.claims path is outside the package its go_build profile builds")
 		}
 	}
 	return nil

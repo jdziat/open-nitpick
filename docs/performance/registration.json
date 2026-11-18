@@ -324,7 +324,7 @@
     "budget": {
       "max_reserved_usd": 1,
       "phase": "P4",
-      "phase_ceiling_usd": 25,
+      "phase_ceiling_usd": 10,
       "total_ceiling_usd": 100
     },
     "idempotence": "Stable job id per (pass, finding id, prompt sha256, model alias); exclusive receipt per job; terminal receipts reused across binary and script versions; per-request response cache keyed by request hash; an unresolved purchase keeps its reservation and never auto-retries.",
@@ -345,7 +345,7 @@
     "label_provenance": "MODEL-GENERATED. Providers differ, so errors are less correlated than two prompts to one model, but the models share training data and see no code. Agreement between them is not ground truth and supports no precision, recall or quality claim.",
     "budget": {
       "ceiling_usd": 5,
-      "phase_ceiling_usd": 25,
+      "phase_ceiling_usd": 10,
       "total_ceiling_usd": 100
     },
     "idempotence": "Job id = hash(model, finding id, prompt sha256); exclusive receipt per job; terminal receipts reused across script versions; pending file blocks reruns; no automatic retry. A failed job is recorded and skipped, other models continue.",

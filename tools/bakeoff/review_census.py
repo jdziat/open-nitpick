@@ -39,7 +39,7 @@ def summarize(path):
         if attempt.get("started_at"):
             start = datetime.datetime.fromisoformat(attempt["started_at"].replace("Z", "+00:00"))
             started.append(start)
-            ended.append(start + datetime.timedelta(milliseconds=attempt["duration_ms"]))
+            ended.append(start + datetime.timedelta(milliseconds=attempt.get("duration_ms", 0)))
     failed = report.get("failed_stages", [])
     severity = collections.Counter(finding["severity"] for finding in report.get("findings", []))
     return {
@@ -50,7 +50,7 @@ def summarize(path):
         "complete_without_failed_stages": report.get("complete") is True and not failed,
         "severity_counts": dict(severity),
         "attempts": len(attempts),
-        "failed_attempts": sum(attempt["failed"] for attempt in attempts),
+        "failed_attempts": sum(bool(attempt.get("failed")) for attempt in attempts),
         "missing_usage_attempts": missing_usage,
         "unknown_cost_attempts": unknown_cost,
         "reported_cost_usd_lower_bound": float(sum(costs, decimal.Decimal(0))),

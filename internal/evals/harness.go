@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -386,10 +387,11 @@ func OptionsFromEnv() (Options, error) {
 	}
 
 	if raw := strings.TrimSpace(os.Getenv(EnvRuns)); raw != "" {
-		var n int
-		if _, err := fmt.Sscanf(raw, "%d", &n); err == nil && n > 0 {
-			opts.Runs = n
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			return opts, fmt.Errorf("%s=%q: want a positive integer", EnvRuns, raw)
 		}
+		opts.Runs = n
 	}
 
 	if raw := strings.TrimSpace(os.Getenv(EnvFixtures)); raw != "" {
