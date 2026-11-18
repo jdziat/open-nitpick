@@ -105,7 +105,7 @@ func ownersAtBase(ctx context.Context, gh dismissalForge, ref vcs.Ref, path stri
 	if err != nil {
 		return nil, false, fmt.Errorf("could not resolve the base revision to read CODEOWNERS from: %w", err)
 	}
-	at := vcs.Ref{Owner: ref.Owner, Repo: ref.Repo, Head: base}
+	at := vcs.Ref{Owner: ref.Owner, Repo: ref.Repo, Number: ref.Number, Head: base}
 	for _, p := range vcs.CodeownersPaths {
 		data, err := gh.FileContent(ctx, at, p)
 		if errors.Is(err, vcs.ErrNotFound) {

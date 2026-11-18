@@ -114,20 +114,30 @@ func TestFindingsOnUnchangedLinesAreDropped(t *testing.T) {
 }
 
 func TestOnlyChangedLinesIsConfigurable(t *testing.T) {
+	const source = "diff --git a/app.go b/app.go\n--- a/app.go\n+++ b/app.go\n@@ -1,2 +1,2 @@\n-old\n+new\n unchanged\n"
 	cfg := baseConfig()
 	cfg.Linters.OnlyChangedLines = false
 
 	set := New(".", cfg, nil)
 	set.runners = []Runner{&fakeRunner{name: "fake", detected: true, findings: []Finding{
-		{Path: "app.go", Line: 1, Message: "changed", Severity: config.SeverityWarning},
+		{Path: "app.go", Line: 2, Message: "unchanged", Severity: config.SeverityWarning},
 	}}}
 
-	got, err := set.Run(context.Background(), parse(t, changedDiff))
+	got, err := set.Run(context.Background(), parse(t, source))
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if len(got) != 1 {
 		t.Errorf("findings = %d, want 1", len(got))
+	}
+	cfg.Linters.OnlyChangedLines = true
+	set = New(".", cfg, nil)
+	set.runners = []Runner{&fakeRunner{name: "fake", detected: true, findings: []Finding{
+		{Path: "app.go", Line: 2, Message: "unchanged", Severity: config.SeverityWarning},
+	}}}
+	got, err = set.Run(context.Background(), parse(t, source))
+	if err != nil || len(got) != 0 {
+		t.Fatalf("changed-line filtering = %+v, err %v; want no findings", got, err)
 	}
 }
 

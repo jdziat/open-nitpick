@@ -60,11 +60,14 @@ code demonstrates. The evidence after each is a band, not a count: run
 `nitpick standards` for the exact numbers and for the contested probes, and
 `make agents` to regenerate this block.
 
-- Name a test after the behaviour it pins, in at least three words. (every site of 1000+ places)
-- Open an exported declaration's doc comment with the declaration's own name. (every site of 800+ places)
-- Put context.Context first in the parameter list. (every site of 300+ places)
+- Name a test after the behaviour it pins, in at least three words. (every site of 2000+ places)
+- Open an exported declaration's doc comment with the declaration's own name. (every site of 900+ places)
+- Put context.Context first in the parameter list. (every site of 400+ places)
 - Wrap an error you are formatting into a new one with %w, not %v or %s. (every site of 200+ places)
 - Call t.Helper() at the top of a test helper. (every site of 100+ places)
+- Name Python functions and methods in snake_case. (every site of 100+ places)
 - Return named results explicitly; do not use a bare return. (every site of 60+ places)
+
+1 probe(s) have sites here and do not clear the floor, so they are not rules: python-class-pascal-case. `nitpick standards` has their counts.
 
 <!-- nitpick:standards:end -->

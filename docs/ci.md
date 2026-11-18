@@ -1,5 +1,9 @@
 # GitHub Actions and other CI
 
+The optional [selected execution pilot](guide/execution-evidence.md) attaches
+baseline/candidate evidence to authorized fix proposals. It is operator-enabled
+and does not change the default review or approval policy.
+
 Running the reviewer on a runner rather than from a terminal: the Action and
 the workflow it goes in, the inputs and permissions it needs, what an
 incremental review is, what a fork changes, and the same review as a plain CLI
@@ -238,8 +242,8 @@ than the repository root.
 | `allow-degraded-triage` | `false` | when only triage failed, publishes the findings, applies `fail-on` and reports `result: degraded` instead of exiting 2 |
 | `version` | `latest` | release tag or `latest`; falls back to building the Action checkout when its release is unavailable |
 | `analyzers` | empty | catalog names to install, comma separated; `auto` selects ones for changed languages; empty uses runner tools |
-| `command` | `review` | `review`, `fast-review`, or `respond` |
-| `args` | none | flags passed to `review` and `fast-review` |
+| `command` | `review` | `review`, `fast-review`, `deep-review`, or `respond`; `deep-review` needs the repository checked out and makes many times the model calls |
+| `args` | none | flags passed to `review`, `fast-review` and `deep-review` |
 
 ### What a run does
 

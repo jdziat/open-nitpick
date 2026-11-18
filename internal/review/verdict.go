@@ -110,7 +110,7 @@ func (e *Engine) applyVerdict(f *Finding, v Verdict) {
 	// Skip when the anchor moved: the replacement was written for the line
 	// triage saw, and moveAnchor has already made f.Line equal to it, so the
 	// comparison has to be against the line the reviewer anchored.
-	if strings.TrimSpace(v.Suggestion) != "" && v.Line == reviewerLine {
+	if strings.TrimSpace(v.Suggestion) != "" && (v.Line == 0 || v.Line == reviewerLine) {
 		f.Suggestion = v.Suggestion
 		// A replacement written for the anchored line alone must not inherit
 		// a wider range the reviewer's own suggestion covered: a shorter

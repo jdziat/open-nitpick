@@ -1,0 +1,6 @@
+# R13: R1 (the default batches of 6 files and 60,000 tokens) with the same room
+# to finish thinking as R12, so batch size is the only difference between them.
+models:
+  default:
+    max_tokens: 131072
+    timeout: 20m

@@ -12,9 +12,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
@@ -54,6 +57,11 @@ type Client struct {
 	// batch, and a config that lowers one has no reason to want the other.
 	stallRetries int
 
+	// noTemperature is set once a router has refused a request because no
+	// endpoint for the model takes a temperature. It is per client, so the
+	// refusal is paid for once and not on every call.
+	noTemperature atomic.Bool
+
 	// clock replaces time.Now for the retry budget. Nil outside tests.
 	clock func() time.Time
 
@@ -63,7 +71,12 @@ type Client struct {
 
 	// retries receives the SDK's retry callback. Nil on a client built for a
 	// test, which bypasses the resilience wrapper entirely.
-	retries *retryLog
+	retries  *retryLog
+	observed *observedLLM
+
+	// replay answers a request it has already paid for from disk. Nil unless
+	// the operator set EnvResponseCache.
+	replay *replayLLM
 }
 
 // Provider returns the configured provider name.
@@ -121,7 +134,27 @@ func BuildContext(ctx context.Context, spec config.ModelSpec) (*Client, error) {
 	// and the Client needs the resilient client, so the logger cannot be known
 	// yet. It arrives later through setLog.
 	rl := &retryLog{model: spec.Provider + "/" + spec.Model}
-	resilient := resilience.NewResilientClient(client,
+	observed := &observedLLM{inner: client, model: spec.Model}
+	var inner llms.LLM = observed
+	var replay *replayLLM
+	if dir := strings.TrimSpace(os.Getenv(EnvResponseCache)); dir != "" {
+		switch spec.Provider {
+		case ProviderOpenRouter:
+			cfg, err = openRouterConfig(cfg, os.Getenv)
+		case ProviderSynthetic:
+			cfg, err = syntheticConfig(cfg, os.Getenv)
+		}
+		if err != nil {
+			return nil, err
+		}
+		namespace, err := replayNamespace(spec, cfg)
+		if err != nil {
+			return nil, err
+		}
+		replay = newReplayLLM(observed, filepath.Join(dir, namespace))
+		inner = replay
+	}
+	resilient := resilience.NewResilientClient(inner,
 		resilience.WithMaxRetries(maxRetries),
 		resilience.WithOnRetry(rl.observe))
 
@@ -130,7 +163,7 @@ func BuildContext(ctx context.Context, spec config.ModelSpec) (*Client, error) {
 		mode = config.StructuredAuto
 	}
 
-	return &Client{LLM: resilient, Spec: spec, mode: mode, stallRetries: maxRetries, fallback: fallback, retries: rl}, nil
+	return &Client{LLM: resilient, Spec: spec, mode: mode, stallRetries: maxRetries, fallback: fallback, retries: rl, observed: observed, replay: replay}, nil
 }
 
 // NewClientForTest wraps an arbitrary SDK client, bypassing provider
@@ -200,10 +233,12 @@ func (r *Roles) Each(fn func(*Client)) {
 		return
 	}
 	seen := map[*Client]bool{}
-	visit := func(c *Client) {
+	var visit func(*Client)
+	visit = func(c *Client) {
 		if c != nil && !seen[c] {
 			seen[c] = true
 			fn(c)
+			visit(c.Fallback())
 		}
 	}
 	for _, c := range []*Client{r.Review, r.Triage, r.Validate, r.Router} {
@@ -390,17 +425,64 @@ func BuildRolesContext(ctx context.Context, cfg *config.Config) (*Roles, error) 
 }
 
 // CallOptions renders the spec's generation parameters as SDK call options.
-func (c *Client) CallOptions() []llms.CallOption {
+func (c *Client) CallOptions() []llms.CallOption { return callOptions(c.Spec, c.noTemperature.Load()) }
+
+// CallOptionsWith is CallOptions with the temperature and the reasoning level
+// chosen by the caller, for a stage that samples differently from the model's
+// own configuration. A nil temperature or an empty level keeps the model's.
+func (c *Client) CallOptionsWith(temperature *float64, reasoning config.ReasoningLevel) []llms.CallOption {
+	spec := c.Spec
+	if temperature != nil {
+		spec.Temperature = temperature
+	}
+	if reasoning != "" {
+		spec.Reasoning = reasoning
+	}
+	return callOptions(spec, c.noTemperature.Load())
+}
+
+// OmitsTemperature reports whether this client has learned that its model takes
+// no temperature, so a caller building its own options leaves one out.
+func (c *Client) OmitsTemperature() bool { return c.noTemperature.Load() }
+
+// RejectsTemperature reports whether err is OpenRouter's refusal of a request
+// whose temperature no endpoint for the model takes, which require_parameters
+// turns into a failed review on the newest OpenAI and Anthropic models. A caller
+// that sees true sends the call again with [WithoutTemperature]. It only
+// classifies: the router's words name no parameter, so the client learns that
+// its model takes none from a retry that succeeds, through [Client.NoteNoTemperature].
+func (c *Client) RejectsTemperature(err error, call []llms.CallOption) bool {
+	if err == nil || llms.ApplyOptions(call...).Temperature == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no endpoints found") && strings.Contains(msg, "parameters")
+}
+
+// NoteNoTemperature records that a call without a temperature succeeded where
+// the same call with one was refused, so later calls leave the temperature out
+// from the start.
+func (c *Client) NoteNoTemperature() { c.noTemperature.Store(true) }
+
+// WithoutTemperature returns call with its temperature unset. Options apply in
+// order, so appending the unset is enough and no earlier option is edited.
+func WithoutTemperature(call []llms.CallOption) []llms.CallOption {
+	return append(slices.Clone(call), func(o *llms.CallOptions) { o.Temperature = nil })
+}
+
+// callOptions renders a spec's generation parameters as SDK call options. A
+// temperature the model has been found to refuse is left out.
+func callOptions(spec config.ModelSpec, omitTemperature bool) []llms.CallOption {
 	var opts []llms.CallOption
 
-	if c.Spec.Temperature != nil {
-		opts = append(opts, llms.WithTemperature(*c.Spec.Temperature))
+	if spec.Temperature != nil && !omitTemperature {
+		opts = append(opts, llms.WithTemperature(*spec.Temperature))
 	}
-	if r, ok := reasoningOption(c.Spec.Reasoning); ok {
+	if r, ok := reasoningOption(spec.Reasoning); ok {
 		opts = append(opts, r)
 	}
-	if strings.EqualFold(c.Spec.Provider, "openrouter") {
-		if c.Spec.Reasoning == config.ReasoningOff {
+	if strings.EqualFold(spec.Provider, "openrouter") {
+		if spec.Reasoning == config.ReasoningOff {
 			// The SDK's neutral switch emits thinking.type, while OpenRouter
 			// routes its own reasoning.enabled field to upstream providers.
 			opts = append(opts, llms.WithExtraBodyParam("reasoning", map[string]any{"enabled": false}))
@@ -414,13 +496,13 @@ func (c *Client) CallOptions() []llms.CallOption {
 		routing := map[string]any{
 			"require_parameters": true,
 		}
-		if len(c.Spec.Providers) > 0 {
-			routing["only"] = append([]string(nil), c.Spec.Providers...)
+		if len(spec.Providers) > 0 {
+			routing["only"] = append([]string(nil), spec.Providers...)
 			routing["allow_fallbacks"] = false
 		}
 		opts = append(opts, llms.WithExtraBodyParam("provider", routing))
 	}
-	if len(c.Spec.Providers) > 0 && !strings.EqualFold(c.Spec.Provider, "openrouter") {
+	if len(spec.Providers) > 0 && !strings.EqualFold(spec.Provider, "openrouter") {
 		// OpenRouter's provider routing. "only" restricts the candidate set;
 		// "order" ranks whatever set the other filters leave, which is not the
 		// same thing and was the bug. With order plus allow_fallbacks false,
@@ -434,14 +516,14 @@ func (c *Client) CallOptions() []llms.CallOption {
 		// chosen, and this is what stops the router serving the request from
 		// outside that list when none of them is available.
 		opts = append(opts, llms.WithExtraBodyParam("provider", map[string]any{
-			"only":            append([]string(nil), c.Spec.Providers...),
+			"only":            append([]string(nil), spec.Providers...),
 			"allow_fallbacks": false,
 		}))
 	}
 	switch {
-	case c.Spec.MaxTokens > 0:
-		opts = append(opts, llms.WithMaxTokens(c.Spec.MaxTokens))
-	case strings.EqualFold(strings.TrimSpace(c.Spec.Provider), "openrouter") && c.Spec.Reasoning != config.ReasoningOff:
+	case spec.MaxTokens > 0:
+		opts = append(opts, llms.WithMaxTokens(spec.MaxTokens))
+	case strings.EqualFold(strings.TrimSpace(spec.Provider), "openrouter") && spec.Reasoning != config.ReasoningOff:
 		// A reasoning model with no cap can think for the whole call timeout.
 		// DeepSeek V4 Flash on a 330 KB prompt gave no answer in 300s at the
 		// default and at effort minimal, and took 157s and 182s at effort low
@@ -450,7 +532,7 @@ func (c *Client) CallOptions() []llms.CallOption {
 		// cap ends the runaway in tens of seconds, and the empty answer at the
 		// cap is already retried once with reasoning off. See issue #214.
 		opts = append(opts, llms.WithMaxTokens(firstAttemptMaxTokens))
-	case strings.EqualFold(strings.TrimSpace(c.Spec.Provider), "anthropic"):
+	case strings.EqualFold(strings.TrimSpace(spec.Provider), "anthropic"):
 		// Anthropic's API requires max_tokens, and the SDK fills an unset
 		// one with 4,096, a cap a reasoning model's thinking exhausts on
 		// an ordinary review. Every other provider is sent no cap at all
@@ -459,7 +541,7 @@ func (c *Client) CallOptions() []llms.CallOption {
 		// asking the API what each model's maximum is.
 		opts = append(opts, llms.WithMaxTokens(anthropicUnsetMaxTokens))
 	}
-	if tier := strings.TrimSpace(c.Spec.ServiceTier); tier != "" {
+	if tier := strings.TrimSpace(spec.ServiceTier); tier != "" {
 		opts = append(opts, llms.WithExtraBodyParam("service_tier", tier))
 	}
 	return opts

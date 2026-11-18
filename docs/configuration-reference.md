@@ -12,9 +12,10 @@ checkout will use, run `nitpick explain-config`.
 Find a key with site search or your browser's Find command. The page runs
 through its sections in alphabetical order:
 
-[instructions](#instructions), [linters](#linters), [models](#models),
-[persona](#persona), [practices](#practices), [review](#review),
-[security](#security), [standards](#standards) and [validation](#validation).
+[execution](#execution), [instructions](#instructions), [linters](#linters),
+[models](#models), [persona](#persona), [practices](#practices),
+[review](#review), [security](#security), [standards](#standards) and
+[validation](#validation).
 
 Regenerate with `nitpick config-reference -o docs/configuration-reference.md`,
 which `make docs` runs and CI checks. That check diffs this file against
@@ -44,6 +45,73 @@ Endpoint and credential keys (`base_url`, `api_key_env`, `extra`,
 withheld from a repository's own file unless `NITPICK_TRUST_CONFIG_ENDPOINTS=1`
 is set, for every role. So is `persona.custom`. See
 [Trust model](trust-model.md).
+
+## execution
+
+### `execution.checks[].kind`
+
+string, default `none`.
+Kind selects go_test or go_build.
+
+### `execution.checks[].package`
+
+string, default `none`.
+Package is one module-relative package, such as . or ./internal/example.
+
+### `execution.claims[].check_index`
+
+integer, default `0`.
+CheckIndex selects a go_build profile from execution.checks.
+
+### `execution.claims[].finding_sha256`
+
+string, default `none`.
+FindingSHA256 binds the claim to the exact finding text.
+
+### `execution.claims[].head`
+
+string, default `none`.
+Head is the immutable source revision the claim names.
+
+### `execution.claims[].kind`
+
+string, default `none`.
+Kind selects the supported go_build_failure claim.
+
+### `execution.claims[].path`
+
+string, default `none`.
+Path is the finding's repository-relative source file.
+
+### `execution.enabled`
+
+boolean, default `false`.
+Enabled permits the operator's registered checks to execute.
+
+### `execution.image`
+
+string, default `none`.
+Image is a locally available immutable Docker image ID.
+
+### `execution.required_for_fix`
+
+boolean, default `false`.
+RequiredForFix refuses proposals unless every baseline and candidate check passes.
+
+### `execution.risk_accepted`
+
+boolean, default `false`.
+RiskAccepted acknowledges the shared-kernel runtime boundary.
+
+### `execution.runtime`
+
+string, default `none`.
+Runtime selects runsc or an explicitly accepted trusted-corpus runtime.
+
+### `execution.trusted_corpus`
+
+boolean, default `false`.
+TrustedCorpus limits shared-kernel execution to operator-selected source.
 
 ## instructions
 
@@ -1287,6 +1355,66 @@ Scope says what the ceiling covers. One of: run, pull_request.
 integer, default `4`.
 Concurrency bounds in-flight model calls.
 
+### `review.deep.agents`
+
+list of string, default `[general security]`.
+Agents names the reviewers that read each batch in parallel: general reviews with the ordinary prompt, and security looks only for vulnerabilities.
+
+### `review.deep.confidence_floor`
+
+number, default `0.7`.
+ConfidenceFloor is the confidence a finding needs to be posted.
+
+### `review.deep.critique`
+
+boolean, default `true`.
+Critique grades each finding that passed the floor against the code it cites, and withholds the ones the code does not support.
+
+### `review.deep.low_priority_cap`
+
+integer, default `5`.
+LowPriorityCap keeps at most this many info and nit findings a review.
+
+### `review.deep.max_files_per_request`
+
+integer, default `60`.
+MaxFilesPerRequest replaces review.max_files_per_request, so a pull request is read as a whole.
+
+### `review.deep.max_tokens`
+
+integer, default `0`.
+MaxTokens caps the output of each agent call, reasoning included, and of its final submission. Zero keeps the review model's cap for a turn and gives the final submission 65,536 tokens to finish thinking.
+
+### `review.deep.max_turns`
+
+integer, default `10`.
+MaxTurns bounds how many times each agent is asked before it must submit what it has found.
+
+### `review.deep.prompts`
+
+string, default `none`.
+Prompts names the instructions the agents review under.
+
+### `review.deep.reasoning`
+
+string, default `medium`.
+Reasoning is the agents' reasoning level, whatever the review model's own. One of: minimal, low, medium, high, xhigh, max, off.
+
+### `review.deep.temperature`
+
+number, default `0.2`.
+Temperature is the agents' sampling temperature, whatever the review model's own.
+
+### `review.deep.timeout`
+
+duration, default `15m0s`.
+Timeout is the wall-clock budget of one agent on one batch.
+
+### `review.deep.token_budget_per_request`
+
+integer, default `120000`.
+TokenBudgetPerRequest replaces review.token_budget_per_request.
+
 ### `review.fail_on`
 
 string, default `none`.
@@ -1312,6 +1440,21 @@ IncludeFullFiles sends whole changed files alongside the diff when the token bud
 boolean, default `true`.
 Incremental reuses successful model requests from the previous PR review when their prompts, context, model and policy still match.
 
+### `review.jev.api_key_env`
+
+string, default `none`.
+APIKeyEnv names the environment variable holding the OpenRouter key. Empty means OPENROUTER_API_KEY.
+
+### `review.jev.model`
+
+string, default `none`.
+Model is the decision model as OpenRouter names it. Empty selects the built-in default, which the jev package defines.
+
+### `review.jev.threshold`
+
+number, default `0`.
+Threshold is the lowest bug plus error probability a finding may have and be kept, from 0 to 1.
+
 ### `review.knowledge`
 
 boolean, default `false`.
@@ -1336,6 +1479,21 @@ KnowledgeQuery is what gets embedded to retrieve against: "batch", the changed l
 
 integer, default `0`.
 KnowledgeTokens bounds the retrieved section, counted with its own framing. Zero is unbounded, which is what shipped: the section carries at most five entries and the ceiling below is what a measurement would tighten.
+
+### `review.learnings.enabled`
+
+boolean, default `false`.
+Enabled includes accepted repository references in review prompts.
+
+### `review.learnings.max_tokens`
+
+integer, default `0`.
+MaxTokens caps the complete rendered section. Zero selects the built-in cap of 2,000 tokens; it does not mean unbounded.
+
+### `review.learnings.repository`
+
+string, default `none`.
+Repository is the operator-authorized repository identity bound to each reference.
 
 ### `review.max_file_bytes`
 
@@ -1476,6 +1634,11 @@ TokenBudgetPerRequest bounds the context assembled for a single model call, incl
 
 boolean, default `false`.
 TriageNoNewClaims restores the reviewer's own words over anything triage rewrote, so triage may select, drop, group and re-anchor findings but may not author them.
+
+### `review.verify`
+
+string, default `none`.
+Verify turns on a pass that checks each model finding against the repository with read_file and grep_repo, and withholds the ones it does not confirm. "confirmed" keeps only findings the checker confirmed; "not_refuted" also keeps the ones it could not settle. Empty is off.
 
 ## security
 

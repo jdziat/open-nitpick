@@ -1,13 +1,42 @@
 package review
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/bundle"
 	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/jdziat/open-nitpick/internal/vcs"
 )
+
+func TestBudgetTrimmingRetainsEarlierPlannerSkips(t *testing.T) {
+	risky, plain := file("auth.go", 10, 5), file("notes.go", 10, 0)
+	plan := planOf(entry(risky, 100_000), entry(plain, 100_000))
+	skip := bundle.Skip{Path: "generated.go", Reason: bundle.ReasonGenerated}
+	plan.Skipped = []bundle.Skip{skip}
+	plan.FramingReserved = 600
+	engine := newEngine(t, &scriptedLLM{}, &stubProvider{}, nil)
+	engine.Config = budgetConfig(0.25)
+	fit, trimmed, err := engine.applyBudget(t.Context(), vcs.Ref{}, nil, plan, diff.Files{risky, plain},
+		func(context.Context, string) ([]byte, error) { return []byte("package app\n"), nil })
+	if err != nil || fit == nil || len(fit.Kept) != 1 || trimmed == nil {
+		t.Fatalf("control did not retain one budgeted file: fit=%+v plan=%+v err=%v", fit, trimmed, err)
+	}
+	if trimmed.FramingReserved != 600 {
+		t.Fatalf("framing reserve lost: %d", trimmed.FramingReserved)
+	}
+	count := 0
+	for _, got := range trimmed.Skipped {
+		if got == skip {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("planner skip lost or duplicated: %+v", trimmed.Skipped)
+	}
+}
 
 func budgetConfig(maxSpend float64) *config.Config {
 	cfg := config.Defaults()

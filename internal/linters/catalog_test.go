@@ -447,10 +447,17 @@ func TestAutoDetectedToolsSkipWhenAbsentAndRunWhenPresent(t *testing.T) {
 	if _, err := set.Run(context.Background(), files); err != nil {
 		t.Fatal(err)
 	}
+	found := false
 	for _, s := range set.Statuses() {
-		if s.Linter == "shellcheck" && s.Outcome != "ran" {
-			t.Errorf("installed auto-detected shellcheck: %+v", s)
+		if s.Linter == "shellcheck" {
+			found = true
+			if s.Outcome != "ran" {
+				t.Errorf("installed auto-detected shellcheck: %+v", s)
+			}
 		}
+	}
+	if !found {
+		t.Fatal("installed auto-detected shellcheck missing from analyzer roster")
 	}
 }
 

@@ -86,9 +86,10 @@ const maxRelatedPerFile = 12
 // relatedCollector resolves imports and extracts definitions for one plan,
 // caching every read so two files importing the same helper read it once.
 type relatedCollector struct {
-	ctx   context.Context
-	fetch ContentFetcher
-	list  DirLister
+	methodHeaders map[string]map[string][]string
+	ctx           context.Context
+	fetch         ContentFetcher
+	list          DirLister
 
 	// changed is every path in the diff. Those are under review already and
 	// are never attached as context: the model has them, and a definition

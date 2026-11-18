@@ -1,0 +1,26 @@
+--- a/internal/review/engine.go	2026-11-14 15:33:43.236073487 -0800
++++ internal/review/engine.go	2026-11-14 15:30:32.216585487 -0800
+@@ -2257,6 +2257,11 @@
+ 	if len(findings) == 0 {
+ 		return "", nil, nil, nil
+ 	}
++	if bakeoffNoTriage() {
++		// Bakeoff only: keep every finding as the reviewer wrote it, after the
++		// dedupe above, so the model's judgment is what the comparison removes.
++		return "", findings, nil, nil
++	}
+ 
+ 	base, err := e.triagePrompt()
+ 	if err != nil {
+--- /dev/null	2026-11-10 05:36:07.533188495 -0800
++++ internal/review/bakeoff_triage.go	2026-11-14 15:30:31.316578465 -0800
+@@ -0,0 +1,9 @@
++package review
++
++import "os"
++
++// bakeoffNoTriage is set only by the bakeoff, to measure what triage's model
++// judgment removes. It is never set in a shipped configuration.
++func bakeoffNoTriage() bool {
++	return os.Getenv("NITPICK_BAKEOFF_NO_TRIAGE") != ""
++}

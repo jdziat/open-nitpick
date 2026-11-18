@@ -475,6 +475,19 @@ review that took that path is no longer reproducible by re-running it, and
 its log says so. Every retry and its outcome is one log line, so a review
 that took forty minutes says why.
 
+## Models that take no temperature
+
+OpenRouter lists the parameters each model accepts. On 2026-11-14 the newest OpenAI and
+Anthropic models (GPT-6.1 Sol, Terra and Luna, Claude Sonnet 5.5, Opus 5.5 and Fable 5.2) did
+not list `temperature`. The client asks the router to choose only endpoints that honour every
+parameter it sends, so a request with a temperature was answered "No endpoints found that can
+handle the requested parameters", and every batch of the review failed. The client now sends
+such a request again without the temperature, once, and remembers that the model takes none,
+so later calls leave it out from the start. The log line is "the model accepts no
+temperature; sending again without it". `nitpick deep-review` does the same for each agent
+turn, forced submission and critique. A configured `temperature` has no effect on these
+models.
+
 A refusal is a different loop, and until recently a silent one. A 429 or a 5xx
 is retried by the SDK, up to `max_retries` times again, with exponential
 backoff; that loop reported nothing, so a request rate limited three times and

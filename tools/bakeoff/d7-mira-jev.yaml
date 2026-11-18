@@ -1,0 +1,13 @@
+# D7: deep review under Mira's adapted prompts, with the repository check and then the Jev
+# decision model as its selection. The confidence floor and the critique are off, as in D6v, so
+# every draft that survives the duplicate rule and the cap is checked, and posted only when the
+# check confirms it and Jev scores it at 0.3 or more as a defect.
+# docs/remediation-mira.md, "D7".
+review:
+  verify: confirmed
+  jev:
+    threshold: 0.3
+  deep:
+    prompts: mira
+    confidence_floor: 0
+    critique: false

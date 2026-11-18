@@ -58,6 +58,14 @@ func findingProperties(classes []string) map[string]any {
 			"type":        "string",
 			"description": "The concrete consequence and the reasoning, in one to three sentences.",
 		},
+		"confidence": map[string]any{
+			"type":        "number",
+			"description": "How certain you are, from 0 to 1, that this defect is real and reachable in the code as shown.",
+		},
+		"citation": map[string]any{
+			"type":        "string",
+			"description": "OPTIONAL. The line or lines of shown code the claim rests on, quoted exactly.",
+		},
 		"suggestion": map[string]any{
 			"type": "string",
 			"description": "OPTIONAL. Exact replacement code for the anchored line — or for lines line through fix_end_line when fix_end_line is given — with no placeholders and no prose. " +
@@ -84,7 +92,7 @@ func findingsSchema(classes []string) (json.RawMessage, error) {
 				"items": map[string]any{
 					"type":                 "object",
 					"properties":           findingProperties(classes),
-					"required":             []string{"path", "line", "severity", "category", "class", "title", "rationale"},
+					"required":             []string{"path", "line", "severity", "category", "class", "title", "rationale", "confidence"},
 					"additionalProperties": false,
 				},
 			},

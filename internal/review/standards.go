@@ -147,7 +147,10 @@ func BuildStandards(ctx context.Context, cfg *config.Config, checkout, base stri
 		Floor:    standards.Floor{MinShare: cfg.Standards.MinShare, MinSites: cfg.Standards.MinSites},
 		Disabled: cfg.Standards.Disabled,
 	}
-	rep := standards.Measure(files, opts)
+	rep, err := standards.MeasureContext(ctx, files, opts)
+	if err != nil {
+		return skip(fmt.Sprintf("measure %s: %v", base, err))
+	}
 
 	st := StandardsStatus{State: StandardsActive, Standards: len(rep.Standards())}
 	for _, r := range rep.Results {

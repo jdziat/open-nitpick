@@ -68,10 +68,6 @@ func TestAPartlyFailedRunIsNotApproved(t *testing.T) {
 	}
 }
 
-// TestIncompleteFilesBlockApprovalEvenWhenPracticesAreGreen pins the
-// engineering-profile hole: PipelineComplete follows practices.ExitCode, and
-// that can be 0 while model batches still failed. Complete() is what refuses
-// the approval the practices green light would otherwise permit.
 func TestIncompleteFilesBlockApprovalEvenWhenPracticesAreGreen(t *testing.T) {
 	target := practices.Target{Kind: practices.FileTarget, ID: "a.go"}
 	r := &Report{
@@ -88,8 +84,8 @@ func TestIncompleteFilesBlockApprovalEvenWhenPracticesAreGreen(t *testing.T) {
 			}},
 		},
 	}
-	if !r.PipelineComplete() {
-		t.Fatalf("setup: PipelineComplete must be true under a green practices report; problems=%v", r.Practices.Problems())
+	if r.PipelineComplete() {
+		t.Fatal("green practices erased unread source")
 	}
 	if r.Complete() {
 		t.Fatal("setup: Complete must be false while Incomplete is set")

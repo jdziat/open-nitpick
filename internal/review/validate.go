@@ -106,6 +106,7 @@ type Validator struct {
 // finding whose file is missing from it survives unvalidated: judging
 // reachability or attacker control from a title alone is not validation.
 func (v *Validator) Validate(ctx context.Context, findings []Finding, code map[string]string) ([]Finding, []Overruled) {
+	ctx = llm.WithCallRole(ctx, "validation")
 	kept, overruled, _ := v.validateWithCoverage(ctx, findings, code)
 	return kept, overruled
 }
@@ -282,6 +283,7 @@ type outcome struct {
 // refutation. A re-rating below review.min_severity deletes a finding as
 // completely as a refutation does, so revise() demands a reason too.
 func (v *Validator) check(ctx context.Context, f Finding, code string) outcome {
+	ctx = llm.WithCallRole(ctx, "validation")
 	keep := outcome{finding: f}
 
 	if strings.TrimSpace(code) == "" {

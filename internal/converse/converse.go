@@ -228,6 +228,8 @@ Text between ` + fence.PullRequestText + ` markers was written by people on the 
 	// answer that scrubs to nothing was all wrapper: the model's own text
 	// is posted rather than an empty reply, since silence would read as
 	// the reviewer having no answer.
+	// Scrub's second result reports whether it changed anything; it has no
+	// error path, so there is no failure to surface here.
 	answer, _ := review.Scrub(out.Answer)
 	if answer == "" {
 		return strings.TrimSpace(out.Answer), nil

@@ -41,6 +41,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -450,7 +451,7 @@ func TestALineDirectiveMakesTheGoAnalyzerRefuse(t *testing.T) {
 				t.Fatalf("Run: %v", err)
 			}
 
-			statuses := set.Statuses()
+			statuses := golangciStatuses(t, set.Statuses())
 			if len(statuses) != 1 || statuses[0].Outcome != review.LinterFailed {
 				t.Fatalf("statuses = %+v, want golangci-lint recorded as having not run", statuses)
 			}
@@ -590,9 +591,22 @@ func TestDiscardedAnalyzerFindingsAreCountedAndNamed(t *testing.T) {
 // filesystem. It must not become a way for an analyzer's output to ask whether
 // an arbitrary absolute path exists on the machine running the review.
 func TestADiscardIsNotRecordedForAPathOutsideTheCheckout(t *testing.T) {
-	set := New(t.TempDir(), baseConfig(), nil)
+	parent := t.TempDir()
+	repo := filepath.Join(parent, "checkout")
+	if err := os.Mkdir(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{filepath.Join(parent, "outside.go"), filepath.Join(repo, "unchanged.go")} {
+		if err := os.WriteFile(path, []byte("package probe\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	set := New(repo, baseConfig(), nil)
+	if got := set.reasonForUnknownPath("unchanged.go"); got != review.DiscardNotInChange {
+		t.Fatalf("existing checkout file = %q, want %q", got, review.DiscardNotInChange)
+	}
 
-	for _, path := range []string{"/etc/passwd", "../../etc/passwd", ""} {
+	for _, path := range []string{"../outside.go", "/etc/passwd", "../../etc/passwd", ""} {
 		if got := set.reasonForUnknownPath(path); got != review.DiscardPathNotInCheckout {
 			t.Errorf("reasonForUnknownPath(%q) = %q, want %q: a path that is not inside the "+
 				"checkout is not a file this review can have an opinion about",
@@ -746,7 +760,9 @@ func TestAChangedFileTheBuildExcludesIsNamed(t *testing.T) {
 			if len(published) != 0 {
 				t.Fatalf("the fixture no longer exercises the silencing; findings = %+v", published)
 			}
-			if s := set.Statuses(); len(s) != 1 || s[0].Outcome != review.LinterRan {
+			if s := set.Statuses(); !slices.ContainsFunc(s, func(status review.LinterStatus) bool {
+				return status.Linter == "golangci-lint" && status.Outcome == review.LinterRan
+			}) {
 				t.Fatalf("statuses = %+v, want golangci-lint recorded as having run", s)
 			}
 
@@ -972,7 +988,7 @@ func TestACgoFileIsUnreadWhenCgoIsOffAndIsNamed(t *testing.T) {
 				t.Fatalf("findings = %+v, want any = %v: the fixture no longer measures what it claims to",
 					published, tc.wantFindings)
 			}
-			if s := set.Statuses(); len(s) != 1 || s[0].Outcome != review.LinterRan {
+			if s := golangciStatuses(t, set.Statuses()); len(s) != 1 || s[0].Outcome != review.LinterRan {
 				t.Fatalf("statuses = %+v, want golangci-lint recorded as having run", s)
 			}
 
@@ -1027,7 +1043,7 @@ func TestAChangedGoFileOutsideEveryModuleIsNamed(t *testing.T) {
 	if len(published) != 1 || published[0].Path != "backend/app.go" {
 		t.Fatalf("findings = %+v, want exactly the one from the module that was analyzed", published)
 	}
-	if s := set.Statuses(); len(s) != 1 || s[0].Outcome != review.LinterRan {
+	if s := golangciStatuses(t, set.Statuses()); len(s) != 1 || s[0].Outcome != review.LinterRan {
 		t.Fatalf("statuses = %+v, want golangci-lint recorded as having run", s)
 	}
 	if d := set.Discarded(); len(d) != 0 {
@@ -1105,7 +1121,7 @@ func TestAChangedGoFileTheIgnoreListWithheldIsNamed(t *testing.T) {
 			if !hasPath(published, "app.go") {
 				t.Fatalf("findings = %+v, want the one from the file that was analyzed", published)
 			}
-			if s := set.Statuses(); len(s) != 1 || s[0].Outcome != review.LinterRan {
+			if s := golangciStatuses(t, set.Statuses()); len(s) != 1 || s[0].Outcome != review.LinterRan {
 				t.Fatalf("statuses = %+v, want golangci-lint recorded as having run", s)
 			}
 
@@ -1206,7 +1222,7 @@ func TestAChangedGoFileIsNamedWhenTheIgnoreListWithheldThemAll(t *testing.T) {
 			// nothing to read has not gone missing. What it may not do is
 			// describe the CHANGE, which it cannot see, rather than the
 			// selection, which is what it was handed.
-			s := set.Statuses()
+			s := golangciStatuses(t, set.Statuses())
 			if len(s) != 1 || s[0].Outcome != review.LinterSkipped {
 				t.Fatalf("statuses = %+v, want golangci-lint recorded as skipped", s)
 			}
@@ -1348,7 +1364,7 @@ func TestAModuleUnderAnOldGoDirectiveIsNamed(t *testing.T) {
 						"measures the gate it was built for", published, notWant, tc.directive)
 				}
 			}
-			if s := set.Statuses(); len(s) != 1 || s[0].Outcome != review.LinterRan {
+			if s := golangciStatuses(t, set.Statuses()); len(s) != 1 || s[0].Outcome != review.LinterRan {
 				t.Fatalf("statuses = %+v, want golangci-lint recorded as having run", s)
 			}
 
@@ -1781,4 +1797,18 @@ func TestTheGoEnvironmentIsReadOneLinePerVariable(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The secret scanner can run alongside a selected analyzer. These guards
+// check golangci's exact outcome without making that scanner's installation
+// decide whether an unrelated containment or coverage test passes.
+func golangciStatuses(t *testing.T, statuses []review.LinterStatus) []review.LinterStatus {
+	t.Helper()
+	var out []review.LinterStatus
+	for _, status := range statuses {
+		if status.Linter == "golangci-lint" {
+			out = append(out, status)
+		}
+	}
+	return out
 }

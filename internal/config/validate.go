@@ -53,6 +53,7 @@ func (c *Config) Validate() error {
 	errs = append(errs, c.Standards.Validate())
 	errs = append(errs, c.Practices.Validate())
 	errs = append(errs, c.Security.validate()...)
+	errs = append(errs, c.Execution.validate())
 
 	for i, ins := range c.Instructions {
 		if strings.TrimSpace(ins.Path) == "" {
@@ -245,6 +246,9 @@ func (s ModelSpec) validate(required bool) []error {
 
 func (r Review) validate() []error {
 	var errs []error
+	if r.Learnings.MaxTokens < 0 || r.Learnings.MaxTokens > 8192 {
+		errs = append(errs, fmt.Errorf("review.learnings.max_tokens must be from 0 to 8192"))
+	}
 
 	// A mention is the origin converse.Command reads the verb relative to, so
 	// a blank one anchors at the start of every comment and reads whatever
@@ -277,6 +281,16 @@ func (r Review) validate() []error {
 	}
 	if !r.FailOn.Valid() {
 		errs = append(errs, fmt.Errorf("review.fail_on %q is not a severity", r.FailOn))
+	}
+	errs = append(errs, r.Deep.validate()...)
+	switch r.Verify {
+	case "", VerifyConfirmed, VerifyNotRefuted:
+	default:
+		errs = append(errs, fmt.Errorf("review.verify %q is not confirmed or not_refuted; leave it empty to turn verification off", r.Verify))
+	}
+	// The negated form also refuses NaN, which every ordered comparison passes.
+	if !(r.Jev.Threshold >= 0 && r.Jev.Threshold <= 1) {
+		errs = append(errs, fmt.Errorf("review.jev.threshold must be from 0 to 1, got %v; leave it at 0 to turn the filter off", r.Jev.Threshold))
 	}
 	if r.MaxRounds < 0 {
 		errs = append(errs, fmt.Errorf("review.max_rounds cannot be negative, got %d", r.MaxRounds))
@@ -489,4 +503,58 @@ func (s Standards) Validate() error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func (d DeepReview) validate() []error {
+	var errs []error
+	if len(d.Agents) == 0 {
+		errs = append(errs, errors.New("review.deep.agents must name at least one agent"))
+	}
+	seen := map[string]bool{}
+	for _, a := range d.Agents {
+		switch a {
+		case DeepAgentGeneral, DeepAgentSecurity:
+		default:
+			errs = append(errs, fmt.Errorf("review.deep.agents: %q is not %s or %s", a, DeepAgentGeneral, DeepAgentSecurity))
+		}
+		if seen[a] {
+			errs = append(errs, fmt.Errorf("review.deep.agents names %q twice", a))
+		}
+		seen[a] = true
+	}
+	switch d.Prompts {
+	case "", DeepPromptsMira:
+	default:
+		errs = append(errs, fmt.Errorf("review.deep.prompts %q is not %s; leave it empty for this tool's own", d.Prompts, DeepPromptsMira))
+	}
+	if d.MaxTurns < 1 || d.MaxTurns > 30 {
+		errs = append(errs, fmt.Errorf("review.deep.max_turns must be between 1 and 30, got %d", d.MaxTurns))
+	}
+	if !(d.Temperature >= 0 && d.Temperature <= 2) {
+		errs = append(errs, fmt.Errorf("review.deep.temperature must be between 0 and 2, got %g", d.Temperature))
+	}
+	switch d.Reasoning {
+	case "", ReasoningMinimal, ReasoningLow, ReasoningMedium, ReasoningHigh, ReasoningXHigh, ReasoningMax, ReasoningOff:
+	default:
+		errs = append(errs, fmt.Errorf("review.deep.reasoning %q is not a reasoning level", d.Reasoning))
+	}
+	if d.MaxTokens < 0 {
+		errs = append(errs, fmt.Errorf("review.deep.max_tokens must not be negative, got %d", d.MaxTokens))
+	}
+	if d.Timeout < 0 {
+		errs = append(errs, fmt.Errorf("review.deep.timeout must not be negative, got %s", d.Timeout))
+	}
+	if !(d.ConfidenceFloor >= 0 && d.ConfidenceFloor <= 1) {
+		errs = append(errs, fmt.Errorf("review.deep.confidence_floor must be between 0 and 1, got %g", d.ConfidenceFloor))
+	}
+	if d.LowPriorityCap < 0 {
+		errs = append(errs, fmt.Errorf("review.deep.low_priority_cap must not be negative, got %d", d.LowPriorityCap))
+	}
+	if d.MaxFilesPerRequest <= 0 {
+		errs = append(errs, fmt.Errorf("review.deep.max_files_per_request must be positive, got %d", d.MaxFilesPerRequest))
+	}
+	if d.TokenBudgetPerRequest <= 0 {
+		errs = append(errs, fmt.Errorf("review.deep.token_budget_per_request must be positive, got %d", d.TokenBudgetPerRequest))
+	}
+	return errs
 }

@@ -121,6 +121,18 @@ func Defaults() *Config {
 			// Off until its controls are seen to be silent; see
 			Slop:                 false,
 			RelatedContextTokens: 16000,
+			Deep: DeepReview{
+				Agents:                []string{DeepAgentGeneral, DeepAgentSecurity},
+				MaxTurns:              10,
+				Temperature:           0.2,
+				Reasoning:             ReasoningMedium,
+				ConfidenceFloor:       0.7,
+				LowPriorityCap:        5,
+				Critique:              true,
+				MaxFilesPerRequest:    60,
+				TokenBudgetPerRequest: 120000,
+				Timeout:               15 * time.Minute,
+			},
 			Approve: Approve{
 				// Residual max_severity is stated so an operator who turns
 				// residual on without naming a floor gets info, not zero.

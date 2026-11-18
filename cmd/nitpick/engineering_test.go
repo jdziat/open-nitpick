@@ -310,10 +310,16 @@ func TestActionsCannotReportIncompletePracticesAsClean(t *testing.T) {
 		t.Fatal("required incomplete assessment reported clean in Actions")
 	}
 	r.Practices.Checks[1].Required = false
+	if resultFor(r, config.SeverityNone) != resultError {
+		t.Fatal("optional practices erased failed triage and unread source")
+	}
+	r.Stages = nil
+	r.Incomplete = nil
 	if resultFor(r, config.SeverityNone) != resultClean {
 		t.Fatal("optional incomplete assessment blocked completed required evidence")
 	}
 	r.Practices = nil
+	r.Stages = []review.StageStatus{{Stage: "triage", Reason: "unavailable"}}
 	if resultFor(r, config.SeverityNone) != resultError {
 		t.Fatal("ordinary review lost its required-stage failure")
 	}

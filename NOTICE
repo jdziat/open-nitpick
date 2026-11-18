@@ -37,6 +37,25 @@ following components. Their licenses apply to those portions.
       https://github.com/open-telemetry/opentelemetry-go
 
 --------------------------------------------------------------------------------
+Adapted text
+--------------------------------------------------------------------------------
+
+  Mira (https://github.com/miracodeai/mira)
+      Apache License 2.0
+      Copyright the Mira contributors
+      internal/prompt/templates/deep_mira_general.md and deep_mira_security.md
+      are adapted from Mira's review.jinja2 and security_review.jinja2 at commit
+      04d3491, and are used only under review.deep.prompts: mira.
+
+      Changes made: the assistant's name, the Mira-only output fields
+      (agent_prompt, key_issues, summary), the cache boundary and the context
+      sections this tool supplies elsewhere were removed; the severity scale and
+      the category guide were mapped to this tool's severity levels and finding
+      classes; the tool names were changed to read_file, grep_repo and
+      submit_findings; em dashes were replaced. Mira's per-language footgun lists
+      were not included.
+
+--------------------------------------------------------------------------------
 Documentation site assets
 --------------------------------------------------------------------------------
 

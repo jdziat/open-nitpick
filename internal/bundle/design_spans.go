@@ -13,22 +13,61 @@ type SourceSpan struct {
 
 // SelectSourceSpans returns exact source bytes for ordered, disjoint ranges.
 func SelectSourceSpans(content string, spans []SourceSpan) (string, error) {
-	lines := strings.SplitAfter(content, "\n")
-	if len(lines) > 0 && lines[len(lines)-1] == "" {
-		lines = lines[:len(lines)-1]
+	regions, err := sourceSpanRegions(content, spans)
+	if err != nil {
+		return "", err
+	}
+	size := 0
+	for _, region := range regions {
+		size += region.end - region.start
 	}
 	var out strings.Builder
+	out.Grow(size)
+	for _, region := range regions {
+		out.WriteString(content[region.start:region.end])
+	}
+	return out.String(), nil
+}
+
+type sourceRegion struct {
+	start, end int
+}
+
+func sourceSpanRegions(content string, spans []SourceSpan) ([]sourceRegion, error) {
+	if len(spans) == 0 {
+		return nil, nil
+	}
+	lines := strings.Count(content, "\n")
+	if len(content) > 0 && content[len(content)-1] != '\n' {
+		lines++
+	}
 	prior := 0
 	for _, span := range spans {
-		if span.Start <= prior || span.End < span.Start || span.End > len(lines) {
-			return "", fmt.Errorf("invalid source span %d:%d for %d lines", span.Start, span.End, len(lines))
-		}
-		for _, line := range lines[span.Start-1 : span.End] {
-			out.WriteString(line)
+		if span.Start <= prior || span.End < span.Start || span.End > lines {
+			return nil, fmt.Errorf("invalid source span %d:%d for %d lines", span.Start, span.End, lines)
 		}
 		prior = span.End
 	}
-	return out.String(), nil
+	regions := make([]sourceRegion, len(spans))
+	offset, line := 0, 1
+	for i, span := range spans {
+		for line < span.Start {
+			offset += strings.IndexByte(content[offset:], '\n') + 1
+			line++
+		}
+		start := offset
+		for line <= span.End {
+			next := strings.IndexByte(content[offset:], '\n')
+			if next < 0 {
+				offset = len(content)
+			} else {
+				offset += next + 1
+			}
+			line++
+		}
+		regions[i] = sourceRegion{start: start, end: offset}
+	}
+	return regions, nil
 }
 
 func renderSourceSpans(entry Entry) string {
@@ -37,17 +76,24 @@ func renderSourceSpans(entry Entry) string {
 	for _, instruction := range entry.Instructions {
 		fmt.Fprintf(&out, "Path instruction: %s\n", promptSafe(instruction))
 	}
-	if _, err := SelectSourceSpans(entry.Content, entry.SourceSpans); err != nil {
+	regions, err := sourceSpanRegions(entry.Content, entry.SourceSpans)
+	if err != nil {
 		return out.String() + "Source ranges are unavailable.\n"
 	}
-	lines := strings.SplitAfter(entry.Content, "\n")
-	for _, span := range entry.SourceSpans {
+	for i, span := range entry.SourceSpans {
 		fmt.Fprintf(&out, "\nLines %d-%d:\n```\n", span.Start, span.End)
-		for index := span.Start - 1; index < span.End; index++ {
-			fmt.Fprintf(&out, "%6d  %s", index+1, lines[index])
-			if !strings.HasSuffix(lines[index], "\n") {
+		region := regions[i]
+		for number, offset := span.Start, region.start; offset < region.end; number++ {
+			next := strings.IndexByte(entry.Content[offset:region.end], '\n')
+			end := region.end
+			if next >= 0 {
+				end = offset + next + 1
+			}
+			fmt.Fprintf(&out, "%6d  %s", number, entry.Content[offset:end])
+			if next < 0 {
 				out.WriteByte('\n')
 			}
+			offset = end
 		}
 		out.WriteString("```\n")
 	}

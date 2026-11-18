@@ -46,6 +46,7 @@ func TestDiscardedAnalyzerFindingsArePublishedOnThePullRequest(t *testing.T) {
 	}
 
 	for _, want := range []string{
+		"zz_generated.go",
 		string(DiscardNotInChange),
 		string(DiscardUnchangedLine),
 		string(DiscardUnanchorable),

@@ -200,14 +200,14 @@ func TestAChangeCannotSettleItsOwnSeriesByWritingStopAt(t *testing.T) {
 func TestTheOperatorsRoundFlagsSurviveAPolicyReplacement(t *testing.T) {
 	engine := hostileEngine(t, findingModel(t), &stubProvider{diff: configEditDiff}, nil)
 	three := 3
-	engine.Rounds = RoundsOverride{MaxRounds: &three, StopAt: config.SeverityWarning}
+	engine.Rounds = RoundsOverride{MaxRounds: &three, StopAt: config.SeverityError}
 
 	report, err := engine.Review(context.Background(), vcs.Ref{})
 	if err != nil {
 		t.Fatalf("Review: %v", err)
 	}
-	if report.Rounds == nil || report.Rounds.Max != 3 || report.Rounds.StopAt != config.SeverityWarning {
-		t.Errorf("rounds = %+v, want the operator's max 3 and stop-at warning", report.Rounds)
+	if report.Rounds == nil || report.Rounds.Max != 3 || report.Rounds.StopAt != config.SeverityError {
+		t.Errorf("rounds = %+v, want the operator's max 3 and stop-at error", report.Rounds)
 	}
 }
 
@@ -216,7 +216,7 @@ func TestTheOperatorsRoundFlagsSurviveAPolicyReplacement(t *testing.T) {
 // it was a round, or the limit never fires.
 func TestAPublishedReviewCarriesSeverityAndItsRound(t *testing.T) {
 	model := findingModel(t)
-	provider := &stubProvider{diff: engineDiff}
+	provider := &stubProvider{diff: configEditDiff}
 
 	if _, err := newEngine(t, model, provider, nil).Review(context.Background(), vcs.Ref{}); err != nil {
 		t.Fatalf("Review: %v", err)

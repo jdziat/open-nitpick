@@ -192,12 +192,26 @@ func sortedKeys(m map[string]string) []string {
 // generating it would put an unmeasured claim beside a measured one, and the
 // claim most worth not making here is that the fix works.
 func Body(r Request, res Result, base string, asked string, number int) string {
+	return bodyWithChecks(r, res, base, asked, number, "")
+}
+
+// BodyWithChecks reports selected execution evidence without claiming a repair.
+func BodyWithChecks(r Request, res Result, base string, asked string, number int, checks string) string {
+	return bodyWithChecks(r, res, base, asked, number, checks)
+}
+
+func bodyWithChecks(r Request, res Result, base string, asked string, number int, checks string) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "Applies %d finding(s) from #%d, asked for by @%s.\n\n", len(r.Findings), number, asked)
 
-	b.WriteString("**Not compiled, not run, not tested, not formatted, not linted.** ")
-	b.WriteString("No checkout existed when this was written. The checks on this pull request are the only verification.\n\n")
+	if checks == "" {
+		b.WriteString("**Not compiled, not run, not tested, not formatted, not linted.** ")
+		b.WriteString("No checkout existed when this was written. The checks on this pull request are the only verification.\n\n")
+	} else {
+		b.WriteString(checks)
+		b.WriteString("\nFormatting, linting and semantic repair have not been established.\n\n")
+	}
 
 	fmt.Fprintf(&b, "Written against `%s`. Whole files were replaced, so anything pushed to #%d after that revision is reverted here, and the whole diff wants reading rather than the lines near each finding.\n\n",
 		base, number)

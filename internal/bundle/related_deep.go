@@ -268,6 +268,9 @@ func (c *relatedCollector) pyDefiningFile(file, name string) string {
 
 // --- Go: methods on imported types --------------------------------------------
 
+var goExportedMethodCall = regexp.MustCompile(`\.([A-Z]\w*)\s*\(`)
+var goReceiverMethodHeader = regexp.MustCompile(`(?m)^func\s+\(([^)]*)\)\s+([A-Z]\w*)\(`)
+
 // goMethodWants returns, for a type T of package pkg that the change uses, the
 // methods called on any receiver in the added lines that pkg defines on T. The
 // receiver's static type is not known here, so a method is attached on the
@@ -275,8 +278,8 @@ func (c *relatedCollector) pyDefiningFile(file, name string) string {
 // share a method name, and under-attaches never.
 func (c *relatedCollector) goMethodWants(added string, goFiles []string, typeName string) []want {
 	called := map[string]int{}
-	for _, m := range regexp.MustCompile(`\.([A-Z]\w*)\s*\(`).FindAllStringSubmatch(added, -1) {
-		called[m[1]]++
+	for _, match := range goExportedMethodCall.FindAllStringSubmatch(added, -1) {
+		called[match[1]]++
 	}
 	if len(called) == 0 {
 		return nil
@@ -287,14 +290,34 @@ func (c *relatedCollector) goMethodWants(added string, goFiles []string, typeNam
 		if !ok {
 			continue
 		}
-		for method, n := range called {
-			re := regexp.MustCompile(`(?m)^func\s+\([^)]*\*?` + regexp.QuoteMeta(typeName) + `\)\s+` + regexp.QuoteMeta(method) + `\(`)
-			if re.MatchString(content) {
-				wants = append(wants, want{file: file, name: typeName + "." + method, uses: n, extract: goMethodDefinition(typeName, method)})
+		headers := c.goMethodsInFile(file, content)
+		for method, uses := range called {
+			for _, receiver := range headers[method] {
+				if strings.HasSuffix(receiver, typeName) {
+					wants = append(wants, want{file: file, name: typeName + "." + method, uses: uses, extract: goMethodDefinition(typeName, method)})
+					break
+				}
 			}
 		}
 	}
 	return wants
+}
+
+// goMethodsInFile indexes the captured bytes once for all imported receiver
+// types. Suffix matching preserves the existing receiver heuristic.
+func (c *relatedCollector) goMethodsInFile(file, content string) map[string][]string {
+	if c.methodHeaders == nil {
+		c.methodHeaders = map[string]map[string][]string{}
+	}
+	if headers, ok := c.methodHeaders[file]; ok {
+		return headers
+	}
+	headers := map[string][]string{}
+	for _, match := range goReceiverMethodHeader.FindAllStringSubmatch(content, -1) {
+		headers[match[2]] = append(headers[match[2]], match[1])
+	}
+	c.methodHeaders[file] = headers
+	return headers
 }
 
 func goMethodDefinition(typeName, method string) func(content, name string) (Related, bool) {

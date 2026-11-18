@@ -1,0 +1,1104 @@
+{
+  "schema_version": 1,
+  "status": "partial_preparation_baseline",
+  "additional_paid_review_runs": 1,
+  "source_sha256": {
+    "cmd/nitpick/main.go": "b450548ed5713c8079e5c8f78e83bbfb8c0b7c2662babf0c9a0a631c257f436f",
+    "cmd/nitpick/mcp.go": "5c06ba0f49d4125daa25716346188ff9e2379ad62a38cab42e29d52371240247",
+    "internal/review/preparation_benchmark_test.go": "b304f331aa7a9fd4d4ea227a71c5c436623040853cf5f5b87d97a99225f696b0"
+  },
+  "surfaces": [
+    {
+      "surface": "cli",
+      "entry": "review",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "review",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    },
+    {
+      "surface": "cli",
+      "entry": "fast-review",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "fast-review",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    },
+    {
+      "surface": "cli",
+      "entry": "deep-review",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "deep-review",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    },
+    {
+      "surface": "cli",
+      "entry": "full-review",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "full-review",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    },
+    {
+      "surface": "cli",
+      "entry": "repo-score",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "repo-score",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    },
+    {
+      "surface": "cli",
+      "entry": "improve",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "improve",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    },
+    {
+      "surface": "cli",
+      "entry": "repo-standards",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "repo-standards",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    },
+    {
+      "surface": "cli",
+      "entry": "commits",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "commits",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    },
+    {
+      "surface": "cli",
+      "entry": "standards",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "standards",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    },
+    {
+      "surface": "cli",
+      "entry": "slop",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "slop",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    },
+    {
+      "surface": "cli",
+      "entry": "security",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "security",
+          "outcome": "complete",
+          "samples": 1
+        }
+      ]
+    },
+    {
+      "surface": "cli",
+      "entry": "respond",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Shared-engine measurements are separate and do not measure this command transport."
+    },
+    {
+      "surface": "cli",
+      "entry": "mcp",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Shared-engine measurements are separate and do not measure this command transport."
+    },
+    {
+      "surface": "cli",
+      "entry": "auth",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Source inventory only; no credential/setup mutation was performed."
+    },
+    {
+      "surface": "cli",
+      "entry": "setup",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Source inventory only; no credential/setup mutation was performed."
+    },
+    {
+      "surface": "cli",
+      "entry": "init",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Source inventory only; no credential/setup mutation was performed."
+    },
+    {
+      "surface": "cli",
+      "entry": "explain-config",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Shared-engine measurements are separate and do not measure this command transport.",
+      "quality_applicable": false
+    },
+    {
+      "surface": "cli",
+      "entry": "linters",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Shared-engine measurements are separate and do not measure this command transport.",
+      "quality_applicable": false
+    },
+    {
+      "surface": "cli",
+      "entry": "providers",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Shared-engine measurements are separate and do not measure this command transport.",
+      "quality_applicable": false
+    },
+    {
+      "surface": "cli",
+      "entry": "knowledge-index",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Shared-engine measurements are separate and do not measure this command transport."
+    },
+    {
+      "surface": "cli",
+      "entry": "learn",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Shared-engine measurements are separate and do not measure this command transport."
+    },
+    {
+      "surface": "cli",
+      "entry": "config-reference",
+      "aliases": [],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Shared-engine measurements are separate and do not measure this command transport.",
+      "quality_applicable": false
+    },
+    {
+      "surface": "cli",
+      "entry": "version",
+      "aliases": [
+        "--version",
+        "-v"
+      ],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Shared-engine measurements are separate and do not measure this command transport.",
+      "quality_applicable": false
+    },
+    {
+      "surface": "cli",
+      "entry": "help",
+      "aliases": [
+        "--help",
+        "-h"
+      ],
+      "source": "cmd/nitpick/main.go",
+      "status": "not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Shared-engine measurements are separate and do not measure this command transport.",
+      "quality_applicable": false
+    },
+    {
+      "surface": "mcp",
+      "entry": "review",
+      "source": "cmd/nitpick/mcp.go",
+      "status": "transport_and_live_provider_baseline_not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "review",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    },
+    {
+      "surface": "mcp",
+      "entry": "full_review",
+      "source": "cmd/nitpick/mcp.go",
+      "status": "transport_and_live_provider_baseline_not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "full_review",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    },
+    {
+      "surface": "mcp",
+      "entry": "repo_score",
+      "source": "cmd/nitpick/mcp.go",
+      "status": "transport_and_live_provider_baseline_not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "repo_score",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    },
+    {
+      "surface": "mcp",
+      "entry": "code_smell",
+      "source": "cmd/nitpick/mcp.go",
+      "status": "transport_and_live_provider_baseline_not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "code_smell",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    },
+    {
+      "surface": "mcp",
+      "entry": "ai_slop",
+      "source": "cmd/nitpick/mcp.go",
+      "status": "transport_and_live_provider_baseline_not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "ai_slop",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    },
+    {
+      "surface": "mcp",
+      "entry": "security_scan",
+      "source": "cmd/nitpick/mcp.go",
+      "status": "transport_and_live_provider_baseline_not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "security_scan",
+          "outcome": "complete",
+          "samples": 1
+        }
+      ]
+    },
+    {
+      "surface": "mcp",
+      "entry": "explain_config",
+      "source": "cmd/nitpick/mcp.go",
+      "status": "transport_and_live_provider_baseline_not_measured",
+      "latency_p50_ns": null,
+      "latency_p95_ns": null,
+      "role_cost_usd": null,
+      "coverage": null,
+      "quality_precision": null,
+      "quality_recall": null,
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "explain_config",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
+    }
+  ],
+  "shared_engine_profiles": {
+    "review": {
+      "kind": "Full scripted engine pipeline with empty model responses; not a quality study or actual provider latency",
+      "cases": [
+        {
+          "case": "cross-file",
+          "sample_count": 3,
+          "scripted_pipeline_p50_ns": 135612145,
+          "observations": [
+            {
+              "Duration": 114693494,
+              "FileReads": 456,
+              "DistinctFiles": 431,
+              "DirectoryReads": 63,
+              "DistinctDirectories": 60,
+              "ModelCalls": 2,
+              "PlanAndRequestsSHA256": "2bf9b318f2aa31dafdce104665a48c9941da8b26b8a77a2ef8b3caff63bf3dba"
+            },
+            {
+              "Duration": 135612145,
+              "FileReads": 456,
+              "DistinctFiles": 431,
+              "DirectoryReads": 63,
+              "DistinctDirectories": 60,
+              "ModelCalls": 2,
+              "PlanAndRequestsSHA256": "2bf9b318f2aa31dafdce104665a48c9941da8b26b8a77a2ef8b3caff63bf3dba"
+            },
+            {
+              "Duration": 167368333,
+              "FileReads": 456,
+              "DistinctFiles": 431,
+              "DirectoryReads": 63,
+              "DistinctDirectories": 60,
+              "ModelCalls": 2,
+              "PlanAndRequestsSHA256": "2bf9b318f2aa31dafdce104665a48c9941da8b26b8a77a2ef8b3caff63bf3dba"
+            }
+          ],
+          "p95_ns": null,
+          "real_provider_cost_usd": null,
+          "quality": null
+        },
+        {
+          "case": "large-change",
+          "sample_count": 3,
+          "scripted_pipeline_p50_ns": 242768748,
+          "observations": [
+            {
+              "Duration": 268719200,
+              "FileReads": 558,
+              "DistinctFiles": 447,
+              "DirectoryReads": 66,
+              "DistinctDirectories": 60,
+              "ModelCalls": 8,
+              "PlanAndRequestsSHA256": "c8975d90c3c0eaf89d9fcf473fe7dc86bf0e6c7c1b6b7b941ad84304dac5bb7e"
+            },
+            {
+              "Duration": 242768748,
+              "FileReads": 558,
+              "DistinctFiles": 447,
+              "DirectoryReads": 66,
+              "DistinctDirectories": 60,
+              "ModelCalls": 8,
+              "PlanAndRequestsSHA256": "c8975d90c3c0eaf89d9fcf473fe7dc86bf0e6c7c1b6b7b941ad84304dac5bb7e"
+            },
+            {
+              "Duration": 199456705,
+              "FileReads": 558,
+              "DistinctFiles": 447,
+              "DirectoryReads": 66,
+              "DistinctDirectories": 60,
+              "ModelCalls": 8,
+              "PlanAndRequestsSHA256": "c8975d90c3c0eaf89d9fcf473fe7dc86bf0e6c7c1b6b7b941ad84304dac5bb7e"
+            }
+          ],
+          "p95_ns": null,
+          "real_provider_cost_usd": null,
+          "quality": null
+        },
+        {
+          "case": "noisy-docs",
+          "sample_count": 3,
+          "scripted_pipeline_p50_ns": 123541356,
+          "observations": [
+            {
+              "Duration": 123541356,
+              "FileReads": 473,
+              "DistinctFiles": 450,
+              "DirectoryReads": 60,
+              "DistinctDirectories": 60,
+              "ModelCalls": 5,
+              "PlanAndRequestsSHA256": "fb8a43dfe9a23229b18e240c4729c9852ca473f0f574de25a3013f2fe666fd53"
+            },
+            {
+              "Duration": 120067478,
+              "FileReads": 473,
+              "DistinctFiles": 450,
+              "DirectoryReads": 60,
+              "DistinctDirectories": 60,
+              "ModelCalls": 5,
+              "PlanAndRequestsSHA256": "fb8a43dfe9a23229b18e240c4729c9852ca473f0f574de25a3013f2fe666fd53"
+            },
+            {
+              "Duration": 132904153,
+              "FileReads": 473,
+              "DistinctFiles": 450,
+              "DirectoryReads": 60,
+              "DistinctDirectories": 60,
+              "ModelCalls": 5,
+              "PlanAndRequestsSHA256": "fb8a43dfe9a23229b18e240c4729c9852ca473f0f574de25a3013f2fe666fd53"
+            }
+          ],
+          "p95_ns": null,
+          "real_provider_cost_usd": null,
+          "quality": null
+        },
+        {
+          "case": "provider-retry",
+          "sample_count": 3,
+          "scripted_pipeline_p50_ns": 139736088,
+          "observations": [
+            {
+              "Duration": 139736088,
+              "FileReads": 464,
+              "DistinctFiles": 440,
+              "DirectoryReads": 61,
+              "DistinctDirectories": 60,
+              "ModelCalls": 3,
+              "PlanAndRequestsSHA256": "8cf4e25f84b56016a4027756566d7f932d421bb83fdf843b62d2b92cb359709d"
+            },
+            {
+              "Duration": 135635025,
+              "FileReads": 464,
+              "DistinctFiles": 440,
+              "DirectoryReads": 61,
+              "DistinctDirectories": 60,
+              "ModelCalls": 3,
+              "PlanAndRequestsSHA256": "8cf4e25f84b56016a4027756566d7f932d421bb83fdf843b62d2b92cb359709d"
+            },
+            {
+              "Duration": 150489656,
+              "FileReads": 464,
+              "DistinctFiles": 440,
+              "DirectoryReads": 61,
+              "DistinctDirectories": 60,
+              "ModelCalls": 3,
+              "PlanAndRequestsSHA256": "8cf4e25f84b56016a4027756566d7f932d421bb83fdf843b62d2b92cb359709d"
+            }
+          ],
+          "p95_ns": null,
+          "real_provider_cost_usd": null,
+          "quality": null
+        },
+        {
+          "case": "routine",
+          "sample_count": 3,
+          "scripted_pipeline_p50_ns": 111837291,
+          "observations": [
+            {
+              "Duration": 112510417,
+              "FileReads": 431,
+              "DistinctFiles": 428,
+              "DirectoryReads": 60,
+              "DistinctDirectories": 60,
+              "ModelCalls": 1,
+              "PlanAndRequestsSHA256": "0504f402df24c2c12ed641873494fe0575198033b750a24844f6ccc3516d1281"
+            },
+            {
+              "Duration": 102849558,
+              "FileReads": 431,
+              "DistinctFiles": 428,
+              "DirectoryReads": 60,
+              "DistinctDirectories": 60,
+              "ModelCalls": 1,
+              "PlanAndRequestsSHA256": "0504f402df24c2c12ed641873494fe0575198033b750a24844f6ccc3516d1281"
+            },
+            {
+              "Duration": 111837291,
+              "FileReads": 431,
+              "DistinctFiles": 428,
+              "DirectoryReads": 60,
+              "DistinctDirectories": 60,
+              "ModelCalls": 1,
+              "PlanAndRequestsSHA256": "0504f402df24c2c12ed641873494fe0575198033b750a24844f6ccc3516d1281"
+            }
+          ],
+          "p95_ns": null,
+          "real_provider_cost_usd": null,
+          "quality": null
+        }
+      ]
+    },
+    "engineering_practices": {
+      "kind": "Preparation only; actual framing, no analyzer/model dispatch",
+      "cases": [
+        {
+          "name": "cross-file",
+          "before": [
+            {
+              "Duration": 6730066884,
+              "PlanSHA256": "b5b5721d49ae9ddcda33671844c5b1ede7ae3a33c661a0f04abf10720b511501",
+              "Tasks": 633,
+              "Batches": 21,
+              "Skipped": 395,
+              "Errors": 0
+            },
+            {
+              "Duration": 6443444525,
+              "PlanSHA256": "b5b5721d49ae9ddcda33671844c5b1ede7ae3a33c661a0f04abf10720b511501",
+              "Tasks": 633,
+              "Batches": 21,
+              "Skipped": 395,
+              "Errors": 0
+            },
+            {
+              "Duration": 6548428711,
+              "PlanSHA256": "b5b5721d49ae9ddcda33671844c5b1ede7ae3a33c661a0f04abf10720b511501",
+              "Tasks": 633,
+              "Batches": 21,
+              "Skipped": 395,
+              "Errors": 0
+            }
+          ],
+          "after": [
+            {
+              "Duration": 4540522524,
+              "PlanSHA256": "b5b5721d49ae9ddcda33671844c5b1ede7ae3a33c661a0f04abf10720b511501",
+              "Tasks": 633,
+              "Batches": 21,
+              "Skipped": 395,
+              "Errors": 0
+            },
+            {
+              "Duration": 4747277037,
+              "PlanSHA256": "b5b5721d49ae9ddcda33671844c5b1ede7ae3a33c661a0f04abf10720b511501",
+              "Tasks": 633,
+              "Batches": 21,
+              "Skipped": 395,
+              "Errors": 0
+            },
+            {
+              "Duration": 4746780396,
+              "PlanSHA256": "b5b5721d49ae9ddcda33671844c5b1ede7ae3a33c661a0f04abf10720b511501",
+              "Tasks": 633,
+              "Batches": 21,
+              "Skipped": 395,
+              "Errors": 0
+            }
+          ],
+          "p50_before_ns": 6548428711,
+          "p50_after_ns": 4746780396,
+          "p50_reduction_fraction": 0.27512681202035616
+        },
+        {
+          "name": "large-change",
+          "before": [
+            {
+              "Duration": 13381626147,
+              "PlanSHA256": "3f08595eb65d2c93027a90ebb504357679c01fb2a613ca1d7e84717bd2feaa97",
+              "Tasks": 2414,
+              "Batches": 41,
+              "Skipped": 1884,
+              "Errors": 0
+            },
+            {
+              "Duration": 13566441932,
+              "PlanSHA256": "3f08595eb65d2c93027a90ebb504357679c01fb2a613ca1d7e84717bd2feaa97",
+              "Tasks": 2414,
+              "Batches": 41,
+              "Skipped": 1884,
+              "Errors": 0
+            },
+            {
+              "Duration": 13652848157,
+              "PlanSHA256": "3f08595eb65d2c93027a90ebb504357679c01fb2a613ca1d7e84717bd2feaa97",
+              "Tasks": 2414,
+              "Batches": 41,
+              "Skipped": 1884,
+              "Errors": 0
+            }
+          ],
+          "after": [
+            {
+              "Duration": 10381391232,
+              "PlanSHA256": "3f08595eb65d2c93027a90ebb504357679c01fb2a613ca1d7e84717bd2feaa97",
+              "Tasks": 2414,
+              "Batches": 41,
+              "Skipped": 1884,
+              "Errors": 0
+            },
+            {
+              "Duration": 10210531476,
+              "PlanSHA256": "3f08595eb65d2c93027a90ebb504357679c01fb2a613ca1d7e84717bd2feaa97",
+              "Tasks": 2414,
+              "Batches": 41,
+              "Skipped": 1884,
+              "Errors": 0
+            },
+            {
+              "Duration": 10232715329,
+              "PlanSHA256": "3f08595eb65d2c93027a90ebb504357679c01fb2a613ca1d7e84717bd2feaa97",
+              "Tasks": 2414,
+              "Batches": 41,
+              "Skipped": 1884,
+              "Errors": 0
+            }
+          ],
+          "p50_before_ns": 13566441932,
+          "p50_after_ns": 10232715329,
+          "p50_reduction_fraction": 0.24573330425986895
+        },
+        {
+          "name": "noisy-docs",
+          "before": [
+            {
+              "Duration": 1354492660,
+              "PlanSHA256": "693e575a4d4b7cddbae7d949b5ec662bbd603b9256b3bc1da1cb212cf0011012",
+              "Tasks": 137,
+              "Batches": 14,
+              "Skipped": 40,
+              "Errors": 0
+            },
+            {
+              "Duration": 1392087219,
+              "PlanSHA256": "693e575a4d4b7cddbae7d949b5ec662bbd603b9256b3bc1da1cb212cf0011012",
+              "Tasks": 137,
+              "Batches": 14,
+              "Skipped": 40,
+              "Errors": 0
+            },
+            {
+              "Duration": 1564987621,
+              "PlanSHA256": "693e575a4d4b7cddbae7d949b5ec662bbd603b9256b3bc1da1cb212cf0011012",
+              "Tasks": 137,
+              "Batches": 14,
+              "Skipped": 40,
+              "Errors": 0
+            }
+          ],
+          "after": [
+            {
+              "Duration": 1302667693,
+              "PlanSHA256": "693e575a4d4b7cddbae7d949b5ec662bbd603b9256b3bc1da1cb212cf0011012",
+              "Tasks": 137,
+              "Batches": 14,
+              "Skipped": 40,
+              "Errors": 0
+            },
+            {
+              "Duration": 1299431650,
+              "PlanSHA256": "693e575a4d4b7cddbae7d949b5ec662bbd603b9256b3bc1da1cb212cf0011012",
+              "Tasks": 137,
+              "Batches": 14,
+              "Skipped": 40,
+              "Errors": 0
+            },
+            {
+              "Duration": 1227228764,
+              "PlanSHA256": "693e575a4d4b7cddbae7d949b5ec662bbd603b9256b3bc1da1cb212cf0011012",
+              "Tasks": 137,
+              "Batches": 14,
+              "Skipped": 40,
+              "Errors": 0
+            }
+          ],
+          "p50_before_ns": 1392087219,
+          "p50_after_ns": 1299431650,
+          "p50_reduction_fraction": 0.0665587383716939
+        },
+        {
+          "name": "provider-retry",
+          "before": [
+            {
+              "Duration": 11150894679,
+              "PlanSHA256": "eadba34ec99a408695be2ae3302fdaea4cb4643a90a9bddeb151f49545b2259b",
+              "Tasks": 1547,
+              "Batches": 29,
+              "Skipped": 1249,
+              "Errors": 0
+            },
+            {
+              "Duration": 10701693547,
+              "PlanSHA256": "eadba34ec99a408695be2ae3302fdaea4cb4643a90a9bddeb151f49545b2259b",
+              "Tasks": 1547,
+              "Batches": 29,
+              "Skipped": 1249,
+              "Errors": 0
+            },
+            {
+              "Duration": 11248123711,
+              "PlanSHA256": "eadba34ec99a408695be2ae3302fdaea4cb4643a90a9bddeb151f49545b2259b",
+              "Tasks": 1547,
+              "Batches": 29,
+              "Skipped": 1249,
+              "Errors": 0
+            }
+          ],
+          "after": [
+            {
+              "Duration": 8469366850,
+              "PlanSHA256": "eadba34ec99a408695be2ae3302fdaea4cb4643a90a9bddeb151f49545b2259b",
+              "Tasks": 1547,
+              "Batches": 29,
+              "Skipped": 1249,
+              "Errors": 0
+            },
+            {
+              "Duration": 8415606822,
+              "PlanSHA256": "eadba34ec99a408695be2ae3302fdaea4cb4643a90a9bddeb151f49545b2259b",
+              "Tasks": 1547,
+              "Batches": 29,
+              "Skipped": 1249,
+              "Errors": 0
+            },
+            {
+              "Duration": 8426776306,
+              "PlanSHA256": "eadba34ec99a408695be2ae3302fdaea4cb4643a90a9bddeb151f49545b2259b",
+              "Tasks": 1547,
+              "Batches": 29,
+              "Skipped": 1249,
+              "Errors": 0
+            }
+          ],
+          "p50_before_ns": 11150894679,
+          "p50_after_ns": 8426776306,
+          "p50_reduction_fraction": 0.24429594677548294
+        },
+        {
+          "name": "routine",
+          "before": [
+            {
+              "Duration": 2513370220,
+              "PlanSHA256": "34ef05e222fa782881f2e36823efabd2a240e19c40e5589e2ecb3b9debedd202",
+              "Tasks": 262,
+              "Batches": 12,
+              "Skipped": 106,
+              "Errors": 0
+            },
+            {
+              "Duration": 2405062050,
+              "PlanSHA256": "34ef05e222fa782881f2e36823efabd2a240e19c40e5589e2ecb3b9debedd202",
+              "Tasks": 262,
+              "Batches": 12,
+              "Skipped": 106,
+              "Errors": 0
+            },
+            {
+              "Duration": 2697709340,
+              "PlanSHA256": "34ef05e222fa782881f2e36823efabd2a240e19c40e5589e2ecb3b9debedd202",
+              "Tasks": 262,
+              "Batches": 12,
+              "Skipped": 106,
+              "Errors": 0
+            }
+          ],
+          "after": [
+            {
+              "Duration": 2174358111,
+              "PlanSHA256": "34ef05e222fa782881f2e36823efabd2a240e19c40e5589e2ecb3b9debedd202",
+              "Tasks": 262,
+              "Batches": 12,
+              "Skipped": 106,
+              "Errors": 0
+            },
+            {
+              "Duration": 2009636195,
+              "PlanSHA256": "34ef05e222fa782881f2e36823efabd2a240e19c40e5589e2ecb3b9debedd202",
+              "Tasks": 262,
+              "Batches": 12,
+              "Skipped": 106,
+              "Errors": 0
+            },
+            {
+              "Duration": 1901863082,
+              "PlanSHA256": "34ef05e222fa782881f2e36823efabd2a240e19c40e5589e2ecb3b9debedd202",
+              "Tasks": 262,
+              "Batches": 12,
+              "Skipped": 106,
+              "Errors": 0
+            }
+          ],
+          "p50_before_ns": 2513370220,
+          "p50_after_ns": 2009636195,
+          "p50_reduction_fraction": 0.20042173691387177
+        }
+      ]
+    }
+  },
+  "engineering_surface_note": "Engineering is a practices profile used by applicable review commands/tools. This repository exposes no standalone engineering_review MCP tool or engineering-review top-level command.",
+  "missing": [
+    "Per-mode live-provider latency, cost, completion and coverage baselines beyond the N=1 review compatibility sample",
+    "Mode-specific quality ground truth and operator measurements; the model-label panel is supporting evidence only"
+  ],
+  "promotion": "No policy, provider, model, route or review budget defaults changed.",
+  "inventory_note": "All canonical cases from main.go plus all seven registered MCP tools; CLI flag aliases are recorded with their handler.",
+  "live_pilot": {
+    "artifact": "phase2-live-pilot.json",
+    "status": "Two reasoning-off profiles rejected; one separate low-reasoning review sample completed and replayed with IP sockets denied.",
+    "no_established_baselines": true,
+    "unpriced_attempts": 3,
+    "retained_reservation_usd": 2,
+    "completed_compatibility_samples": 1
+  },
+  "phase1_components": {
+    "C8": "GO for component only: complete context-inclusive equivalence and mutation proof",
+    "C9": "GO for component only: ordered plans/fetches match for Git and worktree; eight mutation guards pass",
+    "reviewer": "CTO agent persona",
+    "limitations": [
+      "Git-backed benchmark process RSS increases by 6,424 KiB",
+      "Routine worktree assembly increases by about 0.14 ms",
+      "No total-review or quality lift established"
+    ]
+  },
+  "local_checkpoint": {
+    "artifact": "phase3-resume.json",
+    "status": "CTO component GO for eligible opt-in resume; per-mode baselines remain open",
+    "repeat_analyzer_invocations": 0,
+    "repeat_scripted_model_calls": 0,
+    "pairs": 20,
+    "not_a_latency_win": "Tiny Ruff case: median34.51ms without resume versus73.91ms for snapshot reuse. No provider-backed latency or cost saving was measured.",
+    "transport_evidence": "Scripted CLI/MCP controls exist in phase2-local-transports.json; live per-mode repeat-savings baselines remain open."
+  },
+  "additional_paid_review_runs_scope": "Completed frozen-corpus compatibility samples only; excludes the three separate closeout self-reviews in closeout.json.",
+  "local_transports": {
+    "artifact": "phase2-local-transports.json",
+    "status": "Completed scripted loopback controls, separate from live baselines",
+    "provider_spend_usd": 0
+  }
+}

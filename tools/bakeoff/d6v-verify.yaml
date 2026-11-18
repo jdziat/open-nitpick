@@ -1,0 +1,9 @@
+# D6v: deep review with the repository check as its selection. The confidence floor and the
+# critique are off, so every draft that survives the duplicate rule and the cap is checked
+# against the checkout and posted only when the check confirms it.
+# docs/remediation-mira.md, "D6v".
+review:
+  verify: confirmed
+  deep:
+    confidence_floor: 0
+    critique: false

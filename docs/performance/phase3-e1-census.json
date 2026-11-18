@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "scope": "Phase 3 item 1 (E1 incremental candidate capture): E0 loss census over retained deep-review logs; no provider calls",
+  "new_provider_spend_usd": 0,
+  "source": "/tmp/bakeoff/runs/*/*/stderr.txt (arms d6v-p1..p3, l1-base/lsp/lsp2, smoke); regenerate with tools/bakeoff/forced_census.py",
+  "census": {
+    "agents": 324,
+    "agents_lost": 0,
+    "whole_batch_diff_only_fallbacks": 0,
+    "forced": 247,
+    "forced_rate": 0.762,
+    "length_cut_forced_calls": 21,
+    "agents_with_ladder_step_down": 14,
+    "forced_with_zero_findings": 10,
+    "completion_tokens_total": 10740475,
+    "cut_token_upper_bound": 1376256,
+    "cut_token_upper_bound_share": 0.128
+  },
+  "reading": "Forced submission is the normal path (76% of finished agents, below the 82-97% the plan quotes for other arms). Every observed forced ladder completed a parseable result, including 10 with zero findings. The logs report no failed agents or whole-batch fallbacks. At a 65,536-token cap, the 21 cut calls represent at most 12.8% of recorded completion-token volume. This is not an upper bound on E1 dollar savings: prompt retransmission and token prices also matter. Recoverable candidate loss is not demonstrated.",
+  "decision": "E1 is not implemented or promoted. Available logs do not demonstrate recoverable candidate loss; an incremental-capture pilot and its total cost comparison remain NOT RUN. The completion-token ratio does not establish whether the cost target can be met.",
+  "status": "NOT PROMOTED on available evidence; live pilot NOT RUN",
+  "source_receipt": {
+    "path": "/home/jdziat/.local/state/open-nitpick/performance-2026-11-18/e0-forced-census.json",
+    "sha256": "ae8d2c6fd8fc8d159d68a7a246593dce9a1c469b2f86630013274dd1498ef730",
+    "logs": 255
+  }
+}

@@ -19,26 +19,28 @@ import (
 // would be run-to-run variance wearing a feature's name, and the log is not
 // evidence: the harness discards it.
 func TestLiveKnowledgeReachesThePlants(t *testing.T) {
-	if os.Getenv("NITPICK_EVAL_EMBED_PROVIDER") == "" {
+	if os.Getenv("NITPICK_EVAL_EMBED_PROVIDER") == "" || os.Getenv("NITPICK_EVAL_EMBED_MODEL") == "" {
 		t.Skip("set NITPICK_EVAL_EMBED_PROVIDER and NITPICK_EVAL_EMBED_MODEL")
 	}
 	entries, err := knowledge.Corpus()
 	if err != nil {
 		t.Fatalf("Corpus: %v", err)
 	}
+	model := os.Getenv("NITPICK_EVAL_EMBED_MODEL")
 	ix, err := knowledge.LoadIndex(mustShippedIndex(t), entries)
 	if err != nil {
 		t.Fatalf("LoadIndex: %v", err)
 	}
 	embedder, err := llm.BuildEmbedder(context.Background(), config.ModelSpec{
 		Provider: os.Getenv("NITPICK_EVAL_EMBED_PROVIDER"),
-		Model:    os.Getenv("NITPICK_EVAL_EMBED_MODEL"),
+		Model:    model,
 	})
 	if err != nil {
 		t.Fatalf("BuildEmbedder: %v", err)
 	}
 	r := &knowledge.Retriever{
 		Entries: entries, Index: ix, Embedder: embedder,
+		Model:      embedder.Model(),
 		Candidates: 20, Keep: 5,
 	}
 
@@ -91,19 +93,43 @@ func TestLiveKnowledgeReachesThePlants(t *testing.T) {
 	}
 }
 
-// mustShippedIndex returns the first index this build ships, for a live test
-// that supplies its own embedder and only needs vectors over the same corpus.
+// mustShippedIndex selects vectors from the configured query model's space.
 func mustShippedIndex(t *testing.T) []byte {
 	t.Helper()
+	model := os.Getenv("NITPICK_EVAL_EMBED_PROVIDER") + "/" + os.Getenv("NITPICK_EVAL_EMBED_MODEL")
+	raw, err := knowledge.SelectIndex(model)
+	if err != nil {
+		t.Fatalf("SelectIndex(%q): %v", model, err)
+	}
+	return raw
+}
+
+func TestShippedKnowledgeIndexesMatchTheConfiguredEmbeddingModel(t *testing.T) {
+	entries, err := knowledge.Corpus()
+	if err != nil {
+		t.Fatal(err)
+	}
 	models, err := knowledge.ShippedModels()
 	if err != nil || len(models) == 0 {
 		t.Fatalf("ShippedModels: %v", err)
 	}
-	raw, err := knowledge.SelectIndex(models[0])
-	if err != nil {
-		t.Fatalf("SelectIndex(%q): %v", models[0], err)
+	for _, model := range models {
+		t.Run(model, func(t *testing.T) {
+			provider, name, ok := strings.Cut(model, "/")
+			if !ok {
+				t.Fatalf("index model has no provider: %q", model)
+			}
+			t.Setenv("NITPICK_EVAL_EMBED_PROVIDER", provider)
+			t.Setenv("NITPICK_EVAL_EMBED_MODEL", name)
+			index, err := knowledge.LoadIndex(mustShippedIndex(t), entries)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := index.CheckModel(model); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
-	return raw
 }
 
 // liveDefectClasses is every class in the taxonomy, for a retrieval test that

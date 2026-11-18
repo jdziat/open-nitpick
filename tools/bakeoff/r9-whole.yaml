@@ -1,0 +1,5 @@
+# R9: the R1 build with each pull request in one batch, as Mira sends it.
+# Defaults are max_files_per_request 6 and token_budget_per_request 60000.
+review:
+  max_files_per_request: 60
+  token_budget_per_request: 120000

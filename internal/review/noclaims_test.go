@@ -90,7 +90,7 @@ func TestAClaimAtAnUnreportedLineIsDropped(t *testing.T) {
 		t.Fatalf("Review: %v", err)
 	}
 	for _, f := range report.Findings {
-		if f.Title == "Something else entirely" {
+		if f.Line == elsewhere.Line {
 			t.Errorf("a claim at an unreported line was published: %+v", f)
 		}
 	}

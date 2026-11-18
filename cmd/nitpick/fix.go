@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 
 	"github.com/jdziat/open-nitpick/internal/config"
@@ -22,7 +24,7 @@ import (
 // something else.
 
 // runFix applies one finding, or every published finding under `fix all`.
-func runFix(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs.Ref, ev *converse.Event, all bool, log *slog.Logger) error {
+func runFix(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs.Ref, ev *converse.Event, all bool, log *slog.Logger) (runErr error) {
 	// The association gate the other commands use has already run. This is
 	// the narrower one: it refuses "none" whatever the config says, because
 	// opening a write to everyone is not a decision an operator makes on
@@ -100,9 +102,22 @@ func runFix(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs.Ref
 	// A client built outside Roles gets no logger otherwise, and a fix that
 	// spent two minutes being rate limited would say only that it was slow.
 	client.SetLogger(log)
+	var usage engineeringUsage
+	usage.reset()
+	usage.attach(&llm.Roles{Review: client})
+	defer func() {
+		// The receipt is diagnostics on stderr; a closed stderr must not turn
+		// a fix that was already proposed into a failed run.
+		if err := json.NewEncoder(os.Stderr).Encode(struct {
+			Event string    `json:"event"`
+			Usage usageJSON `json:"usage"`
+		}{Event: "fix_usage", Usage: usageForJSON(usage.calls())}); err != nil {
+			log.Warn("could not write the fix usage receipt", "error", err)
+		}
+	}()
 
 	req := fix.Request{Findings: findings, Files: files}
-	res, err := fix.Apply(ctx, client, req)
+	res, err := fix.Apply(llm.WithCallRole(ctx, "fix"), client, req)
 	if err != nil {
 		return err
 	}
@@ -120,6 +135,16 @@ func runFix(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs.Ref
 	proposal, ok := fix.Proposal(req, res, pr, branch, body)
 	if !ok {
 		return reply(ctx, gh, ref, ev, fmt.Sprintf("@%s I did not change anything.", ev.Author))
+	}
+	checkRef := ref
+	checkRef.Head = pr.HeadSHA
+	checkBody, allowed := checkFix(ctx, gh, checkRef, cfg.Execution, proposal.Edits)
+	if !allowed {
+		return reply(ctx, gh, ref, ev, fmt.Sprintf("@%s I did not publish the fix because the required selected checks did not pass.%s", ev.Author, checkBody))
+	}
+	if cfg.Execution.Enabled {
+		proposal.Body = fix.BodyWithChecks(req, res, pr.HeadSHA, ev.Author, ref.Number, checkBody)
+		proposal.Message = proposal.Title + "\n\n" + proposal.Body
 	}
 
 	change, err := gh.ProposeChange(ctx, ref, proposal)
@@ -162,6 +187,9 @@ func runFix(ctx context.Context, gh *vcs.GitHub, cfg *config.Config, ref vcs.Ref
 	}
 
 	log.Info("proposed a fix", "branch", change.Branch, "pull_request", change.Number)
+	if cfg.Execution.Enabled {
+		return reply(ctx, gh, ref, ev, fmt.Sprintf("@%s I opened %s as a draft with selected check results in its description.", ev.Author, change.URL))
+	}
 	return reply(ctx, gh, ref, ev, fmt.Sprintf(
 		"@%s I opened %s as a draft. It was never compiled or tested: its own checks are the verification.",
 		ev.Author, change.URL))

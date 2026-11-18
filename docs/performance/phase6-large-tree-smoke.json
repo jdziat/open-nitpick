@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "status": "single_run_large_tree_smoke_not_a_baseline",
+  "provider_spend_usd": 0,
+  "tree": "Go 1.26.8 standard library source copied into a scratch git repository (11,478 tracked files, 7,711 Go files, 199 MB)",
+  "binary_sha256": "d1f4a7a87b7c035d4f5333324d001cecc4ca4c8926af9ef847ce876d7b0d6c85",
+  "host": "192 CPUs, 503 GiB RAM, shared with other jobs",
+  "runs": [
+    {
+      "command": "nitpick standards",
+      "exit": 0,
+      "wall_s": 4.17,
+      "peak_rss_kib": 218488,
+      "files_measured": 5743
+    },
+    {
+      "command": "nitpick slop -no-model -json",
+      "exit": 0,
+      "wall_s": 17.12,
+      "peak_rss_kib": 401100,
+      "files_scored": 6297,
+      "lines": 1942396,
+      "output_bytes": 3437179
+    }
+  ],
+  "first_attempt_note": "One earlier slop invocation failed with exit 64 because the controller passed the flags as one quoted word. It did no work and is not a result.",
+  "not_a_claim": "One run per command on a shared host, no repeats, no p95, no comparison with another build. It shows both model-free commands finish on a 1.9 million line tree with bounded memory. It supports no speedup or regression claim. Review, fast-review and deep-review were not run at this scale."
+}

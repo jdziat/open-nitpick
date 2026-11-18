@@ -1,0 +1,2517 @@
+# Remediation: closing the precision gap to Mira
+
+**Status:** gate run on 2026-11-13; the win condition was not met (see "Held-out result")
+**Date:** 2026-11-13
+**Evidence:** [Bakeoff: open-nitpick against Mira](bakeoff-mira.md)
+
+The bakeoff found one gap, and it is precision. On the same model, open-nitpick
+reported more of the labelled defects than Mira (recall 55% against 40 to 42%)
+and posted four times as many comments, three quarters of which matched nothing
+(precision 28 to 29% against 68 to 76%). This plan closes that gap in stages,
+and each stage has to show its number before the next one starts.
+
+## The target
+
+The goal is a margin that survives a corpus neither tool was tuned on, not a
+win on the 20 pull requests this analysis already looked at.
+
+- **Corpus.** The Martian offline set has 50 pull requests. The bakeoff used 20
+  (entries 1, 2, 4 and 5 of each repository). The other 30 are held out: no
+  stage is tuned on them and they are scored once, at the end.
+- **Win condition.** On the 30 held-out pull requests, with
+  `deepseek/deepseek-v4.1-flash-1017` for every role in both tools and the same
+  upstream judge, three passes each:
+  - open-nitpick's F1 is at least 0.08 above Mira's in every pass, and so is its
+    F2;
+  - open-nitpick's precision is at least 60%;
+  - open-nitpick's median review time is no worse than Mira's;
+  - the planted-defect corpus in `internal/evals` loses no defect it finds today.
+- **What that needs.** At today's recall of 55%, a precision of 65% gives F1 0.60
+  and F2 0.57, against Mira's 0.52 and 0.45 on the tuning set. The arithmetic is
+  in reach. The open question is whether precision can rise that far without
+  recall falling.
+
+Mira's figures are a moving target in one respect. Its prompt carries a list of
+62 language "footguns", and one of them, negative slicing on a Django QuerySet,
+restates a golden comment on sentry-1 almost word for word. That makes the
+held-out split matter more, not less, and it is a reason this plan adds no rule
+derived from a golden comment.
+
+## What the variance allows
+
+Two runs with only a class filter changed (`persona.nitpick: minimal`) scored F1
+0.418 and 0.434 against 0.368 and 0.378 for the shipped passes. A filter cannot
+add a finding: the prompt is generated at `normal` whatever the level
+(`config.GenerationLevel`), and the filter runs after triage. Applied offline to
+the shipped passes, it removes 6 and 5 comments and moves precision by under one
+point. So these are four runs of one generator, and they spread across 0.07 of
+F1, 53% to 61% recall and 92 to 128 comments.
+
+So one pass of open-nitpick can move F1 by more than half the gap this plan sets
+out to open, and two passes agreeing is weaker evidence than the bakeoff document
+first treated it as.
+Every stage below is measured with three passes per arm, compared per pull
+request with a paired bootstrap, and a ship condition has to clear the 95%
+interval, not the mean.
+
+## Stages
+
+Each stage names what it changes, what the measurement must show before it
+ships, and what kills it. Ship and kill conditions are written here, before any
+number exists.
+
+### R0. Make the measurement repeatable
+
+Changes nothing a review produces.
+
+- `nitpick review -format json` prints findings with path, line, severity, class
+  and title, and the fields R1 adds. The bakeoff runner parses the dry-run text
+  today, and its first severity parse was wrong in a way that hid a result.
+- `make bakeoff` runs both tools over a named split, writes the scorer's layout
+  and scores it, with the tooling already in `tools/bakeoff`.
+- A per-pull-request paired bootstrap over F1, precision and recall, printed
+  with the counts behind every rate.
+
+Done when a three-pass arm A rerun on the tuning split reproduces the bakeoff
+numbers within the bootstrap interval.
+
+### R1. Confidence and a citation on every finding
+
+The largest lever, and the one with the most risk.
+
+- The review schema gains `confidence` (0 to 1) and `evidence`: the lines of the
+  shown code the claim rests on, quoted. `internal/review/schema.go`,
+  `internal/review/finding.go`, `internal/prompt/templates/review.md`.
+- A publish floor in code, `review.min_confidence`, applied after triage. It is
+  set from the measurement below, not from Mira's 0.7.
+- Why: severity separates a real finding from noise only weakly here. The judge
+  matched 11% of our info comments, 30% of warnings and 37% of errors. Mira's
+  drafts do separate on confidence: posted comments have median 0.78 and dropped
+  ones 0.665.
+
+Before building the floor, measure whether DeepSeek's self-reported confidence
+separates matched from unmatched comments on the tuning split: the area under
+the curve of confidence against the judge's verdict.
+
+- **Ship:** area at least 0.70, and a floor exists that raises precision by 15
+  points or more while recall falls by 5 or fewer, across three passes.
+- **Kill:** area below 0.65. Self-reported confidence is then not a signal for
+  this model and R2 carries the precision work alone.
+
+**Result (2026-11-13): killed.** Three passes on the 20 tuning pull requests
+produced 316 comments, every one carrying a confidence, 99 matched by the judge.
+The area under the curve is 0.628. Confidence sits between 0.6 and 0.85 for 87% of
+comments, so there is little spread to cut on: a floor of 0.8 keeps 132 comments
+at 40.9% precision and loses 45% of the matched ones, and a floor of 0.9 keeps 39
+comments at 51% and loses 80%. The floor, `review.min_confidence`, is not built.
+
+The three passes scored F1 0.367, 0.430 and 0.420 and precision 29.0%, 32.3% and
+37.0%, against 0.368 and 0.378 and 28 to 29% shipped. A paired bootstrap over the
+20 pull requests puts the F1 difference at +0.030 with an interval of -0.044 to
++0.092, so asking for a confidence and a citation moved nothing this corpus can
+resolve, in either direction.
+
+Looked at after the gate failed, and so not pre-registered, only a lead for R3:
+
+| signal | area under the curve |
+|---|---:|
+| confidence, within a pull request (490 matched-against-unmatched pairs) | 0.704 |
+| severity, over all comments | 0.663 |
+| confidence plus a little severity | 0.676 |
+| length of the rationale | 0.519 |
+
+A comment that quotes a citation matched 35.3% of the time (173 comments), against
+26.6% for one that did not (143). Ranking within a pull request is what a per-pull-request cap needs, so R3 may use confidence as its
+ranking even though R1's floor is dead. That has to be confirmed on the held-out
+split before anyone relies on it. The `confidence` and `citation` fields stay in
+the schema for that reason and for the JSON report; if R3 fails they are removed.
+
+### R2. An evidence-graded critique stage
+
+- A stage after triage, one batched call per pull request, grades each finding as
+  `proven`, `plausible` or `unsupported` against the diff around its cited lines.
+  The keep rule lives in code: proven keeps, plausible keeps at warning or above,
+  unsupported drops.
+- Why not triage: `triage.md` rule 2 already asks triage to rate a thin claim
+  `nit`, and the result is info comments at 11% precision. Triage merges, ranks
+  and re-rates in one call. Grading evidence is a separate job.
+- Why not `validation`: as shipped it cost 13 points of recall for 1 to 2 of
+  precision here, and 4 of 24 planted locations on the knowledge corpus.
+- Measured offline on the shipped passes: precision rose from 27.6% to 32.3% and
+  from 28.8% to 37.1%, recall fell from 54.8% to 50.0% and to 53.2%, and F1 rose
+  0.024 and 0.059.
+
+- **Ship:** precision up 5 points or more at a recall cost of 3 or fewer, across
+  three live passes.
+- **Kill:** recall falls more than 5 points, or precision does not move outside
+  the interval.
+
+**Result (2026-11-13): killed.** Three live passes with `review.critique` on
+against the three R1 passes, which are the same build with the stage off. The
+critique scored precision 35.5% against 33.2% (+2.3 points, interval -2.6 to +8.0)
+and recall 42.6% against 51.5% (-8.8 points, interval -15.5 to -2.0), F1 0.388
+against 0.404. Comments per pass fell from 82 to 126 down to 77 to 86. Recall
+fell by more than the 5 points the kill condition allows, with the interval
+clear of zero.
+
+The offline estimate that motivated the stage (precision +5 to +8, recall -2 to
+-5) compared the same findings with and without the filter. The live comparison
+is between different generations, and the R1 passes alone span 48% to 65% recall,
+so some of the recall difference is the model returning different findings. Both
+ways of measuring agree that evidence grading buys a few points of precision at
+a cost in recall and does not come near the 25 to 30 points the target needs.
+The stage stays in the tree, off, until R4 shows whether a grader that can read
+the repository does better; if it does not, it comes out.
+
+### R2b. Verify each finding with repository tools (replaces R2)
+
+Measured offline before building, on the 316 findings the three R1 passes
+produced, so the comparison is exact: the same findings with and without the
+filter. A grader given `read_file` and `grep_repo` over the head checkout and up
+to eight tool calls submits `confirmed`, `refuted` or `uncertain` for each finding,
+`tools/bakeoff/verify_filter.py`.
+
+| keep (counts pooled over the passes) | precision | recall | F1 | F2 |
+|---|---:|---:|---:|---:|
+| no filter | 33.2% | 51.5% | 0.404 | 0.464 |
+| confirmed only | 47.5% | 47.1% | 0.473 | 0.472 |
+| confirmed and uncertain | 39.4% | 49.0% | 0.437 | 0.467 |
+
+Against the unfiltered findings, keeping confirmed only changes precision by
++14.3 points (interval +8.3 to +20.0), recall by -4.4 (-7.9 to -1.5) and F1 by
++0.069 (+0.019 to +0.112). It graded 199 of 316 confirmed, 64 refuted and 53
+uncertain, used 8.3 tool calls a finding on average, and no grading failed.
+Against Mira on the same 20 pull requests the F1 gap closes from -0.14 to -0.04,
+with an interval of -0.13 to +0.05 that includes zero. Precision is still 25
+points behind.
+
+The recall-weighted F2 hardly moves (0.464 to 0.472), because the filter trades
+recall for precision. The win condition asks for F2 as well as F1, and Mira's F2
+was 0.445 and 0.455, so this does not reach it: F2 needs recall to rise, and
+nothing built so far does that.
+
+With a cap on top (offline, ranked by the reviewer's confidence within a pull
+request), 3 comments a pull request gives 56% precision at 44 comments a pass,
+and 2 gives 63% at 33. Mira posts about 36 a pass at 68 to 76%.
+
+This is the first change in this plan that moves precision by more than the
+variance. The critique stage it replaces graded the same claim without letting the
+grader look anything up, and gained 2 points. The difference this suggests is the
+tools, and it is untested whether a grader with tools but no diff window would do
+as well.
+
+Two follow-ups on the same findings. Verifying the two-reviewer union (arm B)
+left precision at 31.7% against 20.0% unverified, recall at 51.5%, F1 0.392, which
+is 0.085 worse than verifying the single reviewer (interval -0.145 to -0.009): the
+extra recall the second reviewer brings is mostly findings the grader also
+confirms and the judge does not match. A hand read of 14 of the 111 confirmed
+false positives on the tuning set found most of them real-looking defects the
+golden list does not contain (a migration with `force: true` that drops rows, a
+hard-coded upload cap that ignores a site setting, an async `forEach` in a second
+file), which suggested the benchmark was charging real findings as false positives.
+That read was of checker-confirmed comments only. A random blind grade of all
+unmatched held-out comments, below, found otherwise for the false positives as a
+whole, so treat this paragraph as superseded by it.
+
+### R3. Cap low-priority volume per pull request
+
+- Warnings and above always publish. Below that, a per-pull-request cap ranked by
+  R1's confidence, then R2's grade. Mira does the same with a cap of five.
+- Why last among the cheap stages: a cap needs a ranking that means something.
+  Ranked by severity alone, a cap of five reached 34.6% precision at 40.4%
+  recall, which is what saying less costs without a better ranking.
+  Three pull requests with 11 or more comments carried 40% of our comments at 17%
+  precision.
+
+- **Ship:** precision up 5 points or more over R1 and R2 at a recall cost of 2 or
+  fewer.
+- **Kill:** no cap clears that.
+
+### R4. Verify plausible findings against the code they depend on
+
+- A finding graded `plausible` because it depends on code not shown gets that
+  code: the symbol it names, through the definition resolution the related
+  context already does, and is graded again.
+- Why: two of the five golden comments only Mira found are cross-file (a
+  `member` that can be `None` in sentry-1 and sentry-2). Mira reaches them by
+  reading files through tools, which is also why its reviews take 187 seconds on
+  Sonnet against our 22.
+- Budget: no more than 60 seconds added to the median review.
+
+- **Ship:** recall up 3 points or more with precision held, inside the time
+  budget.
+- **Kill:** the time budget is breached, or recall does not move.
+
+## What not to do
+
+Each of these was measured in the bakeoff and lost.
+
+- **Union two reviewers.** Arm B added `qwen3.8-27b` as a second reviewer and
+  matched 4 to 5 more golden comments at a cost of 63 to 80 more false positives.
+  Of 199 comments in one pass, 21 came from qwen and 2 from both models, so there
+  is no agreement signal to vote on either.
+- **Widen context without a denoise step.** In the same arm, with the caller walk
+  on and larger batches, DeepSeek alone posted 176 comments where it posted 123
+  to 128 at shipped settings. The two changes were made together, so this does
+  not say which one did it.
+- **Use adversarial validation for precision.** See R2.
+- **Treat one pass as a result.** See the variance section.
+
+## Held-out result
+
+The gate ran once on the 30 held-out pull requests: three passes each of Mira,
+open-nitpick as it shipped plus R1's confidence and citation fields, and that
+same output kept only when the offline checker confirmed it
+(`tools/bakeoff/verify_filter.py`). A fourth arm ran the Go stage
+(`review.verify: confirmed`, `internal/review/verify.go`) live, three passes.
+All used `deepseek/deepseek-v4.1-flash-1017` in every role and the same judge.
+Counts are pooled over the three passes and over all golden categories, as in
+`tools/bakeoff/compare.py`.
+
+| arm (3 passes) | TP | FP | FN | precision | recall | F1 | F2 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Mira | 158 | 57 | 157 | 73.5% | 50.2% | 0.596 | 0.536 |
+| open-nitpick | 185 | 263 | 130 | 41.3% | 58.7% | 0.485 | 0.542 |
+| open-nitpick, offline-verified | 165 | 165 | 150 | 50.0% | 52.4% | 0.512 | 0.519 |
+| open-nitpick, Go verify, live | 149 | 161 | 166 | 48.1% | 47.3% | 0.477 | 0.475 |
+
+Per pass, F1 for Mira was 0.586, 0.616 and 0.588; offline-verified was 0.484,
+0.495 and 0.556; the live Go stage was 0.442, 0.528 and 0.458. Mira is ahead in
+every pass of every arm.
+
+Paired bootstrap over the 30 pull requests, 95% interval, each arm minus Mira:
+
+| arm | precision | recall | F1 |
+|---|---|---|---|
+| open-nitpick | -32.2 pts (-41.0 to -23.3) | +8.6 (+0.4 to +16.2) | -0.111 (-0.169 to -0.052) |
+| offline-verified | -23.5 (-32.7 to -14.4) | +2.2 (-5.9 to +9.9) | -0.085 (-0.146 to -0.023) |
+| Go verify, live | -25.4 (-34.4 to -16.8) | -2.9 (-12.2 to +5.8) | -0.119 (-0.194 to -0.047) |
+
+**The win condition failed on every line it set.** F1 was to be 0.08 above
+Mira's in every pass; the best open-nitpick pass (0.556) is below the worst Mira pass (0.586). F2 was to be 0.08 above and
+is level at best (0.542 and 0.519 against 0.536). Precision was to reach 60% and
+reached 50%. Median review time was to be no worse than Mira's: Mira's median was
+76 seconds a review and open-nitpick's 131 (133 with the Go stage), though all
+nine passes shared one machine and one provider key, so that gap is indicative.
+The planted-defect corpus was not run, because a stage that fails the first
+three conditions does not ship on the strength of the fourth.
+
+What held and what did not:
+
+- **Verification still helps against its own baseline.** Against the unfiltered
+  output it moved precision by +8.7 points (interval +4.5 to +12.7) and recall by
+  -6.3 (-9.2 to -3.7), and F1 by +0.027, an interval (-0.006 to +0.054) that
+  includes zero. On the tuning set the same filter moved F1 by +0.069. The held-out
+  gain is smaller than the tuning one, as the variance section warned.
+- **The tuning-set claim that it closes most of the F1 gap did not hold.** It
+  reported a gap of -0.04; the held-out gap is -0.085.
+- **The Go stage did not reproduce the offline filter.** It scored 0.035 F1
+  below it (interval -0.072 to +0.001), with 5 points less recall and a
+  precision no better. These are different generations, not the same findings
+  filtered twice, so the difference mixes the stage with the variance between
+  passes. It does not show the live stage is worse; it shows it did not do better.
+- **Recall is the one axis open-nitpick led, and only unfiltered.** 58.7% against
+  Mira's 50.2% (interval +0.4 to +8.6 points over three passes), bought with 263
+  false positives against 57.
+
+Two harness faults surfaced and are recorded so a later reader can discount them.
+
+- **The judge's grouping answers.** The upstream scorer rejects a grouping that
+  repeats or omits an index. Twice that stopped scoring on an answer a
+  temperature-0 judge repeats unchanged, once because numbered lists inside a
+  comment body read as extra candidates. `tools/bakeoff/mira-scorer-dedup-repair.patch`
+  re-asks up to three times, labelling each candidate and quoting the rejected
+  answer, and caches the accepted one under the original prompt. Every arm gets
+  the same repair. Two grouping prompts needed it, both Mira's (pass 3, grafana-6
+  and keycloak-6); no open-nitpick arm needed any. A repaired grouping can merge
+  duplicate comments, which lowers a false-positive count by at most one in about
+  215, so it cannot account for a gap of this size, but it is not neutral.
+- **One stalled live review.** In the Go arm's third pass one checker call never
+  answered and held its finding for the full five minutes, failing the stage and
+  the review (exit 2). That is the same provider behaviour the `firstAttemptMaxTokens`
+  work bounded for review calls, and the stage had no per-call deadline. It now
+  has one (`verifyCallTimeout`, 90 seconds, one resend), with tests that fail
+  without it. The review was run once more under the new binary and its result
+  used; the stalled one is kept beside the runs as
+  `gover-p3-sentry-9-r1.stalled`. The other 89 live reviews finished.
+
+### Is the gap reliability or volume
+
+The same repository checker (`tools/bakeoff/verify_filter.py`, DeepSeek with
+`read_file` and `grep_repo`) was run over Mira's 216 held-out comments, so both
+tools are graded by one neutral party that matches neither tool's labels.
+
+| held-out comments, 3 passes | comments | confirmed | refuted | uncertain | kept after the check: TP / FP | precision | recall | F1 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Mira | 216 | 200 (92.6%) | 1 | 15 | 150 / 50 | 75.0% | 47.6% | 0.583 |
+| open-nitpick | 448 | 324 (72.3%) | 69 | 54 | 165 / 165 | 50.0% | 52.4% | 0.512 |
+
+The check leaves Mira where it was (F1 0.596 before, 0.583 after, interval of the
+change -0.030 to +0.001) and moves its precision by 1.5 points, an interval that
+includes zero, so the checker is not what makes Mira's number look good. After it, open-nitpick is still 25 points
+behind on precision (interval -33.4 to -16.6) and 4.8 ahead on recall (interval
+-3.7 to +12.7).
+
+Two effects are visible. The checker confirms 20 points fewer of open-nitpick's
+comments, so Mira's generation is more reliable and not merely shorter. And among
+what it confirms, open-nitpick still posts 165 comments that match no golden
+comment against Mira's 50, about 55 a pass against 17. The checker reads those as
+real, which is not the same as being real: the blind grade below found it too
+lenient.
+
+The checker is the same model family as both reviewers and shares its blind
+spots, so this is indicative; the blind grade that follows tests it against hand
+reading.
+
+### A blind grade of the false positives
+
+The question the gate left open was how many of each tool's unmatched comments
+are real defects the golden list lacks, because that decides whether the
+precision gap is quality or labelling. A random sample of the held-out unmatched
+comments was drawn (30 of open-nitpick's 263 and 18 of Mira's 57, three passes
+pooled, seed 20261114), shuffled so no item showed which tool wrote it, and split
+across four graders, each a model with the repository checkout and the diff and
+told to judge the claim against the code and not to reward confidence. A grader
+returned `real`, `partly` (a genuine concern, overstated or misplaced),
+`not_real` (contradicted, handled elsewhere, pre-existing or speculative) or
+`unclear`. The graders are a different model family from the reviewers and the
+checker, and 44 of the 48 verdicts cite a file and line.
+
+| unmatched comments, sampled | n | real | partly | not real | unclear |
+|---|---:|---:|---:|---:|---:|
+| open-nitpick | 30 | 8 (27%, 95% interval 14 to 44) | 6 (20%) | 16 (53%) | 0 |
+| Mira | 18 | 11 (61%, 39 to 80) | 5 (28%) | 2 (11%) | 0 |
+
+Over half of open-nitpick's false positives are wrong by hand grade, against 11% of
+Mira's, and most of Mira's are real defects the labels lack. That reverses the
+earlier suggestion that our false positives were mostly unlabelled real defects.
+Counting a real unmatched comment as correct, open-nitpick's precision moves from
+41.3% to about 57% (50 to 67 across the sample's interval) and Mira's from 73.5% to
+about 90% (84 to 95); counting `partly` as well, 69% and 97%. The gap is 32.7
+points after the adjustment against 32.2 before it (28 counting `partly`), because
+Mira has real unlabelled comments too. The precision gap is a quality gap.
+
+The same sample says something about our checker. Against the hand grades it
+confirmed all 8 `real` comments, 4 of 6 `partly`, and 7 of 16 `not_real`; it
+refuted 6 and called 3 uncertain. Keeping only what it confirms therefore removes 9
+of 16 wrong comments and 2 of 14 real or partly real ones. It filters usefully and
+leaves 7 wrong comments in 19 kept. That pointed at a stronger checker, so one was
+tried on the same comments.
+
+#### A stronger checker, on the graded sample
+
+`tools/bakeoff/verify_filter.py --model anthropic/claude-sonnet-4.6` over the 30
+graded open-nitpick comments plus 20 randomly drawn matched ones as a recall
+control (880,000 prompt tokens and 44,000 completion tokens, about $3 at list
+price). Keeping only what each checker confirms:
+
+| of 50 comments | DeepSeek V4 Flash | Sonnet 4.6 |
+|---|---:|---:|
+| wrong comments removed (of 16 `not_real`) | 9 | 6 |
+| real, partly real or matched comments lost (of 34) | 4 | 1 |
+| verdicts of "uncertain" | 6 | 0 |
+
+The stronger model is not the better filter. It commits where DeepSeek hedges, so
+it loses fewer good comments and removes fewer bad ones: 10 of the 16 wrong
+comments are confirmed, against 7. At 4.9 lookups a comment it stops sooner than the
+graders did. The wrong comments that survive are the ones that need a framework's
+behaviour or a control flow read to rebut (a proxied controller property, a loop
+that runs a pass on shutdown), and a checker with reasoning off and eight lookups
+does not do that reading with either model. Whether one with reasoning on would is
+untested; at this sample size a difference of two or three comments is noise.
+
+Limits: 30 and 18 are small, and the intervals are wide; one family of grader read
+all 48; and `partly` is a judgement. The sample, key and verdicts are in
+`/tmp/bakeoff/grade`, not in the repository.
+
+### R5. Generate with the repository open (registered 2026-11-13, before any run)
+
+The one lever the gate leaves is the generator. Mira's reviewer reads files and
+searches the repository while it decides what to file, and its prompt tells it to
+look before staying silent. Ours reviews from the diff and what the bundle
+carries, and a checker looks things up afterwards. R5 gives the reviewer the same
+two tools in its own call (`review.investigate`), with `submit_findings` as the
+way to finish, and changes nothing else: same prompt, same schema, same model.
+
+It runs on the 20 tuning pull requests only. The 30 held-out ones were read once
+and a second look is contaminated, so a result here is a reason to look for a new
+corpus, not a win.
+
+- **Ship to a fresh-corpus gate:** over three passes, paired against the same
+  tuning set's three R1 passes, precision up 10 points or more, recall down 3 or
+  fewer, and F1 at or above Mira's on the same 20 pull requests (0.505 and 0.524 in its
+  two passes; the three R1 passes it is paired against scored 0.364, 0.425 and 0.424).
+- **Kill:** any of the three fails. A precision gain with a larger recall loss is
+  a cap, which the gate already measured.
+- **Cost bound:** under twice the model calls of an R1 review, stated as measured
+  calls, and review time reported with it.
+
+#### R5 result: killed
+
+Two builds, three passes each, on the 20 tuning pull requests, paired against the
+same set's three R1 passes. R5a switched reasoning off for the whole generation
+call, which the checker does for its lookups; R5b left the client's reasoning on
+and echoed it back across tool turns, so the tools are the only change.
+
+| arm (3 passes, 20 pull requests) | TP | FP | FN | precision | recall | F1 | median review |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| R1, no tools | 105 | 211 | 99 | 33.2% | 51.5% | 0.404 | 146 s |
+| R5a, tools, reasoning off | 119 | 338 | 85 | 26.0% | 58.3% | 0.360 | 70 s |
+| R5b, tools, reasoning on | 88 | 186 | 116 | 32.1% | 43.1% | 0.368 | 218 s |
+| Mira (2 passes) | 54 | 20 | 82 | 73.0% | 39.7% | 0.514 | |
+
+| against R1 | precision | recall | F1 |
+|---|---|---|---|
+| R5a | -7.2 pts (-11.7 to -1.9) | +6.9 (-1.2 to +15.2) | -0.044 (-0.090 to +0.015) |
+| R5b | -1.1 (-7.4 to +4.7) | -8.3 (-14.2 to -2.0) | -0.036 (-0.088 to +0.024) |
+
+The ship condition was precision up 10 points, recall down at most 3, and F1 at
+or above Mira's 0.514. Neither build comes near any of the three. R5a lowers
+precision; R5b leaves it where it was and loses recall. The two differ from each
+other by what the thinking does: with it off the reviewer files more (457 comments
+against 274) and with it on, fewer; precision moves a little the other way
+(26.0% to 32.1%, interval +0.5 to +10.2) and recall falls 15 points, which is the
+trade a cap makes.
+
+How much the reviewer looked: in R5b every one of the 102 investigated batches
+used the whole 12-lookup budget, 8 turns at the median. A reviewer that looks up
+something particular would stop sooner on a small change; this one reads until it
+is stopped. 42 of 144 batches fell back to the ordinary review because the model
+ended without submitting, so R5b is a mix of the two modes and understates what
+tools alone would do. R5a fell back on 6 of 144.
+
+Reasoning on also costs time: the median review went from 146 to 218 seconds, and
+Mira's takes 76 on the held-out set. The option was removed with this result
+rather than left on the books as a default-off stage nobody should enable.
+
+### R6. A budget in the prompt (registered 2026-11-14, before it runs)
+
+Every selector tried after generation, a cap by confidence, agreement between
+passes, a repository check, ranks comments the model has already written, and
+none ranks them as well as the model that wrote them chose. R6 moves the choice
+before the writing: the review prompt states a budget of two findings a batch and
+asks for the ones with the most severe demonstrated consequence if there are more.
+The model then allocates its attention knowing it has two to spend. This is the
+only change: same model, schema and context, no cap in code.
+
+It runs on the 20 tuning pull requests, three passes, paired against the three R1
+passes. It is a prompt edit, so it is measured by a build carrying the edit and
+reverted if it fails.
+
+- **Ship to a fresh-corpus gate:** precision up 10 points or more, recall down 3
+  or fewer, F1 at or above Mira's 0.514 on these 20.
+- **Kill:** any of the three fails. A precision gain bought with a larger recall
+  loss is the cap the held-out diagnostic already measured.
+
+#### R6 result: killed
+
+Three passes on the 20 tuning pull requests with the budget in the prompt, paired
+against the same set's three R1 passes. The reviewer posted 152 comments where R1
+posted 316.
+
+| arm (3 passes, 20 pull requests) | TP | FP | FN | precision | recall | F1 |
+|---|---:|---:|---:|---:|---:|---:|
+| R1 | 105 | 211 | 99 | 33.2% | 51.5% | 0.404 |
+| R6, budget of two a batch | 76 | 82 | 128 | 48.1% | 37.3% | 0.420 |
+| Mira (2 passes) | 54 | 20 | 82 | 73.0% | 39.7% | 0.514 |
+
+Against R1: precision +14.9 points (+7.4 to +21.3), recall -14.2 (-24.5 to -5.1),
+F1 +0.016 (-0.070 to +0.085). Per pass F1 was 0.393, 0.439 and 0.427. Against
+Mira: precision -24.9 (-37.4 to -13.4), recall -2.5 (-14.8 to +9.1), F1 -0.094
+(-0.204 to +0.019).
+
+Precision cleared the ship condition and recall and F1 did not, so it is killed. It
+is the cap again, reached through the prompt: the model that chooses before
+writing lands where the post-hoc cap lands (at 2.5 comments a pull request the
+held-out cap table gives 54% precision at 37% recall for unverified output), not
+above it. The worth of this run is the comparison with Mira at matched recall:
+R6 recalls 37.3% against Mira's 39.7% and posts about as many comments, and its
+precision is still 25 points lower. At equal volume and equal recall, Mira's
+comments are better aimed by 25 points, which is a difference in what the model
+looks for and not in how many things it says. The template change was reverted.
+
+### R7. What the prompt tells the reviewer to look for (registered 2026-11-14, before it runs)
+
+R6 posted about as many comments as Mira, recalled about as much, and was still 25
+points less precise, so the difference is in what the model goes looking for. Mira's
+prompt is a set of review heuristics, and none of ours is: it names three places
+defects hide (the consuming side of a value that crosses a boundary, what a refactor
+silently dropped, callers and implementers that did not follow a signature change)
+and a list of things not worth a finding. R7 adds both to our review prompt, in our
+own words, and changes nothing else.
+
+It runs on the 20 tuning pull requests, three passes, paired against the three R1
+passes, and is reverted if it fails. The heuristics are general review practice and
+none is taken from a golden comment.
+
+- **Ship to a fresh-corpus gate:** precision up 10 points or more, recall down 3 or
+  fewer, F1 at or above Mira's 0.514 on these 20.
+- **Kill:** any of the three fails.
+
+#### R7 result: killed
+
+Three passes on the 20 tuning pull requests with the three heuristics and the
+exclusion list in the review prompt, paired against the same set's R1 passes.
+
+| arm (3 passes, 20 pull requests) | TP | FP | FN | precision | recall | F1 | comments |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| R1 | 105 | 211 | 99 | 33.2% | 51.5% | 0.404 | 316 |
+| R7, heuristics in the prompt | 92 | 192 | 112 | 32.4% | 45.1% | 0.377 | 282 |
+| Mira (2 passes) | 54 | 20 | 82 | 73.0% | 39.7% | 0.514 | |
+
+Against R1: precision -0.8 points (-4.8 to +3.2), recall -6.4 (-13.8 to 0.0), F1
+-0.027 (-0.074 to +0.014). The prompt moved the reviewer's output by a small amount
+and in no useful direction. So the 25 points of precision Mira has at matched
+volume and recall are not in the review heuristics a prompt can state. R6 showed it
+is not in how much the model says either.
+
+One more selector, checked offline on the stored R1-build output
+(`tools/bakeoff/citation_filter.py`): Mira discards a comment whose quoted code is
+not in the diff, so the same rule applied to open-nitpick's `citation` field keeps a
+comment only when it cites code present in the diff.
+
+| stored output | comments | precision | recall | F1 |
+|---|---:|---:|---:|---:|
+| held-out, no filter | 447 | 41.3% | 58.7% | 0.485 |
+| held-out, citation present and in the diff | 219 | 41.6% | 29.2% | 0.343 |
+| tuning, no filter | 316 | 33.2% | 51.5% | 0.404 |
+| tuning, citation present and in the diff | 135 | 32.1% | 21.1% | 0.254 |
+
+More than half the comments carry no citation (167 of 447 on the held-out set),
+because the field is optional, and the ones that have one are no more likely to
+match. The rule halves recall and leaves precision where it was.
+
+### Where Mira's results come from
+
+Read from Mira's source (`core/engine.py`, `core/passes.py`, `core/noise_filter.py`,
+`llm/prompts/templates/review.jinja2`, `config.py`) and measured by rebuilding what
+each stage of its pipeline drafted and removed (`tools/bakeoff/mira_funnel.py`,
+which joins the audit trail Mira stores with the drafts in its stored model calls;
+the join matches the audit's draft count on every review checked).
+
+What Mira does, in order, per chunk of at most 120,000 tokens (`config.py:66`):
+
+1. **A reviewer that reads while it reviews** (`core/passes.py:326`). The model gets
+   `read_file` and `grep_repo` beside the terminal `submit_review`, up to 10 turns, with
+   its reasoning replayed on every turn. A model that stops calling tools, or runs
+   out of turns, is not abandoned: the submission is forced over the whole transcript
+   (`:86`). The system prompt tells it to verify a cross-file claim before filing it
+   (`:172`). Over the 90 held-out reviews it made 12.7 tool calls a review.
+2. **A prompt of review heuristics** (`review.jinja2`): trace the receiving side of a
+   new value, audit what a rewrite dropped, check callers of a changed signature, plus
+   explicit lists of what not to file and not to speculate about, and no comment quota.
+3. **A noise filter in code** (`core/noise_filter.py:116`): confidence floor 0.7,
+   duplicates merged, a cap of 5 on suggestions and nitpicks only.
+4. **A self-critique** (`core/passes.py:942`): one batched call grades each draft
+   `proven`, `plausible` or `unsupported` against the diff window around it, and a keep
+   rule in code (`:921`) keeps `plausible` only at warning or above with confidence of
+   0.75 or more.
+
+What is off by default: the second look (`config.py:352`), the multi-run ensemble
+(`config.py:291`). Neither ran in the bakeoff.
+
+**The funnel.** Counts pooled over passes, held-out set (30 PRs, 3 passes) and tuning
+set (20 PRs, 2 passes):
+
+| stage | held-out precision / recall / F1 | tuning precision / recall / F1 |
+|---|---|---|
+| Mira, drafted (everything the model filed) | 53.9% / 63.5% / 0.583 | 50.6% / 57.4% / 0.538 |
+| after the noise filter | 63.4% / 58.4% / 0.608 | 56.5% / 47.8% / 0.518 |
+| posted, after the critique | 73.5% / 50.2% / 0.596 | 73.0% / 39.7% / 0.514 |
+| open-nitpick, no filter | 41.3% / 58.7% / 0.485 | 33.2% / 51.5% / 0.404 |
+| open-nitpick, verify on | 50.0% / 52.4% / 0.512 | |
+
+The two filters buy about 20 points of precision with about 13 of recall and leave F1
+where the drafts had it (+0.013 held-out, -0.024 tuning). They are the same trade a cap
+makes. The noise filter was right to drop 65 of the 81 held-out comments it removed,
+the critique 49 of 75. **Mira's lead is in the drafts**: its raw F1 is 0.098 above ours
+on the held-out set and 0.134 above on the tuning set, from fewer comments (371 against
+448) and more matches (200 against 185). The filters account for none of it; our own
+verify stage gains slightly more F1 than Mira's two filters do.
+
+Two things I had suspected are not it. Mira's confidence separates real from wrong no
+better than ours (area under the curve 0.647 on its 463 drafts against 0.680 on our
+447), so the floor at 0.7 is not a better signal than what we had. And the filters
+do not inflate the benchmark number: on the tuning set they lower F1.
+
+**Ablation.** Mira with `agentic_tools` and `security_agentic` off
+(`MIRA_BAKEOFF_NO_AGENTIC`), same model, same prompt, 20 tuning PRs, two passes, no
+tool calls in any audit trail:
+
+| 20 tuning PRs | comments | precision | recall | F1 |
+|---|---:|---:|---:|---:|
+| Mira drafted, tools on (2 passes) | 154 | 50.6% | 57.4% | 0.538 |
+| Mira drafted, tools off (2 passes) | 218 | 36.2% | 58.1% | 0.446 |
+| open-nitpick R1 (3 passes) | 316 | 33.2% | 51.5% | 0.404 |
+| Mira posted, tools on | 74 | 73.0% | 39.7% | 0.514 |
+| Mira posted, tools off | 85 | 51.8% | 32.4% | 0.398 |
+
+**Taking the tools away puts Mira's drafts where ours are** (36.2% precision at 58.1%
+recall against our 33.2% at 51.5%) and the filters then cannot rescue it: posted F1
+falls to 0.398, below our unfiltered 0.404. The tool loop is worth about 14 points of
+precision at equal recall in the drafts, and it is what makes the later filters work.
+The same ablation moves recall by under a point, so the tools make the model say
+fewer wrong things and do not make it find more.
+
+**Why R5 did not reproduce that.** R5 gave our reviewer the same two tools and
+found no gain, so the loop is not enough by itself. What R5 lacked that Mira has:
+a forced structured submission when the model stops (R5b fell back to a diff-only
+review for 42 of 144 batches, Mira never discards its transcript); a turn budget
+and not a lookup budget (every R5b batch exhausted its 12 lookups, so the model was
+browsing, not checking); and a prompt that says what to go and check. R7 supplied that
+prompt without tools and R5 supplied the tools without the prompt, so the
+combination Mira runs has not been measured here. Its tuning-set ablation is
+two passes of one model, so the 14 points carry the variance this plan already
+documents; the direction is large enough to act on and the size is not exact.
+
+### R8. Mira's loop, whole (registered 2026-11-14, before it runs)
+
+The code review and the tools-off ablation say the gap is in the drafts and that the
+tool loop is where Mira's precision comes from. R5 gave our reviewer tools and R7
+gave it heuristics, and neither alone moved anything. R8 builds what Mira runs, as
+one change, with the three things R5 lacked:
+
+- tools, with reasoning on and echoed back across turns, as in R5b;
+- a forced structured submission whenever the model stops without submitting or runs
+  out of turns, over the whole transcript, so a finished investigation is never thrown
+  away for a diff-only review (R5b discarded 42 of 144);
+- a turn budget of 10 and a byte budget on tool output, and not a lookup budget, so
+  the model decides how much to read;
+- the review heuristics and the not-worth-a-finding list of R7, which say what to
+  go and check.
+
+It falls back to the ordinary review only when the first call fails before anything was
+read. It runs on the 20 tuning pull requests, three passes, paired against the
+three R1 passes, and is removed if it fails, as R5 was. It is off by default.
+
+- **Ship to a fresh-corpus gate:** precision up 10 points or more, recall down 3 or
+  fewer, F1 at or above Mira's 0.514 on these 20. The tools-off ablation says a
+  working loop should add about 14 points of precision at unchanged recall.
+- **Kill:** any of the three fails.
+- **Reported with it:** forced submissions, turns and tool calls per batch, median
+  review time, and calls per review against R1's.
+
+Erratum, made after the first 13 batches had run and before any R8 score was read:
+this stage first listed a fourth kill condition, that a forced submission on more
+than a third of batches would mean the loop was not working. All 13 batches were
+forced. Mira's own loop hit its 10-turn cap, and so was forced to submit, in 43 of
+90 held-out chunks (48%), and 47 of the 90 used all 10 turns, so a loop that is
+working is forced about half the time. The condition rested on a wrong assumption
+and is withdrawn; the three numeric conditions are unchanged.
+
+#### R8 result: failed, with two defects found in the build
+
+Three passes on the 20 tuning pull requests, paired against the same set's R1 passes.
+
+| arm (3 passes, 20 pull requests) | TP | FP | FN | precision | recall | F1 |
+|---|---:|---:|---:|---:|---:|---:|
+| R1 | 105 | 211 | 99 | 33.2% | 51.5% | 0.404 |
+| R8, Mira's loop whole | 94 | 170 | 110 | 35.6% | 46.1% | 0.402 |
+| Mira (2 passes) | 54 | 20 | 82 | 73.0% | 39.7% | 0.514 |
+
+Against R1: precision +2.4 points (-4.3 to +9.8), recall -5.4 (-10.0 to 0.0), F1 -0.002
+(-0.063 to +0.070). Per pass F1 was 0.453, 0.370 and 0.380. It fails all three ship
+conditions. The reviewer was forced to submit in 108 of the 111 investigated batches, a
+median of 10 turns and 20 lookups a batch, and a median review took 350 seconds against
+146 for R1.
+
+Two defects in the build, both visible in the logs and the SDK source and not in the
+scores, so neither was chosen to rescue the result:
+
+1. **The forced submission came back as prose, or empty, in 33 of 144 batches (23%),**
+   which then fell back to a diff-only review. A reasoning model that spends the whole
+   output budget thinking returns nothing, and `llm.Client` retries that with reasoning
+   off for an ordinary review (`internal/llm/structured.go:201`); this loop called the
+   SDK directly and had no such retry. Mira's provider has the equivalent
+   (`_budget_exhausted_retry`).
+2. **The model's reasoning was never replayed.** Our OpenRouter client is the SDK's
+   OpenAI-compatible provider, whose `ConvertMessages`
+   (`pkg/openaicompat/converters.go`) copies role, content and tool calls but not
+   `Message.Reasoning`, although the request type has a `reasoning` field for it. So each
+   turn re-thought from the tool results alone. Mira replays the reasoning of every turn
+   in raw message fields (`core/passes.py:154`).
+
+The first alone does not explain the result. On the 36 reviews where every batch was
+investigated, R8 scored precision 40.8% and recall 44.3% against R1's 39.9% and 51.9% on
+the same pull requests.
+
+#### R8b: R8 with its two defects fixed (registered before it runs)
+
+The same stage with the SDK replaying each assistant turn's reasoning on the wire and
+the forced submission retried with reasoning off when it comes back empty at the
+output cap. The reasoning replay is a one-line change to the SDK's converter, built
+here from a patched copy of the module through an alternate `go.mod`, so neither this
+repository's `go.mod` nor the SDK checkout is touched; a change to the SDK is made only
+if this works. Same conditions as R8 and the same 20 pull requests, three passes, paired
+against R1.
+
+- **Ship to a fresh-corpus gate:** precision up 10 points or more, recall down 3 or
+  fewer, F1 at or above Mira's 0.514.
+- **Kill:** any of the three fails. This is the third build of one hypothesis, the second
+  fixing a defect found in the source and not in the scores; a fail ends it.
+
+#### R8b result: failed
+
+Three passes on the 20 tuning pull requests, paired against the same set's R1 passes. The
+loop ran as intended this time: 142 of 144 batches investigated (R8: 111), 2 fell back
+(R8: 33), the reviewer submitted on its own in 22 and was forced in 120, 41 forced calls
+came back empty at the output cap and every one was recovered by the retry without
+reasoning, and the median review took 161 seconds (R8: 350, R1: 146).
+
+| arm (3 passes, 20 pull requests) | TP | FP | FN | precision | recall | F1 |
+|---|---:|---:|---:|---:|---:|---:|
+| R1 | 105 | 211 | 99 | 33.2% | 51.5% | 0.404 |
+| R8 | 94 | 170 | 110 | 35.6% | 46.1% | 0.402 |
+| R8b, reasoning replayed, forced call retried | 90 | 169 | 114 | 34.7% | 44.1% | 0.389 |
+| Mira (2 passes) | 54 | 20 | 82 | 73.0% | 39.7% | 0.514 |
+
+Against R1: precision +1.5 points (-5.0 to +9.6), recall -7.4 (-14.7 to +0.6), F1 -0.015
+(-0.077 to +0.059). Per pass F1 was 0.350, 0.435 and 0.385. Against R8: -0.9, -2.0 and
+-0.013, all inside the interval. It fails the ship conditions, and the registration
+said a fail ends this hypothesis.
+
+**What this settles.** Giving our reviewer tools, a turn budget, a forced structured
+submission that survives an empty reply, replayed reasoning and the review heuristics,
+with the same model Mira runs on, does not reproduce the 14 points of precision that
+switching the same things off costs Mira. The two defects the build had were real and
+are fixed in this run, and fixing them moved nothing, so they were not why. What is
+left is a difference in what is around the loop and not in the loop: Mira's
+`grep_repo` ranks the files nearest the pull request first, its prompt carries a
+language-by-language list of footguns and requires each comment to quote the code it is
+about, its submission carries a summary and key issues the reviewer must reconcile with
+its comments, and the review is preceded by a cross-file context pass. Which of those
+does it is not known, and each would be a separate experiment on a stage that has now
+failed three times.
+
+**A defect found on the way, outside this repository.** `llm-go-sdk`'s OpenAI-compatible
+`ConvertMessages` does not send an assistant turn's `Reasoning` back, which any caller
+running a thinking model through a tool loop on OpenRouter would want. The change is one
+guard (`tools/bakeoff/llm-go-sdk-reasoning-replay.patch`, with a test). It is not
+applied here.
+
+### Locating Mira's gain (registered 2026-11-14, before it runs)
+
+Mira with tools off drafts at our level and with tools on drafts 14 points more
+precisely, and our own tool loop in three builds did not reproduce that. So the gain is
+in something that works with the tools. This switches off one of Mira's other parts at a
+time, with the tools left on, on the same 20 tuning pull requests, two passes each, and
+reads what each one costs the drafts. Mira's code is changed only through environment
+switches in `tools/bakeoff/mira-replay-bakeoff.patch`; the default path is untouched.
+
+| ablation | what is removed |
+|---|---|
+| no context | the cross-file code context placed in the prompt before the diff; the tools stay |
+| no footguns | the per-language list of hazards in the prompt |
+| no tool hint | the system-prompt section that tells the model to verify a cross-file claim before filing it; the tools stay |
+| no heuristics | the three sections naming where defects hide: the receiving side, what a rewrite dropped, callers that did not follow |
+| no exclusions | the two sections listing what not to file and what not to speculate about |
+
+The measure is the drafted stage (everything the model filed, before the noise filter and
+the critique), rebuilt with `tools/bakeoff/mira_funnel.py` and scored by the same judge:
+default 50.6% precision, 57.4% recall, F1 0.538; tools off 36.2%, 58.1%, 0.446.
+
+- **A part carries the gain** if removing it takes drafted precision down by 7 points or
+  more (half the tools effect) with recall within 3 points.
+- **Within the variance** otherwise. Two passes of 20 pull requests spread by about 0.03
+  F1 and several points of precision (the two default passes scored F1 0.552 and 0.524),
+  so a smaller shift is not read as a finding.
+- **What each answer would mean.** A part that carries it is the next thing to try in
+  our reviewer, singly. If none does, the gain is an interaction among them or in the
+  tools themselves (their ranking and windows), and no ablation of this kind will
+  find it.
+
+#### Locating Mira's gain: result
+
+Each part removed with the tools left on, 20 tuning pull requests, two passes, drafted stage.
+The five switches were checked by rendering Mira's real prompt under each: the system
+prompt is 15,262 characters by default, 11,868 without the footgun list (and no footgun
+line), 12,704 without the three heuristic sections (exclusions and severity guide still
+present) and 12,601 without the two exclusion sections. Every ablated run had 20 of 20
+reviews, no failed chunk, and 14 to 16 tool calls a review, so the tools were in use in all.
+
+| drafts, 2 passes pooled | comments | precision | recall | F1 | per pass F1 |
+|---|---:|---:|---:|---:|---|
+| default, tools on | 154 | 50.6% | 57.4% | 0.538 | 0.552, 0.524 |
+| tools off | 218 | 36.2% | 58.1% | 0.446 | 0.427, 0.466 |
+| no cross-file context | 169 | 49.7% | 61.8% | 0.551 | 0.539, 0.562 |
+| no footgun list | 160 | 48.1% | 56.6% | 0.520 | 0.486, 0.553 |
+| no tool-use hint | 166 | 50.0% | 61.0% | 0.550 | 0.555, 0.544 |
+| no heuristics sections | 172 | 49.4% | 62.5% | 0.552 | 0.548, 0.556 |
+| no exclusions sections | 181 | 45.3% | 60.3% | 0.517 | 0.557, 0.478 |
+
+By the rule registered before it ran, **no part carries the gain**: none takes drafted
+precision down by 7 points (the changes are -0.9, -2.5, -0.6, -1.2 and -5.3, against -14.4
+for tools off). Removing the cross-file context, the tool-use hint or the heuristic
+sections moves drafted precision by about a point and raises recall by 4 to 5 points, so
+those parts do not help Mira's drafts at all. That agrees with R7 and R8, which gave our
+reviewer the same heuristics with and without tools and moved nothing. The exclusions list
+is the largest effect (-5.3 points, and the two passes scored F1 0.557 and 0.478) and is
+inside the variance.
+
+What the ablation does show is in the posted column: with any one part removed, Mira's
+posted precision falls from 73.0% to 64 to 68% and posted F1 from 0.514 to between 0.437
+and 0.518, although its drafts are no worse. The filters that follow, the confidence floor
+and the critique, work best on the drafts the full prompt produces. Posted counts of 70 to
+88 comments over two passes cannot separate that from a lucky default draw, so it is noted
+and not relied on.
+
+So the gain sits in the tools themselves, and what is left to explain is why our
+loop (R8b: 34.7% precision, 44.1% recall) does not have it. The parts of Mira's loop that
+no switch has touched are the tool semantics (`grep_repo` ranks the files nearest the
+changed ones first and returns paths on request, `read_file` returns 12,000-byte
+windows), the structured submission (each comment must carry a verbatim quote and an
+agent prompt, and the submission a summary and key issues), the explicit
+`reasoning_effort: medium`, and the transcript replay of every message key a provider
+returns. A first attempt at this ablation ran with a broken switch, an undefined name
+that failed every review chunk with a `NameError`, and its ten runs were discarded
+unscored; the switches were then checked with a linter and a real review before the
+ten runs above.
+
+### Mira's tool semantics (registered 2026-11-14, before it runs)
+
+The ablation above left the tools themselves. Reading Mira's `llm/agentic_tools.py`
+against `internal/review/repotools.go` shows two differences that any loop of ours,
+including the checker, would feel:
+
+- **A capped read says where it stopped.** Mira's `read_file` fills a 12,000-byte window
+  by lines and, when it cuts, reports "window capped at line N of TOTAL; call read_file
+  with start_line=N+1 to continue". Ours returns up to 120 lines by default, cuts the
+  text at 6,000 bytes, and appends a bare "[truncated]", so a model reading a large file
+  sees roughly the first 75 lines and cannot tell where it ended.
+- **A search is ranked.** Mira's `grep_repo` scans the files nearest the changed ones
+  first, up to 40 files, and reports how many it scanned and how many it did not. Ours
+  runs `git grep` over the whole tree and returns the first 30 hits in path order, with
+  "(no matches)" when there are none and no note of coverage.
+
+Two switches in the Mira harness make its tools behave as ours do: `MIRA_BAKEOFF_SHORT_READ`
+(a 6,000-byte window, 120 lines by default, a bare "[truncated]") and
+`MIRA_BAKEOFF_NO_RANK` (every file scanned in path order, the first 30 hits returned,
+no coverage note). Same 20 tuning pull requests, two passes each, drafted stage.
+
+- **The semantic matters** if removing it takes drafted precision down 7 points or more,
+  the same rule as the parts above.
+- **If either does,** the next build of our loop is these two tool changes and nothing
+  else. If neither does, the tools' behaviour is not what separates our loop from
+  Mira's, and this line of work stops.
+
+### Tool semantics and Jev: results (unregistered probes)
+
+Both were run as probes, not as registered stages, so they carry no ship condition.
+
+**Tool semantics.** Mira's drafts with our 6,000-byte read window, with our unranked grep,
+and with both, on the 20 tuning pull requests, two passes: F1 0.551, 0.559 and 0.571, against
+0.538 with Mira's own tools. Our tool behaviour does not explain the precision gap: Mira's
+drafts stay at 50 to 52% precision with our tools.
+
+**Jev as a decision filter.** The endpoint is the one cleatus's `scripts/jev_parity.py` calls,
+`https://openrouter.ai/api/alpha/decisions`, with model `~typesafe/jev-latest` (it resolves to
+`typesafe/jev-1.14-20261014`). Each call costs about 0.002 cents and returns in about 0.3 s. The
+probe asked one yes-or-no question per comment, with the claim and the diff window, on the 50
+hand-graded comments (16 wrong, 34 good), two decisions each, `tools/bakeoff/jev_probe.py`.
+
+| Jev probability | AUC, wrong vs good | removes wrong of 16 | loses good of 34 |
+|---|---:|---:|---:|
+| diff only, keep at 0.7 | 0.667 | 9 | 13 |
+| diff and the checker's evidence, keep at 0.7 | 0.653 | 8 | 10 |
+| diff and the checker's evidence, keep at 0.8 | 0.653 | 14 | 20 |
+| DeepSeek checker, same run, confirmed only | | 10 | 5 |
+| checker confirmed and Jev at least 0.7 | | 12 | 12 |
+
+Repeats agree closely (median spread 0.01). The mean probability was about 0.72 for real
+comments, 0.68 to 0.70 for partly real, 0.63 to 0.64 for wrong and 0.74 to 0.77 for matched
+controls, so Jev sits near a prior and does not rank the comments. TypeSafe reports good
+calibration, and the cleatus benchmark reports ECE 0.03 on policy-style questions. Calibration
+is not discrimination, and neither benchmark is a code review.
+
+Jev does not help as a filter on our findings. Its evidence-free AUC equals our own
+self-reported confidence (0.68 held-out), and adding what the checker read does not improve it.
+Not tested: other decisions (routing, severity), other question wording or criteria, and Jev on
+whole files instead of the checker's evidence. The probe cost $0.02 in total. The probe sent
+public diffs to the same provider as every other call in this work.
+
+### Jev as a decision filter, revisited (unregistered probes, 2026-11-16)
+
+The first probe asked Jev a yes-or-no question about a diff window. It did not use Jev the way
+the model is meant to be used, and this section repeats it with the context a reviewer would have
+and a five-way question. Nothing here was registered before it ran, and the threshold below was
+chosen after the grades were read.
+
+**What Jev was asked.** One choice among `bug`, `error`, `warning`, `info` and `noise`, each with
+a one-line meaning, in that order. The state held the pull request's title and description, the
+changed files, the comment's claim, the reviewer's severity, class, confidence and cited code, what
+the repository check had read and grepped for that comment, the file's diff and the whole file. The
+score is P(bug) + P(error). Each request cost about 0.002 cents.
+
+**Against the Sonnet judge's matched or unmatched labels, 297 R1 comments (95% interval):**
+
+| state and question | AUC |
+|---|---:|
+| yes or no, diff window (the first probe, repeated) | 0.654 (0.59 to 0.72) |
+| yes or no, whole file and the reviewer's facts | 0.668 (0.60 to 0.73) |
+| five-way, diff window, 1 - P(noise) | 0.600 (0.53 to 0.66) |
+| five-way, whole file and facts, P(bug) + P(error) | 0.741 (0.68 to 0.79) |
+| five-way, with the description, the check's lookups and the diff, P(bug) + P(error) | 0.752 (0.69 to 0.80) |
+| the reviewer's own confidence | 0.635 |
+
+Those labels call an unmatched comment wrong, and the blind grade above found about 27% of R1's
+unmatched comments real, so every AUC in the table is biased low.
+
+**Against agent grades.** Ten Claude subagents graded 100 of those comments blind, each with the
+checkout, the pull request's diff and its description, and without labels or scores: 50 sampled
+evenly across Jev's score range, then 50 drawn at random from the rest. Verdicts were real, partly,
+not real or unclear (none were unclear). The first 50 were 15, 14 and 21; the random 50 were 14, 15
+and 21.
+
+| score, against the agent grades | n | AUC |
+|---|---|---:|
+| P(bug) + P(error), real against the rest | 29 against 71 | 0.808 (0.71 to 0.89) |
+| the reviewer's own confidence, real against the rest | 29 against 71 | 0.625 |
+| 1 - P(noise), real and partly against not real | 58 against 42 | 0.755 (0.65 to 0.84) |
+| the reviewer's own confidence, real and partly against not real | 58 against 42 | 0.615 |
+
+On the 100, what each selector keeps, and what it withholds of the 42 not real, 29 real and 29
+partly findings:
+
+| selector | kept | not real withheld | real lost | partly lost | kept precision |
+|---|---:|---:|---:|---:|---:|
+| reviewer confidence at least 0.7 (deep review's floor) | 61 | 20 | 8 | 11 | 0.64 |
+| repository check, confirmed only | 67 | 25 | 3 | 5 | 0.75 |
+| repository check, not refuted | 78 | 19 | 1 | 2 | 0.71 |
+| Jev at least 0.3 | 77 | 16 | 0 | 7 | 0.66 |
+| Jev at least 0.5 | 55 | 22 | 5 | 18 | 0.64 |
+| check confirmed and Jev at least 0.3 | 57 | 29 | 3 | 11 | 0.77 |
+| check not refuted and Jev at least 0.3 | 63 | 27 | 1 | 9 | 0.76 |
+
+Kept precision counts real and partly. The base rate is 0.58. On the random 50 alone the check
+withheld 11 of 21 not real findings and lost 2 of 14 real ones; with Jev at 0.3 after it, 15 of 21
+and 2 of 14.
+
+**Reading.** Jev ranks the agent-graded findings (0.81 for real against the rest) better than the
+reviewer's own confidence does (0.63), and the first probe's conclusion, that it does not help,
+holds for the question and state it used and not for this one. Alone at 0.3 it is a weaker filter
+than the repository check. After the check it withholds 4 more of the 42 not real findings, loses no
+more real ones and loses 6 more partly ones (5 to 11), and kept precision moves from 0.75 to 0.77.
+That is a small gain bought with some partly findings, not a replacement for the check.
+
+**Built as an option.** `review.jev.threshold` (zero, the default, is off) runs after
+`review.verify` and withholds findings whose score is under it, with the score in the reason.
+The check's lookups are handed to Jev as its evidence. A request that fails keeps its finding and
+adds a `jev` entry to the stage list. The key is read from `OPENROUTER_API_KEY` or the variable
+`review.jev.api_key_env` names. The setting is user-config only: it sends source code to OpenRouter
+and spends the operator's key, so a repository's own `.nitpick.yaml` cannot turn it on
+(`docs/trust-model.md`). It is not part of any registered stage and has no ship condition.
+
+**Limits.** One agent family graded, no human checked the verdicts, and `partly` is a judgement.
+The first 50 comments were stratified by an earlier Jev score, so the table's counts are not rates
+for a population, and the threshold of 0.3 was chosen after seeing them. The comments are R1
+findings from a single call, not deep review's drafts, and the deep critique is not in the table.
+The check in the table is `tools/bakeoff/verify_filter.py` with DeepSeek V4.1 Flash, the prototype
+of the Go stage, and its lookups were rerun after a first run lost its verdicts to a write
+error, so the evidence Jev saw came from the first run and the check's verdicts from the second.
+Jev's answers carry sampling noise that was not measured here: one decision a comment.
+
+### Correction: tool semantics at the posted stage
+
+The tool-semantics line above reported drafts only. At the posted stage, 20 tuning PRs,
+two passes, Mira's own pipeline with our tools: default precision 73.0%, recall 39.7%, F1
+0.514 (74 comments); our short read windows 75.6%, 45.6%, 0.569 (82); our unranked grep
+73.8%, 43.4%, 0.546 (80); both 74.6%, 39.0%, 0.512 (71). Our tool semantics do not lower
+Mira's precision at the posted stage either. The short-read arm's F1 gain over the default
+is about 0.05 on two passes and is not separated from the variance the document already
+records.
+
+### Reasoning replay: Mira's loop, registered 2026-11-14 before it runs
+
+Mira replays each assistant turn's reasoning on the next request, both the `reasoning` text
+and the `reasoning_details` field (`core/passes.py`, `_REASONING_REPLAY_KEYS`). In its stored
+run it sent 51 of 61 assistant turns with both. Our loop, through the SDK, replays only the
+`reasoning` text (R8b), and drafts at 34.7% precision where Mira, with its tools, drafts at
+50.6%. Two ablations of Mira's replay, with the same model, tools and prompt, 20 tuning PRs,
+two passes each:
+
+- **none**: no reasoning replayed (`MIRA_BAKEOFF_NO_REASONING_REPLAY`);
+- **text only**: only the `reasoning` text replayed, which is what R8b sends
+  (`MIRA_BAKEOFF_TEXT_REASONING_ONLY`).
+
+Reading, against the default drafts at 50.6% precision and 57.4% recall:
+
+- **The gap is `reasoning_details`** if text only drops drafted precision by 7 points or
+  more with recall within 3 points. The next build then carries that field through the SDK.
+- **The gap is not replay** if text only matches the default. The replay line of work then
+  ends.
+- **Neither reading** if only none drops: that would contradict R8b, and it is reported as such.
+
+### R9: whole-PR batching (registered 2026-11-14, before it runs)
+
+Our default batches at most 6 files, under a token budget of 60,000
+(`internal/config/defaults.go:94-95`). Mira sends each pull request in one call of up to
+120,000 tokens: on the 20 tuning pull requests it made one call per pull request, 20 of 20.
+In R1, 12 of the 20 were split into 2 to 10 batches, and comments per review rose with the
+batch count (2.8, 4.8 and 9.9 for one, two and three or more batches). Pull request size
+confounds that, and Rule 8 of `docs/measurement.md` records that batching has never been
+measured as a variable.
+
+R9 is the R1 build with `review.max_files_per_request: 60` and
+`review.token_budget_per_request: 120000` (`tools/bakeoff/r9-whole.yaml`). Nothing else
+changes: same model, prompt, and verify stage off. It runs on the 20 tuning pull requests,
+three passes, paired against the three R1 passes.
+
+- **Ship to a fresh-corpus gate:** precision up 10 points or more, recall down 3 or fewer,
+  and F1 at or above Mira's 0.514.
+- **Kill:** any of the three fails. If R9 fails, the next run is the R8b tool loop with
+  whole-PR batching, rebuilt from commit 2ac4bfc, registered separately before it runs.
+- **Reported with it:** batches per pull request, tokens per call, pull requests whose one
+  batch still exceeds 120,000 tokens, and median review time.
+
+#### Reasoning replay: result
+
+Mira's own loop, same model, tools and prompt, 20 tuning pull requests, two passes.
+
+| arm | drafts: precision, recall, F1 (comments) | posted: precision, recall, F1 (comments) |
+|---|---|---|
+| default, every key replayed | 50.6%, 57.4%, 0.538 (154) | 73.0%, 39.7%, 0.514 (74) |
+| text only (what R8b sends) | 49.4%, 58.8%, 0.537 (162) | 67.5%, 41.2%, 0.511 (83) |
+| no replay | 40.3%, 70.6%, 0.513 (238) | 59.1%, 50.0%, 0.542 (115) |
+
+The registered reading is "not replay": text only matches the default on drafts (-1.2
+points of precision, +1.4 of recall), so `reasoning_details` is not the carrier. The replay
+line of work ends. This also removes the R8b explanation: our loop already replays the text,
+and Mira's loop with text alone drafts at 49%, against 35% for ours. Replay does shape the
+balance. With no replay at all, Mira files more and is less precise. Its posted F1 of 0.542
+is above the default's 0.514 on two passes, but its precision is 59%, so it fails the
+registered precision condition, and the difference is inside the variance recorded above.
+
+#### R9 result: whole-PR batching lowers recall and does not raise precision
+
+Three passes on the 20 tuning pull requests, no verify stage, paired against R1. Whole-PR
+batching took 51 of 60 reviews to one batch (the other 9 had two), and no batch exceeded
+120,000 tokens; median review time was 119 seconds against 146.
+
+| arm | precision | recall | F1 | comments |
+|---|---:|---:|---:|---:|
+| R1, 6-file batches | 33.2% | 51.5% | 0.404 | 316 |
+| R9, whole PR | 27.8% | 43.1% | 0.338 | 316 |
+
+R9 minus R1: precision -5.4 points (-13.3 to +2.0), recall -8.3 (-13.4 to -3.2), F1 -0.065
+(-0.128 to -0.003). It fails its ship condition, and it moved the numbers down. Without tools,
+seeing the whole pull request does not help our reviewer, which matches the ablation above:
+whole-PR context did not help Mira's drafts either.
+
+### R10: the tool loop with whole-PR batching (registered 2026-11-14, before it runs)
+
+R9 tested batching without tools. The interaction is untested: R5, R5b, R8 and R8b ran the tool
+loop per 6-file batch, and Mira's loop checks cross-file claims against the whole diff. R10 is
+the R8b loop, built from commit 2ac4bfc, with the text reasoning replay of
+`tools/bakeoff/llm-go-sdk-reasoning-replay.patch` (Mira's default replays text, and the replay
+ablation showed that with no replay at all Mira files more and is less precise, so the patch
+keeps the comparison fair). It runs with `review.investigate: true`,
+`review.max_files_per_request: 60` and `review.token_budget_per_request: 120000`
+(`tools/bakeoff/r10-whole-investigate.yaml`), three passes on the 20 tuning pull requests,
+paired against R1 and R8b.
+
+- **Ship to a fresh-corpus gate:** precision up 10 points or more against R1, recall down 3
+  or fewer, and F1 at or above Mira's 0.514.
+- **Kill:** any of the three fails.
+- **Reported with it:** forced submissions, turns and lookups per batch, batches per review,
+  median review time, and calls per review.
+
+#### R10 result: killed by its recall and F1 conditions
+
+Three passes on the 20 tuning pull requests, no verify stage, paired against R1 and against
+Mira's two default passes. Batching: 51 of 60 reviews in one batch, 9 in two. The loop: 68
+batches investigated, 58 forced to submit, 10 submitted on their own, 1 fell back to the
+ordinary review. Median turns 10 and lookups 17 per batch. Median review time 137 seconds
+(R1 146). Forced calls that came back empty at the output cap were retried without reasoning,
+20 times.
+
+| arm | precision | recall | F1 | comments |
+|---|---:|---:|---:|---:|
+| R1, 6-file batches | 33.2% | 51.5% | 0.404 | 316 |
+| R8b, 6-file loop | 34.7% | 44.1% | 0.389 | 259 |
+| R9, whole PR, no tools | 27.8% | 43.1% | 0.338 | 316 |
+| R10, whole PR, loop | 48.6% | 43.6% | 0.460 | 183 |
+| Mira, default (2 passes) | 73.0% | 39.7% | 0.514 | 74 |
+
+R10 minus R1: precision +15.4 points (+7.6 to +22.3), recall -7.8 (-13.1 to -1.8), F1 +0.056
+(+0.005 to +0.102). R10 minus Mira: precision -24.3 (-38.1 to -12.4), recall +3.9 (-6.2 to
++14.2), F1 -0.054 (-0.148 to +0.040). Per pass F1 was 0.460, and R1's three passes were
+0.364, 0.425 and 0.424.
+
+It fails two of its three conditions (recall down 7.8, F1 below 0.514), so it is killed by
+its own rule. It is still the first lever in this work to move precision by an interval that
+clears zero, and the R9 and R10 pair says the whole-PR context helps only when the tool loop
+reads it. The gap to Mira's precision is 24 points.
+
+### R11: triage off (registered 2026-11-14, before it runs)
+
+The R10 build runs a model triage pass after the reviewer. It dropped 16% of the findings it
+saw on the tuning set (12 to 20% across passes; R1 dropped 26 to 43%), and nothing in this
+work has measured whether those drops were right. R11 is the R10 build with that model call
+skipped: dedupe still runs, every other stage is unchanged. The switch is bakeoff-only,
+`NITPICK_BAKEOFF_NO_TRIAGE` (`tools/bakeoff/triage-off-bakeoff.patch`). A smoke review on
+calcom-1 published all 11 findings the reviewer filed.
+
+Three passes on the 20 tuning pull requests, paired against R10.
+
+- **Ship to a fresh-corpus gate:** precision at least 43.2% (R1 plus 10 points), recall at least
+  48.5% (R1 minus 3 points), and F1 at least Mira's 0.514.
+- **Kill:** any of the three fails.
+- **Read:** if recall rises and the precision cost is smaller than the recall gain, triage was
+  removing real findings. If precision holds, its drops were duplicates or low-value findings.
+
+#### R11 result: killed; triage removes mostly wrong comments
+
+Three passes on the 20 tuning pull requests, paired against R10 (triage on).
+
+| arm | precision | recall | F1 | comments |
+|---|---:|---:|---:|---:|
+| R10, triage on | 48.6% | 43.6% | 0.460 | 183 |
+| R11, triage off | 44.1% | 47.5% | 0.458 | 220 |
+| Mira, default (2 passes) | 73.0% | 39.7% | 0.514 | 74 |
+
+R11 minus R10: precision -4.5 points (-11.1 to +1.9), recall +3.9 (-1.1 to +9.4), F1 -0.002
+(-0.044 to +0.044). R11 misses its recall gate by about one point and misses its F1 gate, so
+it is killed.
+
+Triage's own drops, from the difference: R11 has 37 more comments, of which 8 matched a golden
+comment and 29 did not. Triage removes wrong comments at 78%, so it is a good filter and not
+the cause of the gap.
+
+The gap is in draft recall. Per pass on the same 20 pull requests, Mira's drafts (before its
+noise filter and critique) match 39 golden comments and file 38 unmatched. Our output with
+triage off matches 32 and files 41. Mira finds about 7 more real findings per pass with
+three fewer wrong comments.
+
+#### Model: Sonnet 4.6, one pass (arm C, tuning set)
+
+Mira with Sonnet 4.6 drafts and posts at F1 0.545 (precision 52.0%, recall 57.4%, 75
+comments), and our original build with Sonnet 4.6 at F1 0.390 (precision 34.9%, recall 44.1%,
+86 comments). Both are one pass, scored with the same judge and the counts that
+`tools/bakeoff/compare.py` uses, which differ from the Core-profile figures in the arm table
+above. A stronger model does not close the gap for the original build. R10 with Sonnet 4.6 has
+not been run.
+
+### The output cap took the reasoning out of most of our reviews (found 2026-11-14)
+
+When `max_tokens` is unset, open-nitpick sends a reasoning model on OpenRouter a cap of
+16,384 output tokens (`internal/llm/client.go:444`), and reasoning counts against it.
+DeepSeek V4.1 Flash spent the whole cap thinking on most of our single-call reviews. Each
+of those calls came back empty and was sent again with reasoning off
+(`internal/llm/structured.go:201`). Mira has the same cap and the same fallback
+(`mira/llm/base.py:217`), and its loop seldom reached it. Counted from the stored logs by
+`tools/bakeoff/fallbacks.py`:
+
+| arm | review calls a pass | sent again with reasoning off, each pass |
+|---|---:|---|
+| R1, 6-file batches | 48 | 39, 38, 36 |
+| R9, whole PR | 23 | 19, 19, 20 |
+| R10, whole PR, tool loop | 23 | 7, 7, 7 (forced submissions and review calls together) |
+| R11, R10 with triage off | 23 | 6, 7, 9 (counted the same way) |
+| Mira, default loop | 20 reviews | 1, 0 |
+| Mira, tools off | 20 reviews | 10, 12 |
+| held-out, ours (R1 build) | 85 | 45, 50, 46 |
+| held-out, Mira | 30 reviews | 2, 0, 1 |
+
+Most of our reviews on both sets were written without reasoning, and nearly all of Mira's
+with it. Three readings above depend on that and are reopened:
+
+- R9's "whole-PR batching lowers recall" compared two arms that each lost the reasoning on
+  about four calls in five.
+- The tools-off ablation in "Locating Mira's gain" compared Mira's loop, which reasoned on
+  nearly every call, with a single call that lost its reasoning on about half the pull
+  requests. On that evidence "the tool loop is the source" cannot be told apart from "the
+  reasoning finished".
+- The held-out gap was measured with the reasoning off on more than half of our review
+  calls and almost none of Mira's.
+
+### R12 and R13: room for the reasoning to finish (registered 2026-11-14, before they run)
+
+R13 is R1 with `models.default.max_tokens: 131072` and `models.default.timeout: 20m`
+(`tools/bakeoff/r13-batch-thinking.yaml`). R12 adds R9's whole-PR batching to the same two
+settings (`tools/bakeoff/r12-whole-thinking.yaml`). Both use the R1 binary, model, prompt and
+triage, with verify off, three passes each on the 20 tuning pull requests. R13 against R1
+measures what finished reasoning is worth. R12 against R13 is the test R9 was meant to be:
+whole-PR batching with the reasoning intact. The model's output limit is 943,718 tokens and
+output costs $0.50 a million, so a call that uses the whole new cap costs about 7 cents. A
+smoke run of R12 on three pull requests checks the settings first and is not scored.
+
+- **Ship to a fresh-corpus gate (each arm):** precision up 10 points or more against R1,
+  recall down 3 or fewer, and F1 at or above Mira's 0.514, the conditions R9 and R10 had.
+- **Kill:** any of the three fails.
+- **Batching reading:** R12 minus R13 on F1, with its interval. A positive difference with an
+  interval that clears zero means whole-PR batching helps once the reasoning finishes, and
+  R9's reading is withdrawn.
+- **Validity:** an arm with more than 5% of its review calls still sent again with reasoning
+  off is reported and not ranked.
+- **Reported with it:** those fallbacks for each pass, median review time, comments per
+  review, and model spend for each pass.
+
+#### R12 and R13 result: neither ranked; a single call still loses its reasoning
+
+Three passes each on the 20 tuning pull requests, the R1 binary, scored with the counts
+`tools/bakeoff/compare.py` uses. The last column is from `tools/bakeoff/fallbacks.py`.
+
+| arm | precision | recall | F1 | comments | review calls sent again without reasoning, each pass |
+|---|---:|---:|---:|---:|---|
+| R1, 6-file batches, 16,384-token cap | 33.2% | 51.5% | 0.404 | 316 | 39, 38, 36 of 48 |
+| R13, 6-file batches, 131,072-token cap | 32.0% | 41.7% | 0.362 | 266 | 24, 24, 19 of 48 |
+| R9, whole PR, 16,384-token cap | 27.8% | 43.1% | 0.338 | 316 | 19, 19, 20 of 23 |
+| R12, whole PR, 131,072-token cap | 37.4% | 37.7% | 0.376 | 206 | 14, 11, 13 of 23 |
+| Mira, default (2 passes) | 73.0% | 39.7% | 0.514 | 74 | 1, 0 of 20 reviews |
+
+With a cap eight times larger, DeepSeek V4.1 Flash still thought past it on 40% to 61% of
+single calls, so both arms fail their validity condition and neither is ranked. The batching
+reading cannot be taken either: R12 minus R13 is F1 +0.014 (-0.062 to +0.081). R13 minus R1
+lost recall (-9.8 points, -16.2 to -3.5), so more room to think did not help a single call.
+What the pair shows is that no cap tried keeps this model's reasoning in one call, and the
+loop does: the deep-review smoke had no fallbacks. The batching question moves to deep
+review, where every call reasons.
+
+## Deep review (registered 2026-11-14)
+
+`nitpick review` stays as it is. `nitpick deep-review` is a second mode that reviews the
+way Mira does and costs more. The differences it closes, each read from Mira's source and
+stored runs:
+
+| | Mira | `nitpick review` | `nitpick deep-review` |
+|---|---|---|---|
+| Shape | a general loop and a security loop per pull request, in parallel, up to 10 tool turns each (`core/passes.py:365`) | one call per batch of 6 files or 60,000 tokens, no tools | a general agent and a security agent per batch of up to 60 files or 120,000 tokens, in parallel, up to 10 turns each with `read_file` and `grep_repo` (`internal/review/deep.go`) |
+| Sampling | temperature 0.2, effort medium (`config.py:60`) | the model's own: temperature 0, effort unset | `review.deep.temperature` 0.2 and `review.deep.reasoning` medium |
+| Selection | confidence floor 0.7, cap of 5 on suggestions and nitpicks (`config.py:117-122`), then a critique grading each draft proven, plausible or unsupported (`core/passes.py:930`) | model triage | the same floor, duplicate rule, cap and critique, with Mira's keep rule (`internal/review/deepselect.go`) |
+
+The security agent extends the review prompt with a security focus
+(`internal/prompt/templates/deep_security.md`), so both agents file in one shape. An agent
+that stops early or runs out of turns is asked to submit what it has; one failing does not
+cost the others' findings; a batch every agent failed is reviewed by the ordinary call.
+Reasoning replay between turns is off. `nocturnium/llm-go-sdk` v6.15.0 drops an assistant
+turn's reasoning, the loop keeps it on each turn, and the D2r result below measured sending
+it back as worse than not sending it.
+
+The loop: each stage is registered here before it runs, measured with three passes on the
+20 tuning pull requests paired against R1, R10 and Mira, kept only if it meets its
+conditions, and the funnel (drafted, after the filter, posted, each scored) decides the next
+stage. The claim is made on the held-out set; both splits have been read, so a fresh corpus
+remains the stronger test.
+
+### D0: the mode (built 2026-11-14)
+
+`nitpick deep-review`, the `review.deep` configuration, and per-agent accounting of turns,
+lookups, forced submissions, reasoning fallbacks and tokens. `-format json` now lists
+withheld findings with the stage that held them, and `tools/bakeoff/deep_funnel.py`
+rebuilds the drafted and after-filter stages from one run. Every guard test was seen to fail
+when its behaviour was broken. A smoke review of keycloak-4 ran both agents to their 10 turns
+(about 19 lookups each, no reasoning fallback), drafted 3 findings, kept 1, in 91 seconds.
+
+### D1: deep review at its defaults (registered 2026-11-14, before it runs)
+
+Two arms, three passes each on the 20 tuning pull requests, DeepSeek V4.1 Flash:
+
+- **D1:** `nitpick deep-review` at its defaults.
+- **D1g:** the same with `review.deep.agents: [general]`, which measures the security agent.
+
+Both are paired against R1, R10 and Mira's two default passes, at the posted stage and, from
+the same runs, at the drafted and after-filter stages.
+
+- **Ship to the held-out gate:** D1's F1 above Mira's 0.514.
+- **Otherwise the funnel picks the next stage:** drafts below Mira's drafts (F1 0.538,
+  precision 50.6%, recall 57.4%) send the next stage to the agents; drafts at or above Mira's
+  with posted F1 below send it to the selection.
+- **Validity:** an arm with more than 5% of its agent runs failed, or of its forced
+  submissions sent again without reasoning, is reported and not ranked.
+- **Reported with it:** calls, turns, lookups and tokens for each review, model spend, and
+  median review time.
+
+Amended 2026-11-14, before any D1 score was read: the first D1 build lacked Mira's
+duplicate rule, so two agents filing one defect posted it twice (calcom-1 posted one async
+`forEach` defect twice on each of two lines). The partial runs were deleted unscored, and D1
+restarted on the build with the rule (`deepDuplicate`, `internal/review/deepselect.go`).
+
+### D2r: D1 with the reasoning replayed (registered 2026-11-14, before it runs)
+
+Mira replays each turn's reasoning to the next; deep review cannot until
+`nocturnium/llm-go-sdk` sends it. D2r is the D1 build compiled against
+`tools/bakeoff/llm-go-sdk-reasoning-replay.patch` (it applies to v6.15.0 and its test passes
+there) through an alternate modfile, so the repository's `go.mod` is unchanged. Everything
+else is D1's defaults. Three passes on the 20 tuning pull requests, run beside D1 and paired
+against it.
+
+- **Keep:** F1 above D1's with precision down 2 points or fewer, which would make the SDK
+  change worth releasing.
+- **Ship to the held-out gate:** F1 above Mira's 0.514, as for D1.
+- **Validity:** D1's.
+
+### Judge change (registered 2026-11-14, before any rescored number is read)
+
+Every number above was judged by the upstream benchmark's judge, `anthropic/claude-sonnet-4.5`.
+From here the primary judge is `openai/gpt-6.1-sol`, with `openai/gpt-6.1-terra` and
+`openai/gpt-6-luna` reported beside it, on the maintainer's direction that these track human
+review most closely. Only `--judge-model` changes; the scorer, its prompts and its
+deduplication are the upstream ones. The published competitor rows stay under the old judge
+and are not compared.
+
+Mira is not re-run. Its stored runs, the open-nitpick runs this record compares, and the
+scoring inputs are frozen outside the repository with a SHA-256 manifest and no write
+permission, and every arm is rescored from those files, so a difference between judges is
+the judges' alone. Sonnet-judged numbers above stay as history. A comparison is made only
+between arms scored by one judge, and a ship or kill condition that names a number taken
+under the old judge now means the same quantity rescored by GPT-6.1 Sol.
+
+A two-case smoke (calcom-1, keycloak-4) ran all three. On Mira's comments, Sol and Luna
+matched Sonnet's counts and Terra counted one fewer true positive on calcom-1.
+
+#### Judge calibration (unregistered, 2026-11-16)
+
+The judge was to be the one model, of Sol, Terra, Luna and GPT-4o mini, that scores closest to a
+human. The benchmark's methodology says its judge "has not been formally calibrated against human
+annotations", so there was no data to pick from, and one was built.
+
+The 1,228 match prompts stored from scoring D6v under Sol were sent unchanged, with the scorer's
+own settings, to the other three. Sol, Terra and Luna agreed on 99.1% to 99.7% of them (they split
+on 13 pairs). GPT-4o mini agreed with them 83% of the time and called 29.7% of pairs a match
+against 12.5% to 13.4%. A sample of 60 pairs was labelled: all 13 GPT-6 splits, 37 of the 202
+pairs where only GPT-4o mini differs, and 5 unanimous matches and 5 unanimous non-matches. The
+labels are a majority of three Claude agents that saw only the two texts, not a human's: the owner
+asked for the agents to label them. Two pairs had no majority and were left out; the agents agreed
+on 56 of 60, and on the one pair the owner labelled by hand.
+
+| judge | agreement with the labels, weighted to the 1,228 | 95% interval | pairs differing |
+|---|---:|---|---:|
+| Sol | 0.9962 | 0.9933 to 0.9990 | about 5 |
+| Luna | 0.9952 | 0.9923 to 0.9981 | about 6 |
+| Terra | 0.9942 | 0.9913 to 0.9971 | about 7 |
+| GPT-4o mini | 0.8317 | 0.8288 to 0.8345 | about 207 |
+
+GPT-4o mini was wrong on all 37 sampled pairs where it alone differed, which it matched and the
+labels did not. On the 11 labelled pairs where the three GPT-6 models split, Sol agreed with the
+labels on 7, Luna on 6 and Terra on 5. Sol is the closest and is the judge from here; Sol, Luna and
+Terra are within 1 to 2 pairs of each other, which the intervals do not separate, so the choice of
+Sol over Luna (a twentieth of the cost) rests on it being the registered primary and nominally the
+closest, not on a measured gap. Limits: model labellers, 11 informative pairs, and the pairs come
+from candidates of one arm (D6v) on the tuning set.
+
+#### Rescored under the new judges
+
+Every compared run, scored again from the frozen files under GPT-6.1 Sol, Terra and Luna.
+The last column is each arm's F1 minus Mira's, with the 95% interval from the paired
+bootstrap over pull requests. Mira's own F1 moved by 0.012 across the three judges. The order
+of the arms is the same under each, except among R10, R11 and D1, which sit within 0.014 of
+each other and swap places.
+
+Tuning set, 20 pull requests, Sol (primary):
+
+| arm | precision | recall | F1 | TP, FP | F1 minus Mira |
+|---|---:|---:|---:|---|---|
+| Mira, default (2 passes) | 69.4% | 36.8% | 0.481 | 50, 22 | |
+| R1, 6-file batches | 27.6% | 42.6% | 0.335 | 87, 228 | -0.146 (-0.223, -0.052) |
+| R10, whole PR, tool loop | 43.5% | 39.2% | 0.412 | 80, 104 | -0.068 (-0.150, +0.019) |
+| R11, R10 with triage off | 40.2% | 43.1% | 0.416 | 88, 131 | -0.065 (-0.153, +0.037) |
+| D1, deep review | 56.3% | 32.8% | 0.415 | 67, 52 | -0.066 (-0.148, +0.010) |
+| D1g, general agent only | 53.3% | 31.4% | 0.395 | 64, 56 | -0.086 (-0.180, +0.010) |
+| D2r, D1 with reasoning replayed | 48.8% | 30.9% | 0.378 | 63, 66 | -0.102 (-0.201, -0.002) |
+
+F1 under the other two judges: Terra has Mira 0.469, R1 0.342, R10 0.407, R11 0.421, D1 0.415,
+D1g 0.395, D2r 0.366. Luna has Mira 0.478, R1 0.352, R10 0.441, R11 0.431, D1 0.430, D1g 0.410,
+D2r 0.382. Held-out set, 30 pull requests, three passes each, Mira against the R1 build:
+
+| judge | Mira precision, recall, F1 | R1 build precision, recall, F1 | F1 difference |
+|---|---|---|---|
+| Sol | 66.2%, 46.7%, 0.547 | 36.3%, 52.1%, 0.428 | -0.120 (-0.180, -0.062) |
+| Terra | 67.9%, 47.0%, 0.555 | 38.1%, 54.6%, 0.449 | -0.106 (-0.168, -0.047) |
+| Luna | 72.2%, 49.5%, 0.588 | 38.8%, 55.2%, 0.455 | -0.132 (-0.186, -0.073) |
+
+The three arms that read the repository and filter (D1, D1g, D2r) kept the precision and lost
+recall, as before. The security agent helps (D1 over D1g, 0.415 against 0.395), and replaying
+reasoning hurts (D2r below D1), under every judge.
+
+### D3m: Mira's agent prompts (registered 2026-11-14, before it runs)
+
+D2r's drafts were 34.4% precise and recalled 47.5% (Sonnet judge), against 50.6% and 57.4% for
+Mira's drafts from the same model, loop shape and selection rules. The largest difference
+left is what the agents are told. Ours extends the review prompt, written for one call;
+Mira's tells the agent to file only at confidence 0.7 or more, to trace a new value to the
+code that consumes it, to treat removed lines as a specification, to follow a changed
+signature to every caller and implementer, and not to speculate past what it can cite.
+
+D3m is the D1 build with both agents' system prompts replaced by Mira's general and security
+prompts, adapted to the findings schema (field names, severity scale, class list; Apache
+License 2.0, `/tmp/bakeoff/d3m/adapt.py` makes the adaptation), built in a worktree so the
+repository is unchanged unless the stage is kept. Because D1's forced submissions came back
+empty at the 16,384-token cap 16% to 34% of the time, the forced submission in this build
+also gets a 65,536-token cap and a 10-minute deadline; the reasoning-off retry stays as the
+last resort. A two-case smoke still had 1 of 3 forced submissions run out at 65,536.
+
+Three passes on the 20 tuning pull requests, scored by GPT-6.1 Sol, Terra and Luna, paired
+against D1 and Mira under the same judge.
+
+- **Keep, and write our own prompts to this structure:** drafted precision up 8 points or
+  more over D1's drafts under Sol, with drafted recall not lower.
+- **Ship to the held-out gate:** posted F1 above Mira's under Sol.
+- **Validity:** D1's. The forced-submission fallbacks are reported either way.
+
+#### D3m result: at Mira's F1, by a different route
+
+Three passes on the 20 tuning pull requests, scored by all three judges. One review
+(discourse-4, pass 1) came back incomplete: its critique was cut at the output cap and
+returned no grades. It was re-run once.
+
+| judge | D3m precision, recall, F1 | Mira F1 | D3m minus Mira, F1 | D3m minus D1, F1 |
+|---|---|---:|---|---|
+| Sol | 56.5%, 42.6%, 0.486 | 0.481 | +0.005 (-0.064, +0.088) | +0.071 (+0.013, +0.143) |
+| Terra | 54.8%, 42.2%, 0.476 | 0.469 | +0.008 (-0.060, +0.090) | +0.062 (+0.002, +0.136) |
+| Luna | 57.0%, 44.1%, 0.497 | 0.478 | +0.019 (-0.060, +0.113) | +0.067 (+0.001, +0.144) |
+
+D3m is the first arm whose F1 is not below Mira's, and the interval says it is level with it,
+not above it. It gets there with 13 points less precision (-24.1 to -2.9 under Sol, which
+excludes zero) and 5.9 points more recall (-2.1 to +14.5). Against D1 the gain is recall: +9.8
+points (+4.0 to +16.7), with precision unchanged (+0.2).
+
+Drafts, Sol. D3m's drafts are 36.0% precise with 57.8% recall, D1's 34.4% and 51.0%, Mira's
+44.2% and 50.7%. The registered condition for writing our own prompts to Mira's structure
+was drafted precision up 8 points over D1's with recall not lower, and it fails: precision is
+up 1.5 points (-5.4 to +8.1), recall up 6.9 (+0.5 to +13.8). Mira's prompts did not make the
+agents more precise. The registered ship condition, posted F1 above Mira's under Sol, holds
+as a point comparison (0.486 against 0.481) and not as an interval.
+
+Two things changed from D1, the prompts and the forced-submission cap, so this result cannot
+say which one carried the recall. D1c separates them. Validity: 5 of D3m's 98 forced
+submissions (5.1%; 2.9%, 6.3% and 6.5% by pass) were sent again without reasoning, which is
+3.6% of its agent runs, against a registered limit of 5% that the strict reading puts just
+over. D1's were 13% to 26% of its agent runs.
+
+### D1c: the repository build (registered 2026-11-14, before it runs)
+
+D3m changed two things at once from D1: Mira's prompts and a larger forced-submission cap.
+The repository build has the cap, a ladder behind it (low effort, then none), a critique
+that is asked again when it is cut mid-answer, and a report that names a failed agent or a
+batch reviewed without tools, all with our own prompts. D1c is that build at its defaults,
+three passes on the 20 tuning pull requests, scored by Sol (primary), Terra and Luna, paired
+against D1 (what the fixes change), D3m (what the prompts change) and Mira.
+
+- **Reading:** D3m minus D1c, posted F1 under Sol, with its interval. An interval that
+  excludes zero says the prompts carry part of D3m's gain, and the next stage writes our own
+  prompts to D3m's structure. An interval that includes zero keeps the repository's prompts.
+- **Ship to the held-out gate:** D1c's posted F1 above Mira's under Sol, as a point
+  comparison like every earlier stage. The held-out run is made once, on the build that is in
+  the repository, and nothing is tuned on its result.
+- **Validity:** more than 5% of forced submissions sent again without reasoning, or any
+  failed agent, is reported and the arm is not ranked. A review that comes back incomplete is
+  re-run once and both runs are reported.
+
+### D1t: twenty investigation turns (registered 2026-11-14, before it runs)
+
+Most agents stop at the turn cap: 70% of D3m's agent runs (97 of 138) ended in a forced submission, and
+60% of Mira's loops hit its 10-hop cap. Neither tool's misses on the tuning set are cheap
+lookups. Of the 28 golden comments neither tool's drafts matched, the ones that name code
+elsewhere (the delegate that `getForLogin` should call, the key a validator reads, a
+queryset that cannot take a negative slice) take more reading than ten turns of a
+flash-class model gives them. D1t is D1c with `review.deep.max_turns: 20`
+(`/tmp/bakeoff/cfg/d1t-turns20.yaml`) and nothing else changed. Three passes on the 20
+tuning pull requests, scored by Sol, Terra and Luna, paired against D1c.
+
+- **Adopt 20 as the default:** posted F1 under Sol above D1c's by 0.03 or more.
+- **Otherwise 10 stays,** and the cost of the extra turns is reported against what they bought.
+- **Reported with it:** turns, lookups and tokens per review, model spend, forced
+  submissions, and drafted recall against D1c's.
+
+Erratum, 2026-11-15, before any D1t score was read: the paragraph above states as fact what
+is a hypothesis. That the missed comments need more reading than ten turns give is not
+shown, and one of its three examples is a language rule the model has to recall (a Django
+queryset takes no negative slice), not code it has to read. The conditions above are
+unchanged.
+
+### D1h: high reasoning effort (registered 2026-11-14, before it runs)
+
+Mira reviews at medium effort, as does every deep arm so far. The golden comments neither
+tool matched are mostly semantic: a language rule the model has to recall, or a pattern in
+code it has read. D1h is D1c with `review.deep.reasoning: high` and nothing else
+(`/tmp/bakeoff/cfg/d1h-high.yaml`). Three passes on the 20 tuning pull requests, scored by
+Sol, Terra and Luna, paired against D1c. A higher effort runs out of output budget more
+often, so the forced-submission steps are counted.
+
+- **Adopt high as the default:** posted F1 under Sol above D1c's by 0.03 or more.
+- **Otherwise medium stays,** and the cost of the extra thinking is reported.
+- **Several knobs:** D1t and D1h each change one setting. If both are adopted, the
+  combination is run on the tuning set before the held-out gate, not assumed.
+
+#### D1c and D1h results: the prompt carries D3m's gain, and neither the fixes nor effort do
+
+Three passes each on the 20 tuning pull requests, 60 reviews each, scored by all three judges.
+Two D1c reviews came back incomplete and were re-run once, as registered: discourse-4 in pass 1
+(the critique used 4,167 reasoning tokens and made no call, so it returned no grades) and
+calcom-5 in pass 3 (an agent's `submit_findings` did not parse). Both are failure modes the
+build since fixed. The key's weekly limit then stopped the work for a day, and the runs
+resumed from the stored reviews without re-running any that had completed.
+
+| judge | D1c precision, recall, F1 | D1h precision, recall, F1 | D1c minus D1 | D1h minus D1c | D3m minus D1c |
+|---|---|---|---|---|---|
+| Sol | 55.3%, 33.3%, 0.416 | 57.9%, 32.4%, 0.415 | +0.001 (-0.044, +0.043) | -0.001 (-0.065, +0.070) | +0.070 (+0.001, +0.146) |
+| Terra | 53.2%, 32.4%, 0.402 | 58.0%, 31.9%, 0.411 | -0.012 | +0.009 | +0.074 (+0.003, +0.153) |
+| Luna | 53.6%, 32.8%, 0.407 | 56.5%, 31.9%, 0.408 | -0.023 | +0.000 | +0.090 (+0.019, +0.165) |
+
+The registered readings:
+
+- **The prompt.** D3m minus D1c excludes zero under every judge, and the whole of it is recall:
+  +9.3 points under Sol (+3.0 to +16.7), with precision unchanged (+1.2, -9.8 to +12.7). Drafts
+  say the same: D3m's are 57.8% recalled against D1c's 49.0%, at 36.0% and 39.5% precision.
+  So Mira's prompts, and not the forced-submission cap, carried the gain. D3o writes our own
+  text to that structure.
+- **The fixes** (the forced-submission cap and ladder, the critique retries, the report of a
+  failed agent) change F1 by +0.001 under Sol. They are robustness work, and the record does not
+  claim a quality gain for them.
+- **High effort is killed.** D1h minus D1c is -0.001 under Sol against a registered +0.03, and
+  it cost 30% more ($0.062 to $0.064 a review against $0.047 to $0.053) and took 254 to 313
+  seconds against 200 to 235. Medium stays.
+- **D1c is not the build that ships.** Its F1 under Sol is 0.416 against Mira's 0.481 (-0.065,
+  -0.143 to +0.003).
+
+Validity: no failed agent in either arm, and 1 forced submission in each D1c pass (2.9% to
+3.1%) and 0 to 1 in D1h was sent again without reasoning, under the 5% limit.
+
+#### D1t result: twenty turns trade recall for precision, and ten stay
+
+Three passes on the 20 tuning pull requests, 60 reviews, scored by all three judges. Seven
+reviews that the key limit cut short were re-run on the same binary, and no agent failed.
+
+| judge | D1t precision, recall, F1 | D1t minus D1c, F1 | D1t minus Mira, F1 |
+|---|---|---|---|
+| Sol | 60.5%, 33.8%, 0.434 | +0.018 (-0.036, +0.080) | -0.047 (-0.133, +0.024) |
+| Terra | 60.5%, 33.8%, 0.434 | +0.032 (-0.014, +0.078) | -0.035 (-0.126, +0.042) |
+| Luna | 61.1%, 33.8%, 0.435 | +0.028 (-0.010, +0.066) | -0.043 (-0.134, +0.037) |
+
+The registered adoption condition was posted F1 above D1c's by 0.03 or more under Sol. It is
++0.018, so ten turns stay. The gain that is there is precision (60.5% against 55.3%), and the
+agents file less: drafted recall fell from 49.0% to 43.6%, and drafted precision from 39.5% to
+35.7%. A review made 32 to 35 turns and 57 to 62 lookups against 18 to 19 and 32 to 36,
+cost $0.065 to $0.085 against $0.047 to $0.053, and took 285 to 385 seconds against 200 to
+235. Forced submissions were sent again without reasoning in 0% to 3.1% of cases.
+
+### L1: the repository build on GPT-6 Luna (registered 2026-11-14, before it runs)
+
+Every arm so far is DeepSeek V4.1 Flash, the model Mira was frozen on. GPT-6 Luna costs about
+the same ($0.10 and $0.50 per million tokens) and takes no temperature, which makes it the
+test of the temperature handling added to the client and of whether the mode depends on one
+model. L1 is the repository build at its defaults with `LLM_MODEL=openai/gpt-6-luna`,
+three passes on the 20 tuning pull requests, scored by Sol, Terra and Luna.
+
+It is descriptive. Mira has no frozen run on this model, so L1 is not ranked against it, and
+no ship condition is attached. It is read against D1c, to see what the model changes, and for
+two counts: reviews that completed, and agent turns that were refused for a temperature.
+
+#### L1 result: the mode runs on a model that takes no temperature, at lower recall
+
+Three passes on the 20 tuning pull requests, GPT-6 Luna, the repository build before the deep
+prompt. All 60 reviews completed. No agent failed and no review came back incomplete. The model
+refused a temperature on 138 first calls, one for each agent run, because a review starts its
+agents together and so each meets the refusal once before the client has learned it. Each was
+sent again without it and later calls left it out.
+
+| judge | L1 precision, recall, F1 | Mira precision, recall, F1 |
+|---|---|---|
+| Sol | 60.6%, 27.9%, 0.383 | 69.4%, 36.8%, 0.481 |
+| Terra | 60.6%, 27.9%, 0.383 | 67.1%, 36.0%, 0.469 |
+| Luna | 62.5%, 29.4%, 0.400 | 68.5%, 36.8%, 0.478 |
+
+Mira's column is its DeepSeek run and is shown for scale. It is not a comparison. Luna drafted
+122 findings in all and posted 101 (1.7 a review), against 400 and 166 (2.8 a review) for D3m on
+DeepSeek, so its recall is the lower. It also cost $0.006 to $0.015 a review at its list price of $0.10 and
+$0.50 per million tokens, against about $0.04, and a review took a median of 60 to 73 seconds
+against 183 to 246. The mode is not tied to one model. On this set Luna is the cheap and fast
+setting, and DeepSeek the more thorough one.
+
+### D3o: our own deep base prompt (registered 2026-11-14, before it runs)
+
+D3m's recall gain could come from Mira's prompt or from the forced-submission cap, and D1c
+separates the two. D3o prepares the answer in case it is the prompt. Our review prompt is
+written for a reviewer with the diff alone: report nothing it cannot demonstrate, choose the
+lower level when torn, drop a finding that needs code it was not shown. A deep agent reads
+the repository and is followed by a critique, so those rules ask it to be silent about what
+it has tools to check. `internal/prompt/templates/deep_review.md` is written for it. It
+keeps our anchoring, severity, confidence, citation and suggestion rules, which the filters
+depend on, and asks the agent to file every defect it can defend, follow a change to the code
+that receives it, treat the removed lines of a refactor as its specification, and check every
+implementer and caller of a changed contract, with lists of what not to file and what not
+to speculate about. It is our own text, written from those practices and not from Mira's.
+The persona, model notes and run instruction layer over it as before.
+
+D3o is the repository build at its commit `ea01431` with nothing else changed: three passes on
+the 20 tuning pull requests, scored by Sol, Terra and Luna, paired against D1c, D3m and Mira.
+
+- **Keep the deep prompt:** posted F1 under Sol at least D1c's. Otherwise the commit is
+  reverted before the held-out gate and the deep agents go back to the ordinary base prompt.
+- **Reading:** D3o minus D1c and D3o minus D3m, each with its interval, so the record shows
+  whether our text does what Mira's did.
+- **Ship to the held-out gate:** kept, and posted F1 above Mira's under Sol as a point
+  comparison.
+- **Reported with it:** drafted recall and precision against D1c's and D3m's, and how many
+  agents used their time budget.
+
+#### D3o result: below D1c under Sol, so the deep prompt is reverted
+
+Under Sol, D3o's posted F1 was 0.411, against D1c's 0.416 (-0.004, interval -0.063 to
++0.063) and D3m's 0.486 (-0.075, -0.150 to -0.003). It raised recall 5.4 points over D1c
+(+0.5 to +10.8) and cut precision 11.4 (-19.2 to -1.8): asked to file every defect it can
+defend, the agent did, and D3o posted 186 comments over three passes where D1c posted 126
+and D3m 166. Terra and Luna put it 0.015 and 0.010 above D1c and 0.059 and 0.079 below D3m.
+The registered condition is Sol's, so `ea01431` is reverted (`d865d18`) and the deep agents
+review under the ordinary prompt with the lookup note. Our text did not do what Mira's did:
+D3m gained 9.3 points of recall over D1c at no cost in precision.
+
+| Sol, three passes | posted precision | posted recall | posted F1 | drafted precision | drafted recall | drafted F1 |
+|---|---|---|---|---|---|---|
+| D1c | 55.3% | 33.3% | 0.416 | 39.5% | 49.0% | 0.438 |
+| D3m | 56.5% | 42.6% | 0.486 | 36.0% | 57.8% | 0.444 |
+| D3o | 43.9% | 38.7% | 0.411 | 29.7% | 52.5% | 0.379 |
+
+No agent used its 15-minute budget. D3o's agents were made to submit in 128 of 144 runs
+(89%), against D1c's 99 of 138 (72%), and a review cost $0.057 to $0.076 with a median of
+284 to 391 seconds, against $0.047 to $0.053 and 200 to 235 seconds for D1c.
+
+### D4a: the held-out gate for the build at `ab683d3` (registered 2026-11-15, before it runs)
+
+The held-out set is 30 pull requests the tuning work never selected on, read once for the
+earlier arms. D4a runs the repository build at its current HEAD, `ab683d3`, which has the deep
+base prompt, ten turns, medium effort and the failure-path fixes: three passes on the 30
+pull requests, scored by Sol, Terra and Luna against Mira's three held-out passes rescored
+under the same judges. It runs while D3o is still being measured on the tuning set, so that
+no held-out number can steer a choice the tuning set has not already made.
+
+- **Ship:** posted F1 above Mira's under Sol as a point comparison, reported with its
+  interval and under the other two judges.
+- **If D3o is not kept** (below D1c on the tuning set), `ab683d3` is not the build that ships.
+  D4a is still reported, and the build that ships gets its own gate, D4b.
+- **If D1t or D1h is adopted,** the build that ships changes and gets its own gate as well.
+  Every held-out run is reported, whatever it shows.
+
+#### D4a result: below Mira on the held-out set, at the same recall
+
+The build at `ab683d3`, with the deep prompt D3o later removed, scored posted F1 0.494 under
+Sol on the 30 held-out pull requests, against Mira's 0.547 (-0.054, interval -0.126 to
++0.022). Recall was level, 45.4% against 46.7% (-1.3 points, -10.0 to +7.5), and precision
+was 12 points lower, 54.2% against 66.2% (-19.6 to -5.0). Terra put it 0.054 below Mira and
+Luna 0.067 below. It is 0.066 above the R1 build on the same set under Sol (+0.000 to
++0.136), 0.052 under Terra and 0.065 under Luna. No agent failed in 204 agent runs, and a
+review cost $0.057 to $0.060 with a median of 254 to 303 seconds. The ship condition fails,
+and the build would not have shipped anyway, since D3o was not kept.
+
+### F6: a confidence floor of 0.6, scored from stored drafts (registered 2026-11-15, before it runs)
+
+The deep selection's floor of 0.7 is Mira's number, taken without a measurement of our own.
+Joined with the scorer's verdicts on the drafted sets, the drafts that floor withheld at
+confidence 0.6 to 0.69 were true 34% to 37% of the time on D1c under each of the three judges,
+and 42% of the time on D3m under Sol. Adding a finding raises F1 when it is true more often
+than half the current F1, about 24% here, so the floor appears to withhold findings that
+would raise it. The estimate from those labels is biased: it puts D3m's posted F1 at 0.447,
+where its posted sets scored 0.486. It is therefore checked on posted sets before an arm runs.
+
+F6 builds, from each stored pass, the set a floor of 0.6 would post: the posted findings plus
+the drafts the floor withheld at 0.6 or more, with the cap of five info and nit findings
+applied in severity-then-confidence order (`floorset.py`, beside the bakeoff scripts). The
+critique never saw the added drafts, so this is a 0.6 floor with the critique off for them.
+The critique withholds mostly false findings (8 true of 85 on D3m), so a real arm should do
+no worse. The sets are scored by Sol and paired by pull request with the passes they were
+built from. F6 runs on D1c now and on D3o once D3o is scored.
+
+- **Run the arm, D5f:** F6's posted F1 under Sol at least 0.02 above the passes it was built
+  from, on D1c and, if D3o is kept, on D3o. D5f is the build that ships with
+  `review.deep.confidence_floor: 0.6`: three passes on the tuning set, scored by Sol, Terra
+  and Luna.
+- **Keep the floor at 0.6:** D5f's posted F1 under Sol at least 0.03 above its parent's, the
+  bar D1t was held to. The default then changes, and the build gets its own held-out gate.
+- **Leave the floor at 0.7:** F6 below 0.02 on either arm, or D5f below its bar.
+
+#### F6 result: a floor of 0.6 clears its bar on D1c
+
+On D1c, the sets a floor of 0.6 would post scored F1 0.440 under Sol, against 0.416 for the
+same passes as posted (+0.024, interval -0.027 to +0.082). Recall rose 7.8 points (+3.5 to
++12.6) and precision fell 8.1 (-14.0 to -1.5). That clears the registered 0.02. On D3o it
+was +0.017 (-0.029 to +0.074), but D3o is not kept and its condition lapsed with it. D5f
+therefore runs on the build that ships, `d865d18`, with `review.deep.confidence_floor: 0.6`.
+The estimate from labels had put the gain at about 0.045; on posted sets it is half that.
+
+### F6m: the same floor on D3m's drafts (registered 2026-11-15, before it runs)
+
+F6's method applied to D3m's three stored passes, scored by Sol and paired with them as
+posted. It sizes what Mira's adapted prompts would post with a floor of 0.6, and decides
+nothing by itself: shipping text adapted from Mira's prompts is the owner's decision, for its
+licence and attribution and for the contamination limit below. It is reported for that
+decision, whatever it shows.
+
+#### F6m result: Mira's adapted prompts with a 0.6 floor are above Mira on the tuning set
+
+On D3m, the sets a floor of 0.6 would post scored F1 0.510 under Sol, against 0.486 for the
+same passes as posted (+0.024, interval -0.008 to +0.059), with recall up 6.4 points (+2.8 to
++10.1) and precision down 3.3 (-6.2 to -0.2). Against Mira's two passes that is +0.029
+(-0.043 to +0.115). The floor costs D3m less precision than D1c because what it lets in is
+both fewer and truer: 13 true of 34 scored for D3m, against 16 of 55 for D1c. The same gain
+on our own prompt (F6, D1c) leaves it at 0.440, below Mira's 0.481.
+
+*Erratum, 2026-11-15:* the sets for F6 and F6m leave the critique out of the findings they add,
+and D5f showed that it withholds most of them. Neither figure was reproduced live: F6 on D1c
+became 0.412 for D5f. F6m's 0.510 is an upper bound for a floor of 0.6, and Mira's prompts at
+the default floor, 0.486, are the measured figure.
+
+#### D5f result: the floor of 0.6 adds nothing live, and F6 overstated it
+
+D5f, the build at `d865d18` with `review.deep.confidence_floor: 0.6`, scored posted F1 0.412
+under Sol, against D1c's 0.416 (-0.004, interval -0.049 to +0.046); Terra put it 0.005 above
+and Luna 0.011 above. It misses F6's bar of 0.02 and the 0.03 the floor needed to change the
+default, so the floor stays at 0.7. F6 had put the same change at +0.024 on D1c's drafts. It
+let the 60 findings between 0.6 and 0.7 straight into the posted set, and the critique was
+never asked about them. Live, 62 findings in that band passed the floor and the critique withheld
+42 of them, so only 13 were posted, against 60 in F6's sets. A plausible finding is kept
+only at confidence 0.75 or more, which makes the critique the binding limit for the band the floor
+opens. F6m has the same flaw (see its result).
+
+### F7: a corpus neither tool has seen (registered 2026-11-15, before it is built)
+
+Asked whether to adopt prompts adapted from Mira or keep ours, the owner asked first for a
+comparison on different bugs, to see whether the grades hold. Every pull request so far is from
+the Martian set, which the person writing the prompts has read and Mira's authors score
+themselves on. F7 builds a second corpus by a rule fixed here and runs the arms already
+measured on it.
+
+**Corpus rule, applied mechanically.**
+
+1. Merged pull requests from 2026-09-01 to 2026-11-08 in public repositories with at least 200
+   stars whose primary language is TypeScript, Python, Go, Java or Ruby, excluding the five
+   Martian repositories. The window is after the Martian benchmark's own data and recent
+   enough that no reviewer here is likely to have trained on it.
+2. 2 to 40 changed files, 40 to 1,500 changed lines, an author that is not a bot.
+3. A golden comment is a review thread whose first comment is by a human other than the pull
+   request's author, is at least 30 characters, and which GitHub marks outdated, meaning a later
+   commit changed the lines it was on. The reviewed state is the commit that carries the most
+   such threads (ties: the earliest). Its diff against the pull request's base is the review
+   input, and only threads on that commit count.
+4. Each golden comment is given one of Martian's ten categories by `anthropic/claude-sonnet-5.5`
+   from the comment, the diff hunk and the path. A pull request needs at least one comment in
+   a core category (bug, security, concurrency, data, api, perf, test_gap, doc_defect) to be
+   eligible.
+5. Eligible pull requests are ordered by the SHA-256 of `owner/repo#number`, and the first six
+   per language are taken, at most two per repository. Nothing about a pull request's content,
+   or any tool's result on it, enters the order.
+6. The golden text is the human's comment as written, prefixed with `path:line: `. Nothing is
+   paraphrased.
+
+**Arms.** Three passes each, `deepseek/deepseek-v4.1-flash-1017` for every role, scored by
+Sol, Terra and Luna with the upstream matching prompts, posted and drafted sets both:
+
+- Mira, with the settings of its frozen arm A.
+- D1c, the repository build with our prompt, as measured on the tuning set.
+- D3m, the same build with Mira's two prompts adapted to our schema.
+- ~~D5f, the current build `d865d18` with `review.deep.confidence_floor: 0.6`.~~ Dropped on
+  2026-11-15, before any F7 arm ran: D5f scored 0.412 against D1c's 0.416 on the tuning set, so
+  it is D1c with a different floor and adds no arm.
+
+**Counts.** The primary figures are `compare.py`'s raw counts over every golden category, as in
+every earlier stage. The upstream core profile, in which a match to a style or speculative
+comment is neither rewarded nor penalised, is reported beside them, because this corpus has far
+more of those than the Martian set (amended 2026-11-15, before any arm ran: the registration had
+named the core profile as the measure).
+
+**Reading,** each difference paired by pull request with a bootstrap interval, under Sol first
+and the other two beside it. A grade holds when its sign repeats and the point estimate is within
+0.04 of the earlier one; the earlier values, under Sol, are Mira minus D1c +0.065, D3m minus D1c
++0.070 and D3m minus Mira +0.005.
+
+- **Adopt the adapted prompts** (a recommendation, the decision is the owner's): D3m minus D1c
+  at least +0.03 and D3m minus Mira at least -0.02 under Sol. Otherwise the adoption case falls
+  away and our prompts stay.
+- **Beating Mira** is claimed for a configuration only when its posted F1 exceeds Mira's under
+  Sol on this corpus and on the held-out set. No build with Mira's prompts has been gated on
+  the held-out set, so D4b follows if D3m clears the adoption condition here.
+- Every number is reported, whatever it shows.
+
+**Rules for the corpus.** It is read only to check the build: the counts and a sample of golden
+comments. No prompt, filter or default changes because of what it contains. Each arm is scored
+once per judge. Mira's runs are frozen when they finish, like the others. The estimate is $60,
+and the work stops and reports if the key's weekly usage passes $300 (it was $223 on the 15th).
+
+#### F7 result: the order holds, no arm reaches Mira, and our selection stages do not transfer
+
+The corpus came out at 30 pull requests from 28 repositories (six per language, none of the
+five Martian repositories) with 94 golden comments: 68 in core categories (bug 25, doc_defect
+21, test_gap 11, concurrency 4, api 4, data 2, perf 1) and 26 outside them (style 20,
+speculative 6). 53 are rated Low and 4 High. 15 further candidates were skipped for having no
+golden comment in a core category and one for a reviewed state over the size rule. The Martian
+set is mostly bugs rated Medium or High, so this is a different kind of corpus. Mira ran with
+its arm A settings, D1c and D3m as measured on the tuning set. All 270 reviews finished, and one
+D3m review was re-run once after its critique returned no grades.
+
+Under Sol, three passes of 30 pull requests, raw counts over every golden category:
+
+| | posted precision | posted recall | posted F1 | posted a review | empty reviews | drafted F1 |
+|---|---|---|---|---|---|---|
+| Mira | 27.6% | 8.5% | 0.130 | 0.92 | 35 of 90 | |
+| D3m | 19.0% | 6.7% | 0.099 | 1.10 | 30 of 90 | 0.172 |
+| D1c | 24.3% | 3.2% | 0.056 | 0.40 | 64 of 90 | 0.141 |
+
+| posted F1, paired | Sol | Terra | Luna |
+|---|---|---|---|
+| D1c minus Mira | -0.074 (-0.155 to +0.006) | -0.079 (-0.161 to +0.002) | -0.072 (-0.155 to +0.014) |
+| D3m minus Mira | -0.031 (-0.098 to +0.031) | -0.031 (-0.096 to +0.026) | -0.037 (-0.104 to +0.022) |
+| D3m minus D1c | +0.043 (-0.026 to +0.112) | +0.048 (-0.025 to +0.121) | +0.035 (-0.043 to +0.106) |
+
+Mira's F1 is 0.135 under Terra and 0.141 under Luna. The core profile puts Mira at 0.152, D3m at
+0.119 and D1c at 0.075 under Sol, in the same order, with every interval across zero. The only
+interval that excludes zero, under Sol and Terra, is D1c's recall against Mira's: 5.3 points
+lower (-11.0 to -0.3 under Sol). Mira matched bug 11 of 75, concurrency 4 of 12, data 4 of 6 and
+api 3 of 12, and none of the 96 test or documentation comments, which its prompt tells the
+reviewer not to file.
+
+**The registered reading.** Mira minus D1c is +0.074 against +0.065 earlier: it holds. D3m minus
+D1c is +0.043 against +0.070: it holds, with its interval across zero as before. D3m minus Mira is
+-0.031 against +0.005: the sign does not repeat, so it does not hold. The adoption condition needs
+D3m minus D1c of at least +0.03 and D3m minus Mira of at least -0.02. The first is met and the
+second is not, so the adoption case falls away and our prompts stay. No arm's posted F1 exceeds
+Mira's, so beating Mira is claimed for none.
+
+**What else the corpus shows** (read after the fact, not registered). Every score is a quarter or
+less of its Martian value: Mira 0.130 against 0.481 and 0.547, D3m 0.099 against 0.486, D1c 0.056
+against 0.416 and D4a's 0.494. And the selection stages, which raised F1 on the Martian set, lower it
+here. D3m's posted F1 was 0.486 against 0.444 drafted on the tuning set, and D4a's 0.494 against
+0.415 on the held-out set; here the drafted sets score 0.172 for D3m and 0.141 for D1c, both above Mira's
+posted 0.130, and the posted sets 0.099 and 0.056. D1c posts 0.40 findings a review and drafts
+2.28, and 64 of its 90 reviews are empty. The signals the stages use stop separating the true
+findings from the rest:
+
+| true findings among, under Sol | D1c | D3m | D3m on the tuning set |
+|---|---|---|---|
+| posted | 7 of 35 (20%) | 15 of 96 (16%) | 54% |
+| held by the critique as plausible | 10 of 37 (27%) | 15 of 98 (15%) | 11% |
+| held by the floor | 14 of 118 (12%) | 15 of 123 (12%) | 30% |
+| confidence 0.8 or more | 7 of 41 (17%) | 3 of 35 (9%) | 57% |
+
+A finding the critique withheld is as likely to be true as one it posted, and confidence above 0.8
+is no better than 0.7. That is a statement about this corpus only: a golden comment here is a
+change a person asked for, so a real defect a tool found that nobody commented on counts as
+false, and "false" is likely to be overstated for every arm. The same corpus gives the same bias to all
+three, which is why the order between them is the reading and the level is not.
+
+#### Selection replay on the stored drafts: nothing built from the drafts transfers (unregistered, no model calls)
+
+`tools/bakeoff/selection_replay.py` replays rules on the drafted sets of D1c and D3m (tuning), D4a
+(held-out) and D1c and D3m (fresh), from the judge's labels under Sol. The share of labelled drafts
+that were true, by what a rule could read:
+
+| | tuning, D1c and D3m | held-out | fresh, D1c and D3m |
+|---|---|---|---|
+| severity error or critical | 83% and 78% | 47% | 8% and 9% |
+| confidence 0.9 or more | 78% and 91% | 60% | 1 of 3 and 0 of 2 |
+| a second agent filed it | 68% against 28%, 54% against 28% | 46% against 25% | 22% against 15%, 18% against 13% |
+
+Only agreement keeps its direction on every corpus, and its lift falls from 1.9 to 2.4 times on
+the tuning set to 1.4 to 1.5 times on the fresh one. Rules built from agreement, severity and
+confidence were then replayed as a replacement for today's floor, critique and cap. The F1 below
+is estimated from the labels, which puts today's posted sets at 0.401, 0.469, 0.471, 0.050 and 0.079
+against the measured 0.416, 0.486, 0.494, 0.056 and 0.099, so it ranks rules and does not replace
+scoring one.
+
+| estimated F1 | tuning D1c | tuning D3m | held-out | fresh D1c | fresh D3m |
+|---|---|---|---|---|---|
+| posted today | 0.401 | 0.469 | 0.471 | 0.050 | 0.079 |
+| floor 0.7 alone, no critique | 0.390 | 0.443 | 0.453 | 0.100 | 0.138 |
+| best agreement rule on that corpus | 0.413 | 0.414 | 0.448 | 0.060 | 0.074 |
+
+The best agreement rule on each corpus, picked on that corpus and so flattering it, differs from
+today's by +0.012, -0.055, -0.023, +0.010 and -0.005. Dropping the critique costs 0.011 to 0.026
+on the Martian sets and gains 0.050 and 0.059 on the fresh one. No selection rule from these
+properties is carried further. A selection change would need a signal that separates true from false
+on both kinds of corpus, which none of these does.
+
+### D4b: the held-out gate for Mira's adapted prompts on the build at HEAD (registered 2026-11-15, before it runs)
+
+F7 left one leg of the Mira-prompt question unmeasured. D3m has been run on the tuning set (0.486
+against Mira's 0.481) and on the fresh corpus (0.099 against 0.130) and never on the held-out set.
+D6m is the build that would ship if the prompts were adopted: the code at HEAD, which has not
+changed since `d865d18`, with the two agents' system prompts replaced by Mira's general and
+security prompts adapted to our schema, as in D3m, and nothing else touched. D4b runs it for three
+passes on the 30 held-out pull requests, scored by Sol, Terra and Luna and paired against Mira's
+three held-out passes rescored under the same judges.
+
+It decides nothing alone. Mira's prompts carry the contamination limit below, since one of their
+items restates a golden comment on the tuning set, so a result above Mira's on this set does not
+count towards beating it; the fresh corpus is the clean reading, and D3m was 0.031 below Mira there.
+D4b is reported whatever it shows, and it completes the three corpora for the owner's decision on
+the prompts.
+
+*Not run, 2026-11-15.* The first attempt failed on every review within seconds: OpenRouter
+returned 403 "Key limit exceeded (monthly limit)", naming a limit of $400.00 with $400.01 used,
+resetting 2026-12-01. The key's own endpoint reported $169 left of a weekly $400, which resets on
+the 16th, and small requests answered a minute later, so which limit is real is not known. The
+driver was stopped with no spend and the aborted run directories were deleted. D4b waits for the
+owner to say whether the key may be used further.
+
+### Where the true drafts go, stage by stage (unregistered, no model calls)
+
+`tools/bakeoff/stage_loss.py` reads the scorer's counts under Sol for the drafted, after-filter and
+posted sets of Mira, D1c and D3m on the tuning set, and the confidence each labelled draft reported.
+The first three rows are true and false findings a pass.
+
+| | Mira (2 passes) | D1c | D3m |
+|---|---|---|---|
+| drafted | 34.5, 43.5 | 33.3, 51.0 | 39.3, 70.0 |
+| after the floor, the duplicate rule and the cap | 30.0, 27.0 | 24.3, 28.3 | 34.0, 48.7 |
+| posted, after the critique | 25.0, 11.0 | 22.7, 18.3 | 29.0, 22.3 |
+| true drafts the filter withheld | 13% | 27% | 14% |
+| false drafts the critique removed, of those it saw | 59% | 35% | 54% |
+| labelled drafts reporting under 0.7 | 44 of 155 (28%) | 94 of 250 (38%) | 82 of 325 (25%) |
+| reporting 0.75 or more, of those the floor passed | 58 of 107 (54%) | 116 of 149 (78%) | 117 of 230 (51%) |
+| posted at 0.75 to 0.85 that were true | 24 of 37 (65%) | 32 of 78 (41%) | 33 of 74 (45%) |
+
+D1c's agents draft as many true findings as Mira's, 33.3 against 34.5 a pass, with 7.5 more false
+ones. The gap opens after that. The filter withholds twice the share of D1c's true drafts that it
+withholds of Mira's, and the critique removes a little over half the share of false ones. Both
+stages cut on the confidence the agent reported: the floor at 0.7, and the critique through its keep
+rule, which keeps a finding it graded plausible only at 0.75 or more. The critique graded 4 of
+D1c's 149 labelled drafts unsupported, so what it withholds is a plausible finding under 0.75 or
+below warning, and how much it withholds follows how many drafts report under 0.75. Under our
+prompt 38% of drafts report below the floor and 78% of the rest report 0.75 or more, so the floor
+takes more and the critique less than they do for Mira. With Mira's prompts in the same build
+(D3m) both shares are Mira's, which is the 9.3 points of recall D3m had over D1c.
+
+Moving the two cuts does not recover it. D5f lowered the floor and the critique withheld what it
+let in, and D1c's posted findings at 0.75 to 0.85 are 41% true where Mira's are 65%, so above the
+floor the number carries less for us than it does for Mira.
+
+#### A blind grade of the deep build's unmatched comments (unregistered)
+
+The held-out blind grade above was of the R1 build, where 27% of open-nitpick's unmatched comments
+were real. It had not been repeated on a deep build. The same procedure was run on the tuning set:
+30 of D1c's 55 posted comments that Sol judged unmatched (three passes) and 18 of Mira's 22 (two
+passes), drawn with seed 20261115, shuffled, and split across four graders that had each comment,
+the checkout and the diff, and no label. The graders are Claude subagents, a different family from
+the DeepSeek reviewers. 44 of the 48 verdicts name a file and line. The sample, key and verdicts are
+in `/tmp/bakeoff/grade2`, not in the repository; `build.py` there draws the sample.
+
+| unmatched posted comments, sampled | n | real | partly | not real |
+|---|---:|---:|---:|---:|
+| D1c, deep build | 30 | 20 (67%, 95% interval 49 to 81) | 6 | 4 |
+| Mira | 18 | 11 (61%, 39 to 80) | 6 | 1 |
+
+D1c's unmatched comments are as often real as Mira's, and the intervals overlap. On the R1 build the
+same grade found 27% real, so the deep build's extra false positives are mostly defects the golden
+list does not contain. That changes what the stage comparison above means: D1c's 18.3 false findings
+a pass against Mira's 11.0 are largely a labelling effect, and the gap that costs it F1 is the
+labelled true findings the selection withholds (22.7 posted against Mira's 25.0, from 33.3 drafted
+against 34.5). A selector that removes judge-false findings, as D6v's check does, can raise F1
+against these labels without raising the share of posted comments that are real. D6v's result is
+read as a score against the golden list, and is not claimed as an improvement in review quality.
+Limits: 30 and 18 are small, `partly` is a judgement, and one family of grader read all 48.
+
+### D6v: the repository check as deep review's selection (registered 2026-11-15, before it runs)
+
+The floor and the critique select on a number the agent reports about itself, and the comparison
+above puts D1c's loss to Mira there. The one selector in this record that moved precision by more
+than the variance read the repository instead: R2b's check kept a finding only when a grader with
+`read_file` and `grep_repo` confirmed it, and moved precision by +14.3 points for -4.4 of recall
+on the tuning set and by +8.7 for -6.3 on the held-out set. It was measured on findings drafted
+from the diff alone and has never run on deep review's drafts. The stage is in the build
+(`review.verify`, `internal/review/verify.go`) and runs after the deep selection, so D6v is
+configuration only, `tools/bakeoff/d6v-verify.yaml`: `review.verify: confirmed`,
+`review.deep.confidence_floor: 0` and `review.deep.critique: false`. Every draft that survives the
+duplicate rule and the cap of five low-priority findings is checked, and posted only when the
+check confirms it. The build is HEAD, `6450059`, whose Go code and prompts are those of `d865d18`.
+Three passes on the 20 tuning pull requests, DeepSeek V4.1 Flash in every role, scored by Sol,
+Terra and Luna, paired against D1c and against Mira's two passes.
+
+- **Projection, written before the run:** R2b's check kept 91% of the true findings and 50% of
+  the false ones on the tuning set, and 89% and 63% on the held-out set. At those rates D1c's drafts
+  post 30 true and 26 to 32 false a pass, F1 0.46 to 0.49. Deep drafts were written by an agent
+  with the same tools, so the check may confirm more of them and remove less.
+- **Adopt as the deep selection:** posted F1 under Sol at least 0.03 above D1c's 0.416, the bar
+  D1t and D5f were held to. Otherwise the floor and the critique stay.
+- **Ship to the held-out gate:** adopted, and posted F1 above Mira's 0.481 under Sol as a point
+  comparison, reported with its interval.
+- **Second reading, from the same runs:** the sets `review.verify: not_refuted` would have posted,
+  rebuilt as the posted findings plus those the check could not settle (`deep_funnel.py --stages
+  notrefuted`) and scored by Sol. It replaces `confirmed` only if it clears the same bar and scores
+  above it.
+- **Validity:** D1c's limits on failed agents and on forced submissions sent again without
+  reasoning. An arm in which more than 5% of the checks could not run, so that their findings
+  were posted unchecked, is reported and not ranked.
+- **Reported with it:** the check's verdict counts, the share of true and of false drafts it kept
+  against the projection, and cost and median time a review against D1c's $0.047 to $0.053 and 200
+  to 235 seconds.
+
+### D7: Mira's adapted prompts, with the repository check and Jev as the selection (registered 2026-11-16, before it runs)
+
+The owner asked on 2026-11-16 to adopt and adapt Mira's prompts and combine them with the Jev
+filter, to see whether the result beats Mira. D3m put Mira's prompts in this pipeline and reached
+Mira's F1 on the tuning set, not on the fresh one (F7: D3m minus Mira -0.031 under Sol, and the
+condition for adopting the prompts failed by 0.011). D6v, the repository check as the selection,
+is registered above and has no score, because its scoring did not start. Jev, above, ranked
+agent-graded findings better than the reviewer's own confidence, and after the check it withheld
+4 more of 42 not real findings on R1 findings.
+
+**Build.** Working tree `c131b3cdb335ebc6c960257f78c8c47d138527c0` on `89736ff`, uncommitted: the `review.jev` stage, the
+`review.deep.prompts` option and the adapted prompts (`internal/prompt/templates/deep_mira_*.md`,
+attributed in `NOTICE`). The adaptation is a re-do from Mira's templates at `04d3491`, since
+D3m's script was lost with its scratch directory, so D3m's own prompt text is not reproduced
+byte for byte. Changes from Mira's text: names, the severity scale, the category map, the tool
+names and the Mira-only fields; the language footgun lists are not included. The agents'
+prompts keep this tool's voice, persona and tool-note layers after the base.
+`tools/bakeoff/d7-mira-jev.yaml`: `review.deep.prompts: mira`, `review.verify: confirmed`,
+`review.jev.threshold: 0.3`, confidence floor 0, critique off. The threshold was chosen on R1
+findings, not on this corpus. DeepSeek V4.1 Flash in every role, Jev `~typesafe/jev-latest`
+through OpenRouter.
+
+**Contamination, and why the fresh corpus is the test.** Mira's prompts name patterns that match
+golden comments of Martian tuning pull requests: the security prompt's `X-Frame-Options:
+ALLOWALL`, `indexOf` origin check and `postMessage` target-origin patterns match discourse-4's
+three golden comments, and the negative-slice-offset footgun in its Python list matches sentry-1
+and sentry-2's. A tool that carries those prompts is helped on those cases, and the Martian
+tuning and held-out sets have been read. D7 is therefore not run on them, no held-out gate is
+made, and the claim is made on the fresh corpus of F7 only: 30 pull requests from other
+repositories that neither tool has seen. The footgun lists, which are the likeliest carrier of
+this, are the part of Mira's prompt not adopted. The security prompt's patterns are adopted.
+
+**Run.** Three passes on the 30 fresh pull requests from one run each. The stage sets are rebuilt
+from it with `deep_funnel.py`: drafted, after the check (posted plus what Jev withheld) and
+posted. Scored by Sol, with Mira's three stored fresh passes rescored in the same invocation (Mira
+is not re-run) and D3m's stored fresh passes beside them, paired. Amended 2026-11-16, before any D7
+score was read: Terra and Luna are not run, after the judge calibration above picked Sol.
+
+- **Claim "beats Mira":** posted F1 under Sol above Mira's with the paired 95% interval over pull
+  requests excluding zero. A point lead with an interval that includes zero is reported as level.
+- **Recommend as a combination:** posted F1 under Sol at or above Mira's as a point comparison.
+  Below it, the prompts, the check and Jev stay options and none becomes a default.
+- **Keep Jev in the combination:** posted F1 at least 0.01 above the after-check F1, under Sol,
+  from the same drafts. Otherwise Jev is reported as adding nothing on deep drafts.
+- **Fidelity of the re-adaptation:** D7's drafted F1 within 0.03 of D3m's drafted F1 on this
+  corpus, under Sol. Below that the re-adaptation lost something D3m had, and the result is read
+  as that of these prompts and not of D3m's.
+- **Validity:** D1c's limits on failed agents and on forced submissions sent again without
+  reasoning, and more than 5% of checks or Jev requests that could not run. An arm past a limit
+  is reported and not ranked. An incomplete review is re-run once and both runs are reported.
+- **Reported with it:** the check's verdict counts, Jev's score for every finding from the stored
+  logs and a sweep of the threshold from 0.2 to 0.7 (exploratory, not used to choose one), the
+  share of true and false drafts each stage kept, and median time a review.
+
+#### D7 result: the check alone is level with Mira, and Jev lowers F1
+
+Three passes on the 30 fresh pull requests, scored by Sol, with Mira's stored passes and D3m's
+beside them. One review in 15 timed out at the runner's 900 seconds in its first run (`py-1` in all
+three passes, `java-1`, `ts-1` and `rb-5` in one each); each was run once more with 2,400 seconds,
+all finished, and the first runs were not scored.
+
+| arm | precision | recall | F1 | F1 minus Mira (95% interval) |
+|---|---:|---:|---:|---|
+| Mira | 27.6% | 8.5% | 0.130 | |
+| D3m posted | 19.0% | 6.7% | 0.099 | not computed |
+| D3m drafted | 15.5% | 18.8% | 0.170 | not computed |
+| D7 drafted | 12.9% | 16.0% | 0.142 | not computed |
+| D7 after the check (the same drafts, before Jev) | 19.6% | 12.4% | 0.152 | +0.022 (-0.054, +0.096) |
+| D7 posted (check, then Jev at 0.3) | 18.2% | 8.9% | 0.119 | -0.011 (-0.084, +0.060) |
+
+Under the core profile the same differences from Mira are +0.006 (-0.083, +0.096) after the check
+and -0.022 (-0.108, +0.066) posted. After the check minus posted: F1 +0.033 (+0.002, +0.073) and
+recall +3.5 points (+1.0, +7.1).
+
+- **Beats Mira:** no. Posted F1 is 0.119 against 0.130 and the interval includes zero.
+- **Recommend as a combination:** no, for the same reason.
+- **Keep Jev:** no. Posted F1 is 0.033 below the after-check F1, against a bar of 0.01 above it.
+- **Fidelity of the re-adaptation:** met, narrowly. D7's drafted F1 is 0.142 against D3m's 0.170,
+  0.028 under, inside the 0.03.
+- **Validity:** 0 of 278 checks could not run, and 0 of 186 Jev requests failed. Of 228 agent runs,
+  186 ended on a forced submission, 33 of those were sent again at low effort and 17 with reasoning
+  off: 9.1% of forced submissions, 7.5% of agent runs, over the 5% limit on the strict reading. D7 is
+  reported and not ranked, and the result above is a measurement of this build and not a ranking.
+
+What each stage kept, pooled over the three passes: the check kept 35 of 45 matched drafts (78%) and
+144 of 305 unmatched ones (47%), from 278 verdicts (186 confirmed, 52 refuted, 40 uncertain). Jev
+then kept 25 of those 35 matched findings (71%) and 112 of the 144 unmatched (78%), so it withheld
+a larger share of the findings that matched than of those that did not. A sweep of its threshold
+from the stored scores (approximate; at 0.3 it reproduces the scored 0.119) gives F1 0.152 with no
+threshold, 0.137 at 0.2, 0.119 at 0.3, 0.106 at 0.4, 0.102 at 0.5, 0.091 at 0.6 and 0.062 at 0.7:
+no threshold raises F1. Median time a review was 347 seconds, re-runs included.
+
+Jev scored the R1 findings in the section above better than the reviewer's own confidence. On this
+build's findings it does not help, which is the second time a result on one kind of finding did
+not carry to another here. `review.jev` stays an off-by-default option, and its configuration text
+now says so.
+
+The owner asked for the check-only arm to be evaluated as a run of its own. That choice was made
+after this result was read, so the after-check row is a reading chosen from three, and is not
+confirmed by it.
+
+### D7c: check only (registered 2026-11-16, before it runs)
+
+D7 with `review.jev` off: Mira's adapted prompts, the repository check as the selection, floor and
+critique off (`tools/bakeoff/d7c-mira-check.yaml`). The binary is D7's, so the code and prompts are
+the same working tree, and the corpus is the same 30 fresh pull requests with three new passes
+and a 1,800 second limit. Because the arm was chosen after D7 was read and the pull requests are
+the ones it was read on, D7c replicates a chosen arm with fresh draws. It is not a clean test, and
+a claim about Mira needs pull requests nobody has read.
+
+- **Claim "beats Mira":** posted F1 under Sol above Mira's with the paired 95% interval over pull
+  requests excluding zero. A point lead with an interval that includes zero is reported as level.
+- **Replication:** posted F1 within 0.03 of D7's after-check 0.152. Further away, the D7 reading
+  was a draw and is not carried forward.
+- **Validity:** D7's, on the strict reading. D7 was over the 5% limit on reasoning fallbacks, and
+  the same agents run here, so an arm over it is reported and not ranked.
+- **Reported with it:** the check's verdict counts, the share of matched and unmatched drafts kept,
+  and median time a review.
+
+#### D7c result: ahead of Mira at a point, level on the interval, and over the validity limit
+
+Three new passes on the same 30 fresh pull requests, scored by Sol, with Mira's stored passes and
+D7's after-check reading beside them. All 90 reviews finished (median 336 seconds).
+
+| arm | precision | recall | F1 | F1 minus Mira (95% interval) |
+|---|---:|---:|---:|---|
+| Mira | 27.6% | 8.5% | 0.130 | |
+| D7c drafted | 14.9% | 17.0% | 0.159 | not computed |
+| D7c posted (check only) | 20.4% | 14.9% | 0.172 | +0.042 (-0.053, +0.136) |
+| D7 after the check, for comparison | 19.6% | 12.4% | 0.152 | +0.022 (-0.054, +0.096) |
+
+Under the core profile D7c is 0.178 against Mira's 0.152, +0.026 (-0.081, +0.136). D7c minus D7's
+after-check reading is +0.020 (-0.028, +0.070).
+
+- **Claim "beats Mira":** not made. The point lead is +0.042 and the interval includes zero, so it is
+  level.
+- **Replication:** met. D7c's 0.172 is 0.020 from D7's after-check 0.152, inside the 0.03.
+- **Validity:** not met. Of 188 forced submissions, 19 (10.1%; 8.3% of the 228 agent runs) were sent
+  again with reasoning off, and 39 at low effort, over the 5% limit. D7c is reported and not ranked,
+  as D7 was. No check failed to run (286 verdicts: 208 confirmed, 46 refuted, 32 uncertain).
+
+The check kept 42 of 48 matched drafts (88%) and 164 of 275 unmatched ones (60%), and raised F1 from
+0.159 to 0.172. Both D7 readings of the check agree on its direction and are within noise of each
+other. Across the two runs the arm sits 0.022 and 0.042 above Mira's 0.130 at a point, with intervals
+reaching from -0.05 to +0.14 on 30 pull requests, and it is read on the pull requests it was
+chosen on. What this record supports is that Mira's adapted prompts with the repository check are not
+below Mira on this corpus, and not that they are above it.
+
+### LS1: language-server call sites in the prompt (registered 2026-11-16, after the runs started and before any result was read)
+
+The agents find callers with `grep_repo`, which matches text. A language server resolves them: the
+references of a function, method or type, exact for Go and Python where a name is common. The test
+is whether giving the reviewer that, on a sample of Martian items, changes what it finds.
+
+**Build.** An experiment-grade client (`internal/lsp`, a scratch copy outside the repository),
+`gopls` 0.24.0 for Go and `pyright` for Python. Two ways of offering it were tried first. As tools
+the agent may call (`find_references`, `go_to_definition`) it was offered and never called, in 42
+calls over two reviews, with the instruction in the system prompt and after the tools were named
+in the lookup section; called directly with a short prompt the same model uses it at once. So the
+arm tested here does not depend on the agent choosing: before the batch is sent, the engine finds
+the definitions the diff adds and the functions its hunks sit in, asks the server for their
+references (at most 10 symbols and 8 call sites each) and adds them to the batch prompt as a
+"Call sites from the language server" section. TypeScript was not tested: `tsserver` loads one
+project at a time, and the callers in a monorepo like cal.com live in other projects.
+
+**Sample.** Eight Martian tuning pull requests, grafana-1, 2, 4 and 5 (Go) and sentry-1, 2, 4 and 5
+(Python). One of their 28 golden comments names callers, an override or a signature (matched by
+`caller|call site|callsite|invoker|subclass|override|implementer|signature|all usages|other
+places|other callers`, fixed before any run), so the benchmark rewards this little.
+
+**Arms.** One binary, with and without `NITPICK_EXP_LSP_CONTEXT=1`; deep review at its defaults with
+this tool's own prompts; DeepSeek V4.1 Flash in every role; three passes of each; scored by Sol
+over these 8 pull requests only, paired.
+
+- **Helps:** pooled F1 under Sol at least 0.03 above the baseline's, with recall not lower. Any
+  other result is no evidence of help, and on 8 pull requests an interval that includes zero is
+  reported as level.
+- **Reported with it:** F1, precision and recall per arm, recall on the one caller golden comment,
+  the server's start time and median query time, how often a query returned nothing, and the
+  change in review time.
+
+#### LS1 result: the call sites did not help, and the point estimate is lower
+
+Three passes of 8 Martian tuning pull requests (grafana-1, 2, 4, 5 in Go; sentry-1, 2, 4, 5 in
+Python), with and without the language server's call sites in the batch prompt, from one binary,
+scored by Sol. All 48 reviews finished.
+
+| arm | precision | recall | F1 | F1 minus baseline (95% interval) |
+|---|---:|---:|---:|---|
+| baseline | 57.4% | 41.7% | 0.483 | |
+| call sites from the language server | 54.7% | 34.5% | 0.423 | -0.059 (-0.153, +0.045) |
+
+Recall is 7.1 points lower (-20.6, +3.7) and precision 2.7 points lower. By pass the F1 is 0.333,
+0.435 and 0.490 with the call sites against 0.480, 0.490 and 0.478 without, so the third pass is
+level and the loss comes from the first two. By pull request the true findings fell most on sentry-2
+(10 to 5) and rose on grafana-1 (5 to 7). The loss is concentrated: by pass sentry-2 is -2, -3 and 0
+true findings, which is 5 of the net 6 lost, and without it the arms are level (net -1 over 21
+case-passes). The call sites also came with fewer findings, 2.21 a review against 2.58. So the
+direction is not established: what the 8 pull requests show is that nothing was gained.
+
+- **Helps:** no. The registered bar was F1 at least 0.03 above the baseline's with recall not
+  lower; F1 is 0.059 below and recall is lower. The interval includes zero, so the result is "no
+  evidence of help", with a negative point estimate, on 8 pull requests.
+- **The server:** `gopls` 0.24.0 and `pyright` answered all 195 queries with no error, in a median of
+  718 ms, and 18 of them (9%) found nothing, mostly Python methods reached through untyped values.
+  Review time was 219 seconds with the call sites and 211 without, so the cost is small.
+- **Offered as tools it was not used.** `find_references` and `go_to_definition` were offered to the
+  deep-review agents, named in their lookup section and called for in their instructions, and in 42
+  calls over two reviews the agents made none, all to `grep_repo` and `read_file`. A replay of one
+  agent turn against the API with the real system prompt, tool list and diff gave the same, with the
+  instruction repeated in the user message and the tools renamed; a short prompt with the same tools
+  has the model call `find_references` at once. The long prompt and the diff win.
+- **Why little was to be gained.** One of the 28 golden comments in these pull requests concerns
+  callers, an override or a signature. The benchmark rewards call-site analysis very little, so a
+  corpus of defects that depend on callers is what would test the idea, and this one cannot.
+- **Not tested:** TypeScript (`tsserver` loads one project at a time, so callers in other packages
+  of a monorepo are missed unless those projects are open), Java and Ruby. No plan for further
+  languages was written, because the condition for one, a result that helps, was not met.
+
+#### Reasoning step-downs in deep review: the logs, and three fixes that did not help (unregistered, 2026-11-16)
+
+Over 456 agent runs in D7 and D7c (Mira's prompts) and 138 in D6v (this tool's prompts), 82% and 80%
+ended on a forced submission. Every failed forced attempt (108 of them) was `finish=length` with
+empty content: the model spent the 65,536-token budget thinking and wrote nothing, and each failure
+costs about 65,000 tokens. Of the 36 agent runs that fell to reasoning off, 24 were agents that
+stopped before using their turns (25 of all early stops came after one turn with no lookups), and 31
+were the general agent. Step-downs rose with the size of the transcript: 2% under 60,000 prompt
+tokens, 16% to 18% above 140,000. Agents that used all 10 turns fell to reasoning off 4% of the
+time. The general agent fell 13.6% of the time under Mira's prompts (31 of 228) and 2.9% under this
+tool's (2 of 69), on different corpora.
+
+Three fixes were tried on the 12 pull requests with the most step-downs, against an unpatched
+baseline run beside them, 40 agent runs each: Plan A, convert a prose answer with reasoning off;
+Plan B, require a tool call every turn; Plan C, a 65,536-token cap on every turn.
+
+| arm | reasoning off | low effort | failed attempts | completion tokens | median review |
+|---|---:|---:|---:|---:|---:|
+| baseline | 6 | 9 | 15 | 2.30M | 416 s |
+| A, convert prose | 8 | 10 | 18 | 2.32M | 498 s |
+| B, require a tool | 10 | 12 | 22 | 2.52M | 528 s |
+| C, cap every turn | 9 | 11 | 21 | 3.51M | 614 s |
+
+None reduced the step-downs and each made reviews slower. Plan A never ran: `converted` was 0 in all
+40 runs, so the agents that stop early are not answering in prose, and the cause of their early
+stop is not known. At 40 runs per arm the step-down counts do not separate the arms. Lowering
+`review.deep.reasoning` is the lever not tried.
+
+### LS2: language-server call sites on injected caller defects (registered 2026-11-17, before it runs)
+
+LS1 found no gain on Martian items, where 1 of 28 golden comments concerns callers. The owner asked
+to try it on defects it should help with first. Real ones are too few to use: a broad keyword match
+over the 173 Martian and 94 fresh golden comments finds a handful, and few of those are defects in
+callers. So the defects are injected, with ground truth known exactly.
+
+**Cases.** 12 pull requests of one commit each, made on checkouts of the Martian grafana-1 (Go) and
+sentry-1 (Python) trees. A function with 2 to 10 non-test callers in at least 2 other files, found
+by the language server, has its signature changed and nothing else: a required trailing parameter
+added (`retry bool` in Go, `retry` or keyword-only `*, retry` in Python), or its last parameter
+removed. The callers are left as they were. Three Go and three Python functions are easy, a name
+that `git grep -w` finds about as many times as the server finds references (ratio under 1.5), and
+three of each are hard, a common name where text search is noisy (ratio from 4.4 to 634). A rename
+was left out: at the new state the old name has no references to resolve, so a server cannot help
+without indexing the base as well. The callers each server found are the ground truth.
+
+**Arms.** One binary, with and without `NITPICK_EXP_LSP_CONTEXT=1` (the call sites of the functions
+the diff defines, in the prompt, as in LS1); deep review at its defaults with this tool's own
+prompts; DeepSeek V4.1 Flash in every role; two passes of each, 24 reviews an arm.
+
+**Scoring** is by string match, with no judge. A review **flags the defect** when a posted finding
+is anchored within 3 lines of the changed line and names the function or says the signature,
+parameter or argument is wrong. It **names a caller** when a posted finding names the function and
+the path or file name of one of its true callers.
+
+- **Helps:** callers named in at least 6 more of the 24 reviews than the baseline's (0.25), with
+  the defect flagged in no fewer.
+- **Reported with it:** both rates by tier (easy and hard) and language, how many true callers a
+  review names, and the paired counts.
+
+#### LS1 correction (2026-11-17): the Python half was a cold-start artifact, and the corrected result is level
+
+In the LS1 run `pyright` was asked within a second of starting. It answers nothing for about the
+first 30 seconds (0 references at once, 12 after 30 seconds, for a function with 10 callers), and
+the prompt section said "no references the server can resolve", so most Python queries told the
+reviewer that nothing called what the change touched. `gopls` blocks until it has loaded and was not
+affected. The four sentry pull requests were run again, three passes, with the integration asking
+again every 5 seconds, for up to 4 minutes, while an answer was empty: 135 queries, 12 of them never
+answered (9%).
+
+| arm | precision | recall | F1 | F1 minus baseline (95% interval) |
+|---|---:|---:|---:|---|
+| baseline | 57.4% | 41.7% | 0.483 | |
+| call sites, server cold (the run above) | 54.7% | 34.5% | 0.423 | -0.059 (-0.153, +0.045) |
+| call sites, server warm | 62.3% | 39.3% | 0.482 | -0.001 (-0.070, +0.070) |
+
+F1 by pass is 0.489, 0.478 and 0.478. Precision is 4.9 points higher (-3.6, +17.9) and recall 2.4
+lower (-10.0, +4.6); true findings on sentry-2 are 8 against the baseline's 10 (5 cold). The warm
+result is level and the registered bar of +0.03 is still not met. The cost is in the retry: 486
+repeated queries, and each of the 12 symbols the server never answered waited the 4 minutes.
+
+### LS2 result: no gain on injected caller defects, and the first scoring was too strict
+
+Twelve injected signature changes, two passes of each arm, 24 reviews an arm. The first run had the
+cold `pyright` above and was repeated with the warm integration (the baseline did not use a server
+and was not repeated). The first scorer required a finding to name the function and to give a
+caller's full path or its directory and file. The findings name callers by file and line
+(`database.go:196`) and often leave the function name out of the text, so it undercounted both
+arms. It was replaced after the outputs had been read, with a match on any posted finding anchored
+within 3 lines of the changed line that says the signature, parameter or argument is wrong, and on
+a caller named by path or by `file:line`. The corrected scorer is applied to every arm alike, and
+the first scorer's numbers are given beside it.
+
+| arm | flags the defect | names a caller | mean share of callers named |
+|---|---:|---:|---:|
+| baseline | 22 of 24 | 15 of 24 | 0.51 |
+| call sites, server cold (void for Python) | 21 of 24 | 17 of 24 | 0.57 |
+| call sites, server warm | 22 of 24 | 16 of 24 | 0.56 |
+| first scorer: baseline, warm | 18 of 24, 18 of 24 | 9 of 24, 8 of 24 | |
+
+By tier, easy names: the baseline names a caller in 10 of 12 reviews (share 0.83), the warm arm in 10
+of 12 (0.81). Hard names, where text search is noisy: 5 of 12 (0.19) against 6 of 12 (0.31). By
+language, Go 6 of 12 against 5 of 12, Python 9 of 12 (0.61) against 11 of 12 (0.74). Paired by case
+and pass, the warm arm names a caller in 3 reviews where the baseline does not, and the baseline in
+2 where it does not, with 13 in both; the defect is flagged in the same 22 reviews by both.
+
+- **Helps:** no. The registered bar was callers named in 6 more of the 24 reviews; the difference is
+  1.
+- **Why the test could not show it.** The baseline already flags the defect in 22 of 24 reviews and
+  names callers in 15, with `grep_repo`. A change of one signature line is visible in the diff: a
+  removed parameter the body still uses, a new one nothing uses. The reviews that missed it
+  (`NewWorkerPool`, `WriteErrOrFallback`) were not rescued, with the right callers in the prompt
+  in `WriteErrOrFallback`'s case.
+- **Where there is a hint.** On names a text search matches many times, the share of callers named
+  rose from 0.19 to 0.31 (names a caller 5 of 12 to 6 of 12). It is 12 reviews and not tested.
+- **The server's answers, against the callers mined from it at start-up** (the ground truth, so
+  itself incomplete where the server was): 5 of 5 and 2 of 2 callers for the two Go functions with
+  concrete callers, 1 of 4 for `Read` (callers through an interface are not references of the
+  method that implements it), 0 of 3 and 0 of 2 for `List` and `DecryptedValues`, no query at all
+  for `NewWorkerPool`, and for Python 12 against 10, 9 of 9, 2 of 2, 3 of 3, 1 against 9
+  (`redact_source_secrets`) and 38 against 8 (`from_object`, a name shared by many classes).
+- **What was not tested:** a rename or a removal, which needs the base indexed as well; behaviour
+  changes whose callers are not visibly wrong; TypeScript, Java and Ruby.
+
+Across LS1 and LS2 a language server gave no measured gain on Martian items or on defects chosen
+for it. Whether a defect that only the call sites reveal, in a diff that does not show it, would
+change that is not tested here, and no plan for more languages was written.
+
+### What this means for the goal
+
+Deep review is built: two agents a batch that read the repository over up to ten turns,
+sampling at the deep temperature and reasoning level, a forced submission that steps down
+when it runs out, and a selection of floor, duplicate rule, cap and critique. It runs on a
+model that takes no temperature (L1), and every failure path names its stage. It does not
+yet beat Mira.
+
+- Held out, the one build gated so far (D4a) scored F1 0.494 under Sol against Mira's 0.547.
+  Recall was level with Mira's and precision 12 points lower.
+- On the tuning set the agent prompt is what separates the tools. With Mira's prompts
+  adapted (D3m), the same pipeline scored 0.486 against Mira's 0.481. With ours it scored 0.416
+  (D1c) and 0.411 with the prompt written for it (D3o).
+- Shipping prompts adapted from Mira's is the owner's decision: Mira is Apache-2.0, so it
+  needs attribution, and the limit on contamination below applies to it more than to
+  anything else here, since Mira's authors measure themselves on this benchmark.
+- A floor of 0.6 did not help live (D5f 0.412 against D1c's 0.416). The offline estimates
+  that suggested it (F6, F6m) left the critique out.
+- F7 repeated the comparison on 30 pull requests from other repositories. The order held
+  (Mira above D3m above D1c, under all three judges), no arm reached Mira (D3m -0.031, D1c
+  -0.074 under Sol), and the adoption condition for Mira's prompts failed by 0.011. Our prompts stay.
+- Selection from the drafts' own properties does not transfer either (replay above): agreement
+  keeps its direction but shrinks, and severity and confidence stop separating true from false on
+  the fresh corpus.
+- The selection stages (floor, critique, cap) raised F1 on the Martian set and lowered it on the
+  fresh one: the drafted sets there score 0.172 and 0.141, above Mira's posted 0.130, and the
+  posted ones 0.099 and 0.056. What our agents find is not the limit on that corpus. What the
+  stages then keep is, and it needs a measure that holds on both.
+- On 2026-11-16 the owner adopted Mira's prompts as an option (`review.deep.prompts: mira`, not the
+  default). With the repository check as the selection and no Jev (D7c) the arm scores 0.172 on the
+  fresh corpus against Mira's 0.130 (+0.042, interval -0.053 to +0.136): level with Mira, not ahead,
+  and over the validity limit on reasoning fallbacks (10.1% of forced submissions against 5%). Jev
+  lowered F1 on these drafts (D7). The next test is on pull requests nobody has read.
+
+#### Before deep review, judged by Sonnet 4.5
+
+Nothing built here, alone or stacked, beats Mira on this benchmark with this
+model. The ceiling is visible in the table: precision between 41% and 50% for
+every open-nitpick arm, against 73.5%, and a recall edge that disappears once
+findings are filtered. The remaining levers in this plan do not reach it.
+
+- R3 (cap by confidence) is killed. Run after the gate on the stored held-out
+  passes, ranking each pull request's comments by the reviewer's confidence and
+  keeping the top N, it never gets F1 past 0.517 for any N, against Mira's 0.596.
+  This is a post-hoc diagnostic: N was read off the data, so it flatters the cap,
+  and it still loses. The unfiltered counts (185 TP, 263 FP, 130 FN) reproduce the
+  table above, which is the check that the simulation matches the scorer.
+
+  | keep per pull request | unverified: precision / recall / F1 | offline-verified: precision / recall / F1 |
+  |---|---|---|
+  | all | 41.3% / 58.7% / 0.485 | 50.0% / 52.4% / 0.512 |
+  | 6 | 49.0% / 52.4% / 0.506 | 54.2% / 49.5% / 0.517 |
+  | 4 | 51.1% / 43.2% / 0.468 | 57.8% / 43.5% / 0.496 |
+  | 3 | 54.0% / 36.8% / 0.438 | 59.4% / 38.1% / 0.464 |
+  | 2 | 62.3% / 31.4% / 0.418 | 66.4% / 32.1% / 0.433 |
+
+  Precision reaches 60% only at 2 a pull request, where recall has fallen to 32%.
+  The reviewer's confidence does not rank well enough for a cap to remove noise
+  faster than it removes defects. Mira posts 2.4 comments a pull request at 73.5%
+  precision and 50% recall, so its selection happens before the comments exist.
+- Agreement across passes is not the missing selector either. Keeping a comment
+  only when another pass of the same reviewer commented within 5 lines of the same
+  file gives open-nitpick F1 0.498 (unverified, up from 0.485) and 0.497
+  (offline-verified, down from 0.512). It also lowers Mira's, from 0.596 to 0.577.
+  `tools/bakeoff/selector_diagnostics.py` reproduces this and the cap table.
+- The gap is selection, not discovery. Over the three passes open-nitpick's output
+  matches 79 of the 105 golden comments and Mira's matches 62; only 5 are Mira's
+  alone. Open-nitpick finds nearly everything Mira finds and posts it among 263
+  false positives, and none of confidence, a repository check or agreement between
+  passes separates the two well enough. Giving the reviewer the repository to read
+  (R5, below) did not separate them either. What is left is a generator that
+  chooses what to say before it says it, which is a new architecture and not a
+  stage of this plan. Its evaluation needs a corpus neither tool has been scored
+  on: the 30 held-out pull requests have now been read once.
+- R4 aims at recall, and recall was never what Mira led on.
+- R7 (review heuristics in the prompt) is killed above, and a verbatim-citation
+  rule is no better.
+- What the code review found is in "Where Mira's results come from". The combination it
+  pointed at, tools with a forced submission, a turn budget, replayed reasoning and the
+  heuristics together (R8, R8b), did not reproduce it.
+- R6 (a budget in the prompt) is killed above; it reproduces the cap.
+- R5 (the reviewer reads the repository while it files) is killed above. It was
+  the generator change the plan had left, and it did not move precision.
+- Mira's own agentic loop, noise filter and self-critique are a different shape
+  of tool, and matching its precision means matching what produces it: fewer,
+  more carefully chosen comments, not more careful filtering of many.
+
+The benchmark scores agreement with a short list of human-labelled defects, but the
+blind grade above shows that is not what explains the gap: over half of
+open-nitpick's unmatched comments are wrong, against about a tenth of Mira's. The
+gap is quality. A stronger checker without reasoning did not remove more of it, so
+the lever is still unidentified.
+
+## Order, cost and time
+
+| stage | depends on | estimate | model spend to measure |
+|---|---|---|---|
+| R0 | | 1 to 2 days | none |
+| R1 | R0 | 2 to 3 days | three passes on DeepSeek, a few dollars |
+| R2 | R0 | 2 days | three passes, a few dollars |
+| R3 | R1, R2 | half a day | offline on stored runs |
+| R4 | R2 | 3 to 5 days | three passes, a few dollars |
+| final | all shipped stages | 1 day | three passes per tool on the 30 held-out pull requests, then Sonnet 4.6 at about $45 a pass |
+
+R1 and R2 are independent and can be built in parallel. The final gate runs
+Mira on the held-out split at the same time as open-nitpick, in the same session.
+
+## Limits
+
+- Since 2026-11-14 three judges score every arm (GPT-6.1 Sol, Terra and Luna). They agree on
+  the order of the arms except D3o against D1c, which Sol puts 0.004 below and Terra and Luna
+  0.015 and 0.010 above. Every figure before that was scored by one judge, Sonnet 4.5, and
+  those stay as history.
+- The 20 tuning and 30 held-out pull requests have been read by the person writing the
+  prompts, and their golden comments with them. Text written for the deep agents is not clean
+  of that. `deep_security.md` was written after reading Mira's security prompt, whose items
+  include classes of defect the benchmark labels, and `deep_review.md`, reverted after D3o,
+  followed the structure of Mira's prompt, which D3m showed carries recall. A gain from either is not shown to
+  generalize. No pitfall list for the benchmark's languages was written for that reason, since
+  the choice of items would be steered by the comments already read. A corpus neither the
+  prompts nor the tool have seen is the test that would settle it.
+- The fresh corpus (F7) is 30 pull requests, each drawn from the 75 most-commented merged pull
+  requests, with 3 to 25 comments, of its week and language. Its golden comments are review
+  threads GitHub marked outdated: a later commit changed the lines, which does not show that the
+  comment was the reason. One model assigned the categories. 58 of its 94 comments are test,
+  documentation, style or speculative, and 26 are outside the core profile. Its intervals include zero, so it
+  reads as an order and not as a margin. The classifier, the corpus builder and every arm are
+  recorded in `tools/bakeoff/fresh_corpus.py` and the frozen directory
+  `bakeoff-frozen/2026-11-15-fresh`.
+- The benchmark's golden comments are sparse and human-curated, so a real defect
+  nobody labelled counts against the tool that reports it. A blind grade of 48
+  unmatched held-out comments sized it: 27% of open-nitpick's and 61% of Mira's
+  were real, which moves both precisions up and leaves the gap where it was.
+- The time and cost figures are estimates from the bakeoff, not measurements of
+  the new stages. open-nitpick's token use per review was not recorded; Mira's
+  was, at about 443,000 prompt tokens a review.

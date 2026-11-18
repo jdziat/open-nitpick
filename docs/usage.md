@@ -59,6 +59,7 @@ nitpick review                          # uncommitted changes
 nitpick review -base main               # working tree against main
 nitpick review -base main -head feature # a committed branch
 nitpick fast-review                     # changed diffs, top ten findings
+nitpick deep-review                     # agents that read the repository; slower, more calls
 nitpick explain-config -path src/db.go  # what would be sent, and why
 nitpick providers                       # available model providers
 ```
@@ -71,6 +72,21 @@ findings, ranked by severity. Requests carry up to four diffs, and concurrency
 is selected by provider: eight for OpenRouter, six for DeepSeek, Fireworks,
 Together AI, Groq and Cerebras, four for other hosted providers, and two for
 Ollama and llama.cpp. Account-specific rate limits can be lower.
+
+Deep review sends each pull request whole to two agents, a general reviewer and a security
+reviewer. Each agent reads files and searches the repository over up to ten turns before it
+files anything, so a claim about a caller, an implementer or a consumer is checked before
+it is posted. What the agents file then passes a confidence floor, a rule that merges one
+defect filed twice, a cap on info-level findings, and a critique that grades each finding
+against the code it cites. The review lists what was withheld and why. It needs a git
+checkout to search, and it says so when it has none. On DeepSeek V4.1 Flash a review took
+about 19 agent turns and 35 lookups, plus a final submission for each agent and one
+critique, and cost about $0.04, with a median of three to four minutes. Its settings are under `review.deep`, and `docs/remediation-mira.md` has the
+measurements. When an agent fails, or a batch is reviewed in one call without tools, the
+review names the stage that did not complete. The model's context has to hold more than the
+pull request: `review.deep.token_budget_per_request`, 120,000 tokens by default, sizes an
+agent's first request, and the agent may then read up to 80,000 bytes and ask for an answer
+of up to 65,536 tokens when it is made to submit.
 
 With no model configured it selects `deepseek/deepseek-v4.1-flash` over
 OpenRouter, needing `OPENROUTER_API_KEY`. It aims for feedback in under a minute

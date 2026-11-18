@@ -49,6 +49,9 @@ type Config struct {
 	// Security configures the tree security scan (`nitpick security`).
 	Security Security `yaml:"security"`
 
+	// Execution attaches optional check evidence to fix proposals.
+	Execution Execution `yaml:"execution"`
+
 	// Source records where the configuration was loaded from. It is empty when
 	// only built-in defaults were used.
 	Source string `yaml:"-"`
@@ -519,6 +522,33 @@ type Review struct {
 	// alone. Empty, the default, never settles.
 	StopAt Severity `yaml:"stop_at"`
 
+	// Verify turns on a pass that checks each model finding against the
+	// repository with read_file and grep_repo, and withholds the ones it does
+	// not confirm. "confirmed" keeps only findings the checker confirmed;
+	// "not_refuted" also keeps the ones it could not settle. Empty is off.
+	// Withheld findings are listed with the checker's reason, never dropped
+	// silently, and analyzer findings are never checked. It needs a git
+	// checkout to search, and without one it reads files but cannot grep.
+	// Off by default: it costs about eight model calls a finding, and
+	// docs/remediation-mira.md, stage R2b, has the measurement.
+	Verify VerifyMode `yaml:"verify"`
+
+	// Jev adds an optional second opinion on each model finding, from TypeSafe's
+	// Jev decision model through OpenRouter, and withholds the findings it
+	// rates unlikely to be defects. Off unless jev.threshold is set. It runs
+	// after review.verify and is meant to follow it: the checker's lookups are
+	// sent along as evidence. See JevFilter.
+	//
+	// A repository's own .nitpick.yaml cannot set it: turning it on sends
+	// source code to a third party and spends the operator's OpenRouter key.
+	Jev JevFilter `yaml:"jev"`
+
+	// Deep configures nitpick deep-review: several agents read each pull
+	// request with the repository open, over many turns, and what they file
+	// passes a confidence floor and a critique before it is posted.
+	// nitpick review ignores it.
+	Deep DeepReview `yaml:"deep"`
+
 	// MinSeverity drops findings below this severity before publishing.
 	MinSeverity Severity `yaml:"min_severity"`
 
@@ -603,6 +633,10 @@ type Review struct {
 	// report the reference, and a reviewer that invents defects out of a style
 	// guide is worse than one that misses them.
 	Knowledge bool `yaml:"knowledge"`
+
+	// Learnings attaches operator-reviewed repository references from the
+	// trusted base, independently of embedded-corpus retrieval.
+	Learnings Learnings `yaml:"learnings"`
 
 	// Standards hands the reviewer the conventions this repository was measured
 	// to follow, counted at the base revision.
@@ -693,7 +727,8 @@ type Review struct {
 	RelatedContextTokens int `yaml:"related_context_tokens"`
 
 	// SummaryStyle chooses how the walkthrough at the top of a review is
-	// produced. See internal/review/receipt.go.
+	// produced. Deep review prints the receipt whatever this says, because
+	// the prose is written by triage and deep review has none.
 	SummaryStyle SummaryStyle `yaml:"summary_style"`
 
 	// TriageNoNewClaims restores the reviewer's own words over anything triage
@@ -1454,3 +1489,123 @@ func ReasoningLevels() []string {
 
 // ReasoningValues reports the same, for the generated reference.
 func (s ModelSpec) ReasoningValues() []string { return ReasoningLevels() }
+
+// DeepReview configures nitpick deep-review. Its defaults are the settings
+// Mira reviews with; docs/remediation-mira.md, "Deep review", has the design
+// and the measurements.
+type DeepReview struct {
+	// Agents names the reviewers that read each batch in parallel: general
+	// reviews with the ordinary prompt, and security looks only for
+	// vulnerabilities. Default both.
+	Agents []string `yaml:"agents"`
+
+	// MaxTurns bounds how many times each agent is asked before it must
+	// submit what it has found. Default 10.
+	MaxTurns int `yaml:"max_turns"`
+
+	// Temperature is the agents' sampling temperature, whatever the review
+	// model's own. Default 0.2.
+	Temperature float64 `yaml:"temperature"`
+
+	// Reasoning is the agents' reasoning level, whatever the review model's
+	// own. Default medium.
+	Reasoning ReasoningLevel `yaml:"reasoning"`
+
+	// MaxTokens caps the output of each agent call, reasoning included, and of
+	// its final submission. Zero keeps the review model's cap for a turn and
+	// gives the final submission 65,536 tokens to finish thinking.
+	MaxTokens int `yaml:"max_tokens"`
+
+	// Timeout is the wall-clock budget of one agent on one batch. When it runs
+	// out between two turns the agent is asked to submit what it has found, so
+	// a slow provider ends a review instead of holding a CI job for an hour.
+	// Zero removes the budget. Default 15m.
+	Timeout time.Duration `yaml:"timeout"`
+
+	// ConfidenceFloor is the confidence a finding needs to be posted. One
+	// below it is listed with the withheld findings, not dropped unseen.
+	// Default 0.7.
+	ConfidenceFloor float64 `yaml:"confidence_floor"`
+
+	// LowPriorityCap keeps at most this many info and nit findings a review.
+	// They are ranked as all findings are, by severity and then confidence, so
+	// an info finding is kept before a nit whatever either's confidence.
+	// Warnings and above are never capped. Zero
+	// turns the cap off. Default 5.
+	LowPriorityCap int `yaml:"low_priority_cap"`
+
+	// Critique grades each finding that passed the floor against the code it
+	// cites, and withholds the ones the code does not support. Default on.
+	Critique bool `yaml:"critique"`
+
+	// Prompts names the instructions the agents review under. Empty, the
+	// default, keeps this tool's own. "mira" replaces them with the general and
+	// security prompts of Mira (https://github.com/miracodeai/mira, Apache
+	// License 2.0), adapted to this tool's findings; see NOTICE for what was
+	// changed. The two do not differ in the schema, the tools or the selection.
+	Prompts string `yaml:"prompts"`
+
+	// MaxFilesPerRequest replaces review.max_files_per_request, so a pull
+	// request is read as a whole. Default 60.
+	MaxFilesPerRequest int `yaml:"max_files_per_request"`
+
+	// TokenBudgetPerRequest replaces review.token_budget_per_request. It
+	// sizes an agent's first request only: the model's context must also hold
+	// what the agent reads, up to 80,000 bytes, and a forced submission's
+	// answer of up to 65,536 tokens. Default 120000.
+	TokenBudgetPerRequest int `yaml:"token_budget_per_request"`
+}
+
+// DeepPromptsMira selects Mira's prompts, adapted, for the deep-review agents.
+const DeepPromptsMira = "mira"
+
+// Deep review agent names.
+const (
+	DeepAgentGeneral  = "general"
+	DeepAgentSecurity = "security"
+)
+
+// JevFilter configures the optional Jev decision-model filter.
+//
+// Each model finding is sent to Jev with the pull request's description, the
+// claim and its cited code, what the repository check read, and the file. Jev
+// gives a probability for bug, error, warning, info and noise, and a finding
+// whose bug plus error probability is under Threshold is withheld with the
+// reason. Analyzer findings are not sent.
+//
+// This sends source code to OpenRouter, so it is off by default and a
+// repository file cannot turn it on. A request that fails keeps its finding and
+// says so in the stage list. On 100 findings that agents graded, the check
+// followed by Jev at 0.3 withheld 29 of 42 not-real findings against 25 for the
+// check alone. On deep review's drafts for 30 unseen pull requests it lowered
+// F1 by 0.033 (0.002 to 0.073), so it is not recommended there
+// (docs/remediation-mira.md).
+type JevFilter struct {
+	// Threshold is the lowest bug plus error probability a finding may have and
+	// be kept, from 0 to 1. Zero, the default, turns the filter off. 0.3 is the
+	// value the measurement above used.
+	Threshold float64 `yaml:"threshold"`
+
+	// Model is the decision model as OpenRouter names it. Empty selects the
+	// built-in default, which the jev package defines.
+	Model string `yaml:"model"`
+
+	// APIKeyEnv names the environment variable holding the OpenRouter key.
+	// Empty means OPENROUTER_API_KEY.
+	APIKeyEnv string `yaml:"api_key_env"`
+}
+
+// Enabled reports whether the filter runs.
+func (j JevFilter) Enabled() bool { return j.Threshold > 0 }
+
+// VerifyMode says which findings survive repository verification.
+type VerifyMode string
+
+// The verification modes. The empty value is off.
+const (
+	// VerifyConfirmed keeps a finding only when the checker confirmed it.
+	VerifyConfirmed VerifyMode = "confirmed"
+
+	// VerifyNotRefuted keeps a finding unless the checker refuted it.
+	VerifyNotRefuted VerifyMode = "not_refuted"
+)

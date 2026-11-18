@@ -1,0 +1,189 @@
+#!/usr/bin/env python3
+"""Run `nitpick review` over the repositories built by build_repos.py.
+
+Writes the layout the upstream scorer reads (the same one Mira's harness
+writes), so both reviewers' runs can be scored together by one judge:
+
+    <out>/run.json
+    <out>/<case>-r1/status.json   {"exit_code": 0}   non-zero when the review failed
+    <out>/<case>-r1/result.json   {"result": {"comments": [{title, path, line, body}]},
+                                   "duration_seconds": s, "manifest": {...}}
+
+The review is the shipped CLI at shipped defaults, with the model set through
+LLM_MODEL and no analyzers, since the other reviewer runs none. Findings are
+read from `review -format json`; a binary older than that flag prints no JSON
+and every review is recorded as failed. The raw output is kept beside the
+result.
+
+    python3 tools/bakeoff/run_nitpick.py --repos /tmp/bakeoff/repos --inputs /tmp/bakeoff/inputs \
+        --out /tmp/bakeoff/nitpick-pass1
+"""
+import argparse
+import concurrent.futures
+import hashlib
+import html
+import json
+import os
+import re
+import shutil
+import subprocess
+import time
+from pathlib import Path
+
+LOCATION = re.compile(r"^(\S[^\n]*?):(\d+)$")
+BOLD = re.compile(r"^\s*\*\*(.+)\*\*\s*$")
+
+
+SEVERITY_ROW = re.compile(r"\*\*\S*\s*(Critical|Error|Warning|Info|Nit)\*\*.*?·\s*(.*)$")
+
+
+def severity_row(lines, start, end):
+    """Severity word and class from the finding's second line, or (None, None)."""
+    for j in range(start + 1, min(end, start + 4)):
+        m = SEVERITY_ROW.search(html.unescape(lines[j]).replace("&nbsp;", " "))
+        if m:
+            return m.group(1).lower(), m.group(2).strip()
+    return None, None
+
+
+def parse(stdout: str):  # runs recorded before review -format json existed
+    """Findings from a dry-run review: each starts at a `path:line` line."""
+    lines = stdout.splitlines()
+    starts = [i for i, ln in enumerate(lines) if LOCATION.match(ln) and "://" not in ln]
+    comments = []
+    for n, i in enumerate(starts):
+        end = starts[n + 1] if n + 1 < len(starts) else len(lines)
+        m = LOCATION.match(lines[i])
+        path, line = m.group(1), int(m.group(2))
+        # The severity row ("**🔴 Critical** · class") is not wholly bold, and a
+        # bare one starts with a severity marker; the title is the next bold line.
+        bolds = [
+            (j, BOLD.match(lines[j]).group(1))
+            for j in range(i + 1, end)
+            if BOLD.match(lines[j]) and not BOLD.match(lines[j]).group(1).lstrip().startswith(("🔴", "🟠", "🟡", "🔵", "⚪"))
+        ]
+        if not bolds:
+            continue
+        title_at, title = bolds[0]
+        sev, cls = severity_row(lines, i, end)
+        body, fence = [], False
+        for j in range(title_at + 1, end):
+            raw = lines[j]
+            text = raw.strip()
+            if text.startswith("flagged by") or text.startswith("💬") or text.startswith("Reviewed "):
+                break
+            if text.startswith("**Suggested change**"):
+                break
+            if text.startswith("```"):
+                fence = not fence
+                continue
+            if fence:
+                continue
+            body.append(text)
+        comments.append({
+            "title": html.unescape(title),
+            "path": path,
+            "line": line,
+            "body": html.unescape("\n".join(x for x in body if x)).strip(),
+            "severity": sev,
+            "class": cls,
+        })
+    return comments
+
+
+def review(case, repos, out, model, timeout, config, binary, command="review"):
+    repo = repos / case
+    t0 = time.time()
+    env = dict(os.environ, LLM_PROVIDER="openrouter", LLM_MODEL=model, NITPICK_NO_USER_CONFIG="1")
+    dest = out / f"{case}-r1"
+    dest.mkdir(parents=True, exist_ok=True)
+    try:
+        run = subprocess.run(
+            [binary, command, "-repo", str(repo), "-base", "HEAD~1", "-head", "HEAD", "-dry-run", "-no-linters",
+             "-format", "json"]
+            + (["-config", str(config)] if config else []),
+            capture_output=True, text=True, env=env, timeout=timeout,
+        )
+        code, stdout, stderr = run.returncode, run.stdout, run.stderr
+    except subprocess.TimeoutExpired as e:
+        code, stdout, stderr = 124, (e.stdout or b"").decode() if isinstance(e.stdout, bytes) else (e.stdout or ""), "timeout"
+    seconds = time.time() - t0
+    (dest / "stdout.txt").write_text(stdout)
+    (dest / "stderr.txt").write_text(stderr)
+    # exit 1 is "findings at the gate"; only 2 and a timeout are failures, and
+    # a report that says the run did not finish is one too.
+    try:
+        report = json.loads(stdout)
+    except json.JSONDecodeError:
+        report = None
+    failed = code not in (0, 1) or report is None or not report.get("complete")
+    status = {"exit_code": 1 if failed else 0, "nitpick_exit": code}
+    comments = [] if failed else [
+        {"title": f["title"], "path": f["path"], "line": f["line"], "body": f["rationale"],
+         "severity": f["severity"], "class": f["class"], "confidence": f.get("confidence"),
+         "citation": f.get("citation", "")}
+        for f in report["findings"]
+    ]
+    # What a later stage held back, kept beside the posted comments so the
+    # drafted set can be rebuilt and scored from the same run.
+    withheld = [] if failed else [
+        {"title": f["title"], "path": f["path"], "line": f["line"], "body": f["rationale"],
+         "severity": f["severity"], "class": f["class"], "confidence": f.get("confidence"),
+         "citation": f.get("citation", ""), "withheld_by": f.get("withheld_by", ""), "reason": f.get("reason", "")}
+        for f in report.get("withheld") or []
+    ]
+    result = {
+        "result": {"comments": comments, "withheld": withheld},
+        "usage": report.get("usage") if report else None,
+        "duration_seconds": seconds,
+        "manifest": {"reviewer": "open-nitpick", "model": model, "version": nitpick_version(binary),
+                     "config": str(config) if config else None, "command": command},
+    }
+    result["manifest"]["artifacts_sha256"] = {
+        p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in (dest / "stderr.txt", dest / "stdout.txt") if p.is_file()
+    }
+    if config:
+        result["manifest"]["config_sha256"] = hashlib.sha256(config.read_bytes()).hexdigest()
+    result["manifest"]["binary_sha256"] = hashlib.sha256(Path(binary).read_bytes()).hexdigest()
+    (dest / "status.json").write_text(json.dumps(status))
+    (dest / "result.json").write_text(json.dumps(result, indent=2))
+    print(json.dumps({"case": case, "exit": code, "findings": len(comments), "seconds": round(seconds)}), flush=True)
+
+
+def nitpick_version(binary="nitpick"):
+    return subprocess.run([binary, "version"], capture_output=True, text=True).stdout.strip()
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--repos", type=Path, required=True)
+    ap.add_argument("--inputs", type=Path, required=True)
+    ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--model", default="deepseek/deepseek-v4.1-flash-1017")
+    ap.add_argument("--concurrency", type=int, default=2)
+    ap.add_argument("--timeout", type=int, default=900)
+    ap.add_argument("--only", default="")
+    ap.add_argument("--config", type=Path, default=None, help="a .nitpick.yaml to review under")
+    ap.add_argument("--binary", default="nitpick", help="the nitpick binary to run")
+    ap.add_argument("--command", default="review", help="the subcommand to review with, such as deep-review")
+    args = ap.parse_args()
+    found = shutil.which(args.binary)
+    if found is None and not Path(args.binary).exists():
+        ap.error(f"--binary {args.binary!r} is not on PATH and is not a file")
+    args.binary = str(Path(found or args.binary).resolve())
+    selection = json.loads((args.inputs / "selection.json").read_text())
+    args.out.mkdir(parents=True, exist_ok=True)
+    (args.out / "run.json").write_text(json.dumps({
+        "selection": selection, "repeats": 1, "model": args.model, "reviewer": "open-nitpick",
+        "version": nitpick_version(args.binary), "config": str(args.config) if args.config else None,
+        "command": args.command,
+    }))
+    only = {x for x in args.only.split(",") if x}
+    cases = [c["case"] for c in selection["cases"] if not only or c["case"] in only]
+    with concurrent.futures.ThreadPoolExecutor(args.concurrency) as pool:
+        list(pool.map(lambda c: review(c, args.repos, args.out, args.model, args.timeout, args.config, args.binary, args.command), cases))
+
+
+if __name__ == "__main__":
+    main()

@@ -6,41 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
 	"github.com/jdziat/open-nitpick/internal/converse"
 	"github.com/jdziat/open-nitpick/internal/review"
 	"github.com/jdziat/open-nitpick/internal/vcs"
 )
-
-// The requirement the eval measurement rests on: asking for the wider pass
-// must not change what the next push produces. The pass runs on a copy, and
-// this pins that the copy is one.
-func TestImproveConfigCopyLeavesTheCallersAlone(t *testing.T) {
-	cfg := config.Defaults()
-	cfg.Persona.Nitpick = config.NitpickNormal
-	cfg.Review.Slop = false
-	cfg.Review.MinSeverity = config.SeverityWarning
-
-	icfg := *cfg
-	icfg.Persona.Nitpick = config.NitpickPedantic
-	icfg.Review.Slop = true
-	icfg.Review.MinSeverity = config.SeverityNit
-
-	if cfg.Persona.Nitpick != config.NitpickNormal {
-		t.Errorf("caller's nitpick level = %q, want it untouched at normal", cfg.Persona.Nitpick)
-	}
-	if cfg.Review.Slop {
-		t.Error("caller's review.slop was switched on by the improve run")
-	}
-	if cfg.Review.MinSeverity != config.SeverityWarning {
-		t.Errorf("caller's min_severity = %q, want it untouched at warning", cfg.Review.MinSeverity)
-	}
-
-	// And the copy reaches the style pass, which is the whole point of it.
-	if !icfg.Persona.Nitpick.NeedsStylePass() {
-		t.Error("the improve config does not reach the style pass")
-	}
-}
 
 func TestDropPublishedRemovesWhatIsAlreadyOnThePullRequest(t *testing.T) {
 	posted := review.Finding{Path: "a.go", Line: 10, Class: "style", Title: "name this"}

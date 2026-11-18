@@ -27,6 +27,49 @@ from "could not run" (2). Use `-dry-run` with
 | Configure a provider, editor integration, or a new repository | [`auth`](#auth), [`mcp`](#mcp), or [`init`](#init) |
 | Inspect configuration or generated reference material | [`explain-config`](#explain-config) or [`config-reference`](#config-reference) |
 
+## `learn`
+
+Propose and individually accept repository references. A draft is inactive;
+acceptance prints one accepted entry to stdout for a normal reviewed policy change.
+Only the trusted base revision can activate it. Repository configuration cannot
+enable `review.learnings` or redirect its repository identity.
+
+### `learn draft`
+
+```sh
+nitpick learn draft -input feedback.json -scripted-entry entry.json > draft.json
+nitpick learn draft -input feedback.json -provider openai -model gpt-4.1 -allow-provider-feedback > draft.json
+```
+
+Feedback names the repository, source URL and revision, evidence date,
+classification, rationale, and quoted thread text. Resolved status alone is
+insufficient. Bot-generated events are rejected. Thread text is redacted and
+bounded before a model call; the drafting model has no tools. Drafts retain
+the source excerpt hash and usage records instead of the original thread body.
+
+| Flag | Meaning |
+| --- | --- |
+| `-input` | JSON feedback file. |
+| `-scripted-entry` | Operator-authored entry JSON; makes no model call. |
+| `-provider`, `-model` | Explicit model selection for a generated draft. |
+| `-config` | Operator model configuration. |
+| `-allow-provider-feedback` | Consent to send redacted feedback to that provider. |
+
+### `learn accept`
+
+Review the complete draft and supply its entry's `content_hash`. Editing the
+entry changes that hash and requires another review. The command emits one
+accepted entry; combine entries in a version-1
+`.nitpick/learnings/manifest.json` through a reviewed change. It does not push
+or activate policy.
+
+| Flag | Meaning |
+| --- | --- |
+| `-input` | One reviewed draft JSON. |
+| `-reviewed-hash` | Exact `content_hash` of the entry reviewed. |
+| `-repository` | Explicit target owner/repository; must match the draft. |
+| `-local-operator` | Attribute acceptance to the authenticated OS user. Without it, current GitHub write, maintain, or admin permission is required. |
+
 ## `review`
 
 ```sh
@@ -45,6 +88,7 @@ The normal change review. With no `-base`, it reviews uncommitted changes; with
 | `-profile` | Opt in to an engineering assessment profile. |
 | `-instruction` | One extra instruction for this invocation. |
 | `-fail-on` | Override `review.fail_on`: `nit`, `info`, `warning`, `error`, `critical`, or `none`. |
+| `-format` | `text` prints the review. `json` prints one object with `result`, `complete`, `failed_stages`, the published findings, each with `confidence` and `citation` when the reviewer gave them, and `withheld`: the findings a later stage held back, each with that stage in `withheld_by`, its `reason`, and `revised` when an expert agreed and rated it below the publication level. These are not the Action's `withheld` output, which counts findings an earlier review already posted. The review text then goes to stderr. |
 | `-max-rounds` | Override `review.max_rounds`. Once that many complete reviews are on the pull request, the run calls no model, lists what is unresolved and exits 3. `0` lifts the limit. |
 | `-stop-at` | Override `review.stop_at`: `nit`, `info`, `warning`, `error` or `critical`; `none` turns a configured value off for this run. When nothing at or above it remains, `result` is `settled` and the exit status is 0. |
 | `-owner`, `-repo-name`, `-pr` | GitHub repository and pull request to review. |
@@ -67,6 +111,23 @@ not limit the number of files reviewed. It intentionally omits some full-review
 stages, so do not use it as an approval decision. It accepts the same flags as
 [`review`](#review) except `-profile`: fast review rejects the engineering
 assessment profile because that assessment needs the full review path.
+
+## `deep-review`
+
+```sh
+nitpick deep-review -base origin/main -dry-run
+```
+
+Reviews each pull request whole with two agents in parallel, a general reviewer
+and a security reviewer, that read files and search the repository over up to
+ten turns before they file anything. What they file then passes a confidence
+floor, a cap on low-priority findings, and a critique that grades each finding
+against the code it cites; the review lists what was withheld and why. It makes
+about twenty model calls a pull request where [`review`](#review) makes a few,
+and its settings are under `review.deep`. Without a git checkout to search, it
+reviews from the diff. Its walkthrough is always the receipt, because the prose
+style is written by triage, which it does not run. It accepts the same flags as
+[`review`](#review).
 
 ## `full-review`
 

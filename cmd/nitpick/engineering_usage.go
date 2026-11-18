@@ -1,6 +1,8 @@
 package main
 
 import (
+	stdcmp "cmp"
+	"slices"
 	"sort"
 	"sync"
 
@@ -11,14 +13,16 @@ import (
 )
 
 type engineeringUsage struct {
-	mu     sync.Mutex
-	meters map[*llm.Client]*evals.Meter
+	mu       sync.Mutex
+	meters   map[*llm.Client]*evals.Meter
+	external []llm.CallRecord
 }
 
 func (u *engineeringUsage) reset() {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	u.meters = map[*llm.Client]*evals.Meter{}
+	u.external = nil
 }
 
 func (u *engineeringUsage) attach(roles *llm.Roles) {
@@ -46,7 +50,7 @@ func (u *engineeringUsage) attach(roles *llm.Roles) {
 	roles.Build = func(spec config.ModelSpec) (*llm.Client, error) {
 		client, err := build(spec)
 		if err == nil {
-			meter(client)
+			(&llm.Roles{Review: client}).Each(meter)
 		}
 		return client, err
 	}
@@ -75,4 +79,23 @@ func (u *engineeringUsage) snapshot() []practices.ModelUsage {
 			PromptTokens: usage.Prompt(), CompletionTokens: usage.Completion(), CacheReadTokens: usage.CacheRead(), CacheWriteTokens: usage.CacheWrite(), ReasoningTokens: usage.Reasoning()})
 	}
 	return out
+}
+
+func (u *engineeringUsage) calls() []llm.CallRecord {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	out := append([]llm.CallRecord{}, u.external...)
+	for _, meter := range u.meters {
+		out = append(out, meter.Records()...)
+	}
+	slices.SortFunc(out, func(a, b llm.CallRecord) int {
+		return stdcmp.Or(a.StartedAt.Compare(b.StartedAt), stdcmp.Compare(a.Provider, b.Provider), stdcmp.Compare(a.Model, b.Model), stdcmp.Compare(a.Role, b.Role))
+	})
+	return out
+}
+
+func (u *engineeringUsage) observe(call llm.CallRecord) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	u.external = append(u.external, call)
 }

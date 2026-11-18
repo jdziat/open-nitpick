@@ -51,6 +51,9 @@ func (p *engineeringReviewPolicy) ResolvePolicy(ctx context.Context, ref vcs.Ref
 	}
 	scoped := *cfg
 	applyEngineeringScope(&scoped)
+	// Nested model checks clear markers on their synthetic input; the outer
+	// review still honors the operator's accepted skip policy.
+	scoped.Review.SkipMarkers = slices.Clone(cfg.Review.SkipMarkers)
 	if p.selected != nil {
 		p.selected()
 	}
@@ -279,6 +282,14 @@ func reviewAnalyzerCheck(files []standards.File, report *review.Report, cfg *con
 	}
 	for _, uncovered := range report.Uncovered {
 		c.State, c.Reason = practices.Partial, "analyzer reported incomplete coverage: "+string(uncovered.Reason)
+	}
+	if cfg.Linters.Mode != config.LinterOff {
+		for _, name := range cfg.Linters.Enabled {
+			if _, ok := described[name]; !ok {
+				c.State, c.Reason = practices.Unavailable, "unknown enabled analyzer: "+name
+				break
+			}
+		}
 	}
 	for _, finding := range report.AnalyzerFindings {
 		c.Findings = append(c.Findings, practices.Finding{Rule: finding.Source, Target: practices.Target{Kind: practices.FileTarget, ID: finding.Path, Line: finding.Line}, Title: finding.Title,

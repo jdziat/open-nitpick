@@ -2,7 +2,6 @@ package evals
 
 import (
 	"bytes"
-	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -98,29 +97,9 @@ type TokenUsage struct {
 	// without saying which.
 	Unreported int
 
-	// Failed is how many calls returned an error, and it is a stated BLIND SPOT
-	// rather than a term in Complete below.
-	//
-	// It is one of two, and the other leaves no trace at all: MeterClient wraps
-	// the client OUTSIDE llms.NewResilientClient, so a request that failed twice
-	// and succeeded on the third attempt is one entry here with one attempt's
-	// tokens, and is not counted in Failed either. Metering the inner client
-	// instead would mean rebuilding the resilience wrapper with retry settings
-	// this package cannot read back out of it, which would measure a retry
-	// policy production does not use, a worse error than the one it fixes.
-	// Both blind spots run the same way: every amount is a LOWER bound, which is
-	// the direction that cannot flatter a model into being the default. Stated
-	// in CostReadingLegend so a reader sees it, since neither is countable.
-	//
-	// A failed call may still have been billed, a provider that generates a
-	// response and then fails to deliver it charges for the generation, and
-	// that charge is not visible from here at all. It is not used to discard the
-	// run because failure here does not imply the run failed: in
-	// StructuredAuto, a provider that rejects json_schema produces a capability
-	// error and the client retries in JSON mode, so voiding the cost on a failed
-	// call would silently drop every model without schema support out of the
-	// table entirely. Reported, so the reader can see that this row's cost is a
-	// lower bound.
+	// Failed counts failed provider attempts, including retries. A failed
+	// attempt without usage may still have been billed; priced totals remain
+	// lower bounds even when all successful attempts reported usage.
 	Failed int
 }
 
@@ -226,8 +205,9 @@ func (u *TokenUsage) observe(resp *llms.Response, err error) {
 // Meter accumulates reported usage across every model call made through one
 // client.
 type Meter struct {
-	mu    sync.Mutex
-	usage TokenUsage
+	mu      sync.Mutex
+	usage   TokenUsage
+	records []llm.CallRecord
 }
 
 // Usage returns what has been metered so far.
@@ -244,44 +224,36 @@ func (m *Meter) Usage() TokenUsage {
 	}
 }
 
-// meteredLLM records the usage of every response that passes through it.
-//
-// It wraps a client at the same seam recordingLLM does, OUTSIDE the SDK's
-// resilience wrapper, so a request that was retried contributes the usage of
-// the attempt that succeeded.
-type meteredLLM struct {
-	inner llms.LLM
-	meter *Meter
+// Records returns the provider attempts behind this meter without request or
+// response bodies. Callers can reconcile roles and missing usage independently.
+func (m *Meter) Records() []llm.CallRecord {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]llm.CallRecord{}, m.records...)
 }
-
-func (m *meteredLLM) GenerateContent(ctx context.Context, msgs []llms.Message, opts ...llms.CallOption) (*llms.Response, error) {
-	resp, err := m.inner.GenerateContent(ctx, msgs, opts...)
-
-	m.meter.mu.Lock()
-	m.meter.usage.observe(resp, err)
-	m.meter.mu.Unlock()
-
-	return resp, err
-}
-
-func (m *meteredLLM) Stream(ctx context.Context, msgs []llms.Message, opts ...llms.CallOption) (<-chan llms.StreamChunk, error) {
-	// Nothing in the review path streams. Metering a stream means reading the
-	// final chunk's usage, and a wrapper that silently passed the stream
-	// through would report a streamed run as costing nothing.
-	return m.inner.Stream(ctx, msgs, opts...)
-}
-
-func (m *meteredLLM) Provider() llms.Provider { return m.inner.Provider() }
-func (m *meteredLLM) Model() string           { return m.inner.Model() }
 
 // MeterClient installs usage metering on a client and returns the meter that
-// accumulates it, replacing the client's LLM in place.
+// accumulates it, including attempts inside the client's retry loop.
 //
 // Call it before the client is used: a meter attached to a client that is
 // already answering requests would race with them and miss whatever it missed.
 func MeterClient(c *llm.Client) *Meter {
 	m := &Meter{}
-	c.LLM = &meteredLLM{inner: c.LLM, meter: m}
+	c.ObserveCalls(func(record llm.CallRecord) {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		m.records = append(m.records, record)
+		if record.Failed {
+			m.usage.Failed++
+		}
+		if record.Usage == nil {
+			if !record.Failed {
+				m.usage.Unreported++
+			}
+			return
+		}
+		m.usage.observe(&llms.Response{Usage: *record.Usage}, nil)
+	})
 	return m
 }
 
@@ -2073,10 +2045,10 @@ const CostReadingLegend = "$/DEFECT IS NOT A RANKING ON ITS OWN. It is minimised
 	"ORDERABLE. The five qwen rows have a spread of 1.0x and are exact, which is why the marker matters: " +
 	"the column mixes exact figures with figures that could be several times either way. Pin a provider " +
 	"and the band collapses. " +
-	"EVERY AMOUNT HERE IS A LOWER BOUND, by two stated blind spots: a call that errored (FAILED) may " +
-	"still have been billed for a response that was never delivered, and the meter sits outside the " +
-	"SDK's retry loop, so a request that succeeded on its second attempt contributes only the second " +
-	"attempt's tokens. Neither is knowable from a response, and neither is filled in from a guess. " +
+	"EVERY AMOUNT HERE IS A LOWER BOUND: a call that errored (FAILED) may still have been billed " +
+	"without returning usage. Failed provider attempts and retry attempts are retained; missing " +
+	"usage is not filled in from a guess. Requests and timing count logical calls, while retained " +
+	"usage records count provider attempts. " +
 	RateLegend + " Here that means RECALL and NOISE: RECALL is printed as the defects located over the " +
 	"defects planted in the PRICED reviews, and NOISE as invented findings per priced review. Both step " +
 	"by one whole finding, and DEFECTS and PRICED are the counts they step over. " +

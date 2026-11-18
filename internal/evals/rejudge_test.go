@@ -394,7 +394,7 @@ func TestRejudgeReportShowsBothRankingsAndTheVendorCohort(t *testing.T) {
 	}
 	// It was first under the baseline judge and must not be first under the new
 	// one, or the report is hiding the only thing it exists to show.
-	if !strings.Contains(openai, "-1") {
+	if fields := strings.Fields(openai); len(fields) == 0 || fields[len(fields)-1] != "-1" {
 		t.Errorf("the openai row shows no rank movement after its precision inverted: %q", openai)
 	}
 
@@ -750,7 +750,7 @@ func TestRejudgeReportKeepsPhantomVerdictsOutOfPrecision(t *testing.T) {
 		t.Errorf("PHAN is %q, want 2: the invented verdicts are counted nowhere in the row, so the "+
 			"failure is visible only to a reader who scrolls to the notes", got)
 	}
-	if !strings.Contains(report, "about a finding that does not exist") {
+	if !strings.Contains(report, "the new judge returned 2 verdict(s) about a finding that does not exist") {
 		t.Error("no note explains the PHAN cell, so a reader cannot tell an inventing judge from a " +
 			"formatting artefact")
 	}

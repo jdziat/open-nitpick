@@ -6,6 +6,7 @@ require (
 	github.com/alecthomas/chroma/v2 v2.27.0
 	github.com/bmatcuk/doublestar/v4 v4.10.3
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
+	github.com/gofrs/flock v0.13.0
 	github.com/google/go-github/v74 v74.0.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/nocturnium/llm-go-sdk/v6 v6.11.3

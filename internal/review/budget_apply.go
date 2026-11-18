@@ -88,9 +88,21 @@ func (e *Engine) applyBudget(
 		return &fit, empty, nil
 	}
 
-	trimmed, err := bundle.AssembleWith(ctx, e.Config, kept, fetch, bundle.ListerFrom(e.Provider, ref))
+	trimmed, err := bundle.AssembleReserving(ctx, e.Config, kept, fetch, bundle.ListerFrom(e.Provider, ref), bundle.Reserve{Tokens: plan.FramingReserved})
 	if err != nil {
 		return nil, nil, fmt.Errorf("re-assemble under the spending ceiling: %w", err)
+	}
+	for _, skipped := range plan.Skipped {
+		found := false
+		for _, existing := range trimmed.Skipped {
+			if existing == skipped {
+				found = true
+				break
+			}
+		}
+		if !found {
+			trimmed.Skipped = append(trimmed.Skipped, skipped)
+		}
 	}
 	trimmed.Skipped = append(trimmed.Skipped, budgetSkips(fit.Dropped)...)
 

@@ -205,6 +205,7 @@ found, per surface:
 | the PR title in the triage prompt | nothing | now flattened and defanged |
 | `linters.trusted` | nothing | pruned from a repository file |
 | `review.knowledge_index` | nothing | pruned from a repository file |
+| `review.jev` (sends source code to OpenRouter on the operator's key) | nothing | pruned from a repository file, and `checkPruned` refuses the merge-key route |
 | `semgrep_config` registry reference | `HasPrefix("p/")` | a shape: no traversal, scheme or whitespace |
 | `linters.golangci_config` and the other analyzer paths | the decoded value | already right, see below |
 | `persona.custom` | the prune, and `checkPruned` behind it | already right |

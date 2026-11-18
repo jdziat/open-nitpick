@@ -121,7 +121,12 @@ func stageSentence(st StageStatus) string {
 			"deduplicated, ranked or summarized.", st.Reason)
 	case "style":
 		return fmt.Sprintf("The style pass failed (%s), so style findings are missing.", st.Reason)
+	case "deep-review":
+		return fmt.Sprintf("Some batches were reviewed in one call without tools (%s), not by the deep-review agents.", st.Reason)
 	default:
+		if strings.HasPrefix(st.Stage, "deep-review ") {
+			return fmt.Sprintf("The %s failed (%s), so its findings from the affected batches are missing.", st.Stage, st.Reason)
+		}
 		return fmt.Sprintf("The %s stage failed (%s).", st.Stage, st.Reason)
 	}
 }
@@ -143,7 +148,7 @@ var unreadable = []string{
 
 // classifySkips splits the planner's skips into the two kinds.
 func classifySkips(report *Report) (routine, unread int) {
-	if report.Plan == nil {
+	if report.Plan == nil || report.DesignExecution != nil {
 		return 0, 0
 	}
 	for _, s := range report.Plan.Skipped {

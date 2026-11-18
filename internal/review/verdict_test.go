@@ -285,6 +285,12 @@ func TestAReplacementSuggestionCarriesItsOwnFixEndLine(t *testing.T) {
 	if shorter[0].FixEndLine != 4 {
 		t.Errorf("FixEndLine = %d, want triage's 4: a one-line replacement must not keep the reviewer's wider range", shorter[0].FixEndLine)
 	}
+	unchanged, _ := triageWith(t, before, TriageResult{Verdicts: []Verdict{{
+		Number: 1, Severity: "warning", Class: "correctness", Suggestion: "replacement", FixEndLine: 4,
+	}}})
+	if len(unchanged) != 1 || unchanged[0].Suggestion != "replacement" || unchanged[0].FixEndLine != 4 || unchanged[0].Line != 4 {
+		t.Fatalf("omitted rewrite line moved or discarded the anchored replacement: %+v", unchanged)
+	}
 
 	held, _ := triageWith(t, before, TriageResult{Verdicts: []Verdict{{
 		Number: 1, Severity: "warning", Class: "correctness",

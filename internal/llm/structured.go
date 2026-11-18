@@ -127,8 +127,13 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 // records because such a review will not reproduce. Budget is max_retries.
 func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, call []llms.CallOption) (T, *llms.Response, error) {
 	started := c.now()
+	dropped := false
 	for attempt := 0; ; attempt++ {
 		value, raw, err := llms.GenerateTyped[T](ctx, c.LLM, msgs, call...)
+		if err == nil && dropped {
+			c.NoteNoTemperature()
+		}
+		dropped = dropped || c.RejectsTemperature(err, call)
 		if next, ok := c.retryAfter(ctx, attempt, started, call, raw, err); ok {
 			call = next
 			continue
@@ -141,6 +146,7 @@ func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, c
 // generateContent is GenerateContent with generateTyped's retries.
 func generateContent(ctx context.Context, c *Client, msgs []llms.Message, call []llms.CallOption) (*llms.Response, error) {
 	started := c.now()
+	dropped := false
 	for attempt := 0; ; attempt++ {
 		var resp *llms.Response
 		err := whileWaiting(ctx, c.Log, "model call", c.String(), waitInterval, func() error {
@@ -148,6 +154,10 @@ func generateContent(ctx context.Context, c *Client, msgs []llms.Message, call [
 			resp, err = c.LLM.GenerateContent(ctx, msgs, call...)
 			return err
 		})
+		if err == nil && dropped {
+			c.NoteNoTemperature()
+		}
+		dropped = dropped || c.RejectsTemperature(err, call)
 		if next, ok := c.retryAfter(ctx, attempt, started, call, resp, err); ok {
 			call = next
 			continue
@@ -177,6 +187,13 @@ func markStalled(ctx context.Context, err error) error {
 // retryAfter decides whether an attempt is sent again and with what options.
 // started is when the first attempt began; see retryBudgetSpent.
 func (c *Client) retryAfter(ctx context.Context, attempt int, started time.Time, call []llms.CallOption, resp *llms.Response, err error) ([]llms.CallOption, bool) {
+	// Not a retry of the transport and not counted against its budget: it fires
+	// at most once per call, since the options sent again carry no temperature.
+	if c.RejectsTemperature(err, call) {
+		c.logger().Warn("the model accepts no temperature; sending again without it",
+			"model", c.String())
+		return WithoutTemperature(call), true
+	}
 	if attempt >= c.stallRetries {
 		return nil, false
 	}
@@ -230,7 +247,7 @@ func (c *Client) retryAfter(ctx context.Context, attempt int, started time.Time,
 			"attempt", attempt+1,
 			"retries_left", c.stallRetries-attempt)
 		return next, true
-	case attempt > 0 && truncated(resp, err) && !hasTemperatureAbove(call, 0):
+	case attempt > 0 && truncated(resp, err) && !hasTemperatureAbove(call, 0) && !c.OmitsTemperature():
 		// Only after a retry: a first attempt cut at a cap the caller chose is
 		// the caller's to handle. Only from temperature zero: a sampling
 		// temperature the caller set is kept, and a loop at 0.3 is the model's
@@ -958,6 +975,9 @@ func (c *Client) Fallback() *Client {
 // to be cut in the same place. A refused credential or a cancelled context
 // are none of a second model's business.
 func ShouldEscalate(err error) bool {
+	if errors.Is(err, ErrRecordedAttempt) {
+		return false
+	}
 	if err == nil {
 		return false
 	}
@@ -984,4 +1004,19 @@ func ShouldEscalate(err error) bool {
 		}
 	}
 	return false
+}
+
+// NoReasoningOptions are the call options for a request that must not think:
+// the client's own options with reasoning turned off the way the provider
+// reads it, and no output ceiling beyond the client's.
+//
+// A tool loop needs this because each step is a short lookup, and a reasoning
+// model left on spends the call timeout thinking about a grep (issue #214).
+func (c *Client) NoReasoningOptions() []llms.CallOption {
+	off := false
+	opts := append(c.CallOptions(), llms.WithReasoning(llms.ReasoningConfig{Enabled: &off}))
+	if strings.EqualFold(strings.TrimSpace(c.Spec.Provider), "openrouter") {
+		opts = append(opts, llms.WithExtraBodyParam("reasoning", map[string]any{"enabled": false}))
+	}
+	return opts
 }

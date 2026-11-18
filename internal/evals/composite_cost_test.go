@@ -114,7 +114,7 @@ func TestCompositeMeteringKeepsTheReviewerSpend(t *testing.T) {
 	// Stubs go in before the meters, the order runOne uses: a meter wraps
 	// whatever the client held when it was installed.
 	stub := &meterStub{usage: llms.Usage{PromptTokens: 1000, CompletionTokens: 200}}
-	roles.Each(func(c *llm.Client) { c.LLM = stub })
+	roles.Each(func(c *llm.Client) { *c = *llm.NewClientForTest(stub, c.Spec) })
 
 	meters := map[*llm.Client]*Meter{}
 	roles.Each(func(c *llm.Client) { meters[c] = MeterClient(c) })

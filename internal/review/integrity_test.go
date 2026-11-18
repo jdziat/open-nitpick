@@ -3,6 +3,7 @@ package review
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/bundle"
@@ -83,17 +84,22 @@ func TestPartialReviewMustNotCacheFailedFiles(t *testing.T) {
 }
 
 type snapshotProvider struct {
+	mu sync.Mutex
 	incrementalProvider
 	refs []vcs.Ref
 }
 
 func (p *snapshotProvider) Diff(ctx context.Context, ref vcs.Ref) ([]byte, error) {
+	p.mu.Lock()
 	p.refs = append(p.refs, ref)
+	p.mu.Unlock()
 	return p.stubProvider.Diff(ctx, ref)
 }
 
 func (p *snapshotProvider) FileContent(ctx context.Context, ref vcs.Ref, path string) ([]byte, error) {
+	p.mu.Lock()
 	p.refs = append(p.refs, ref)
+	p.mu.Unlock()
 	return p.stubProvider.FileContent(ctx, ref, path)
 }
 

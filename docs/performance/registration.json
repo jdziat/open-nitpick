@@ -1,0 +1,354 @@
+{
+  "schema_version": 1,
+  "status": "registered before new paid calls and Phase1 concurrency changes",
+  "baseline_id": "phase1-before-parallelism-20261118",
+  "approved_total_new_spend_usd": 100,
+  "phase_ceilings_usd": {
+    "P0_P1": 20,
+    "P2": 10,
+    "P3": 25,
+    "P4": 10,
+    "P5": 10,
+    "final_review": 25,
+    "P6": 0
+  },
+  "accounting": "reported provider costs plus unresolved-attempt reservations; no failed-cost-as-zero assumption",
+  "phase1": {
+    "paired_repetitions_per_workload": 20,
+    "profile_repetitions": 3,
+    "latency_target_p95_reduction": 0.25,
+    "peak_rss_target_reduction": 0.2,
+    "cost_target_reduction": 0.2,
+    "nondeterminism": "recorded responses held constant; real-provider results reported separately",
+    "safety": "identical ordered findings, skips, evidence payloads and stage completeness; no dropped analyzer results",
+    "promotion": "no product latency, quality or memory claim from a synthetic-delay control or isolated microbenchmark",
+    "GOMAXPROCS": 4,
+    "raw_samples": "NITPICK_PERFORMANCE_SAMPLES stores all 20 durations and ordered-payload digest per workload"
+  },
+  "quality": {
+    "holdouts": "fresh validation/test selection must be frozen separately; these performance cases are not untouched quality holdouts",
+    "critical_false_positives": "no new confirmed critical false positives",
+    "noninferiority_failure_missing_noise_recall_margin": 0.01,
+    "P3_precision_gain": 0.05,
+    "P4_cost_reduction": 0.25,
+    "P5_operator_value_target": 0.2,
+    "P5_fix_improvement": 0.1,
+    "classification": "pass/fail/inconclusive only after the registered experiment actually runs; otherwise NOT RUN"
+  },
+  "rollout_order": [
+    "latest findings deterministic closeout",
+    "P0 source-bound baseline",
+    "P1 Phase1 concurrency and allocation controls",
+    "P2 candidate/recovery census",
+    "P3 quality",
+    "P4 routing",
+    "P5 operator/fix studies",
+    "P6 compatibility and release audit",
+    "one final strict cached review and CTO approval"
+  ],
+  "external_evidence_pending": [
+    "authentic temporal accepted/rejected feedback for learnings study",
+    "observed operator acceptance and review time",
+    "fresh blinded labels for quality/fix studies"
+  ],
+  "workloads": [
+    {
+      "cohort": "routine",
+      "url": "https://github.com/jdziat/open-nitpick/pull/200",
+      "base": "43308568e9b5bcefa2977b2cc471440594cce40f",
+      "head": "37a9b93b7a01dd738bcff345d577411f5dafb72c",
+      "pr_head": "08b23f4f419e262456186af425a6d82327ec7f6c",
+      "changed_files": 2,
+      "additions": 28,
+      "deletions": 1,
+      "quality_holdout": false,
+      "selection": "metadata-only performance case, fixed before measurement",
+      "independent_adjudication": "not yet labeled"
+    },
+    {
+      "cohort": "noisy-docs",
+      "url": "https://github.com/jdziat/open-nitpick/pull/210",
+      "base": "54018c0be0d575593b7af7cddf5a9a5c182d897a",
+      "head": "b2d82441eb3df7f93ea5b825b56c32b47edba7b1",
+      "pr_head": "46359443d02dd1a197728db238e4ee6387d71799",
+      "changed_files": 22,
+      "additions": 114,
+      "deletions": 122,
+      "quality_holdout": false,
+      "selection": "metadata-only performance case, fixed before measurement",
+      "independent_adjudication": "not yet labeled"
+    },
+    {
+      "cohort": "cross-file",
+      "url": "https://github.com/jdziat/open-nitpick/pull/197",
+      "base": "47d2f05f2b246ef1c188c02dece761d825242ced",
+      "head": "34caa3acb261dc94254515cf0abd7f35c785e8da",
+      "pr_head": "6970e46c129f63ec11c3531a9526113fa1fb7def",
+      "changed_files": 7,
+      "additions": 817,
+      "deletions": 46,
+      "quality_holdout": false,
+      "selection": "metadata-only performance case, fixed before measurement",
+      "independent_adjudication": "not yet labeled"
+    },
+    {
+      "cohort": "provider-retry",
+      "url": "https://github.com/jdziat/open-nitpick/pull/215",
+      "base": "73736e7cae86a8fddb0ac173c4ec3bf021c50ce3",
+      "head": "8a0dfdb1f6c1272fa8974412d97136b04fec32b0",
+      "pr_head": "ed19eaad66a9b2d0d12b4aa0a5904386991d9163",
+      "changed_files": 6,
+      "additions": 187,
+      "deletions": 18,
+      "quality_holdout": false,
+      "selection": "metadata-only performance case, fixed before measurement",
+      "independent_adjudication": "not yet labeled"
+    },
+    {
+      "cohort": "large-change",
+      "url": "https://github.com/jdziat/open-nitpick/pull/213",
+      "base": "b2d82441eb3df7f93ea5b825b56c32b47edba7b1",
+      "head": "73736e7cae86a8fddb0ac173c4ec3bf021c50ce3",
+      "pr_head": "afa992c9b1c41a8526c46a32294de602e9caa63f",
+      "changed_files": 40,
+      "additions": 2168,
+      "deletions": 58,
+      "quality_holdout": false,
+      "selection": "metadata-only performance case, fixed before measurement",
+      "independent_adjudication": "not yet labeled"
+    }
+  ],
+  "phase1_candidates": [
+    {
+      "id": "C1",
+      "hypothesis": "Index receiver method headers once per captured related-source file instead of recompiling and rematching one regex per type/method/file tuple.",
+      "registered_before_candidate_change": true,
+      "profile": "p0-bundle.cpu + p0-bundle.mem; goMethodWants cumulative allocation dominates",
+      "compatibility": "Preserve suffix-based receiver matching, exported method filtering, snippet extraction, uses counts, and sorted attachment order; all five ordered-plan SHA256 values must match baseline.",
+      "comparison": "20 iterations per frozen workload with the same benchmark binary flags; report isolated preparation separately from end-to-end latency.",
+      "stop": "Any changed ordered payload or memory/cost/coverage regression blocks promotion."
+    },
+    {
+      "id": "C2",
+      "hypothesis": "Reuse captured repository file bytes, line splits, and identical grep results within a lookup session; join at most four lookups from one returned tool turn in original call order.",
+      "preregistered_scope": "performance-follow-on-plan.md Phase 1 item 2 (predates code); local fixtures only, no quality or end-to-end speed claim",
+      "comparison": "20 iterations, same binaries and flags, local tracked 4096-line file read in 12 windows and eight identical git searches; baseline restores original repotools.go and uses a sequential lookup turn",
+      "guards": "Live waiter retries a separately cancelled loader; cancelled/transient reads and grep errors are not retained; stable absence is retained; each pinned review head resets sharing; lookup limit and submission bound starts; all workers join before answers append; charged retained payloads/line indexes capped at 8 MiB; oversized source remains readable to Jev without retention.",
+      "stop": "Any changed tool answer, failed race guard, or worse measured memory blocks promotion.",
+      "scope_limit": "Provider file reads remain per captured lookup session; this does not make a mutable local worktree an immutable Git snapshot. No model or embedding responses use internal/memo."
+    },
+    {
+      "id": "C3-detect",
+      "hypothesis": "Parallel built-in Detect checks shorten detection on frozen local snapshots. Detect does not run analyzers or source code.",
+      "comparison": "Same default built-in runner roster and frozen source snapshots; sequential vs goroutine-per-runner; 20 samples, GOMAXPROCS=4; compare ordered detection name/error hashes and wall time.",
+      "stop": "Do not change production if representative cases show no gain; no model or full-review latency claim. Module analyzer execution and golangci locking unchanged.",
+      "outcome": "Rejected: mixed sub-millisecond gains, 54% median regression on the large frozen change. Keep production detection serial."
+    },
+    {
+      "id": "C4-sources",
+      "hypothesis": "A per-review provider source memo avoids duplicate reads between flow capture, bundle context and budget reassembly.",
+      "comparison": "Five frozen workloads, default and $0.03 modeled budget, three profiling iterations; original versus memoized provider; scripted empty model responses, no network or source execution; hash ordered model messages and prepared plan.",
+      "stop": "Any changed model input, budget decision, coverage or source error prevents production promotion. This measures a scripted pipeline, not real model latency or quality.",
+      "network_control": "Repeat the same scripted profile with a fixed 2ms delay per provider FileContent/ListDir dispatch, three iterations. This is simulated IO and never contacts a provider; compare identical plan/request/budget hashes.",
+      "outcome": "Not promoted:3-repeat local and2ms simulated-IO profiles preserve plans and requests but show mixed latency and local regressions. Production source reads unchanged."
+    },
+    {
+      "id": "C5-spans",
+      "hypothesis": "Byte-offset source selection avoids splitting whole files for every design-context span and avoids a second whole-file split when rendering the same spans.",
+      "profile_evidence": "engineering-before CPU:SelectSourceSpans33.73s cumulative,24.61s in strings.SplitAfter; baseline engineering40-file prep13.53s,13.03GB allocations/op.",
+      "comparison": "Existing engineering baseline binary/three-sample frozen plans, candidate same settings; exact design execution/ordered plan hashes and output-equivalence fuzz oracle.",
+      "stop": "Any changed selected bytes, invalid-span error, original line numbering, task ID, omission, budget or packed plan blocks promotion; no model calls or quality claim.",
+      "outcome": "C5-only CTO GO; all5x3 plan/count identities match, equivalence fuzz and5 mutation guards pass, dependent race suite passes; preparation improves6.7\u201327.5% and allocations32\u201341%, no request/token change."
+    }
+  ],
+  "phase2_offline_replay": {
+    "source": "tools/bakeoff/selection_replay.py existing six RULES and selector_diagnostics.py, unchanged",
+    "corpora": [
+      "previously inspected familiar 20-PR D6v, 3 passes",
+      "previously inspected fresh 30-PR D7, 3 passes"
+    ],
+    "status": "exploratory only, both historical sets already inspected",
+    "limitations": [
+      "Fixed existing judge labels are reused; removing a candidate does not re-run matching.",
+      "No held-out unseen-corpus quality claim, no threshold/default change, and no new model calls.",
+      "Confidence sweeps/caps, paired bootstrap, human adjudication and fresh holdout remain required before promotion.",
+      "Historical replay uses optimistic any-true cluster votes and omits unlabelled-only clusters; published estimates cannot establish quality or promotion."
+    ],
+    "stop": "Report estimated F1 as estimated; do not promote a default from this replay."
+  },
+  "phase2_mode_profiles": {
+    "status": "registered_before_engineering_profile",
+    "mode": "engineering_review preparation only",
+    "reason": "Retained run6 log reports55.835s design assembly; normal-review assembly is not a proxy.",
+    "workloads": "same five frozen snapshots",
+    "iterations": 3,
+    "inputs": "full default engineering configuration and actual framing token computation; no model or analyzer dispatch",
+    "comparison": "hash design tasks, omissions and packed ordered plan; record CPU and durations; no quality/completion claim."
+  },
+  "phase2_live_pilot": {
+    "registered_before_calls": true,
+    "scope": "One ordinary-review CLI sample and one fast-review CLI sample on the fixed routine snapshot. Bounded profile: no linters/knowledge/standards/flow; 4096 output tokens, reasoning off, no retries. Not a default-product or quality baseline.",
+    "models": {
+      "review": "z-ai/glm-5.3-flash",
+      "triage": "qwen/qwen3.8-27b"
+    },
+    "source_prices": "OpenRouter public /api/v1/models saved before calls; GLM input/output $0.15/$0.50 per million, Qwen $0.06/$2.20",
+    "reservation_usd_per_run": 1,
+    "maximum_reserved_usd": 2,
+    "total_phase_ceiling_usd": 10,
+    "samples": [
+      "routine-review-1",
+      "routine-fast-review-1"
+    ],
+    "idempotence": "Stable experiment IDs; exclusive receipts and budget lock; recorded terminal runs reused across binary versions; strict per-request response cache; unresolved purchases retain their reservation and never auto-retry.",
+    "stop": "Stop on an unresolved provider purchase, missing usage cost, incomplete report, or receipt mismatch. No automatic follow-on model calls.",
+    "outputs": "CLI elapsed time, per-role reported provider cost/token/cache usage, completion, counts of reviewed/skipped files/findings, request-cache reuse. No precision/recall or p95 from one sample."
+  },
+  "phase1_profile_extensions": {
+    "C7": {
+      "plan_item": 1,
+      "status": "profiled, rejected prototype",
+      "sample_count_per_variant_case": 20,
+      "model_service_time": "scripted zero-delay; no network-model latency claim"
+    },
+    "C8": {
+      "plan_item": 4,
+      "sample_count_per_variant_case": 20,
+      "comparison": "ordered findings, full task context, and each messages/options payload byte-identical",
+      "proof_correction": {
+        "reason": "Finding JSON omits engine-owned fields, including TaskContext. Original hashes could not prove context equivalence.",
+        "serializer": "Ordered model-visible findings, all engine-owned finding fields and ordered messages/options; same serializer for both arms",
+        "samples_per_arm_cohort": 20,
+        "mutation": "Omitting TaskContext from the serializer must fail the context-change guard",
+        "additional_provider_spend_usd": 0
+      }
+    },
+    "C9": {
+      "plan_item": 3,
+      "registered_at": "2026-11-18T10:45:14.385449+00:00",
+      "registered_before_prototype_measurement": true,
+      "source_driver": "actual local git show at the five frozen heads; canonical in-memory ordered-plan oracle",
+      "sample_count_per_variant_case": 20,
+      "window": 4,
+      "policy": "speculation never crosses remaining max_files slots; generated-file omissions reopen capacity; ignored/deleted/binary/no-change paths excluded; maintain ordered results, unchanged errors/skips/fit/related context",
+      "memory": "compiled benchmark process MaxRSS recorded, excluding compiler; simultaneous external git-process memory sum is not measured",
+      "new_provider_spend_usd": 0,
+      "fast_path_control": "Before/after regular-file Worktree reads from materialized frozen source bytes; no external git processes, same canonical ordered-plan oracle. Registered before this control.",
+      "mutation_guards": [
+        "worker bound",
+        "serial scheduling",
+        "MaxFiles speculation bound",
+        "generated omission refill",
+        "error preservation",
+        "cancellation/draining",
+        "source assignment",
+        "mixed selection"
+      ]
+    }
+  },
+  "phase2_live_pilot_corrected": {
+    "registered_at": "2026-11-18",
+    "reason": "Prior GLM pilot was terminally rejected with HTTP 400 because reasoning was disabled; do not retry its request identities.",
+    "change": "Same models and fixed routine workload; reasoning low instead of off. SDK retries stay disabled. New job identities, successful old requests reused across builds through request hashes.",
+    "max_jobs": 2,
+    "max_reservation_per_job_usd": 1,
+    "phase_ceiling_usd": 10,
+    "attempted_price_unknown_usd": 1,
+    "failure_policy": "Stop after the first incomplete corrected job; do not launch a second configuration or model on failure.",
+    "comparability": "Warmup pilot only; raw calls and known-zero reuse attempts separated. No quality or total-program claim."
+  },
+  "phase3_linter_checkpoint": {
+    "scope": "Persistent complete analyzer-stage snapshots, including findings, statuses, discarded findings and uncovered inputs. Reuse is separate from saved model requests. Paid results outrank analyzer data under the progress size limit.",
+    "identity": "Same head, review policy, complete diff, clean tracked Git checkout, native analyzer executable content, Go toolchain/version and module replacement bounds where applicable, analyzer policy, environment. No application build hash.",
+    "eligibility": "Isolated native Ruff or native golangci-lint with cgo off and bounded Go flags. Hidden Git flags, dirty/untracked/ignored inputs, symlinks/submodules, scripts, external configs, workspaces/replacements/drivers or incomplete results run fresh. A discovered gopackagesdriver is external even when GOPACKAGESDRIVER is unset.",
+    "samples": {
+      "paired_runs": 20,
+      "arms": [
+        "resume disabled, fresh",
+        "resume enabled, fresh",
+        "resume enabled, prior completed snapshot"
+      ],
+      "tool": "installed native Ruff on a frozen clean Python fixture",
+      "provider": "scripted in process; no HTTP/provider calls",
+      "canonical_proof": "Ordered findings, analyzer statuses, discards and uncovered metadata must match. The repeat must invoke neither analyzer nor scripted model.",
+      "overhead": "Retain uncached/fresh/reused durations even if identity hashing is slower than the small analyzer run."
+    },
+    "mutations": [
+      "disable engine checkpoint integration",
+      "drop analyzer provenance",
+      "accept failed status",
+      "omit policy/head/diff/identity bounds",
+      "skip post-run input check",
+      "count analyzer reuse as model reuse",
+      "prioritize analyzer data over paid responses",
+      "omit executable/config/environment or dirty-tree bounds"
+    ],
+    "additional_provider_spend_usd": 0,
+    "observed_fixture_correction": "Default Ruff creates ignored .ruff_cache output. Eligible snapshot runs disable its native cache; resume-disabled control keeps it in a separate identical checkout. This was fixed before accepting complete 20-pair samples.",
+    "identity_probing": "Same GOTOOLCHAIN=local and executable resolution as actual runner; no repository-driven toolchain downloads."
+  },
+  "phase2_local_transports": {
+    "registered_before_runs": true,
+    "scope": "Actual binary CLI subprocesses and stdio MCP entry points on a tiny fixed Git fixture, with deterministic loopback OpenAI-compatible chat/tool/embedding responses and dummy credentials. No production edits, real provider calls, fixes, learning activation or external publication.",
+    "primary": "Effective request model/reasoning/schema/options and honest completion/coverage at each entry point; transport/startup controls separate from provider baselines.",
+    "samples_per_successful_surface": 20,
+    "stop": "First preflight failure is retained as one attempted run, not silently retried. A controller/fixture defect needs a separately identified correction. Security required-scanner surfaces get one bounded attempt, no disabled required scanners.",
+    "latency": "CLI includes process start and completion. MCP separately records session startup and persistent-session call time. All attempts retained; timeout/incomplete observations are censored at the configured deadline for p95.",
+    "idempotence": "Terminal local receipts matched to binary, fixture, mode, arguments and response-policy version; skipped on identical reruns. Never reuse a local timing as a paid-provider measurement.",
+    "non_goals": "No quality, real provider tokens/costs, network latency or default recipe promotion claim. Fixture usage is explicitly synthetic.",
+    "additional_provider_spend_usd": 0,
+    "response_classes": [
+      "clean response",
+      "one-candidate fast-review response to prove verification prefix behavior"
+    ]
+  },
+  "phase2_review_low_compatibility": {
+    "registered_before_purchase": true,
+    "id": "compat-review-low-1",
+    "phase": "P2",
+    "max_new_purchase_reservation_usd": 1,
+    "phase_ceiling_usd": 10,
+    "total_ceiling_usd": 100,
+    "preflight": "Real CLI HTTP capture: review and triage both transmit reasoning_effort=low; fast-review transmits reasoning.enabled=false and thinking.type=disabled and remains incompatible with the chosen GLM model. No fast-review retry.",
+    "scope": "One fixed routine corpus review through the CLI at the existing low-reasoning config; no scanners, publication or edits. New semantic request profile, not a retry of either rejected off-reasoning request.",
+    "stop": "Any incomplete or unpriced result retains reservation and stops further live purchases. No automatic provider retry or model/configuration sweep.",
+    "replay": "After a successful complete purchase, replay the same corpus/config using the retained older binary under a kernel filter denying IPv4/IPv6 sockets. Cache miss must fail without another purchase.",
+    "acceptance": "Live result and reported per-role usage/cost if provided; exact cached response receipts; network-denied older-binary replay. N=1 compatibility/cost observation, never a provider p95 or quality study."
+  },
+  "phase4_llm_labels": {
+    "registered_before_purchase": true,
+    "decision": "Operator approved LLM-generated labels (or open-source labeled data) in place of human labels, and ~deepseek/deepseek-flash-latest as the model, on 2026-11-18.",
+    "model": "~deepseek/deepseek-flash-latest via OpenRouter, a moving alias; the resolved model id from each response is recorded. List price 0.036 USD per million input, 0.5 per million output.",
+    "scope": "Two separately prompted labelling passes over the 15 retained hand-picked examples in human-review-packet.json, labels valid/invalid/uncertain, each pass sees one finding at a time plus the repository path and no other pass output. Output is stored beside the packet, never inside the human slots.",
+    "label_provenance": "MODEL-GENERATED. These are not human labels and are not independent of model-family errors. They can show whether the model agrees with itself and with its own prior, and they cannot establish ground truth, precision or recall. Any claim built on them must say so.",
+    "budget": {
+      "max_reserved_usd": 1,
+      "phase": "P4",
+      "phase_ceiling_usd": 10,
+      "total_ceiling_usd": 100
+    },
+    "idempotence": "Stable job id per (pass, finding id, prompt sha256, model alias); exclusive receipt per job; terminal receipts reused across binary and script versions; per-request response cache keyed by request hash; an unresolved purchase keeps its reservation and never auto-retries.",
+    "stop": "Stop on the first HTTP error, missing usage cost, unparseable label, or receipt mismatch. No automatic retry, no model sweep.",
+    "open_source_alternative": "Not used for the retained packet: its findings come from this tool on third-party repositories and have no public labels. Public labeled corpora would measure a different task and need a separate registration."
+  },
+  "phase4_llm_label_panel": {
+    "registered_before_purchase": true,
+    "decision": "Operator asked for several models from different providers through OpenRouter to label the retained examples (2026-11-18).",
+    "models": [
+      "anthropic/claude-haiku-5.5",
+      "google/gemini-4-hydrogen",
+      "openai/gpt-6.2-sol",
+      "mistralai/mistral-large-4-0",
+      "qwen/qwen4-max"
+    ],
+    "scope": "Each model labels each of the 15 retained findings once (valid/invalid/uncertain), seeing only the file path and finding text, with the same prompt. Added to the existing deepseek labels, giving six providers.",
+    "label_provenance": "MODEL-GENERATED. Model providers differ, but their error correlation is unmeasured. The models may share training data and see no code. Agreement between them is not ground truth and establishes no precision, recall or quality improvement.",
+    "budget": {
+      "ceiling_usd": 5,
+      "phase_ceiling_usd": 10,
+      "total_ceiling_usd": 100
+    },
+    "idempotence": "Job id = hash(model, finding id, prompt sha256); exclusive receipt per job; terminal receipts reused across script versions; pending file blocks reruns; no automatic retry. A failed job is recorded and skipped, other models continue.",
+    "stop": "Stop when spend reaches the ceiling or on any unresolved pending job."
+  }
+}

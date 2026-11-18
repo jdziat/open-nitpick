@@ -44,6 +44,8 @@ func denied(p string) bool {
 		return true
 	case p == ".nitpick.yaml":
 		return true
+	case p == ".nitpick/learnings", strings.HasPrefix(p, ".nitpick/learnings/"):
+		return true
 	}
 	return strings.HasPrefix(p, ".git/") || p == ".git"
 }
@@ -315,6 +317,18 @@ func (g *GitHub) treeModes(ctx context.Context, ref Ref, treeSHA string) (map[st
 		out[e.GetPath()] = e.GetMode()
 	}
 	return out, nil
+}
+
+// AuthenticatedUser resolves the identity belonging to the API credential.
+func (g *GitHub) AuthenticatedUser(ctx context.Context) (string, error) {
+	u, _, err := g.client.Users.Get(ctx, "")
+	if err != nil {
+		return "", fmt.Errorf("authenticated GitHub operator: %w", err)
+	}
+	if u.GetLogin() == "" {
+		return "", fmt.Errorf("GitHub returned no authenticated operator")
+	}
+	return u.GetLogin(), nil
 }
 
 // Permission reports what login may do to the repository.

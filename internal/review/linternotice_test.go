@@ -80,7 +80,7 @@ func TestAnalyzerStatusesSurviveSummariesBeingOff(t *testing.T) {
 
 	report := &Report{Summary: "Walkthrough.", Plan: &bundle.Plan{}, Linters: statuses()}
 
-	out := renderSummary(report, cfg)
+	out := Render(report, diff.Files{}, cfg).Summary
 	if !strings.Contains(out, "golangci-lint") {
 		t.Errorf("summaries off suppressed the analyzer roster:\n%s", out)
 	}

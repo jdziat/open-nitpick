@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -488,11 +489,15 @@ func TestTriageFailureStillPublishesFindings(t *testing.T) {
 		"Review the following changes": reviewOut,
 		"triaging findings":            "this is not json and never will be",
 	}}
-	engine := newEngine(t, model, &stubProvider{diff: engineDiff}, nil)
+	provider := &stubProvider{diff: engineDiff}
+	engine := newEngine(t, model, provider, nil)
 
 	report, err := engine.Review(context.Background(), vcs.Ref{})
 	if err != nil {
 		t.Fatalf("Review should survive a triage failure: %v", err)
+	}
+	if provider.published == nil || len(provider.published.Comments) != 1 {
+		t.Fatalf("triage failure lost the published finding: %+v", provider.published)
 	}
 	if len(report.Findings) != 1 {
 		t.Errorf("findings = %+v, want the review findings to survive", report.Findings)
@@ -697,7 +702,7 @@ func TestEngineValidatesWiring(t *testing.T) {
 	cases := map[string]*Engine{
 		"no config":   {Roles: &llm.Roles{}, Provider: &stubProvider{}},
 		"no models":   {Config: config.Defaults(), Provider: &stubProvider{}},
-		"no provider": {Config: config.Defaults(), Roles: &llm.Roles{}},
+		"no provider": {Config: config.Defaults(), Roles: &llm.Roles{Review: &llm.Client{}, Triage: &llm.Client{}}},
 	}
 
 	for name, e := range cases {
@@ -749,8 +754,11 @@ func TestPublishedProseIsScrubbed(t *testing.T) {
 		t.Fatalf("findings = %+v", report.Findings)
 	}
 	f := report.Findings[0]
-	if strings.Contains(f.Title+f.Rationale+report.Summary, "—") && !strings.Contains(f.Rationale, "`a — b`") {
-		t.Errorf("an em dash survived outside code: %+v", f)
+	// Remove the code spans first, so a dash the model put inside one is not
+	// mistaken for a survivor and a dash outside one cannot hide behind it.
+	prose := regexp.MustCompile("`[^`]*`").ReplaceAllString(f.Title+" "+f.Rationale+" "+report.Summary, "")
+	if strings.Contains(prose, "—") {
+		t.Errorf("an em dash survived outside code: %q", prose)
 	}
 	if f.Title != "Deferred close panics, resp is nil" {
 		t.Errorf("title = %q", f.Title)

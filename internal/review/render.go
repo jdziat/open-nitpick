@@ -429,6 +429,9 @@ func fenceFor(s string) string {
 // and is indistinguishable from a clean review.
 func renderSummary(report *Report, cfg *config.Config) string {
 	var b strings.Builder
+	if notice := report.Learnings.notice(); notice != "" {
+		b.WriteString(notice + "\n\n")
+	}
 
 	// First, because it changes how everything below it should be read: these
 	// findings, these skips and these budgets are the product of a policy that
@@ -448,7 +451,7 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	// the walkthrough off must not turn it into a silent trim.
 	b.WriteString(budgetNote(report))
 	if report.ReusedRequests > 0 {
-		fmt.Fprintf(&b, "Reused %d completed model request(s) from the previous review. Downstream checks ran again.\n\n", report.ReusedRequests)
+		fmt.Fprintf(&b, "Reused %d completed model result(s) from the previous review. Open comments are checked again.\n\n", report.ReusedRequests)
 	}
 	// Same rule, same reason. A stage that did not run is a fact about what
 	// the findings below have been through, and review.summary is a setting
@@ -464,7 +467,7 @@ func renderSummary(report *Report, cfg *config.Config) string {
 		// The heading has to describe what happened. These findings were
 		// reported and then withheld; calling them anything else repeats an
 		// error this renderer has already been fixed for once.
-		b.WriteString("\n<details>\n<summary>Reported by the reviewer, then withheld after a domain expert disagreed</summary>\n\n")
+		b.WriteString("\n<details>\n<summary>Reported by the reviewer, then withheld " + report.WithheldCause() + "</summary>\n\n")
 		b.WriteString(notes)
 		b.WriteString("\n</details>\n")
 	}
@@ -1015,7 +1018,7 @@ func overruledNotes(report *Report) string {
 	var b strings.Builder
 
 	for _, r := range report.Overruled {
-		fmt.Fprintf(&b, "- `%s:%d` — %s\n", r.Finding.Path, r.Finding.Line, inline(r.Finding.Title))
+		fmt.Fprintf(&b, "- %s — %s\n", PathSpan(fmt.Sprintf("%s:%d", r.Finding.Path, r.Finding.Line)), inline(r.Finding.Title))
 
 		if r.Revised != "" {
 			// The "from" level is the one published for this finding, after the
@@ -1032,20 +1035,37 @@ func overruledNotes(report *Report) string {
 	return b.String()
 }
 
+// WithheldCause completes "withheld ..." for the findings in Overruled.
+//
+// A repository check withholds a finding it could not confirm as well as one
+// it refuted, a decision model withholds one it scored under the threshold, and
+// a deep review withholds findings below its confidence floor that nobody
+// disagreed with, so "a domain expert disagreed" would misstate
+// why either is missing. The narrower wording is kept when only experts ruled.
+func (r *Report) WithheldCause() string {
+	for _, o := range r.Overruled {
+		switch o.Expert {
+		case verifyExpert, jevExpert, deepFilterExpert, deepCritiqueExpert:
+			return "by a second check"
+		}
+	}
+	return "after a domain expert disagreed"
+}
+
 // oneLine collapses text onto a single line.
 func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 
-// inline prepares untrusted text for a bullet: one line, and no raw HTML.
-//
-// It does not neutralize markdown: "<b>" is escaped, but "[text](https://x)"
-// still renders as a live link. Some of this text is written by the change
-// under review (a Go compile error quotes source verbatim, so a string literal
-// reaches golangci-lint's message), which makes that a link the change authored
-// inside a comment under this bot's name. Two call sites wrap it in a code
-// span, where backslash escapes would render literally, so escaping belongs at
-// each call site by whether the text is prose or code. The README's security
-// section records the gap.
+// inline flattens text and escapes HTML. Callers must also escape Markdown
+// according to whether the surrounding text is prose or a code span.
 func inline(s string) string { return html.EscapeString(oneLine(s)) }
+
+// PathSpan renders a repository path as an inline code span. The path is bytes
+// the change under review chose, so a backtick, pipe or newline in it must not
+// close the span or the table cell around it.
+func PathSpan(path string) string {
+	flat := strings.ReplaceAll(inline(path), "|", "&#124;")
+	return "`" + strings.ReplaceAll(flat, "`", "'") + "`"
+}
 
 // skipNotes lists files that were not reviewed, grouped by reason.
 func skipNotes(report *Report) string {
@@ -1138,8 +1158,8 @@ func budgetNote(report *Report) string {
 	if !fit.Trimmed() {
 		fmt.Fprintf(&b, "\n> **This review is expected to exceed its spending ceiling.** "+
 			"Every changed file was reviewed at an estimated $%.2f against a $%.2f "+
-			"ceiling, because `review.budget.min_files` is set to %d. Coverage is "+
-			"unaffected.\n", fit.After.Dollars, fit.Ceiling, len(fit.Kept))
+			"ceiling, because `review.budget.min_files` requires them. Coverage is "+
+			"unaffected.\n", fit.After.Dollars, fit.Ceiling)
 		return b.String()
 	}
 

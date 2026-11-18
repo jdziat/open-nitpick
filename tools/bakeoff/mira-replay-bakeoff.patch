@@ -1,0 +1,147 @@
+diff --git a/scripts/replay_snapshot_review.py b/scripts/replay_snapshot_review.py
+index 7429ee3..ccabb6b 100644
+--- a/scripts/replay_snapshot_review.py
++++ b/scripts/replay_snapshot_review.py
+@@ -80,6 +80,20 @@ config.llm.reasoning_effort = args.reasoning_effort
+ if args.agentic_max_hops is not None and hasattr(config.review, "agentic_max_hops"):
+     config.review.agentic_max_hops = args.agentic_max_hops
+ 
++# Bakeoff only: documented config fields, passed through the environment so the
++# tracked flags and the default path are untouched when the variables are unset.
++if os.environ.get("MIRA_BAKEOFF_FALLBACK_MODEL"):
++    config.llm.fallback_model = os.environ["MIRA_BAKEOFF_FALLBACK_MODEL"]
++if os.environ.get("MIRA_BAKEOFF_ENSEMBLE_RUNS"):
++    config.review.ensemble_runs = int(os.environ["MIRA_BAKEOFF_ENSEMBLE_RUNS"])
++if os.environ.get("MIRA_BAKEOFF_SECOND_LOOK"):
++    config.review.second_look = True
++if os.environ.get("MIRA_BAKEOFF_NO_AGENTIC"):
++    config.review.agentic_tools = False
++    config.review.security_agentic = False
++if os.environ.get("MIRA_BAKEOFF_NO_CRITIQUE"):
++    config.review.self_critique = False
++
+ pr = PRInfo(
+     title=metadata["title"],
+     description=metadata["body"],
+@@ -114,6 +128,9 @@ manifest = {
+     "agentic_max_hops": getattr(config.review, "agentic_max_hops", None),
+     "security_agentic": config.review.security_agentic,
+     "self_critique": config.review.self_critique,
++    "fallback_model": config.llm.fallback_model,
++    "ensemble_runs": config.review.ensemble_runs,
++    "second_look": config.review.second_look,
+     "review_round": 1,
+     "source_files": len(tree),
+     "limitations": [
+diff --git a/scripts/run_benchmark_sample.py b/scripts/run_benchmark_sample.py
+index ac01c41..317fa25 100644
+--- a/scripts/run_benchmark_sample.py
++++ b/scripts/run_benchmark_sample.py
+@@ -45,6 +45,7 @@ REPO = Path(__file__).resolve().parents[1]
+ MODELS = {
+     "deepseek": "deepseek/deepseek-v4.1-flash-1017",
+     "glm": "z-ai/glm-5.3-flash",
++    "sonnet": "anthropic/claude-sonnet-4.6",
+ }
+ # Locations are machine-specific, so they come from flags or these variables.
+ ENV_INPUTS = "MIRA_BENCHMARK_INPUTS"  # directory from prepare_benchmark_inputs.py
+diff --git a/src/mira/core/engine.py b/src/mira/core/engine.py
+index 5edca11..aa254c7 100644
+--- a/src/mira/core/engine.py
++++ b/src/mira/core/engine.py
+@@ -4,6 +4,7 @@ from __future__ import annotations
+ 
+ import contextlib
+ import logging
++import os
+ import re
+ from collections.abc import Awaitable, Callable
+ from dataclasses import dataclass, field
+@@ -1891,7 +1892,7 @@ class ReviewEngine:
+                         pr_title=pr_title,
+                         pr_description=pr_description,
+                         existing_comments=base_existing or None,
+-                        code_context=code_context_block,
++                        code_context="" if os.environ.get("MIRA_BAKEOFF_NO_CONTEXT") else code_context_block,
+                         learned_rules=learned_rules or None,
+                         custom_rules=custom_rules or None,
+                         file_history=chunk_history or None,
+diff --git a/src/mira/core/passes.py b/src/mira/core/passes.py
+index af6a07b..72ebcd8 100644
+--- a/src/mira/core/passes.py
++++ b/src/mira/core/passes.py
+@@ -10,6 +10,7 @@ from __future__ import annotations
+ import asyncio
+ import json as _json
+ import logging
++import os
+ from collections.abc import Callable
+ from dataclasses import dataclass, field
+ 
+@@ -170,6 +171,8 @@ _FORCED_SUBMIT_PROMPT = (
+ 
+ 
+ def _tools_system_suffix(max_hops: int) -> str:
++    if os.environ.get("MIRA_BAKEOFF_NO_TOOLS_HINT"):
++        return ""
+     return (
+         "\n\n## Tools\n\n"
+         "You have two helpers for cross-file checks: "
+diff --git a/src/mira/llm/prompts/review.py b/src/mira/llm/prompts/review.py
+index 7e19dce..45ba10b 100644
+--- a/src/mira/llm/prompts/review.py
++++ b/src/mira/llm/prompts/review.py
+@@ -2,6 +2,7 @@
+ 
+ from __future__ import annotations
+ 
++import os
+ import re
+ from pathlib import Path
+ 
+@@ -25,6 +26,27 @@ def _get_template_env() -> Environment:
+     )
+ 
+ 
++def _bakeoff_strip_sections(text: str) -> str:
++    """Bakeoff only: drop named sections of the rendered system prompt.
++
++    The sections are cut between their headings, so the rest of the prompt is
++    byte-identical. Unset, this returns the text unchanged.
++    """
++
++    def cut(text: str, first: str, stop: str) -> str:
++        start = text.find(first)
++        end = text.find(stop)
++        if start == -1 or end == -1 or end < start:
++            raise ValueError(f"bakeoff ablation: {first!r} .. {stop!r} not found")
++        return text[:start] + text[end:]
++
++    if os.environ.get("MIRA_BAKEOFF_NO_HEURISTICS"):
++        text = cut(text, "## Cross-Boundary Tracing", "## Do NOT Suggest")
++    if os.environ.get("MIRA_BAKEOFF_NO_EXCLUSIONS"):
++        text = cut(text, "## Do NOT Suggest", "## Severity Guide")
++    return text
++
++
+ def build_review_prompt(
+     files: list[FileDiff],
+     config: MiraConfig,
+@@ -77,7 +99,7 @@ def build_review_prompt(
+             if entries
+         ]
+ 
+-    footguns = get_footguns_for_files(files)
++    footguns = [] if os.environ.get("MIRA_BAKEOFF_NO_FOOTGUNS") else get_footguns_for_files(files)
+ 
+     system_content = template.render(
+         pr_title=pr_title,
+@@ -98,6 +120,8 @@ def build_review_prompt(
+         footguns=footguns,
+     )
+ 
++    system_content = _bakeoff_strip_sections(system_content)
++
+     # Build user message with optional code context before diffs
+     user_parts = []
+     if code_context:
