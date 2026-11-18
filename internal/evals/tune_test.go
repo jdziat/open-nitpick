@@ -23,22 +23,6 @@ type variant struct {
 
 func boolPtr(b bool) *bool { return &b }
 
-// nitpickVariants isolate the nitpick axis with voice held constant, so a
-// difference in the score is attributable to scope rather than wording.
-func nitpickVariants() []variant {
-	base := config.DefaultPersona()
-
-	out := make([]variant, 0, 4)
-	for _, level := range []config.NitpickLevel{
-		config.NitpickOff, config.NitpickMinimal, config.NitpickNormal, config.NitpickPedantic,
-	} {
-		p := base
-		p.Nitpick = level
-		out = append(out, variant{Name: "nitpick=" + string(level), Persona: p})
-	}
-	return out
-}
-
 // voiceVariants isolate the wording axes with scope held constant.
 func voiceVariants() []variant {
 	base := config.DefaultPersona()
