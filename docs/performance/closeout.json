@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-18",
+  "branch": "perf/follow-on-plan",
+  "reviewed_code_head": "173ead11ef9d48b5a2c16d95e582d9a0a3d4d660",
+  "status": "CTO-approved to commit, push and open the PR; the full performance program remains incomplete.",
+  "program_complete": false,
+  "operator_pass_rule": {
+    "decision": "No errors and only warnings is a pass.",
+    "required": "Review complete, no failed stages, no error or critical findings; warnings and lower severities are accepted.",
+    "decision_date": "2026-11-18"
+  },
+  "latest_review": {
+    "head": "173ead11ef9d48b5a2c16d95e582d9a0a3d4d660",
+    "base": "6b6b108",
+    "artifact_sha256": "625337b1b4862a1f6a8bc8a8796841344fa58641f1ffc012ab4a5f9a022048ae",
+    "complete": true,
+    "failed_stages": [],
+    "severity_counts": {
+      "info": 49,
+      "nit": 9,
+      "warning": 23
+    },
+    "reported_cost_usd": 4.389063167344002,
+    "unknown_usage_attempts": 0
+  },
+  "review_history": [
+    {
+      "head": "173ead11ef9d48b5a2c16d95e582d9a0a3d4d660",
+      "base": "6b6b108",
+      "artifact_sha256": "625337b1b4862a1f6a8bc8a8796841344fa58641f1ffc012ab4a5f9a022048ae",
+      "complete": true,
+      "failed_stages": [],
+      "severity_counts": {
+        "info": 49,
+        "nit": 9,
+        "warning": 23
+      },
+      "reported_cost_usd": 4.389063167344002,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "head": "2cf467adc8cdce07d88a982f932a923055716a3f",
+      "base": "6b6b108",
+      "artifact_sha256": "aadea7552946d92c13a36d3fdd7dae969d5cde5a6567a9fc1d176c1b37ee1b33",
+      "complete": true,
+      "failed_stages": [],
+      "severity_counts": {
+        "info": 47,
+        "nit": 6,
+        "warning": 22
+      },
+      "reported_cost_usd": 3.246652542628,
+      "unknown_usage_attempts": 0
+    },
+    {
+      "head": "7a5cfdf8d1fb40f0c61882993fb0268096c600f2",
+      "base": "6b6b108",
+      "artifact_sha256": "289abde52ff4e62ee842aabc83dcff8fbdc035a7973ce9891863a90a9b1b96a1",
+      "complete": true,
+      "failed_stages": [],
+      "severity_counts": {
+        "error": 1,
+        "info": 50,
+        "nit": 10,
+        "warning": 15
+      },
+      "reported_cost_usd": 4.679017021247995,
+      "unknown_usage_attempts": 0
+    }
+  ],
+  "gates": {
+    "code_snapshot": "173ead11ef9d48b5a2c16d95e582d9a0a3d4d660",
+    "checks": [
+      {
+        "command": "go vet -tags=eval ./...",
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "golangci-lint run ./...",
+        "exit_code": 0,
+        "log_sha256": "e92606b0bf483111dff0a120c315ea165821348f31365020e2468a0059095c47"
+      },
+      {
+        "command": "go run ./cmd/nitpick repo-standards -check",
+        "exit_code": 0,
+        "log_sha256": "99a7808ae7408660e9238ffc3a157f8c9cd42f74b85f55290412dadd6533f123"
+      },
+      {
+        "command": "make docs",
+        "exit_code": 0,
+        "log_sha256": "66ad19fad8991461678e9f61ca32eea2b666b4456cff61135430a1e74e3e4c32"
+      },
+      {
+        "command": "make agents",
+        "exit_code": 0,
+        "log_sha256": "40b83147c6e79b3e80865232136e7c0f6df89b744bfb4009550f993c1552ec42"
+      },
+      {
+        "command": "./scripts/check-commits.sh",
+        "exit_code": 0,
+        "log_sha256": "610e2632108a6125e5992920b7fa8b011aa786e5ecff34d25eb1fc4b861ad71a"
+      },
+      {
+        "command": "go test -race -p 1 ./...",
+        "exit_code": 0,
+        "log_sha256": "c91c3806b5fa0e9630977222956195e6945722bb9eb6adbee23b926db70d51f1"
+      }
+    ],
+    "additional_eval_tag_lint": "golangci-lint run --build-tags=eval ./... passed; no paid eval tests were rerun for this closeout",
+    "focused_offline_python": {
+      "command": "python3 -m pytest -q tools/bakeoff/test_execution_feasibility.py tools/bakeoff/test_forced_census.py tools/bakeoff/test_freeze_workloads.py tools/bakeoff/test_review_census.py tools/bakeoff/test_usage_report.py",
+      "passed": 20,
+      "failed": 0
+    },
+    "model_free_slop": {
+      "command": "go run ./cmd/nitpick slop -no-model <208 changed paths>",
+      "exit_code": 0,
+      "prose_tells": 94,
+      "log_sha256": "efaafc15652b09fc2f950041e8e2e3a4269bfd426cac88b0bda9da6ef51dade8",
+      "note": "Warnings retained; this is not a zero-tell claim."
+    }
+  },
+  "spend": {
+    "ceiling_usd": 100,
+    "reported_cost_usd_lower_bound": 12.613239882219997,
+    "self_review_usd": 12.314732731219998,
+    "compatibility_sample_usd": 0.00772971,
+    "label_panel_usd": 0.267874085,
+    "deepseek_labels_usd": 0.022903356,
+    "unresolved_reservations_usd": 2.005,
+    "unpriced_attempts": 4,
+    "scope": "Retained receipts since the 100 USD approval; excludes the earlier historical 43.37 USD lower bound and is not an account-wide billing reconciliation.",
+    "manual_retry_note": "Earlier label controllers retried empty or truncated replies and one request with unknown billing. Those costs and the unknown reservation are retained; receipt reuse is not a claim that earlier retries never happened."
+  },
+  "track_dispositions": [
+    {
+      "track": "Phase 1",
+      "status": "partial",
+      "evidence": "phase1-results.json",
+      "remaining": "Knowledge-retrieval fixture/memoization; rejected overlap, detection and source-read memo prototypes remain outside production."
+    },
+    {
+      "track": "Phase 2",
+      "status": "incomplete",
+      "evidence": "mode-scorecard.json",
+      "remaining": "Per-mode live baselines; scripted transport controls and N=1 compatibility do not substitute."
+    },
+    {
+      "track": "Phase 3",
+      "status": "partial",
+      "evidence": "phase3-resume.json",
+      "remaining": "Incremental candidate-capture pilot, prefix-cache/single-pass tests and per-mode live savings."
+    },
+    {
+      "track": "Phase 4",
+      "status": "inconclusive",
+      "evidence": "phase4-llm-label-panel.json",
+      "remaining": "Code-grounded quality evaluation and routing comparison; text-only model labels are supporting evidence."
+    },
+    {
+      "track": "Phase 5",
+      "status": "incomplete",
+      "remaining": "G1 semantic-repair corpus and G3 temporal/operator study; model labels do not supply editing time or later maintainer feedback."
+    },
+    {
+      "track": "Phase 6",
+      "status": "partial",
+      "evidence": "phase6-large-tree-smoke.json",
+      "remaining": "Model-backed large-tree, local-model and knowledge-index coverage."
+    }
+  ],
+  "publication_scope": "The PR may describe implemented changes and retained evidence. It must not claim the full performance program, human studies, end-to-end speedup or quality promotion is complete.",
+  "post_review_source_changes": [
+    {
+      "path": "tools/bakeoff/usage_report.py",
+      "change": "Restore paid usage from failed reviews and make the terminal-review denominator explicit. The existing guard reproduced the regression and passes after the fix.",
+      "verification": "20 focused offline Python tests passed; no model calls."
+    }
+  ],
+  "cto_approval": {
+    "date": "2026-11-18",
+    "reviewer": "CTO agent persona /root/cto",
+    "decision": "GO to commit, push, and open the PR",
+    "scope": "Implemented changes and retained measurements, including the final offline failed-review accounting repair. Go code is unchanged from the reviewed snapshot.",
+    "limitations": "Phase 5, per-mode live baselines, human adjudication and the full performance program remain incomplete. Approval establishes no whole-review speedup or quality improvement."
+  }
+}

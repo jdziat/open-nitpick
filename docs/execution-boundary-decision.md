@@ -19,4 +19,3 @@ limits, pinned image) apply to both runtimes.
 This decision covers feasibility and fix-evidence work on the trusted corpus. It does not
 cover running contributor pull requests. That needs `runsc` or another reviewed backend,
 and the plan's rule against falling back to the credentialed runner still holds.
-

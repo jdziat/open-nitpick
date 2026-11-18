@@ -109,11 +109,11 @@
     }
   ],
   "cost": {
-    "reported_usd": 0.027903357,
+    "reported_usd": 0.022903356,
     "lost_request_reserve_usd": 0.005,
+    "total_including_reservation_usd": 0.027903356,
     "failed_attempts_retained": 4,
-    "note": "reported_usd already includes the 0.005 reserve for one request whose controller died mid-flight (billing unknown, retried once). Four attempts hit the token cap with reasoning consuming the budget; they are kept as .attempt1 files and counted.",
-    "reported_usd_includes_lost_request_reserve": true
+    "note": "Empty or length-limited responses are retained and their reported costs counted. Earlier manual retries included one interrupted request with unknown billing; its 0.005 USD reservation is separate from reported costs."
   },
   "what_this_is": "A self-consistency check of one model family reading finding text without the code. Two prompts of one model are not independent annotators.",
   "what_this_is_not": "Ground truth. It cannot establish precision, recall or quality of the reviewer, cannot adjudicate disagreements and does not fill the human label slots in human-review-packet.json. The retained examples are hand-picked and are not a fresh holdout."

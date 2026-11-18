@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "partial_preparation_baseline",
-  "additional_paid_review_runs": 0,
+  "additional_paid_review_runs": 1,
   "source_sha256": {
     "cmd/nitpick/main.go": "b450548ed5713c8079e5c8f78e83bbfb8c0b7c2662babf0c9a0a631c257f436f",
     "cmd/nitpick/mcp.go": "5c06ba0f49d4125daa25716346188ff9e2379ad62a38cab42e29d52371240247",
@@ -20,7 +20,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine measurements are separate and do not measure this command transport."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "review",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     },
     {
       "surface": "cli",
@@ -34,7 +41,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine measurements are separate and do not measure this command transport."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "fast-review",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     },
     {
       "surface": "cli",
@@ -48,7 +62,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine measurements are separate and do not measure this command transport."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "deep-review",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     },
     {
       "surface": "cli",
@@ -62,7 +83,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine measurements are separate and do not measure this command transport."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "full-review",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     },
     {
       "surface": "cli",
@@ -76,7 +104,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine measurements are separate and do not measure this command transport."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "repo-score",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     },
     {
       "surface": "cli",
@@ -90,7 +125,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine measurements are separate and do not measure this command transport."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "improve",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     },
     {
       "surface": "cli",
@@ -104,7 +146,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine measurements are separate and do not measure this command transport."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "repo-standards",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     },
     {
       "surface": "cli",
@@ -118,7 +167,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine measurements are separate and do not measure this command transport."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "commits",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     },
     {
       "surface": "cli",
@@ -132,7 +188,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine measurements are separate and do not measure this command transport."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "standards",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     },
     {
       "surface": "cli",
@@ -146,7 +209,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine measurements are separate and do not measure this command transport."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "slop",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     },
     {
       "surface": "cli",
@@ -160,7 +230,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine measurements are separate and do not measure this command transport."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "security",
+          "outcome": "complete",
+          "samples": 1
+        }
+      ]
     },
     {
       "surface": "cli",
@@ -367,7 +444,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine preparation is recorded separately; it is not a CLI/MCP latency measurement."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "review",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     },
     {
       "surface": "mcp",
@@ -380,7 +464,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine preparation is recorded separately; it is not a CLI/MCP latency measurement."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "full_review",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     },
     {
       "surface": "mcp",
@@ -393,7 +484,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine preparation is recorded separately; it is not a CLI/MCP latency measurement."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "repo_score",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     },
     {
       "surface": "mcp",
@@ -406,7 +504,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine preparation is recorded separately; it is not a CLI/MCP latency measurement."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "code_smell",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     },
     {
       "surface": "mcp",
@@ -419,7 +524,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine preparation is recorded separately; it is not a CLI/MCP latency measurement."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "ai_slop",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     },
     {
       "surface": "mcp",
@@ -432,7 +544,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine preparation is recorded separately; it is not a CLI/MCP latency measurement."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "security_scan",
+          "outcome": "complete",
+          "samples": 1
+        }
+      ]
     },
     {
       "surface": "mcp",
@@ -445,7 +564,14 @@
       "coverage": null,
       "quality_precision": null,
       "quality_recall": null,
-      "notes": "Shared-engine preparation is recorded separately; it is not a CLI/MCP latency measurement."
+      "notes": "Scripted loopback transport controls are recorded in phase2-local-transports.json; they do not establish live-provider latency, cost or quality.",
+      "local_transport_controls": [
+        {
+          "entry": "explain_config",
+          "outcome": "complete",
+          "samples": 20
+        }
+      ]
     }
   ],
   "shared_engine_profiles": {
@@ -937,18 +1063,18 @@
   },
   "engineering_surface_note": "Engineering is a practices profile used by applicable review commands/tools. This repository exposes no standalone engineering_review MCP tool or engineering-review top-level command.",
   "missing": [
-    "CLI and MCP transport timing independently",
-    "Live provider role-attempt cost/usage and completion under fixed recipes",
-    "Mode-specific quality labels and operator measurements"
+    "Per-mode live-provider latency, cost, completion and coverage baselines beyond the N=1 review compatibility sample",
+    "Mode-specific quality ground truth and operator measurements; the model-label panel is supporting evidence only"
   ],
   "promotion": "No policy, provider, model, route or review budget defaults changed.",
   "inventory_note": "All canonical cases from main.go plus all seven registered MCP tools; CLI flag aliases are recorded with their handler.",
   "live_pilot": {
     "artifact": "phase2-live-pilot.json",
-    "status": "Both registered pilots stopped after provider configuration rejection; fast-review forces reasoning off regardless of configured low",
+    "status": "Two reasoning-off profiles rejected; one separate low-reasoning review sample completed and replayed with IP sockets denied.",
     "no_established_baselines": true,
     "unpriced_attempts": 3,
-    "retained_reservation_usd": 2
+    "retained_reservation_usd": 2,
+    "completed_compatibility_samples": 1
   },
   "phase1_components": {
     "C8": "GO for component only: complete context-inclusive equivalence and mutation proof",
@@ -966,6 +1092,13 @@
     "repeat_analyzer_invocations": 0,
     "repeat_scripted_model_calls": 0,
     "pairs": 20,
-    "not_a_latency_win": "Tiny Ruff case: median34.51ms without resume versus73.91ms for snapshot reuse. No provider-backed latency or cost saving was measured."
+    "not_a_latency_win": "Tiny Ruff case: median34.51ms without resume versus73.91ms for snapshot reuse. No provider-backed latency or cost saving was measured.",
+    "transport_evidence": "Scripted CLI/MCP controls exist in phase2-local-transports.json; live per-mode repeat-savings baselines remain open."
+  },
+  "additional_paid_review_runs_scope": "Completed frozen-corpus compatibility samples only; excludes the three separate closeout self-reviews in closeout.json.",
+  "local_transports": {
+    "artifact": "phase2-local-transports.json",
+    "status": "Completed scripted loopback controls, separate from live baselines",
+    "provider_spend_usd": 0
   }
 }

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "scope": "Phase 3 item 3: triage, critique and repository-verification checkpoint component; linter checkpointing and live lost-work savings remain open",
+  "scope": "Phase 3 item 3: triage, critique, repository-verification and eligible linter checkpoints; live lost-work savings remain open",
   "status": "Local model and eligible analyzer checkpoints implemented; full Phase3 per-mode latency/token/cost acceptance remains open",
   "analysis_record_version": 1,
   "stage_key_version": 2,
@@ -199,8 +199,8 @@
     }
   },
   "limits": [
-    "No live lost-work/tail-latency/cost improvement is claimed.",
-    "External linter outcomes are not checkpointed."
+    "No live lost-work, tail-latency or cost improvement is established.",
+    "Only the analyzer sets described in linters.eligible can be checkpointed; ineligible sets run fresh."
   ],
   "linters": {
     "implementation": "Whole completed analyzer sets persist ordered findings and full coverage metadata alongside model-stage progress. Findings include all 11 engine-owned fields and preserve an explicit zero confidence. Empty findings are reusable only with proved ran/no-target statuses. Failed or unproved skipped stages rerun.",
@@ -1197,8 +1197,8 @@
     "timing_source_limit": "Measured native Ruff path includes the fixed hidden Git flags and local toolchain/flag admission. Subsequent changes only added Go driver auto-discovery and tracked replacement-module bounds, then removed a redundant Go path check. Ruff execution/keying and engine checkpoint semantics were unchanged. The exact measured binary remains retained under its receipt hash."
   },
   "unmet_acceptance": [
-    "Independent CLI/MCP and per-mode transports",
-    "Provider-priced per-role cost/token measurements and repeat-run savings",
-    "Full-mode completion/quality and external study evidence"
+    "Live per-mode CLI/MCP latency, cost, completion and coverage baselines; scripted transports are recorded separately",
+    "Provider-priced repeat-run savings beyond the single network-denied compatibility replay",
+    "Full-mode quality and operator-study evidence"
   ]
 }

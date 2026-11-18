@@ -7,6 +7,12 @@ Numbers here are dated and provisional. Read
 produced by an instrument with known bugs, listed under
 [What the instrument got wrong](#what-the-instrument-got-wrong).
 
+The [performance follow-on evidence](performance/README.md) records the
+2026-11-18 preparation and checkpoint experiments, including regressions and
+unmeasured outcomes. Its [closeout](performance/closeout.json) separates
+reported provider costs from unresolved billing reservations. These results
+establish no whole-review speedup or quality improvement.
+
 ## The headline
 
 **Detection is ahead of Incumbent on both counted corpora. Noise is the open

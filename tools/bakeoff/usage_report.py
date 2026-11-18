@@ -70,9 +70,9 @@ def summarize_usage(run):
         completed += 1
         try:
             status = json.loads((case / "status.json").read_text())
-            if status["exit_code"] != 0:
-                failed += 1
-                continue
+            # Failed reviews may have bought responses; skipping them hides
+            # spend and turns missing usage into apparent zero-cost work.
+            failed += status["exit_code"] != 0
             result = json.loads((case / "result.json").read_text())
             usage = result.get("usage")
             if usage is None and (case / "nitpick.json").exists():
@@ -120,7 +120,8 @@ def summarize_usage(run):
             "prompt_tokens_per_review": total["prompt_tokens"] / completed if tokens_complete else None,
             "completion_tokens_per_review": total["completion_tokens"] / completed if tokens_complete else None,
             "malformed_cases": malformed, "artifacts_sha256": hashes,
-            "token_semantics": "reasoning is included in completion; cache tokens are separate input categories"}
+            "token_semantics": "reasoning is included in completion; cache tokens are separate input categories",
+            "review_semantics": "completed means terminal, including failed reviews; paid attempts from failed reviews stay in the totals"}
 
 
 def main():

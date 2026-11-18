@@ -6,6 +6,8 @@ The six retained self-review receipts report **$43.37 as a lower bound**, with 2
 
 - [Registration](registration.json) records the gates, ordering and allocation of that $100.
 - [Historical receipt census](p0-census.json) records per-run costs, unknowns, stage failures and source-artifact hashes. Recreate it with `python3 tools/bakeoff/review_census.py REPORTS... --output OUTPUT`.
+- [Closeout](closeout.json) records the reviewed code snapshot, gate results,
+  spending, the operator's warnings-only pass rule and unfinished experiments.
 
 | Performance cohort | Frozen public change | Files |
 |---|---|---:|
@@ -17,7 +19,7 @@ The six retained self-review receipts report **$43.37 as a lower bound**, with 2
 
 These cases were selected from PR metadata without running a detector. Their merge-parent and merge-commit hashes fix the compared change. They are performance inputs, not untouched quality holdouts. Fresh quality splits and independent adjudications must be registered separately.
 
-New provider spend remains $0. [Local experiment results](phase1-results.json)
+The Phase 1 experiments made no provider calls. [Local experiment results](phase1-results.json)
 retain all twenty samples and the ordered-plan hashes for each frozen workload.
 Receiver-method indexing reduced median preparation of the 40-file case from
 5.26 s to 115 ms with unchanged payloads. Initial whole-process peak RSS was
@@ -67,8 +69,9 @@ Final repository gates and CTO review still apply. These measurements exclude
 provider latency and do not establish total-review speedups.
 
 [The mode scorecard](mode-scorecard.json) inventories the CLI commands and all
-seven MCP tools. It keeps shared-engine preparation evidence separate from
-unmeasured command transports, live-provider timing and role costs.
+seven MCP tools. It keeps shared-engine preparation, scripted transport
+controls and the single live compatibility sample separate. Per-mode live
+latency and role-cost baselines remain incomplete.
 
 [Local transport controls](phase2-local-transports.json) run the real binary through 16 CLI entries and the 7 MCP tools against scripted loopback responses, 20 samples where the entry completes. They record the model, reasoning and thinking options each entry sends (review and full-review send low reasoning, deep-review medium, fast-review disables it), plus startup time. The responses are scripted and spend nothing, so the timings measure transport only, never review speed or provider cost. Three entries are incomplete, with the reason recorded beside each.
 
@@ -80,10 +83,11 @@ baseline or justify a policy change.
 The large scripted review profile covers ten iterations (268 ms per review).
 Prompt rendering accounts for 2.5% of CPU; no dedup prototype is promoted.
 Flow-diagram preparation accounts for 27%, and total bundle assembly for 24%.
-Those CPU fractions are not wall-time savings. Analyzer/model overlap and
-parallel full-file prefetch remain unmeasured: C3 measured detection, and C4
-measured memoization. Per-file knowledge lookup also needs a knowledge fixture.
-Phase 1 is therefore incomplete.
+Those CPU fractions are not wall-time savings. That earlier profile did not
+measure analyzer/model overlap or parallel full-file prefetch; C7 and C9 above
+record the later experiments. C8 measures task-batch rendering reuse separately.
+Per-file knowledge lookup still needs a knowledge fixture, so Phase 1 remains
+partial.
 
 Phase 3 item 1 (incremental candidate capture) has a census of 324 retained
 finished agents. Forced submission completed a parseable result for 247,
@@ -115,10 +119,13 @@ reuse. Identity checking costs more than this small analysis. These in-process
 controls establish repeat-work avoidance; measured live savings and independent
 CLI/MCP baselines remain open, so item 3 is incomplete.
 
-Phase 2 still needs the per-mode latency, completion, coverage and role-cost scorecard;
-the later model experiments remain unrun. Human adjudications, temporal
-operator feedback and editing-time observations are absent. No quality,
-precision, reliable-fix or whole-review speedup claim follows from these data.
+Phase 2 still needs per-mode live latency, completion, coverage and role-cost
+baselines. Incremental candidate capture, provider prefix-cache discounts,
+routing comparisons and model-backed large-tree studies remain unrun. The
+compatibility sample and model-label panel below do not close those studies.
+Human adjudications, temporal operator feedback and editing-time observations
+are absent. No quality, precision, reliable-fix or whole-review speedup claim
+follows from these data.
 
 Recreate the frozen inputs and run the local experiments without provider calls:
 
@@ -139,11 +146,12 @@ configuration: 43.5 s, 3 model calls, 0.0077 USD reported, none unpriced. A repl
 the same corpus with all IP sockets denied made no model calls, wrote no cache entries
 and returned the identical finding. It shows the repeat is free; it is an N=1
 observation, not a latency, quality or p95 baseline. Fast-review was not run because
-this model rejects disabled reasoning. Reported new spend is 0.0077 USD.
+this model rejects disabled reasoning. That sample's reported spend is
+0.0077 USD; total recorded spend, including labels and closeout reviews, is
+in [the closeout](closeout.json).
 
 [Large-tree smoke](phase6-large-tree-smoke.json) ran the two model-free commands once on the Go standard library (7,711 Go files, 1.9 million lines): standards in 4.2 s and 218 MB peak, slop -no-model in 17.1 s and 401 MB peak, both exiting 0. It is one run per command on a shared host with no spend. It shows the commands scale to that size; it is not a baseline, and the model-backed modes were not run at this scale.
 
-[LLM-generated labels](phase4-llm-labels.json) replace the blank human slots for the 15 retained examples, as the operator approved. Two prompts of deepseek-flash read each finding without the code. Across 30 labels: 10 valid, 2 invalid, 18 uncertain, and the two passes agree on 5 of 15. This is one model family checking itself, not ground truth: it supports no precision, recall or quality claim, and the examples are hand-picked rather than a fresh holdout. Spend was 0.028 USD. The operator-timing and temporal-feedback CSVs measure human editing time and later maintainer feedback, so a model cannot fill them and they stay empty.
+[LLM-generated labels](phase4-llm-labels.json) supplement the packet for the 15 retained examples, as the operator approved; the human slots remain blank. Two prompts of deepseek-flash read each finding without the code. Across 30 labels: 10 valid, 2 invalid, 18 uncertain, and the two passes agree on 5 of 15. This is one model family checking itself, not ground truth: it supports no precision, recall or quality claim, and the examples are hand-picked rather than a fresh holdout. The 0.028 USD accounting total includes a 0.005 USD reserve for one interrupted request with unknown billing. The operator-timing and temporal-feedback CSVs measure human editing time and later maintainer feedback, so a model cannot fill them and they stay empty.
 
 [A six-provider label panel](phase4-llm-label-panel.json) (Anthropic, Google, OpenAI, Mistral, Qwen, DeepSeek) labelled the same 15 findings from text alone. A strict majority exists for 12 of 15: 7 valid, 1 invalid, 4 uncertain. Mistral returned only 7 labels and Qwen 13, because failed calls hit the token cap and were not retried. The models share training data and see no code, so a majority is a consistency check, not ground truth, and supports no precision, recall or quality claim. Total spend on labelling was 0.30 USD.
-

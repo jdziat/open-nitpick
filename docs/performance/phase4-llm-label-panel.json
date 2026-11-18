@@ -251,9 +251,11 @@
   },
   "cost": {
     "panel_usd": 0.267874085,
-    "deepseek_usd": 0.0279,
-    "total_usd": 0.2958
+    "deepseek_usd": 0.022903356,
+    "total_usd": 0.290777441,
+    "unresolved_deepseek_reservation_usd": 0.005,
+    "note": "Reported costs exclude the separate reservation for an interrupted request whose billing is unknown."
   },
-  "what_this_is": "Six model families reading finding text without the code. Their errors are less correlated than two prompts to one model, but they share training data and cannot run or read the code.",
+  "what_this_is": "Six model families reading finding text without the code. Error correlation between providers is unmeasured; shared training data may cause shared errors.",
   "what_this_is_not": "Ground truth. Majority vote is not an adjudicated label. It supports no precision, recall or quality claim, and it does not fill the human label slots. The examples are hand-picked and are not a fresh holdout."
 }

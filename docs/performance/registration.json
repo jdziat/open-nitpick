@@ -319,7 +319,7 @@
     "registered_before_purchase": true,
     "decision": "Operator approved LLM-generated labels (or open-source labeled data) in place of human labels, and ~deepseek/deepseek-flash-latest as the model, on 2026-11-18.",
     "model": "~deepseek/deepseek-flash-latest via OpenRouter, a moving alias; the resolved model id from each response is recorded. List price 0.036 USD per million input, 0.5 per million output.",
-    "scope": "Two independent labelling passes over the 15 retained hand-picked examples in human-review-packet.json, labels valid/invalid/uncertain, each pass sees one finding at a time plus the repository path and no other pass output. Output is stored beside the packet, never inside the human slots.",
+    "scope": "Two separately prompted labelling passes over the 15 retained hand-picked examples in human-review-packet.json, labels valid/invalid/uncertain, each pass sees one finding at a time plus the repository path and no other pass output. Output is stored beside the packet, never inside the human slots.",
     "label_provenance": "MODEL-GENERATED. These are not human labels and are not independent of model-family errors. They can show whether the model agrees with itself and with its own prior, and they cannot establish ground truth, precision or recall. Any claim built on them must say so.",
     "budget": {
       "max_reserved_usd": 1,
@@ -342,7 +342,7 @@
       "qwen/qwen4-max"
     ],
     "scope": "Each model labels each of the 15 retained findings once (valid/invalid/uncertain), seeing only the file path and finding text, with the same prompt. Added to the existing deepseek labels, giving six providers.",
-    "label_provenance": "MODEL-GENERATED. Providers differ, so errors are less correlated than two prompts to one model, but the models share training data and see no code. Agreement between them is not ground truth and supports no precision, recall or quality claim.",
+    "label_provenance": "MODEL-GENERATED. Model providers differ, but their error correlation is unmeasured. The models may share training data and see no code. Agreement between them is not ground truth and establishes no precision, recall or quality improvement.",
     "budget": {
       "ceiling_usd": 5,
       "phase_ceiling_usd": 10,
