@@ -19,6 +19,10 @@ from pathlib import Path
 
 from usage_report import summarize_usage
 
+# OpenRouter's price for deepseek/deepseek-v4.1-flash-1017 on 2026-11-14, dollars per million tokens.
+# A run on another model passes its own with --price-in and --price-out.
+PRICE_IN, PRICE_OUT = 0.038, 0.50
+
 FIELD = re.compile(r'(\w+)=("[^"]*"|\S+)')
 
 
@@ -26,7 +30,7 @@ def fields(line):
     return {k: v.strip('"') for k, v in FIELD.findall(line)}
 
 
-def summarize(run, price_in=None, price_out=None):
+def summarize(run, price_in=PRICE_IN, price_out=PRICE_OUT):
     agents = failed = forced = reasoning_low = reasoning_off = turns = lookups = 0
     prompt = completion = 0
     times = []
@@ -79,8 +83,8 @@ def summarize(run, price_in=None, price_out=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("runs", nargs="+", type=Path)
-    ap.add_argument("--price-in", type=float, default=None, help="dollars per million prompt tokens")
-    ap.add_argument("--price-out", type=float, default=None, help="dollars per million completion tokens")
+    ap.add_argument("--price-in", type=float, default=PRICE_IN, help="dollars per million prompt tokens")
+    ap.add_argument("--price-out", type=float, default=PRICE_OUT, help="dollars per million completion tokens")
     args = ap.parse_args()
     for run in args.runs:
         print(summarize(run, args.price_in, args.price_out))

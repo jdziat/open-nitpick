@@ -124,8 +124,14 @@ func TestReplayCacheWaitRespectsCancellation(t *testing.T) {
 	}
 	defer func() { _ = lock.Close() }()
 	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
+	// Cancel only once the call is already waiting on the held lock, so the
+	// lock wait honours it; a context cancelled up front returns earlier.
+	time.AfterFunc(100*time.Millisecond, cancel)
+	started := time.Now()
 	_, err := r.GenerateContent(ctx, []llms.Message{{Role: llms.RoleUser, Content: "x"}})
+	if time.Since(started) < 50*time.Millisecond {
+		t.Fatalf("returned in %v: the call never waited on the lock", time.Since(started))
+	}
 	if !errors.Is(err, context.Canceled) || inner.calls.Load() != 0 {
 		t.Fatalf("cancelled cache wait: err %v, purchases %d", err, inner.calls.Load())
 	}

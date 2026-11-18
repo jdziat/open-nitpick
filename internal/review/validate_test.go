@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
@@ -40,6 +41,7 @@ type blockingLLM struct {
 	release  chan struct{}
 	called   chan struct{}
 	response string
+	calls    atomic.Int32
 
 	once sync.Once
 }
@@ -53,6 +55,7 @@ func newBlockingLLM(response string) *blockingLLM {
 }
 
 func (b *blockingLLM) GenerateContent(_ context.Context, _ []llms.Message, _ ...llms.CallOption) (*llms.Response, error) {
+	b.calls.Add(1)
 	b.once.Do(func() { close(b.called) })
 	<-b.release
 	return &llms.Response{Content: b.response}, nil
@@ -877,6 +880,16 @@ func TestCancellationKeepsEveryFinding(t *testing.T) {
 	}
 	if len(overruled) != 0 {
 		t.Errorf("overruled = %+v, want none: a validation that never ran decided nothing", overruled)
+	}
+	// Only the first finding held the slot. Without the ctx.Done branch the
+	// queued four take it after release and call the model with a dead context.
+	if got := model.calls.Load(); got != 1 {
+		t.Errorf("model calls = %d, want 1: findings queued behind a cancelled run must not be validated", got)
+	}
+	for i, f := range kept {
+		if f.Line != i+1 {
+			t.Errorf("kept[%d].Line = %d, want %d: kept findings must be the originals", i, f.Line, i+1)
+		}
 	}
 }
 

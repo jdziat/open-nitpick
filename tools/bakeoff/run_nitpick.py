@@ -168,7 +168,10 @@ def main():
     ap.add_argument("--binary", default="nitpick", help="the nitpick binary to run")
     ap.add_argument("--command", default="review", help="the subcommand to review with, such as deep-review")
     args = ap.parse_args()
-    args.binary = str(Path(shutil.which(args.binary) or args.binary).resolve(strict=True))
+    found = shutil.which(args.binary)
+    if found is None and not Path(args.binary).exists():
+        ap.error(f"--binary {args.binary!r} is not on PATH and is not a file")
+    args.binary = str(Path(found or args.binary).resolve())
     selection = json.loads((args.inputs / "selection.json").read_text())
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "run.json").write_text(json.dumps({

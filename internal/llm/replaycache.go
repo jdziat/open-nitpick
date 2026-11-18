@@ -148,6 +148,9 @@ func (r *replayLLM) GenerateContent(ctx context.Context, msgs []llms.Message, op
 	if err := r.write(key, resp); err != nil {
 		return resp, fmt.Errorf("persist paid response: %w", err)
 	}
+	// The pending marker stays on purpose. It is the durable record that this
+	// request was paid for, so a later corrupt or lost entry is refused
+	// instead of bought again.
 	return resp, nil
 }
 

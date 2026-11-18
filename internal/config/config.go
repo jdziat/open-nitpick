@@ -1586,8 +1586,8 @@ type JevFilter struct {
 	// value the measurement above used.
 	Threshold float64 `yaml:"threshold"`
 
-	// Model is the decision model as OpenRouter names it. Empty means
-	// ~typesafe/jev-latest.
+	// Model is the decision model as OpenRouter names it. Empty selects the
+	// built-in default, which the jev package defines.
 	Model string `yaml:"model"`
 
 	// APIKeyEnv names the environment variable holding the OpenRouter key.

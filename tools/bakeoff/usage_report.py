@@ -70,7 +70,9 @@ def summarize_usage(run):
         completed += 1
         try:
             status = json.loads((case / "status.json").read_text())
-            failed += status["exit_code"] != 0
+            if status["exit_code"] != 0:
+                failed += 1
+                continue
             result = json.loads((case / "result.json").read_text())
             usage = result.get("usage")
             if usage is None and (case / "nitpick.json").exists():
