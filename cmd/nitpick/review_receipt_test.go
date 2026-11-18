@@ -21,6 +21,9 @@ func (p receiptFailureProvider) PullRequest(context.Context, vcs.Ref) (*vcs.Pull
 }
 
 func TestFatalReviewStillWritesItsAttemptLedgerAsJSON(t *testing.T) {
+	t.Setenv("GITHUB_REPOSITORY", "")
+	t.Setenv("GITHUB_REF", "")
+	t.Setenv("PR_NUMBER", "")
 	t.Setenv("OPENAI_API_KEY", "fixture")
 	t.Setenv("NITPICK_TRUST_CONFIG_ENDPOINTS", "1")
 	root := initRepo(t)
