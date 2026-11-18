@@ -1448,7 +1448,7 @@ APIKeyEnv names the environment variable holding the OpenRouter key. Empty means
 ### `review.jev.model`
 
 string, default `none`.
-Model is the decision model as OpenRouter names it. Empty means ~typesafe/jev-latest.
+Model is the decision model as OpenRouter names it. Empty selects the built-in default, which the jev package defines.
 
 ### `review.jev.threshold`
 
@@ -1488,7 +1488,7 @@ Enabled includes accepted repository references in review prompts.
 ### `review.learnings.max_tokens`
 
 integer, default `0`.
-MaxTokens caps the complete rendered section; zero uses 2,000 tokens.
+MaxTokens caps the complete rendered section. Zero selects the built-in cap of 2,000 tokens; it does not mean unbounded.
 
 ### `review.learnings.repository`
 

@@ -67,7 +67,7 @@ func TestAnAnchorCannotSmuggleTheJevFilterIn(t *testing.T) {
 
 func TestTheJevThresholdMustBeFromZeroToOne(t *testing.T) {
 	t.Setenv(EnvTrustConfigEndpoints, "1")
-	for threshold, ok := range map[string]bool{"0": true, "0.3": true, "1": true, "-0.1": false, "1.5": false} {
+	for threshold, ok := range map[string]bool{"0": true, "0.3": true, "1": true, "-0.1": false, "1.5": false, ".nan": false} {
 		root := writeConfig(t, jevBase+"review:\n  jev: {threshold: "+threshold+"}\n")
 		_, err := Load(root)
 		if (err == nil) != ok {

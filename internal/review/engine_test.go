@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -753,8 +754,11 @@ func TestPublishedProseIsScrubbed(t *testing.T) {
 		t.Fatalf("findings = %+v", report.Findings)
 	}
 	f := report.Findings[0]
-	if strings.Contains(f.Title+f.Rationale+report.Summary, "—") && !strings.Contains(f.Rationale, "`a — b`") {
-		t.Errorf("an em dash survived outside code: %+v", f)
+	// Remove the code spans first, so a dash the model put inside one is not
+	// mistaken for a survivor and a dash outside one cannot hide behind it.
+	prose := regexp.MustCompile("`[^`]*`").ReplaceAllString(f.Title+" "+f.Rationale+" "+report.Summary, "")
+	if strings.Contains(prose, "—") {
+		t.Errorf("an em dash survived outside code: %q", prose)
 	}
 	if f.Title != "Deferred close panics, resp is nil" {
 		t.Errorf("title = %q", f.Title)

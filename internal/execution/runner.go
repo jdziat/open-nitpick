@@ -216,6 +216,9 @@ func (r *Runner) Run(ctx context.Context, snapshot Snapshot, check Check) (resul
 		"--env=GOTOOLCHAIN=local", "--env=GOPROXY=off", "--env=GOSUMDB=off", "--env=GOCACHE=/tmp/go-cache", "--env=GOPATH=/tmp/go-path", "--env=GOMODCACHE=/opt/gomod", "--env=CGO_ENABLED=0",
 		"--entrypoint=/usr/local/bin/nitpick-checker", r.policy.Image, "-head", snapshot.Head, "-sha256", snapshot.SHA256, "-kind", check.Kind, "-package", check.Package}
 	exit, runErr := r.command(ctx, args, output)
+	// Read before cleanup: the deadline answers whether the check itself ran
+	// out of time, and a slow cleanup must not turn a finished check into one.
+	checkTimedOut := ctx.Err() != nil
 	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	cleanupExit, cleanupErr := r.command(cleanupCtx, []string{"rm", "--force", result.JobID}, io.Discard)
 	cleanupCancel()
@@ -228,7 +231,7 @@ func (r *Runner) Run(ctx context.Context, snapshot Snapshot, check Check) (resul
 	switch {
 	case cleanupErr != nil || cleanupExit != 0:
 		result.Reason = "container cleanup was not confirmed"
-	case ctx.Err() != nil:
+	case checkTimedOut:
 		result.Reason = "execution cancelled or exceeded wall-time limit"
 	case runErr != nil || exit < 0 || exit == 75 || exit >= 125:
 		result.Reason = "runtime or check preconditions unavailable"

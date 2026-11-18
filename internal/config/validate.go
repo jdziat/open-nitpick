@@ -288,7 +288,8 @@ func (r Review) validate() []error {
 	default:
 		errs = append(errs, fmt.Errorf("review.verify %q is not confirmed or not_refuted; leave it empty to turn verification off", r.Verify))
 	}
-	if r.Jev.Threshold < 0 || r.Jev.Threshold > 1 {
+	// The negated form also refuses NaN, which every ordered comparison passes.
+	if !(r.Jev.Threshold >= 0 && r.Jev.Threshold <= 1) {
 		errs = append(errs, fmt.Errorf("review.jev.threshold must be from 0 to 1, got %v; leave it at 0 to turn the filter off", r.Jev.Threshold))
 	}
 	if r.MaxRounds < 0 {

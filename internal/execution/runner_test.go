@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func fixtureSnapshot(t *testing.T, headers ...*tar.Header) Snapshot {
@@ -150,6 +151,23 @@ func TestExecutionCancellationStillCleansWithAnIndependentDeadline(t *testing.T)
 	got := runner.Run(ctx, fixtureSnapshot(t), Check{Kind: "go_test", Package: "."})
 	if !cleaned || got.Status != Unavailable || !strings.Contains(got.Reason, "cancelled") {
 		t.Fatalf("cancelled job escaped cleanup: %+v cleaned=%v", got, cleaned)
+	}
+}
+
+func TestASlowCleanupDoesNotTurnAFinishedCheckIntoATimeout(t *testing.T) {
+	runner := fixtureRunner(t)
+	runner.policy.TimeoutSeconds = 1
+	runner.command = func(ctx context.Context, args []string, _ io.Writer) (int, error) {
+		if args[0] == "rm" {
+			// Cleanup outlasts the check's own one-second deadline.
+			time.Sleep(1100 * time.Millisecond)
+			return 0, nil
+		}
+		return 0, nil
+	}
+	got := runner.Run(t.Context(), fixtureSnapshot(t), Check{Kind: "go_test", Package: "."})
+	if got.Status != Passed {
+		t.Fatalf("a check that exited 0 in time was reported %q (%s): cleanup time must not count against it", got.Status, got.Reason)
 	}
 }
 

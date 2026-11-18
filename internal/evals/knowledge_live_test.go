@@ -19,7 +19,7 @@ import (
 // would be run-to-run variance wearing a feature's name, and the log is not
 // evidence: the harness discards it.
 func TestLiveKnowledgeReachesThePlants(t *testing.T) {
-	if os.Getenv("NITPICK_EVAL_EMBED_PROVIDER") == "" {
+	if os.Getenv("NITPICK_EVAL_EMBED_PROVIDER") == "" || os.Getenv("NITPICK_EVAL_EMBED_MODEL") == "" {
 		t.Skip("set NITPICK_EVAL_EMBED_PROVIDER and NITPICK_EVAL_EMBED_MODEL")
 	}
 	entries, err := knowledge.Corpus()

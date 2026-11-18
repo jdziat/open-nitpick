@@ -1158,8 +1158,8 @@ func budgetNote(report *Report) string {
 	if !fit.Trimmed() {
 		fmt.Fprintf(&b, "\n> **This review is expected to exceed its spending ceiling.** "+
 			"Every changed file was reviewed at an estimated $%.2f against a $%.2f "+
-			"ceiling, because `review.budget.min_files` is set to %d. Coverage is "+
-			"unaffected.\n", fit.After.Dollars, fit.Ceiling, len(fit.Kept))
+			"ceiling, because `review.budget.min_files` requires them. Coverage is "+
+			"unaffected.\n", fit.After.Dollars, fit.Ceiling)
 		return b.String()
 	}
 
