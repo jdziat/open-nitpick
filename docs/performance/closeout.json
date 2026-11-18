@@ -129,10 +129,20 @@
     "compatibility_sample_usd": 0.00772971,
     "label_panel_usd": 0.267874085,
     "deepseek_labels_usd": 0.022903356,
-    "unresolved_reservations_usd": 2.005,
+    "unresolved_reservations_usd": 7.005,
     "unpriced_attempts": 4,
     "scope": "Retained receipts since the 100 USD approval; excludes the earlier historical 43.37 USD lower bound and is not an account-wide billing reconciliation.",
-    "manual_retry_note": "Earlier label controllers retried empty or truncated replies and one request with unknown billing. Those costs and the unknown reservation are retained; receipt reuse is not a claim that earlier retries never happened."
+    "manual_retry_note": "Earlier label controllers retried empty or truncated replies and one request with unknown billing. Those costs and the unknown reservation are retained; receipt reuse is not a claim that earlier retries never happened.",
+    "unpriced_attempts_note": "Four retained local attempts plus a cancelled CI review whose total provider-attempt count and bill are unknown.",
+    "cancelled_ci_review": {
+      "run_id": 44409874257,
+      "url": "https://github.com/jdziat/open-nitpick/actions/runs/44409874257",
+      "status": "cancelled",
+      "reserved_usd": 5,
+      "reported_cost_usd": null,
+      "log_sha256": "bc9bdebf8f58aee268e1b57d6c69882c1a86b79fbb9cc2f54714e3789421182b",
+      "cause": "Engineering scope cleared skip markers, so marking PR 220 ready started a duplicate paid review. It was cancelled when the policy bug was identified. The outer policy now retains the operator skip markers; a regression test fails without that fix."
+    }
   },
   "track_dispositions": [
     {
@@ -177,13 +187,23 @@
       "path": "tools/bakeoff/usage_report.py",
       "change": "Restore paid usage from failed reviews and make the terminal-review denominator explicit. The existing guard reproduced the regression and passes after the fix.",
       "verification": "20 focused offline Python tests passed; no model calls."
+    },
+    {
+      "path": "cmd/nitpick/review_receipt_test.go",
+      "change": "Clear inherited Actions PR variables so the test uses its local fixture.",
+      "verification": "Reproduced the CI failure locally; the targeted race test passes with Actions variables set."
+    },
+    {
+      "path": "cmd/nitpick/engineering_review.go",
+      "change": "Keep accepted operator skip markers on the outer engineering policy; nested synthetic checks still clear them.",
+      "verification": "Configured-profile, explicit-profile and disabled-marker controls pass. Deleting the preservation line makes both enabled-marker controls fail."
     }
   ],
   "cto_approval": {
     "date": "2026-11-18",
     "reviewer": "CTO agent persona /root/cto",
     "decision": "GO to commit, push, and open the PR",
-    "scope": "Implemented changes and retained measurements, including the final offline failed-review accounting repair. Go code is unchanged from the reviewed snapshot.",
+    "scope": "Implemented changes and retained measurements, including the offline failed-review accounting repair. This approval predates the CI repairs listed in post_review_source_changes.",
     "limitations": "Phase 5, per-mode live baselines, human adjudication and the full performance program remain incomplete. Approval establishes no whole-review speedup or quality improvement."
   }
 }

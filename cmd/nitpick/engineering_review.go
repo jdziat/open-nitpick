@@ -51,6 +51,9 @@ func (p *engineeringReviewPolicy) ResolvePolicy(ctx context.Context, ref vcs.Ref
 	}
 	scoped := *cfg
 	applyEngineeringScope(&scoped)
+	// Nested model checks clear markers on their synthetic input; the outer
+	// review still honors the operator's accepted skip policy.
+	scoped.Review.SkipMarkers = slices.Clone(cfg.Review.SkipMarkers)
 	if p.selected != nil {
 		p.selected()
 	}
