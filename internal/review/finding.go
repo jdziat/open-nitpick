@@ -245,6 +245,40 @@ func (f Finding) Valid() bool {
 		f.Line > 0
 }
 
+// maxRecoveredTitle bounds a title taken from a rationale, in runes.
+const maxRecoveredTitle = 100
+
+// withRecoveredTitle fills a missing title from the finding's own rationale.
+//
+// A title is display text, and a model that omits it has still made a complete
+// claim: a critical injection with a path, a line and a reason was lost here
+// for want of a heading. Only a blank title is replaced, and only when the
+// rest of the finding would be publishable, so this never turns an empty
+// object into a finding. The text is a verbatim excerpt of the rationale, cut
+// at its first sentence or at maxRecoveredTitle runes with an ellipsis, so it
+// asserts nothing the model did not say and is the same on every replay.
+// The second result reports whether a title was supplied.
+func withRecoveredTitle(f Finding) (Finding, bool) {
+	if strings.TrimSpace(f.Title) != "" {
+		return f, false
+	}
+	if strings.TrimSpace(f.Path) == "" || f.Line <= 0 || !config.Severity(f.Severity).IsFinding() {
+		return f, false
+	}
+	rationale := strings.Join(strings.Fields(f.Rationale), " ")
+	if rationale == "" {
+		return f, false
+	}
+	if end := strings.IndexAny(rationale, ".!?"); end >= 0 && (end+1 == len(rationale) || rationale[end+1] == ' ') {
+		rationale = rationale[:end+1]
+	}
+	if runes := []rune(rationale); len(runes) > maxRecoveredTitle {
+		rationale = strings.TrimSpace(string(runes[:maxRecoveredTitle-1])) + "…"
+	}
+	f.Title = rationale
+	return f, true
+}
+
 // LineSpan is a contiguous run of lines, inclusive. EndLine of zero, or below
 // Line, means the span is the single line Line.
 type LineSpan struct {

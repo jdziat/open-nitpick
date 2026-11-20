@@ -41,7 +41,26 @@ type repoTools struct {
 	searches    memo.Cache[[2]string, string]
 	grepTimeout time.Duration
 	cacheBytes  atomic.Int64
-	failures    atomic.Uint64
+}
+
+// turnFailuresKey carries one operation's failure counter in its context. The
+// engine shares one repoTools across concurrent batches, so a counter on the
+// tools themselves would charge a lookup failure to whichever batch was
+// comparing it at that moment.
+type turnFailuresKey struct{}
+
+// withTurnFailures returns a context whose lookups count their failures into the
+// returned counter and nowhere else.
+func withTurnFailures(ctx context.Context) (context.Context, *atomic.Uint64) {
+	turn := &atomic.Uint64{}
+	return context.WithValue(ctx, turnFailuresKey{}, turn), turn
+}
+
+// fail records one failed lookup against the operation that issued it.
+func (t *repoTools) fail(ctx context.Context) {
+	if turn, ok := ctx.Value(turnFailuresKey{}).(*atomic.Uint64); ok {
+		turn.Add(1)
+	}
 }
 
 type capturedFile struct {
@@ -133,7 +152,7 @@ func (t *repoTools) fileBytes(ctx context.Context, path string) ([]byte, error) 
 		return len(file.data) <= toolReadBytes && t.retainBytes(int64(len(file.data)+len(path)+128))
 	})
 	if err != nil {
-		t.failures.Add(1)
+		t.fail(ctx)
 		return nil, err
 	}
 	return result.data, result.err
@@ -246,7 +265,7 @@ func (t *repoTools) grep(ctx context.Context, pattern, glob string) string {
 		return t.retainBytes(int64(len(out) + len(pattern) + len(glob) + 128))
 	})
 	if err != nil {
-		t.failures.Add(1)
+		t.fail(ctx)
 		if result != "" {
 			return result
 		}

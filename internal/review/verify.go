@@ -325,7 +325,7 @@ func (stored storedVerdict) matches(ctx context.Context, tools *repoTools) bool 
 	if !stored.Complete || !validVerdict(stored.Verdict) {
 		return false
 	}
-	failures := tools.failures.Load()
+	ctx, turnFailures := withTurnFailures(ctx)
 	for _, lookup := range stored.Lookups {
 		args := map[string]any{}
 		if json.Unmarshal([]byte(lookup.Arguments), &args) != nil {
@@ -336,7 +336,7 @@ func (stored storedVerdict) matches(ctx context.Context, tools *repoTools) bool 
 			return false
 		}
 	}
-	return ctx.Err() == nil && failures == tools.failures.Load()
+	return ctx.Err() == nil && turnFailures.Load() == 0
 }
 
 // verifyCached answers from an earlier run's check when the same finding is
@@ -389,14 +389,14 @@ func (e *Engine) verifyOne(ctx context.Context, system string, tools *repoTools,
 		{Role: llms.RoleUser, Content: verifyRequest(f, file)},
 	}
 	lookups := 0
-	failures := tools.failures.Load()
+	ctx, turnFailures := withTurnFailures(ctx)
 	var trace []verdictLookup
 	var seen strings.Builder
 	// found is what each return carries, so no outcome can forget the lookups.
 	found := func(o verifyOutcome) verifyOutcome {
 		o.evidence = seen.String()
 		o.lookups = trace
-		o.complete = failures == tools.failures.Load() && ctx.Err() == nil
+		o.complete = turnFailures.Load() == 0 && ctx.Err() == nil
 		return o
 	}
 	for range verifyMaxLookups + 3 {
