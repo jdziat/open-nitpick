@@ -158,3 +158,22 @@ func TestRedactFindingScrubsMessageLikeFields(t *testing.T) {
 		}
 	}
 }
+
+func TestRedactFindingScrubsTheCitationAndCategory(t *testing.T) {
+	gh := "ghp_" + strings.Repeat("Q", 36)
+	f := &review.Finding{
+		Title:    "token committed",
+		Category: "leaks " + gh,
+		Citation: `const token = "` + gh + `"`,
+	}
+	RedactFinding(f)
+	if strings.Contains(f.Citation, gh) {
+		t.Fatalf("a secret on the cited line survived: %q", f.Citation)
+	}
+	if strings.Contains(f.Category, gh) {
+		t.Fatalf("a secret in the category survived: %q", f.Category)
+	}
+	if !strings.Contains(f.Citation, "const token") {
+		t.Fatalf("redaction removed the quote around the secret: %q", f.Citation)
+	}
+}
