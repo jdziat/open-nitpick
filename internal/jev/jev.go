@@ -2,8 +2,8 @@
 // endpoint, which kind of finding a review comment is.
 //
 // It is an optional second opinion on a finding that has already been written,
-// and the question it asks is the one measured in docs/remediation-mira.md: the
-// comment, the code it rests on and what a checker found, one five-way choice.
+// and the question it asks is a single five-way choice, given the
+// comment, the code it rests on and what a checker found.
 // The package knows nothing about reviews. It sends a state and returns the
 // probabilities, and the caller decides what a probability is worth.
 package jev
@@ -66,7 +66,7 @@ const maxResponseBytes = 1 << 20
 type Scores map[string]float64
 
 // Defect is the probability that the finding is a defect that breaks something:
-// bug plus error. It is the score docs/remediation-mira.md found to rank agent
+// bug plus error. It is the score that ranked agent
 // verdicts best, and it deliberately leaves out warning, which is a real
 // concern that breaks nothing yet.
 func (s Scores) Defect() float64 { return s[Bug] + s[Failure] }

@@ -40,6 +40,9 @@ type DumpRecord struct {
 	Fixture string `json:"fixture"`
 	Run     int    `json:"run"`
 
+	// Measurement distinguishes incomplete attempts from successful silence.
+	Measurement *SampleMeasurement `json:"measurement,omitempty"`
+
 	// HeldOut marks a record produced against the held-out corpus.
 	//
 	// The dump is written to a path the operator chooses and every experiment
@@ -230,6 +233,8 @@ type DumpSample struct {
 	Variant string
 	Run     int
 
+	Measurement *SampleMeasurement
+
 	Fixture  Fixture
 	Findings []review.Finding
 
@@ -274,11 +279,9 @@ func OpenDump() (*Dump, error) {
 
 // NewDump writes records to path.
 //
-// It truncates rather than appends: the records are keyed by (model, fixture,
-// run) and every experiment reuses those keys, so an accumulating file cannot
-// be told apart from one run that produced twice the findings.
+// Existing evidence is refused rather than overwritten or mixed with another run.
 func NewDump(path string) (*Dump, error) {
-	f, err := os.Create(path)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return nil, err
 	}
@@ -467,6 +470,7 @@ func (d *Dump) Record(s DumpSample) error {
 		Findings:        len(s.Findings),
 		Verdicts:        rawVerdicts,
 		FixtureHash:     fixtureFingerprint(s.Fixture),
+		Measurement:     s.Measurement,
 	}
 
 	d.mu.Lock()
@@ -475,10 +479,11 @@ func (d *Dump) Record(s DumpSample) error {
 	// A review that said nothing writes ONE line rather than none. Silence is a
 	// result. It is the correct answer on a clean fixture, and recording it as
 	// an absence made it indistinguishable from a sample that was never run.
-	if len(s.Findings) == 0 {
+	if len(s.Findings) == 0 || (s.Measurement != nil && s.Measurement.Failure != "") {
 		rec := sample
 		rec.Index = -1
-		rec.Silent = true
+		rec.Silent = s.Measurement == nil || s.Measurement.Failure == ""
+		rec.Findings = 0
 		return d.enc.Encode(rec)
 	}
 

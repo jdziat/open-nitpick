@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -60,6 +61,10 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 			if err == nil {
 				return value, nil
 			}
+		}
+		// A failed experimental sample must not silently purchase a repair.
+		if os.Getenv(EnvPurchaseBudget) != "" {
+			return zero, fmt.Errorf("%s: bounded experiment refuses an additional extraction purchase: %w", c, err)
 		}
 		// OpenRouter reserves the whole output cap against the key's balance
 		// before the call, so with no max_tokens set a model whose cap is
@@ -187,6 +192,9 @@ func markStalled(ctx context.Context, err error) error {
 // retryAfter decides whether an attempt is sent again and with what options.
 // started is when the first attempt began; see retryBudgetSpent.
 func (c *Client) retryAfter(ctx context.Context, attempt int, started time.Time, call []llms.CallOption, resp *llms.Response, err error) ([]llms.CallOption, bool) {
+	if os.Getenv(EnvPurchaseBudget) != "" {
+		return nil, false
+	}
 	// Not a retry of the transport and not counted against its budget: it fires
 	// at most once per call, since the options sent again carry no temperature.
 	if c.RejectsTemperature(err, call) {
@@ -975,6 +983,12 @@ func (c *Client) Fallback() *Client {
 // its chance, and on a 55k-token batch that chance is a whole call timeout
 // (issue #161 spent 10 minutes on one, then failed the batch with no fallback).
 //
+// And a model whose endpoint refuses to turn reasoning off. Hitting the output
+// cap with empty content is answered by a reasoning-off retry; an endpoint that
+// cannot comply (glm-5.3-flash on OpenRouter: "Reasoning is mandatory for this
+// endpoint") fails that retry with a 400, and without escalation the batch
+// went unreviewed with a fallback model configured.
+//
 // Not a bare truncation. A first attempt cut at a cap the caller chose never
 // reaches the re-sampling in retryAfter, and the fallback overlays its parent
 // and inherits that same cap, so escalating there would spend a second budget
@@ -1004,6 +1018,7 @@ func ShouldEscalate(err error) bool {
 		"was not valid json after one repair attempt",
 		"no json object in the response matched the expected shape",
 		"no json object found in response",
+		"reasoning is mandatory for this endpoint",
 	} {
 		if strings.Contains(msg, sign) {
 			return true

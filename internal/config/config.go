@@ -529,8 +529,7 @@ type Review struct {
 	// Withheld findings are listed with the checker's reason, never dropped
 	// silently, and analyzer findings are never checked. It needs a git
 	// checkout to search, and without one it reads files but cannot grep.
-	// Off by default: it costs about eight model calls a finding, and
-	// docs/remediation-mira.md, stage R2b, has the measurement.
+	// Off by default: it costs about eight model calls a finding.
 	Verify VerifyMode `yaml:"verify"`
 
 	// Jev adds an optional second opinion on each model finding, from TypeSafe's
@@ -605,6 +604,9 @@ type Review struct {
 	// RelatedContext is on.
 	RelatedContextCallers bool `yaml:"related_context_callers"`
 
+	// GenerationLookups permits one bounded repository lookup round in ordinary review generation.
+	GenerationLookups bool `yaml:"generation_lookups"`
+
 	// RelatedContextPreamble replaces the sentence bundle.Render writes above
 	// every attached definition. The shipped sentence says the context is
 	// reference only and is not under review, which is the right default for
@@ -621,7 +623,7 @@ type Review struct {
 	// overlap is the name that already selected them. The default orders by
 	// use count, which attaches a frequently-named helper even when its body
 	// has nothing in common with the change. Off until a measurement says
-	// otherwise; see docs/experiment-context-framing.md.
+	// otherwise.
 	RelatedContextRerank bool `yaml:"related_context_rerank"`
 
 	// Knowledge attaches entries from the shipped corpus that the change
@@ -1491,8 +1493,7 @@ func ReasoningLevels() []string {
 func (s ModelSpec) ReasoningValues() []string { return ReasoningLevels() }
 
 // DeepReview configures nitpick deep-review. Its defaults are the settings
-// Mira reviews with; docs/remediation-mira.md, "Deep review", has the design
-// and the measurements.
+// Mira reviews with.
 type DeepReview struct {
 	// Agents names the reviewers that read each batch in parallel: general
 	// reviews with the ordinary prompt, and security looks only for
@@ -1578,8 +1579,7 @@ const (
 // says so in the stage list. On 100 findings that agents graded, the check
 // followed by Jev at 0.3 withheld 29 of 42 not-real findings against 25 for the
 // check alone. On deep review's drafts for 30 unseen pull requests it lowered
-// F1 by 0.033 (0.002 to 0.073), so it is not recommended there
-// (docs/remediation-mira.md).
+// F1 by 0.033 (0.002 to 0.073), so it is not recommended there.
 type JevFilter struct {
 	// Threshold is the lowest bug plus error probability a finding may have and
 	// be kept, from 0 to 1. Zero, the default, turns the filter off. 0.3 is the

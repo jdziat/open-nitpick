@@ -81,8 +81,7 @@ defect filed twice, a cap on info-level findings, and a critique that grades eac
 against the code it cites. The review lists what was withheld and why. It needs a git
 checkout to search, and it says so when it has none. On DeepSeek V4.1 Flash a review took
 about 19 agent turns and 35 lookups, plus a final submission for each agent and one
-critique, and cost about $0.04, with a median of three to four minutes. Its settings are under `review.deep`, and `docs/remediation-mira.md` has the
-measurements. When an agent fails, or a batch is reviewed in one call without tools, the
+critique, and cost about $0.04, with a median of three to four minutes. Its settings are under `review.deep`. When an agent fails, or a batch is reviewed in one call without tools, the
 review names the stage that did not complete. The model's context has to hold more than the
 pull request: `review.deep.token_budget_per_request`, 120,000 tokens by default, sizes an
 agent's first request, and the agent may then read up to 80,000 bytes and ask for an answer
@@ -387,8 +386,7 @@ catalog-applicable tools including `golangci-lint` with gosec forced on).
 (Rule 10). There is no `-budget` and no `-no-linters`. The optional model pass
 uses `models.security` when set, otherwise `models.review` / `models.default`
 (see the bake-off in `docs/findings.md`). The MCP tool `security_scan` is the
-same engine; absolute `repo` paths are trusted-operator-only. See
-`docs/plans/2026-09-17-security-command.md`.
+same engine; absolute `repo` paths are trusted-operator-only.
 
 ## The slop class
 

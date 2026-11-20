@@ -28,6 +28,13 @@ import (
 // fixtures by name, so the same two-variant table can be printed for the
 // tuning corpus to measure what related context costs where it is not needed.
 func TestBenchmarkMultiFile(t *testing.T) {
+	if err := requireQualityPurchaseSetup(); err != nil {
+		t.Fatal(err)
+	}
+	variants, err := qualityVariants(os.Getenv("NITPICK_EVAL_VARIANTS"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx := context.Background()
 
 	opts, err := OptionsFromEnv()
@@ -46,87 +53,25 @@ func TestBenchmarkMultiFile(t *testing.T) {
 		t.Fatalf("open the run dump: %v", err)
 	}
 	defer func() {
-		if cerr := dump.Close(); cerr != nil {
-			t.Errorf("closing the run dump: %v", cerr)
+		if cerr := FinalizeQualityDump(dump, dumpPath, opts.Fixtures); cerr != nil {
+			t.Errorf("finalize the run evidence: %v", cerr)
 		}
 	}()
 	t.Logf("retaining every review to %s", dumpPath)
 
-	type row struct {
-		name     string
-		reviews  int
-		lost     int
-		plants   int
-		located  int
-		findings int
-		noise    int
-		anchor   int
-		near     int
-		usd      float64
-		priced   int                        // reviews whose cost is known
-		seconds  float64                    // wall time over the reviews that finished
-		timed    int                        // reviews that carry a duration
-		reason   int                        // provider-reported reasoning tokens
-		complete int                        // provider-reported completion tokens, reasoning included
-		metered  int                        // reviews whose every call reported usage
-		byBand   map[config.Severity][2]int // located, plants
-		perFix   map[string]string          // keyed by fixture, "located/plants (noise)"
-	}
 	var (
 		mu   sync.Mutex
-		rows = map[string]*row{}
+		rows = map[string]*evaluationCell{}
 	)
 	record := func(name string, f Fixture, findings []review.Finding, runErr error, cost Cost, res RunResult) {
 		mu.Lock()
 		defer mu.Unlock()
-		r, ok := rows[name]
-		if !ok {
-			r = &row{name: name, byBand: map[config.Severity][2]int{}, perFix: map[string]string{}}
+		r := rows[name]
+		if r == nil {
+			r = &evaluationCell{}
 			rows[name] = r
 		}
-		if runErr != nil {
-			r.lost++
-			r.perFix[f.Name] = "lost"
-			return
-		}
-		r.reviews++
-		if res.Duration > 0 {
-			r.timed++
-			r.seconds += res.Duration.Seconds()
-		}
-		if res.Usage.Complete() {
-			r.metered++
-			r.reason += res.Usage.Reasoning()
-			r.complete += res.Usage.Completion()
-		}
-		if cost.Known {
-			r.usd += cost.USD
-			r.priced++
-		}
-		d := ScoreDetectionForEval(f, findings)
-		plants := PersonaDefects(f)
-		r.plants += len(plants)
-		r.located += d.Matched
-		r.findings += len(findings)
-		r.noise += d.Noise()
-		r.anchor = max(r.anchor, d.WidestAnchor)
-		r.near += d.NearMisses
-		for _, def := range plants {
-			b := r.byBand[def.WantSeverity]
-			b[1]++
-			if d.Detected[def.Why] {
-				b[0]++
-			}
-			r.byBand[def.WantSeverity] = b
-		}
-		cell := fmt.Sprintf("%d/%d", d.Matched, len(plants))
-		if n := d.Noise(); n > 0 {
-			cell += fmt.Sprintf(" +%dn", n)
-		}
-		if prev, ok := r.perFix[f.Name]; ok && prev != "" {
-			cell = prev + " " + cell
-		}
-		r.perFix[f.Name] = cell
+		r.record(f, findings, runErr, cost, res)
 	}
 
 	// Incumbents first, from cache where there is one. A missing cache is
@@ -173,31 +118,32 @@ func TestBenchmarkMultiFile(t *testing.T) {
 		}
 	}
 
-	// Our side: each model twice, with related context off and on.
+	// Our side: retain both ablations and measure the shipped production default.
 	var routing routeTally
 
-	variants := []struct {
-		suffix string
-		tune   func(*config.Config)
-	}{
-		{"", func(c *config.Config) { c.Review.RelatedContext, c.Review.RelatedContextCallers = false, false }},
-		{" +ctx", func(c *config.Config) { c.Review.RelatedContext, c.Review.RelatedContextCallers = true, true }},
+	registeredVariants := map[string][2]bool{}
+	for index := range variants {
+		if os.Getenv("NITPICK_EVAL_GENERATION_LOOKUPS") == "1" {
+			variants[index].suffix += " +lookup"
+		}
+		registeredVariants[strings.TrimSpace(variants[index].suffix)] = variants[index].context
 	}
-
+	if err := WriteExperimentManifest(dumpPath+".manifest.json", opts, registeredVariants, opts.SampleOffset, manifestTypeFromEnv(), manifestCorpusFromEnv(), manifestStagesFromEnv()); err != nil {
+		t.Fatalf("freeze experiment: %v", err)
+	}
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 4)
 	for _, model := range opts.Models {
 		for _, v := range variants {
 			name := model.ID + v.suffix
 			runOpts := opts
-			runOpts.Tune = v.tune
+			runOpts.Tune = func(c *config.Config) {
+				c.Review.RelatedContext, c.Review.RelatedContextCallers = v.context[0], v.context[1]
+			}
 			for _, f := range opts.Fixtures {
 				for i := range runs {
 					wg.Add(1)
-					go func(model Model, f Fixture, i int, name string, runOpts Options, v struct {
-						suffix string
-						tune   func(*config.Config)
-					}) {
+					go func(model Model, f Fixture, i int, name string, runOpts Options, v qualityVariant) {
 						defer wg.Done()
 						sem <- struct{}{}
 						defer func() { <-sem }()
@@ -210,18 +156,29 @@ func TestBenchmarkMultiFile(t *testing.T) {
 						var cost Cost
 						if model.Composite() {
 							cost = compositeCost(opts.Prices, res.UsageByModel)
-						} else if price, ok := opts.Prices.Price(model.ID); ok && res.Usage.Complete() {
-							cost = Cost{USD: price.Cost(res.Usage), Known: true}
+						} else if price, ok := opts.Prices.Price(model.ID); ok {
+							cost = Cost{USD: price.Cost(res.Usage), Known: res.Usage.Complete() && res.Usage.Failed == 0}
 						}
 						if res.Report != nil && len(res.Report.Routes) > 0 {
 							routing.note(name, res.Report.Routes)
+						}
+						measurement := &SampleMeasurement{SampleID: fmt.Sprintf("%s/%s/%d", model.ID, f.Name, res.Run),
+							Duration: res.Duration, Usage: res.Usage, Cost: cost, CacheHits: res.Replay.Hits, CacheMisses: res.Replay.Misses}
+						if res.Err != nil {
+							measurement.Failure = res.Err.Error()
+						}
+						if err := CaptureSample(opts.CaptureDir, v.suffix, f, res); err != nil {
+							t.Errorf("capture %s/%s: %v", name, f.Name, err)
+						}
+						if err := dump.Record(DumpSample{Model: model.ID, Variant: strings.TrimSpace(v.suffix), Fixture: f,
+							Run: res.Run, Findings: findings, Measurement: measurement}); err != nil {
+							t.Errorf("record %s/%s: %v", name, f.Name, err)
 						}
 						record(name, f, findings, res.Err, cost, res)
 						if res.Err != nil {
 							t.Logf("%s on %s run %d: %v", name, f.Name, i, res.Err)
 							return
 						}
-						_ = dump.Record(DumpSample{Model: model.ID, Variant: strings.TrimSpace(v.suffix), Fixture: f, Run: i, Findings: findings})
 					}(model, f, i, name, runOpts, v)
 				}
 			}
@@ -281,9 +238,9 @@ func TestBenchmarkMultiFile(t *testing.T) {
 		fmt.Fprintf(&b, "%-42s %7s %9s %9s\n", "", sec, think, out)
 	}
 	b.WriteString("\nRECALL = located/plants over every review; NOISE = findings explaining no plant, per review; NEAR = of those, findings naming a plant's keywords in its file beyond the anchor tolerance; ANCHOR = widest anchor in lines.\n")
-	b.WriteString("SEC/REV is wall time per finished review; THINK/REV and OUT/REV are provider-reported reasoning and completion tokens per review (reasoning is a subset of completion), over reviews whose every call reported usage.\n")
+	b.WriteString("SEC/REV is wall time per scheduled review, including failures; THINK/REV and OUT/REV are provider-reported reasoning and completion tokens per review (reasoning is a subset of completion), over reviews whose every call reported usage.\n")
 	b.WriteString("$/REVIEW is the provider-reported spend per review at the shipped rate table; $/LOCATED divides the run's spend by the plants it located, and is n/a when any review went unpriced.\n")
-	b.WriteString("Our side is listed once per model without related context and once with it (+ctx).\n\n")
+	b.WriteString("Our side: diff-only, definitions and callers (+ctx), and definitions only (+default). REV counts scheduled reviews; LOST are included in its denominator.\n\n")
 
 	fmt.Fprintf(&b, "%-32s", "fixture")
 	for _, n := range names {

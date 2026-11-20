@@ -33,6 +33,7 @@ func TestCompositeFixtureReviewsRetainTheirRawResponses(t *testing.T) {
 	spec := config.ModelSpec{Provider: "openai", Model: "gpt-4o", BaseURL: server.URL,
 		APIKeyEnv: "NITPICK_TEST_CAPTURE_KEY", AllowPrivateEndpoint: true, MaxRetries: &zero}
 	result := Run(t.Context(), Model{ID: "capture", RouteFile: route}, Fixtures()[0], 1, Options{
+		CaptureDir: t.TempDir(),
 		Tune: func(cfg *config.Config) {
 			cfg.Models.Default = spec
 			cfg.Models.Review, cfg.Models.Triage, cfg.Models.Validate = &spec, &spec, &spec
@@ -46,6 +47,18 @@ func TestCompositeFixtureReviewsRetainTheirRawResponses(t *testing.T) {
 	}
 	if len(result.Responses) == 0 || result.Responses[0] != content {
 		t.Fatalf("composite review lost the response used as evidence: %q", result.Responses)
+	}
+	if len(result.Calls) == 0 || result.Calls[0].RequestID == "" || len(result.Calls[0].Messages) == 0 {
+		t.Fatalf("request identity was not captured: %+v", result.Calls)
+	}
+	stages := map[string]bool{}
+	for _, snapshot := range result.Snapshots {
+		stages[snapshot.Stage] = true
+	}
+	for _, stage := range []string{"batch-generation", "generation", "triage-input", "triage", "validation", "verification", "publication-gate"} {
+		if !stages[stage] {
+			t.Errorf("silent review omitted stage %s: %+v", stage, result.Snapshots)
+		}
 	}
 }
 

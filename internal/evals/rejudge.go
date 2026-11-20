@@ -264,6 +264,12 @@ func silentSuffix(silent bool) string {
 // keyed on position and a silently-shifted list produces a full set of
 // plausible, wrong verdict pairings.
 func GroupDump(records []DumpRecord) ([]RejudgeGroup, []string, error) {
+	for _, record := range records {
+		if record.Measurement != nil && record.Measurement.Failure != "" {
+			return nil, nil, fmt.Errorf("sample %s/%s/%d failed: %s; cannot rejudge it as silence",
+				record.Model, record.Fixture, record.Run, record.Measurement.Failure)
+		}
+	}
 	known := map[string]Fixture{}
 	for _, f := range AllFixtures() {
 		known[f.Name] = f

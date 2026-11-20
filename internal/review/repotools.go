@@ -41,7 +41,26 @@ type repoTools struct {
 	searches    memo.Cache[[2]string, string]
 	grepTimeout time.Duration
 	cacheBytes  atomic.Int64
-	failures    atomic.Uint64
+}
+
+// turnFailuresKey carries one operation's failure counter in its context. The
+// engine shares one repoTools across concurrent batches, so a counter on the
+// tools themselves would charge a lookup failure to whichever batch was
+// comparing it at that moment.
+type turnFailuresKey struct{}
+
+// withTurnFailures returns a context whose lookups count their failures into the
+// returned counter and nowhere else.
+func withTurnFailures(ctx context.Context) (context.Context, *atomic.Uint64) {
+	turn := &atomic.Uint64{}
+	return context.WithValue(ctx, turnFailuresKey{}, turn), turn
+}
+
+// fail records one failed lookup against the operation that issued it.
+func (t *repoTools) fail(ctx context.Context) {
+	if turn, ok := ctx.Value(turnFailuresKey{}).(*atomic.Uint64); ok {
+		turn.Add(1)
+	}
 }
 
 type capturedFile struct {
@@ -133,13 +152,28 @@ func (t *repoTools) fileBytes(ctx context.Context, path string) ([]byte, error) 
 		return len(file.data) <= toolReadBytes && t.retainBytes(int64(len(file.data)+len(path)+128))
 	})
 	if err != nil {
-		t.failures.Add(1)
+		t.fail(ctx)
 		return nil, err
 	}
 	return result.data, result.err
 }
 
 func (t *repoTools) loadFile(ctx context.Context, path string) ([]byte, error) {
+	// A commit-pinned review reads that commit. The checkout may sit on a
+	// different revision or carry edits, and evidence from it would be
+	// attributed to code the reviewer never saw, so a failed lookup does not
+	// fall back to the checkout.
+	if t.pinned() {
+		if t.root != "" {
+			if data, err := t.showAtRevision(ctx, path); err == nil || t.provider == nil {
+				return data, err
+			}
+		}
+		if t.provider == nil {
+			return nil, errors.New("no source to read")
+		}
+		return t.provider.FileContent(ctx, t.ref, path)
+	}
 	if t.root != "" {
 		full := filepath.Join(t.root, filepath.FromSlash(path))
 		// A symlink in the tree must not lead outside it.
@@ -168,6 +202,31 @@ func (t *repoTools) loadFile(ctx context.Context, path string) ([]byte, error) {
 	return t.provider.FileContent(ctx, t.ref, path)
 }
 
+// pinned reports whether lookups are bound to a commit rather than the
+// working tree.
+func (t *repoTools) pinned() bool { return t.ref.Head != vcs.Worktree }
+
+// showAtRevision reads one file from the reviewed commit's object store. A
+// symlink comes back as its target text, so nothing outside the repository is
+// read, and ignored files are absent because they are not in a commit.
+func (t *repoTools) showAtRevision(ctx context.Context, path string) ([]byte, error) {
+	if strings.HasPrefix(t.ref.Head, "-") {
+		return nil, fmt.Errorf("%s: %w", path, vcs.ErrNotFound)
+	}
+	ctx, cancel := context.WithTimeout(ctx, toolGrepTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "--no-pager", "show", t.ref.Head+":"+path)
+	cmd.Dir = t.root
+	out, err := cmd.Output()
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, fmt.Errorf("%s at %s: %w", path, t.ref.Head, vcs.ErrNotFound)
+	}
+	return out, nil
+}
+
 // private reports whether a path inside the checkout is one the tools must not
 // return: anything under .git, which holds the checkout's own configuration and,
 // in a CI checkout, the token the job pushes with, and anything git ignores,
@@ -194,9 +253,9 @@ func (t *repoTools) private(ctx context.Context, rel string) bool {
 	return !notIgnored
 }
 
-// grep searches the checkout's tracked files with an extended regular
-// expression. The pattern follows -e and the glob follows --, so neither can
-// be read by git as an option.
+// grep searches the reviewed commit, or the checkout's tracked files when no
+// commit is pinned, with an extended regular expression. The pattern follows
+// -e and the glob follows --, so neither can be read by git as an option.
 func (t *repoTools) grep(ctx context.Context, pattern, glob string) string {
 	pattern = strings.TrimSpace(pattern)
 	glob = strings.TrimSpace(glob)
@@ -206,7 +265,7 @@ func (t *repoTools) grep(ctx context.Context, pattern, glob string) string {
 		return t.retainBytes(int64(len(out) + len(pattern) + len(glob) + 128))
 	})
 	if err != nil {
-		t.failures.Add(1)
+		t.fail(ctx)
 		if result != "" {
 			return result
 		}
@@ -226,6 +285,16 @@ func (t *repoTools) search(ctx context.Context, pattern, glob string) (string, e
 	ctx, cancel := context.WithTimeout(ctx, t.grepTimeout)
 	defer cancel()
 	args := []string{"--no-pager", "grep", "-n", "-E", "-I", "--no-color", "-e", pattern}
+	prefix := ""
+	if t.pinned() {
+		if strings.HasPrefix(t.ref.Head, "-") {
+			return "the search failed: invalid revision", errors.New("invalid revision")
+		}
+		// git names a match in a tree as revision:path; the checker is given
+		// the same path form the working-tree search returns.
+		args = append(args, t.ref.Head)
+		prefix = t.ref.Head + ":"
+	}
 	if g := strings.TrimSpace(glob); g != "" {
 		args = append(args, "--", g)
 	}
@@ -251,7 +320,7 @@ func (t *repoTools) search(ctx context.Context, pattern, glob string) (string, e
 		if len(l) > toolGrepWidth {
 			l = l[:toolGrepWidth]
 		}
-		lines = append(lines, l)
+		lines = append(lines, strings.TrimPrefix(l, prefix))
 		if len(lines) == toolGrepLines {
 			break
 		}

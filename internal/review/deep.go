@@ -26,7 +26,6 @@ import (
 // work with a reasoning model: on the R12 smoke, DeepSeek V4.1 Flash thought past
 // 131,072 tokens on 115,000-token prompts and answered nothing. Spread over loop
 // turns, each call stays short enough for the reasoning to finish.
-// docs/remediation-mira.md, "Deep review", has the design.
 
 const (
 	// deepToolBytes bounds what the lookups of one agent may return in total,

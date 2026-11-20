@@ -223,8 +223,7 @@ this reviewer.
 
 ### After the remediation plan (2026-09-04)
 
-See [Remediation](remediation.md) for the plan and what each step
-measured. On the benchmark repository, re-laid-out so nothing tells either
+On the benchmark repository, re-laid-out so nothing tells either
 reviewer it is reading a fixture, the shipped Action moved from 33 to 36 of
 41 plants, recovering four of the eight misses; the four still missed are
 the `info` plants, on which the new info corpus puts the default reviewer at

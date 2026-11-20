@@ -1,9 +1,7 @@
 # STRATEGY
 
-> Updated 2026-11-17 from `revised-plan.md`, which passed adversarial review
-> for planning scope only. The user subsequently approved implementation and
-> trusted-corpus Docker execution. Quality promotion still requires the frozen
-> studies and budgets described in the plan.
+> Updated 2026-11-17. The user approved implementation and trusted-corpus
+> Docker execution. Quality promotion still requires frozen studies and budgets.
 
 ## Problem
 
@@ -42,7 +40,7 @@ silently applies.
 - G2 shows whether a valid claim-specific refutation is available often enough
   to justify execution, with `precision_ceiling` reported as an optimistic
   bound.
-- Promotions require the frozen gates in `revised-plan.md`; inconclusive and
+- Promotions require frozen gates; inconclusive and
   underpowered results are recorded as such and are not rerun on the same
   holdout.
 
@@ -69,7 +67,7 @@ silently applies.
 - No standalone fix command, auto-merge, or self-approval.
 - No arbitrary-code sandbox claim; S0 selects and tests one backend.
 - No feature-parity roadmap, dashboards, diagrams, repeated fix loops, or other
-  deferred work from `revised-plan.md` §12.
+  deferred work.
 - No withdrawn delivery or cost promises. Estimates follow the feasibility
   audits.
 
@@ -88,8 +86,7 @@ results are inconclusive; both block promotion.
 Implementation now includes the accounting receipts, trusted-base learnings,
 thread/approval safety guards, optional fix checks, and a registered build-claim
 execution pilot. `runc` is approved for hand-picked examples; no gVisor
-installation is required for that scope. See `docs/remediation-implementation.md`
-for current validation and the studies that have not run.
+installation is required for that scope.
 
 0. Re-ingest this checkout into Semanta before relying on hosted code retrieval.
    The 2026-11-17 pulse reports drift 87, stale freshness, and no embedded

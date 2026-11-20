@@ -3,6 +3,10 @@ package evals
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"gopkg.in/yaml.v3"
 	"io"
@@ -265,9 +269,10 @@ func (m Model) provider() string {
 
 // Options configure a run.
 type Options struct {
-	Models   []Model
-	Fixtures []Fixture
-	Runs     int
+	Models       []Model
+	Fixtures     []Fixture
+	Runs         int
+	SampleOffset int
 
 	// CaptureDir, when set, receives every raw model response.
 	CaptureDir string
@@ -394,6 +399,13 @@ func OptionsFromEnv() (Options, error) {
 		opts.Runs = n
 	}
 
+	if raw := os.Getenv("NITPICK_EVAL_SAMPLE_OFFSET"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 {
+			return opts, fmt.Errorf("invalid sample offset %q", raw)
+		}
+		opts.SampleOffset = n
+	}
 	if raw := strings.TrimSpace(os.Getenv(EnvFixtures)); raw != "" {
 		// Resolved against both corpora, not against the default list: naming a
 		// held-out fixture has to select it, or the held-out set could only be
@@ -667,18 +679,48 @@ type recordingLLM struct {
 
 	mu        sync.Mutex
 	responses []string
+	calls     []CapturedCall
+}
+
+// CapturedCall retains the request and stage behind one provider outcome.
+type CapturedCall struct {
+	RequestID string          `json:"request_id"`
+	Role      string          `json:"role"`
+	Messages  []llms.Message  `json:"messages"`
+	Options   json.RawMessage `json:"options"`
+	Response  *llms.Response  `json:"response,omitempty"`
+	Failure   string          `json:"failure,omitempty"`
 }
 
 func (r *recordingLLM) GenerateContent(ctx context.Context, msgs []llms.Message, opts ...llms.CallOption) (*llms.Response, error) {
 	resp, err := r.inner.GenerateContent(ctx, msgs, opts...)
+	return resp, errors.Join(err, r.recordResponse(ctx, msgs, opts, resp, err))
+}
 
-	if resp != nil {
-		r.mu.Lock()
-		r.responses = append(r.responses, resp.Content)
-		r.mu.Unlock()
+func (r *recordingLLM) recordResponse(ctx context.Context, msgs []llms.Message, opts []llms.CallOption, resp *llms.Response, callErr error) error {
+	applied := *llms.ApplyOptions(opts...)
+	applied.Trace = nil
+	options, err := json.Marshal(applied)
+	if err != nil {
+		return fmt.Errorf("capture request options: %w", err)
 	}
-
-	return resp, err
+	request, err := json.Marshal([]any{r.inner.Provider(), r.inner.Model(), msgs, applied})
+	if err != nil {
+		return fmt.Errorf("capture request identity: %w", err)
+	}
+	hash := sha256.Sum256(request)
+	call := CapturedCall{RequestID: hex.EncodeToString(hash[:]), Role: llm.CallRole(ctx),
+		Messages: msgs, Options: options, Response: resp}
+	if callErr != nil {
+		call.Failure = callErr.Error()
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls = append(r.calls, call)
+	if resp != nil {
+		r.responses = append(r.responses, resp.Content)
+	}
+	return nil
 }
 
 func (r *recordingLLM) Stream(ctx context.Context, msgs []llms.Message, opts ...llms.CallOption) (<-chan llms.StreamChunk, error) {
@@ -714,6 +756,9 @@ type RunResult struct {
 
 	// Responses are the raw model outputs seen during the run.
 	Responses []string
+	Calls     []CapturedCall
+	Snapshots []review.Snapshot
+	Replay    struct{ Hits, Misses int64 }
 
 	// Usage is what the provider REPORTED this review spent, summed over every
 	// call the run made, review, triage, any repair round-trip. It is the
@@ -738,7 +783,7 @@ type RunResult struct {
 	// TestAFailedRunStillDeclaresItsScale pins it.
 	Scale SeverityScale
 
-	Err      error
+	Err      error `json:"-"`
 	Duration time.Duration
 }
 
@@ -751,6 +796,7 @@ func Run(ctx context.Context, model Model, f Fixture, runIndex int, opts Options
 // RunWithPersona reviews a fixture with an explicit persona, which is how tone
 // and nitpick-level variants are compared.
 func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, opts Options, persona config.Persona) RunResult {
+	runIndex += opts.SampleOffset
 	ctx = llm.WithResponseSample(ctx, fmt.Sprintf("%s/%s/%d", model.ID, f.Name, runIndex))
 	started := time.Now()
 
@@ -808,6 +854,7 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	recorder := &recordingLLM{inner: client.LLM}
 	client.LLM = recorder
 	recorders := []*recordingLLM{recorder}
+	clients := []*llm.Client{client}
 
 	// A composite run builds its own roles from the route file and meters
 	// every client it reaches for, so the row's cost is the sum of each
@@ -839,6 +886,7 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 			recorded := &recordingLLM{inner: c.LLM}
 			c.LLM = recorded
 			recorders = append(recorders, recorded)
+			clients = append(clients, c)
 		}
 		built.Each(meterInto)
 		inner := built.Build
@@ -857,7 +905,18 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	engine := review.NewEngine(cfg, provider, review.NoPolicy("offline fixtures have no forge base"),
 		func(*config.Config) (*llm.Roles, error) { return roles, nil }, cmpLogger(opts.Log))
 	engine.Roles = roles
+	if cfg.Review.GenerationLookups {
+		engine.RepoRoot = dir
+	}
 	engine.Instruction = securityPersonaInstruction()
+	var snapshotsMu sync.Mutex
+	if opts.CaptureDir != "" {
+		engine.OnSnapshot = func(snapshot review.Snapshot) {
+			snapshotsMu.Lock()
+			defer snapshotsMu.Unlock()
+			out.Snapshots = append(out.Snapshots, snapshot)
+		}
+	}
 
 	// Retrieval, when the arm asks for it. A failure to build it fails the run
 	// rather than quietly reviewing without: an arm that was supposed to have
@@ -876,6 +935,21 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 		engine.Knowledge = k
 	}
 
+	ctx = llm.WithToolChatObserver(ctx, func(callCtx context.Context, call llm.ToolChatObservation) error {
+		mmu.Lock()
+		var recorder *recordingLLM
+		for index, candidate := range clients {
+			if candidate == call.Client {
+				recorder = recorders[index]
+				break
+			}
+		}
+		mmu.Unlock()
+		if recorder == nil {
+			return errors.New("bounded request client was not registered for capture")
+		}
+		return recorder.recordResponse(callCtx, call.Messages, call.Options, call.Response, call.Err)
+	})
 	runCtx := ctx
 	if opts.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -893,6 +967,14 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	mmu.Lock()
 	for _, recorded := range recorders {
 		out.Responses = append(out.Responses, recorded.captured()...)
+		recorded.mu.Lock()
+		out.Calls = append(out.Calls, recorded.calls...)
+		recorded.mu.Unlock()
+	}
+	for _, client := range clients {
+		hits, misses := client.ResponseCacheStats()
+		out.Replay.Hits += hits
+		out.Replay.Misses += misses
 	}
 	mmu.Unlock()
 
@@ -906,6 +988,9 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 		mmu.Unlock()
 	}
 
+	if err == nil && report != nil && !report.PipelineComplete() {
+		err = fmt.Errorf("incomplete review: files=%v stages=%v", report.Incomplete, report.FailedStages())
+	}
 	out.Err = err
 	out.Duration = time.Since(started)
 
@@ -1067,6 +1152,7 @@ func evalConfig(model Model) *config.Config {
 	// Linters are deterministic and separately tested; excluding them keeps the
 	// score a measurement of the prompt.
 	cfg.Linters.Mode = config.LinterOff
+	cfg.Review.GenerationLookups = os.Getenv("NITPICK_EVAL_GENERATION_LOOKUPS") == "1"
 
 	// On unless the run asks, matching the shipped default; the switch is
 	// how the layer's own contribution gets measured.

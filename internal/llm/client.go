@@ -10,6 +10,7 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -88,6 +89,40 @@ func (c *Client) Model() string { return c.Spec.Model }
 // String describes the client as provider/model, for logs and errors.
 func (c *Client) String() string { return c.Spec.Provider + "/" + c.Spec.Model }
 
+// ToolChatObservation keeps bounded requests visible without wrapping them in retries.
+type ToolChatObservation struct {
+	Client   *Client
+	Messages []llms.Message
+	Options  []llms.CallOption
+	Response *llms.Response
+	Err      error
+}
+
+type toolChatObserverKey struct{}
+
+// WithToolChatObserver attaches local evidence capture to bounded requests. The
+// capture is optional to attach, but not to lose: an error from observe is joined
+// into ToolChat's error, so a run that was meant to retain every request fails
+// instead of counting a request it could not record.
+func WithToolChatObserver(ctx context.Context, observe func(context.Context, ToolChatObservation) error) context.Context {
+	return context.WithValue(ctx, toolChatObserverKey{}, observe)
+}
+
+// ToolChat makes one attempt, retaining replay and metering but bypassing retries.
+func (c *Client) ToolChat(ctx context.Context, msgs []llms.Message, opts ...llms.CallOption) (*llms.Response, error) {
+	inner := c.LLM
+	if c.replay != nil {
+		inner = c.replay
+	} else if c.observed != nil {
+		inner = c.observed
+	}
+	resp, err := inner.GenerateContent(ctx, msgs, opts...)
+	if observe, ok := ctx.Value(toolChatObserverKey{}).(func(context.Context, ToolChatObservation) error); ok {
+		err = errors.Join(err, observe(ctx, ToolChatObservation{Client: c, Messages: msgs, Options: opts, Response: resp, Err: err}))
+	}
+	return resp, err
+}
+
 // Build constructs a client from a model spec. Unknown providers and missing
 // credentials fail here, before any request is made.
 //
@@ -137,6 +172,9 @@ func BuildContext(ctx context.Context, spec config.ModelSpec) (*Client, error) {
 	observed := &observedLLM{inner: client, model: spec.Model}
 	var inner llms.LLM = observed
 	var replay *replayLLM
+	if (os.Getenv(EnvPurchaseBudget) != "" || os.Getenv(EnvReplayOnly) != "") && strings.TrimSpace(os.Getenv(EnvResponseCache)) == "" {
+		return nil, errors.New("purchase budget and offline replay require a persistent response cache")
+	}
 	if dir := strings.TrimSpace(os.Getenv(EnvResponseCache)); dir != "" {
 		switch spec.Provider {
 		case ProviderOpenRouter:
@@ -152,6 +190,7 @@ func BuildContext(ctx context.Context, spec config.ModelSpec) (*Client, error) {
 			return nil, err
 		}
 		replay = newReplayLLM(observed, filepath.Join(dir, namespace))
+		replay.billingProvider = spec.Provider
 		inner = replay
 	}
 	resilient := resilience.NewResilientClient(inner,

@@ -58,6 +58,9 @@ type Engine struct {
 	// overall context. Zero leaves the configured client timeout in control.
 	RequestTimeout time.Duration
 
+	// OnSnapshot receives immutable stage evidence. Nil avoids capture work.
+	OnSnapshot func(Snapshot)
+
 	// AssessPractices attaches engineering evidence before rendering and gating.
 	// Nil leaves the existing review policy in control.
 	AssessPractices func(context.Context, vcs.Ref, *vcs.PullRequest, *Report) *practices.Report
@@ -1041,6 +1044,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		report.Stages = append(report.Stages, StageStatus{Stage: "style", Reason: errorKind(styleErr)})
 	}
 	findings = append(findings, style...)
+	e.snapshot(Snapshot{Stage: "generation", Findings: findings})
 
 	// Collected across every stage that can drop an analyzer finding, not just
 	// the first one. See the assembly below.
@@ -1087,6 +1091,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	findings, dropped, unpublished := e.filterTaskAnchors(findings, files)
 	report.UnpublishedModelFindings = append(report.UnpublishedModelFindings, unpublished...)
 	discarded = append(discarded, dropped...)
+	e.snapshot(Snapshot{Stage: "anchors-before-triage", Findings: findings, Reason: "anchors must belong to reviewed lines"})
 
 	// A known advisory is deterministic evidence: a scanner matched a pinned
 	// version against a published vulnerability, and no model pass has
@@ -1099,6 +1104,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	findings, advisories := holdAdvisories(dedupe(findings))
 
 	beforeTriage := findings
+	e.snapshot(Snapshot{Stage: "triage-input", Findings: findings})
 	var summary string
 	var withheldByTriage []Overruled
 	switch {
@@ -1125,6 +1131,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		}
 		return nil, err
 	}
+	e.snapshot(Snapshot{Stage: "triage", Findings: findings, Withheld: withheldByTriage})
 	// The summary was written over what triage saw, which the advisories
 	// were not; a walkthrough that says the change is clean above four
 	// posted CVEs would be wrong, so it says they are there.
@@ -1146,6 +1153,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		report.Stages = append(report.Stages, StageStatus{Stage: "design evidence", Reason: "model findings cited source outside their task"})
 	}
 	discarded = append(discarded, dropped...)
+	e.snapshot(Snapshot{Stage: "anchors-after-triage", Findings: findings, Reason: "rewritten anchors must belong to reviewed lines"})
 
 	// Assembled here rather than where the analyzer set was read, BECAUSE READING
 	// IT THERE was THE BUG. Report.Discarded was frozen before the first
@@ -1167,12 +1175,14 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	// threshold in either direction.
 	findings, overruled, validationFailures := e.validateFindings(ctx, findings, plan)
 	report.Stages = append(report.Stages, validationFailures...)
+	e.snapshot(Snapshot{Stage: "validation", Findings: findings, Withheld: overruled})
 	// Repository verification follows validation and sees what survives it.
 	// Its withheld findings join the expert ones, so a reader sees one list of
 	// what was held back and why.
 	var unverified []Overruled
 	findings, unverified, evidence, verifyFailures := e.verifyFindings(ctx, ref, findings, plan)
 	report.Stages = append(report.Stages, verifyFailures...)
+	e.snapshot(Snapshot{Stage: "verification", Findings: findings, Withheld: unverified})
 	overruled = append(overruled, unverified...)
 	// The decision model, when asked for, follows the check and is shown what the
 	// check read. It sees only what the check kept, so it is never paid to score
@@ -1189,6 +1199,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 
 	findings = validateSuggestions(findings, files)
 	findings = e.applyGate(findings)
+	e.snapshot(Snapshot{Stage: "publication-gate", Findings: findings})
 	sortFindings(findings)
 
 	// After the gate, so what is counted as "already posted" is what would
@@ -1984,6 +1995,10 @@ func (e *Engine) analyzeBatch(ctx context.Context, base, prContext string, b bun
 // for it.
 func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base, prContext string, b bundle.Batch, style bool) ([]Finding, error) {
 	ctx = llm.WithCallRole(ctx, "review")
+	bounded := e.Config.Review.GenerationLookups && !e.Deep && !e.FastReview && !style
+	if bounded {
+		base += "\n" + boundedGenerationPrompt
+	}
 	var body strings.Builder
 
 	if prContext != "" {
@@ -2027,18 +2042,34 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 		{Role: llms.RoleUser, Content: body.String()},
 	}
 
-	schema, err := schemaOption(findingsSchemaName, func() (json.RawMessage, error) { return findingsSchema(offeredClasses(e.Config.Review.Slop)) })
+	rawSchema, err := findingsSchema(offeredClasses(e.Config.Review.Slop))
 	if err != nil {
 		return nil, err
 	}
+	schema := llms.WithJSONSchema(findingsSchemaName, rawSchema, true)
 
 	keyBase := base
+	if bounded {
+		keyBase += fmt.Sprintf("\x00generation-lookups:%d:%d:%s",
+			boundedGenerationOperations, boundedGenerationBytes, boundedGenerationTimeout)
+	}
 	if e.Deep && !style {
 		// The engine's mode is not configuration, so the key has to carry it:
 		// a resumed run must never serve one mode's answer to the other.
 		keyBase += "\x00deep-review"
 	}
 	key := e.progress.key(client, keyBase, body.String())
+	if bounded {
+		if e.lookups == nil {
+			return nil, errors.New("bounded generation needs repository tools")
+		}
+		ref, encodeErr := json.Marshal(e.lookups.ref)
+		if encodeErr != nil {
+			return nil, fmt.Errorf("encode bounded generation revision: %w", encodeErr)
+		}
+		options := append(client.CallOptions(), llms.WithTools(deepTools(e.lookups.canSearch(), rawSchema)), llms.WithToolChoiceAuto())
+		key = e.progress.stageKey("bounded-generation", client, keyBase, body.String()+"\x00"+string(ref), options...)
+	}
 	if e.standingOnly != nil {
 		for _, p := range b.Paths() {
 			if e.standingOnly[p] {
@@ -2052,7 +2083,15 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 			}
 		}
 	}
-	cached, reused := e.progress.load(key)
+	var cached []Finding
+	var reused bool
+	var generationLookups []verdictLookup
+	if bounded {
+		saved, hit := e.reuseGeneration(ctx, key)
+		cached, reused = saved.Findings, hit
+	} else {
+		cached, reused = e.progress.load(key)
+	}
 	result := Result{Findings: cached}
 	if reused {
 		e.log().Info("reusing completed model review", "files", b.Paths(), "model", client.String())
@@ -2072,7 +2111,11 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 				callCtx, cancel = context.WithTimeout(ctx, e.RequestTimeout)
 				defer cancel()
 			}
-			result, err = llm.Extract[Result](callCtx, client, msgs, schema)
+			if bounded {
+				result, generationLookups, err = e.boundedGeneration(ctx, client, msgs, rawSchema, e.lookups)
+			} else {
+				result, err = llm.Extract[Result](callCtx, client, msgs, schema)
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -2095,10 +2138,15 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 			}
 		}
 		if !deep.degraded {
-			e.progress.save(key, result.Findings)
+			if bounded {
+				saveStage(e.progress, key, rankAnalysis, storedGeneration{Findings: result.Findings, Lookups: generationLookups, Complete: true})
+			} else {
+				e.progress.save(key, result.Findings)
+			}
 		}
 	}
 
+	e.snapshot(Snapshot{Stage: "batch-generation", Paths: b.Paths(), Findings: result.Findings})
 	var taskContext *TaskContext
 	if b.DesignTask != "" {
 		taskContext = &TaskContext{ID: strings.Join(b.DesignTaskIDs(), "+"), Text: rendered, Lines: map[string]int{}, Spans: map[string][]bundle.SourceSpan{}}
@@ -2115,6 +2163,11 @@ func (e *Engine) analyzeBatchWith(ctx context.Context, client *llm.Client, base,
 	}
 	out := make([]Finding, 0, len(result.Findings))
 	for _, f := range result.Findings {
+		if recovered, ok := withRecoveredTitle(f); ok {
+			e.log().Warn("recovered a missing finding title from its rationale",
+				"path", f.Path, "line", f.Line, "title", recovered.Title)
+			f = recovered
+		}
 		if !f.Valid() {
 			continue
 		}

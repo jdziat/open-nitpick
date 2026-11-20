@@ -22,7 +22,7 @@ import (
 // It follows the repository check on purpose. Measured on 100 findings that
 // agents graded, the check and Jev together withheld more findings that were
 // not real than either did alone, at the same cost in real ones, and the
-// check's lookups are the evidence Jev is shown (docs/remediation-mira.md).
+// check's lookups are the evidence Jev is shown.
 
 const (
 	// jevExpert is how a finding this stage withholds is attributed to a reader.

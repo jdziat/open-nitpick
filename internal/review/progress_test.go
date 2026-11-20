@@ -529,7 +529,7 @@ func TestResumeRechecksEveryVerificationLookupBeforeReusingItsVerdict(t *testing
 			checker := &toolLLM{script: script}
 			e, _ := verifyEngine(t, checker, config.VerifyConfirmed)
 			e.progress = &reviewProgress{now: "abcdef", current: map[string]json.RawMessage{}}
-			ref := vcs.Ref{Head: "abcdef"}
+			ref := vcs.Ref{Head: commitLookupTree(t, root)}
 			first := e.verifyCached(t.Context(), ref, "system", newRepoTools(root, nil, ref), fs[0], nil)
 			if !first.submitted || checker.calls != 4 || strings.Contains(first.evidence, "const Value") {
 				t.Fatalf("control did not put the changed lookup beyond the evidence log: submitted=%t calls=%d evidence bytes=%d", first.submitted, checker.calls, len(first.evidence))
@@ -542,6 +542,7 @@ func TestResumeRechecksEveryVerificationLookupBeforeReusingItsVerdict(t *testing
 			if err := os.WriteFile(filepath.Join(root, "sibling.go"), []byte("const Value = 2\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}
+			ref = vcs.Ref{Head: commitLookupTree(t, root)}
 			e.progress = &reviewProgress{now: "abcdef", prior: e.progress.current, current: map[string]json.RawMessage{}}
 			changed := e.verifyCached(t.Context(), ref, "system", newRepoTools(root, nil, ref), fs[0], nil)
 			if checker.calls != 8 || e.progress.reused != 0 || !changed.submitted {

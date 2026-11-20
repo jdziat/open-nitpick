@@ -1,6 +1,7 @@
 package review
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -104,6 +105,40 @@ func (p *reviewProgress) key(client *llm.Client, base, body string) string {
 // renders is a hash of content that cannot be empty.
 func (p *reviewProgress) load(key string) ([]Finding, bool) {
 	return loadStage[[]Finding](p, key, rankAnalysis)
+}
+
+type storedGeneration struct {
+	Findings []Finding       `json:"findings"`
+	Lookups  []verdictLookup `json:"lookups"`
+	Complete bool            `json:"complete"`
+}
+
+func (e *Engine) reuseGeneration(ctx context.Context, key string) (storedGeneration, bool) {
+	return loadStageChecked[storedGeneration](e.progress, key, rankAnalysis, func(saved storedGeneration) bool {
+		if !saved.Complete || len(saved.Lookups) > boundedGenerationOperations {
+			return false
+		}
+		if len(saved.Lookups) == 0 {
+			return true
+		}
+		if e.lookups == nil {
+			return false
+		}
+		checkCtx, cancel := context.WithTimeout(ctx, boundedGenerationTimeout)
+		defer cancel()
+		checkCtx, turnFailures := withTurnFailures(checkCtx)
+		for _, lookup := range saved.Lookups {
+			args := map[string]any{}
+			if json.Unmarshal([]byte(lookup.Arguments), &args) != nil {
+				return false
+			}
+			answer, ok := runLookup(checkCtx, e.lookups, lookup.Tool, args)
+			if !ok || turnFailures.Load() != 0 || checkCtx.Err() != nil || boundedLookupDigest(answer) != lookup.Digest {
+				return false
+			}
+		}
+		return true
+	})
 }
 
 // loadStage reads one stored result as T. A record that does not decode is a

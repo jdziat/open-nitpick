@@ -122,9 +122,7 @@ nav:
       - Development: docs/development.md
       - Measurement rules: docs/measurement.md
       - Findings: docs/findings.md
-      - Model breakdown: docs/model-breakdown.md
       - Against Incumbent: docs/comparison.md
-      - Remediation: docs/remediation.md
 
 extra:
   generator: false
