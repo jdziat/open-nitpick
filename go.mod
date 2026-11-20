@@ -12,7 +12,7 @@ require (
 	github.com/nocturnium/llm-go-sdk/v6 v6.11.3
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/zalando/go-keyring v0.2.8
-	golang.org/x/mod v0.42.0
+	golang.org/x/mod v0.43.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
