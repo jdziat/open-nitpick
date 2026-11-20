@@ -209,6 +209,9 @@ func TestShouldEscalateSeparatesTheModelsFailuresFromTheTransports(t *testing.T)
 		"response was not valid JSON after one repair attempt: x":                                                                             true,
 		"no JSON object in the response matched the expected shape (x)":                                                                       true,
 		"no JSON object found in response (x)":                                                                                                true,
+		// An endpoint that cannot turn reasoning off fails the reasoning-off
+		// retry with a 400; the fallback model may still answer.
+		"API error (status 400, code 400): Reasoning is mandatory for this endpoint and cannot be disabled.": true,
 		// A bare truncation is the retry path's business, not a second
 		// model's: the fallback overlays its parent and inherits the same
 		// output cap, so it would be cut in the same place.
