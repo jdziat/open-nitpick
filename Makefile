@@ -336,8 +336,8 @@ QUICK ?= z-ai/glm-5.3-flash
 # with related context off and on. What to run after editing a prompt.
 .PHONY: quick
 quick:
-	$(MAKE) benchmark-multifile MODELS='$(QUICK)' RUNS='$(or $(RUNS),1)' FIXTURES='$(or $(FIXTURES),$(TUNING))'
-	$(MAKE) benchmark-multifile MODELS='$(QUICK)' RUNS='$(or $(RUNS),1)'
+	$(MAKE) benchmark-multifile MODELS='$(QUICK)' RUNS='$(or $(RUNS),1)' FIXTURES='$(or $(FIXTURES),$(TUNING))' $(if $(DUMP),DUMP='$(DUMP).tuning.jsonl') $(if $(CAPTURE),CAPTURE='$(CAPTURE)/tuning')
+	$(MAKE) benchmark-multifile MODELS='$(QUICK)' RUNS='$(or $(RUNS),1)' $(if $(DUMP),DUMP='$(DUMP).multifile.jsonl') $(if $(CAPTURE),CAPTURE='$(CAPTURE)/multifile')
 
 # Judge-free head-to-head on the MULTI-FILE corpus: every model with related
 # context off and on, against every incumbent with a cached or collectable
@@ -400,6 +400,8 @@ benchmark-multifile:
 	$(if $(MODELS),NITPICK_EVAL_MODELS='$(MODELS)') \
 	$(if $(FIXTURES),NITPICK_EVAL_FIXTURES='$(FIXTURES)') \
 	$(if $(RUNS),NITPICK_EVAL_RUNS='$(RUNS)') \
+	$(if $(DUMP),NITPICK_EVAL_DUMP='$(DUMP)') \
+	$(if $(CAPTURE),NITPICK_EVAL_CAPTURE='$(CAPTURE)') \
 	$(if $(REASONING),NITPICK_EVAL_REASONING='$(REASONING)') \
 	$(if $(TIMEOUT),NITPICK_EVAL_TIMEOUT='$(TIMEOUT)') \
 	$(if $(ENGINE_LOG),NITPICK_EVAL_ENGINE_LOG='$(ENGINE_LOG)') \

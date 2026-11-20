@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "source_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "models": [
+    {
+      "ID": "test"
+    }
+  ],
+  "runs": 2,
+  "sample_offset": 100,
+  "fixture_hashes": {
+    "go-nil-deref": "abc"
+  },
+  "variants": {
+    "": [
+      false,
+      false
+    ]
+  },
+  "reasoning": "",
+  "request_timeout_ns": 0
+}
