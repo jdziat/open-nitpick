@@ -9,7 +9,7 @@ require (
 	github.com/gofrs/flock v0.13.0
 	github.com/google/go-github/v74 v74.0.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
-	github.com/nocturnium/llm-go-sdk/v6 v6.11.3
+	github.com/nocturnium/llm-go-sdk/v6 v6.16.1
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/mod v0.42.0
