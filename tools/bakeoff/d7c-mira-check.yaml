@@ -1,7 +1,6 @@
 # D7c: D7 without the Jev filter. Mira's adapted prompts with the repository check as the
 # selection: the confidence floor and the critique are off, so every draft that survives the
 # duplicate rule and the cap is checked, and posted only when the check confirms it.
-# docs/remediation-mira.md, "D7c".
 review:
   verify: confirmed
   deep:

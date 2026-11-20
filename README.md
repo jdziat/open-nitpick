@@ -112,8 +112,6 @@ This project makes empirical claims about review quality. These pages say how th
   anywhere from 3.66 to 3.98, so prefer the judge-free columns.
 - [Against Incumbent](docs/comparison.md): capabilities and measured results
   by language, with what each iteration changed.
-- [Remediation](docs/remediation.md): every miss on the benchmark
-  repository, its cause read from the pull request, and the plan.
 - [Findings](docs/findings.md): every measurement taken and what it
   supports, with a table of the measurement bugs found so far and which
   reviewer each one favoured or counted against.

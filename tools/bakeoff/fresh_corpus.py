@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a review corpus from pull requests neither tool has seen (F7 in docs/remediation-mira.md).
+"""Build a review corpus from pull requests neither tool has seen.
 
 Golden comments are real human review threads that a later commit answered: the thread's first
 comment is by a person other than the pull request's author, and GitHub marks the thread

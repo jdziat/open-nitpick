@@ -134,7 +134,7 @@ type Finding struct {
 	// is real and reachable. Nil means the reviewer gave none: an analyzer
 	// finding, or a model that ignored the schema. It is a model's claim and is
 	// treated as one, kept apart from Severity, which says how much the defect
-	// matters if it is real. See docs/remediation-mira.md, stage R1.
+	// matters if it is real.
 	Confidence *float64 `json:"confidence,omitempty"`
 
 	// Citation quotes the lines of shown code the claim rests on, empty when

@@ -10,8 +10,7 @@ import (
 
 // runDeepReview reviews a change with several agents that read the repository
 // over many turns, then withholds what fails a confidence floor or a critique.
-// It makes several times the model calls of review; docs/remediation-mira.md,
-// "Deep review", has the design and the measurements.
+// It makes several times the model calls of review.
 func runDeepReview(ctx context.Context, args []string) error {
 	return reviewWithScope(ctx, "deep-review", args, applyDeepReviewScope, func(engine *review.Engine) {
 		engine.Deep = true

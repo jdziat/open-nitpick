@@ -377,7 +377,7 @@ eval-security:
 eval-security-heldout:
 	NITPICK_EVAL_SECURITY=1 NITPICK_EVAL_SECURITY_DEPTH='$(or $(DEPTH),deep)' $(MAKE) benchmark-multifile FIXTURES='$(SECURITY_HELD_OUT)' MODELS='$(or $(MODELS),$(SECURITY_MODELS))' RUNS='$(or $(RUNS),2)'
 
-# The Martian benchmark bakeoff (docs/bakeoff-mira.md). The inputs live outside
+# The Martian benchmark bakeoff. The inputs live outside
 # the repository: BAKEOFF is a directory holding inputs/ (from Mira's
 # prepare_benchmark_inputs.py), repos/ (from tools/bakeoff/build_repos.py),
 # bench/ (the pinned upstream checkout) and deps/ (its Python dependencies).

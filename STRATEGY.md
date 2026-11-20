@@ -88,8 +88,7 @@ results are inconclusive; both block promotion.
 Implementation now includes the accounting receipts, trusted-base learnings,
 thread/approval safety guards, optional fix checks, and a registered build-claim
 execution pilot. `runc` is approved for hand-picked examples; no gVisor
-installation is required for that scope. See `docs/remediation-implementation.md`
-for current validation and the studies that have not run.
+installation is required for that scope.
 
 0. Re-ingest this checkout into Semanta before relying on hosted code retrieval.
    The 2026-11-17 pulse reports drift 87, stale freshness, and no embedded

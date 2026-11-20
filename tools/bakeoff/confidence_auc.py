@@ -4,9 +4,8 @@
 For every published comment carrying a confidence, the label is whether the
 judge matched it to a golden comment. Prints the area under the ROC curve (the
 chance a matched comment outranks an unmatched one) and, for a range of floors,
-how many comments and matched comments a floor would keep. This is stage R1's
-gate in docs/remediation-mira.md: an area of 0.70 or more to build the floor,
-below 0.65 to abandon it.
+how many comments and matched comments a floor would keep. This is the gate for
+the confidence floor: an area of 0.70 or more to build it, below 0.65 to abandon it.
 
     python3 tools/bakeoff/confidence_auc.py --scores /tmp/bakeoff/scores-R1/scores.json \\
         --run r1-p1=/tmp/bakeoff/nitpick-r1-p1 --run r1-p2=/tmp/bakeoff/nitpick-r1-p2

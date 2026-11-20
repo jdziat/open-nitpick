@@ -27,7 +27,7 @@ import (
 // refutes or says it cannot tell. It exists because the stages that judge a
 // finding from its text alone, severity, triage, expert validation and an
 // evidence grade that could not look anything up, did not raise precision
-// without losing recall. One that can look does (docs/remediation-mira.md, R2b).
+// without losing recall. One that can look does.
 
 // The verdicts a checker may submit. Confirmed and refuted are the words
 // validate.go already uses for an expert; uncertain is this stage's own, and
