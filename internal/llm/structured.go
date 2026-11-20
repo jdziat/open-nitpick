@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -60,6 +61,10 @@ func Extract[T any](ctx context.Context, c *Client, msgs []llms.Message, opts ..
 			if err == nil {
 				return value, nil
 			}
+		}
+		// A failed experimental sample must not silently purchase a repair.
+		if os.Getenv(EnvPurchaseBudget) != "" {
+			return zero, fmt.Errorf("%s: bounded experiment refuses an additional extraction purchase: %w", c, err)
 		}
 		// OpenRouter reserves the whole output cap against the key's balance
 		// before the call, so with no max_tokens set a model whose cap is
@@ -187,6 +192,9 @@ func markStalled(ctx context.Context, err error) error {
 // retryAfter decides whether an attempt is sent again and with what options.
 // started is when the first attempt began; see retryBudgetSpent.
 func (c *Client) retryAfter(ctx context.Context, attempt int, started time.Time, call []llms.CallOption, resp *llms.Response, err error) ([]llms.CallOption, bool) {
+	if os.Getenv(EnvPurchaseBudget) != "" {
+		return nil, false
+	}
 	// Not a retry of the transport and not counted against its budget: it fires
 	// at most once per call, since the options sent again carry no temperature.
 	if c.RejectsTemperature(err, call) {

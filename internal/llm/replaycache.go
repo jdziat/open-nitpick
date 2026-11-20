@@ -21,6 +21,9 @@ import (
 // EnvResponseCache selects an operator-owned directory for completed responses.
 const EnvResponseCache = "NITPICK_LLM_CACHE_DIR"
 
+// EnvReplayOnly refuses cache misses before any provider dispatch.
+const EnvReplayOnly = "NITPICK_LLM_REPLAY_ONLY"
+
 // EnvRetryRequest authorizes one retry of request-hash:unique-approval-token.
 const EnvRetryRequest = "NITPICK_LLM_RETRY_REQUEST"
 
@@ -31,10 +34,11 @@ var ErrRecordedAttempt = errors.New("prior provider attempt needs reconciliation
 const replayVersion = 1
 
 type replayLLM struct {
-	inner  llms.LLM
-	dir    string
-	hits   atomic.Int64
-	misses atomic.Int64
+	inner           llms.LLM
+	billingProvider string
+	dir             string
+	hits            atomic.Int64
+	misses          atomic.Int64
 }
 
 type replayEntry struct {
@@ -42,6 +46,13 @@ type replayEntry struct {
 	Key      string
 	Digest   string
 	Response json.RawMessage
+}
+
+func (r *replayLLM) purchaseProvider() llms.Provider {
+	if r.billingProvider != "" {
+		return llms.Provider(r.billingProvider)
+	}
+	return r.Provider()
 }
 
 func newReplayLLM(inner llms.LLM, dir string) *replayLLM {
@@ -67,11 +78,28 @@ func (r *replayLLM) Provider() llms.Provider { return r.inner.Provider() }
 func (r *replayLLM) Model() string           { return r.inner.Model() }
 
 func (r *replayLLM) Stream(ctx context.Context, msgs []llms.Message, opts ...llms.CallOption) (<-chan llms.StreamChunk, error) {
+	if os.Getenv(EnvReplayOnly) != "" {
+		return nil, errors.New("offline replay does not support streaming; provider dispatch refused")
+	}
+	if os.Getenv(EnvPurchaseBudget) != "" {
+		return nil, errors.New("streaming is not supported by the purchase budget")
+	}
 	return r.inner.Stream(ctx, msgs, opts...)
 }
 
 func (r *replayLLM) GenerateContent(ctx context.Context, msgs []llms.Message, opts ...llms.CallOption) (*llms.Response, error) {
 	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	// The key is computed from the options after the price bound is applied, on
+	// purpose: a response bought under one max_price must not be replayed as the
+	// answer to a request under another. The cost is that editing a ledger's
+	// tariffs changes every request's identity, so a ledger is frozen for as long
+	// as its cache is in use. TestPurchaseRoutingCapParticipatesInRequestIdentity
+	// pins this.
+	var err error
+	opts, err = purchaseOptions(r.purchaseProvider(), r.Model(), opts)
+	if err != nil {
 		return nil, err
 	}
 	key, ok := r.keyFor(ctx, msgs, opts)
@@ -106,6 +134,10 @@ func (r *replayLLM) GenerateContent(ctx context.Context, msgs []llms.Message, op
 		return nil, err
 	}
 	pending := path + ".pending"
+	approvedRetry := false
+	if os.Getenv(EnvReplayOnly) != "" {
+		return nil, errors.New("offline replay cache miss; provider dispatch refused")
+	}
 	if _, err := os.Stat(pending); err == nil {
 		approval := strings.TrimSpace(os.Getenv(EnvRetryRequest))
 		if !strings.HasPrefix(approval, key+":") || len(approval) <= len(key)+1 {
@@ -119,7 +151,13 @@ func (r *replayLLM) GenerateContent(ctx context.Context, msgs []llms.Message, op
 		if err := consumed.Close(); err != nil {
 			return nil, err
 		}
+		approvedRetry = true
 	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	reservation, err := reservePurchase(ctx, r.purchaseProvider(), r.Model(),
+		filepath.Base(r.dir)+"/"+key, approvedRetry, msgs, opts)
+	if err != nil {
 		return nil, err
 	}
 	intent, err := os.OpenFile(pending, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
@@ -135,18 +173,32 @@ func (r *replayLLM) GenerateContent(ctx context.Context, msgs []llms.Message, op
 	r.misses.Add(1)
 	resp, err := r.inner.GenerateContent(ctx, msgs, opts...)
 	if err != nil || !cacheable(resp) {
-		if raw, marshalErr := json.Marshal(resp); marshalErr == nil {
-			if saveErr := os.WriteFile(path+".attempt", raw, 0o600); saveErr != nil {
-				return resp, errors.Join(err, fmt.Errorf("save failed attempt: %w", saveErr))
-			}
+		haltCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		// A charge can be settled even when the provider failed. Its receipt
+		// must never become a reusable answer merely because it looks complete.
+		raw, saveErr := json.Marshal(resp)
+		if saveErr == nil {
+			saveErr = os.WriteFile(path+".attempt", raw, 0o600)
 		}
-		if err != nil {
-			return resp, errors.Join(ErrRecordedAttempt, err)
+		if saveErr != nil {
+			return resp, errors.Join(ErrRecordedAttempt, err, fmt.Errorf("save failed attempt: %w", saveErr),
+				reservation.halt(haltCtx, "paid response persistence failed"))
 		}
-		return resp, nil
+		if resp != nil && resp.Usage.Cost != nil {
+			return resp, errors.Join(ErrRecordedAttempt, err, reservation.settle(haltCtx, resp))
+		}
+		return resp, errors.Join(ErrRecordedAttempt, err, reservation.halt(haltCtx, "provider outcome unresolved"))
 	}
 	if err := r.write(key, resp); err != nil {
-		return resp, fmt.Errorf("persist paid response: %w", err)
+		haltCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		return resp, errors.Join(fmt.Errorf("persist paid response: %w", err), reservation.halt(haltCtx, "paid response persistence failed"))
+	}
+	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if err := reservation.settle(settleCtx, resp); err != nil {
+		return resp, fmt.Errorf("settle paid response: %w", err)
 	}
 	// The pending marker stays on purpose. It is the durable record that this
 	// request was paid for, so a later corrupt or lost entry is refused

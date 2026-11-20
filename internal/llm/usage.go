@@ -29,6 +29,15 @@ func WithCallRole(ctx context.Context, role string) context.Context {
 	return context.WithValue(ctx, callRoleKey{}, role)
 }
 
+// CallRole identifies the stage making this request.
+func CallRole(ctx context.Context) string {
+	role, _ := ctx.Value(callRoleKey{}).(string)
+	if role == "" {
+		return "unclassified"
+	}
+	return role
+}
+
 // WithCallObserver records non-chat usage in the same review ledger.
 func WithCallObserver(ctx context.Context, fn func(CallRecord)) context.Context {
 	return context.WithValue(ctx, callObserverKey{}, fn)
