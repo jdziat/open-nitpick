@@ -100,7 +100,10 @@ type ToolChatObservation struct {
 
 type toolChatObserverKey struct{}
 
-// WithToolChatObserver attaches optional local evidence capture to bounded requests.
+// WithToolChatObserver attaches local evidence capture to bounded requests. The
+// capture is optional to attach, but not to lose: an error from observe is joined
+// into ToolChat's error, so a run that was meant to retain every request fails
+// instead of counting a request it could not record.
 func WithToolChatObserver(ctx context.Context, observe func(context.Context, ToolChatObservation) error) context.Context {
 	return context.WithValue(ctx, toolChatObserverKey{}, observe)
 }
