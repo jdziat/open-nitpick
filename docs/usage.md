@@ -386,8 +386,7 @@ catalog-applicable tools including `golangci-lint` with gosec forced on).
 (Rule 10). There is no `-budget` and no `-no-linters`. The optional model pass
 uses `models.security` when set, otherwise `models.review` / `models.default`
 (see the bake-off in `docs/findings.md`). The MCP tool `security_scan` is the
-same engine; absolute `repo` paths are trusted-operator-only. See
-`docs/plans/2026-09-17-security-command.md`.
+same engine; absolute `repo` paths are trusted-operator-only.
 
 ## The slop class
 
