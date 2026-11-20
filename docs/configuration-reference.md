@@ -1425,6 +1425,11 @@ FailOn is the lowest severity that makes the run exit non-zero. "none" disables 
 boolean, default `false`.
 Flow draws, in the walkthrough, how the functions a change edits are reached and what they reach: the callers up to an entry point and the callees down to effects on the outside world, from Go source only.
 
+### `review.generation_lookups`
+
+boolean, default `false`.
+GenerationLookups permits one bounded repository lookup round in ordinary review generation.
+
 ### `review.ignore`
 
 list of string, default `[**/vendor/** **/node_modules/** **/testdata/** **/dist/** **/build/** **/*.pb.go **/*.gen.go **/*_generated.go **/*.min.js **/*.map **/go.sum **/package-lock.json **/pnpm-lock.yaml **/yarn.lock **/Cargo.lock **/poetry.lock **/*.snap **/*.svg **/*.png **/*.jpg **/*.gif **/*.ico **/*.pdf]`.

@@ -605,6 +605,9 @@ type Review struct {
 	// RelatedContext is on.
 	RelatedContextCallers bool `yaml:"related_context_callers"`
 
+	// GenerationLookups permits one bounded repository lookup round in ordinary review generation.
+	GenerationLookups bool `yaml:"generation_lookups"`
+
 	// RelatedContextPreamble replaces the sentence bundle.Render writes above
 	// every attached definition. The shipped sentence says the context is
 	// reference only and is not under review, which is the right default for
