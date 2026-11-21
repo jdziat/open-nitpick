@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.8.0](https://github.com/jdziat/open-nitpick/compare/v2.7.0...v2.8.0) (2026-11-21)
+
+
+### Features
+
+* add deep reviews and persistent checkpoints ([#220](https://github.com/jdziat/open-nitpick/issues/220)) ([056c2ec](https://github.com/jdziat/open-nitpick/commit/056c2ece986a88cf1773df5e2463a790d2041ec8))
+* bound paid requests, add bounded lookups, audit lost findings ([#222](https://github.com/jdziat/open-nitpick/issues/222)) ([4171b6c](https://github.com/jdziat/open-nitpick/commit/4171b6cb142778ad7b5a790bc7f41db59535c546))
+
+
+### Fixes
+
+* **llm:** log what a capped call spent, and record the retry timings ([#216](https://github.com/jdziat/open-nitpick/issues/216)) ([fc0ec89](https://github.com/jdziat/open-nitpick/commit/fc0ec89b38a31a8e1419b63aa35938177be74cf6))
+
 ## [2.7.0](https://github.com/jdziat/open-nitpick/compare/v2.6.1...v2.7.0) (2026-11-12)
 
 
