@@ -58,6 +58,16 @@ func WithReviewModelOverrides(c *Config, getenv func(string) string) *Config {
 	if model := strings.TrimSpace(getenv(EnvReviewModel)); model != "" {
 		out.Models.Default.Model = model
 	}
+	// The review role reads models.review before the default, and fast-review
+	// always sets it, so leaving it alone kept the file's model for that role.
+	if c.Models.Review != nil {
+		review := *c.Models.Review
+		review.Provider = provider
+		if model := strings.TrimSpace(getenv(EnvReviewModel)); model != "" {
+			review.Model = model
+		}
+		out.Models.Review = &review
+	}
 	if c.Models.Triage != nil {
 		triage := *c.Models.Triage
 		triage.Provider = provider
