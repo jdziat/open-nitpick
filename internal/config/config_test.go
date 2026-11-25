@@ -646,6 +646,26 @@ func TestReviewModelOverridesUseRunnerChoices(t *testing.T) {
 	}
 }
 
+func TestReviewModelOverridesReachAnExplicitReviewRole(t *testing.T) {
+	cfg := Defaults()
+	cfg.Models.Default = ModelSpec{Provider: "openrouter", Model: "z-ai/glm-5.3-flash"}
+	cfg.Models.Review = &ModelSpec{Provider: "openrouter", Model: "z-ai/glm-5.3-flash", MaxTokens: 4096}
+	values := map[string]string{
+		EnvReviewProvider: "ollama",
+		EnvReviewModel:    "qwen2.5-coder:3b",
+	}
+	got := WithReviewModelOverrides(cfg, func(name string) string { return values[name] })
+	if got.Models.Review == nil || got.Models.Review.Provider != "ollama" || got.Models.Review.Model != "qwen2.5-coder:3b" {
+		t.Fatalf("review role = %+v, want the runner's ollama/qwen2.5-coder:3b", got.Models.Review)
+	}
+	if got.Models.Review.MaxTokens != 4096 {
+		t.Errorf("review role max_tokens = %d, want the role's own 4096 kept", got.Models.Review.MaxTokens)
+	}
+	if cfg.Models.Review.Provider != "openrouter" {
+		t.Errorf("the input config was modified: review provider = %q", cfg.Models.Review.Provider)
+	}
+}
+
 func TestDismissAuthorityDefaultsToCodeownersAndAllowsTheAuthor(t *testing.T) {
 	var d DismissRespond
 	if d.EffectiveAuthority() != AuthorityCodeowners {
