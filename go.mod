@@ -4,7 +4,7 @@ go 1.26.11
 
 require (
 	github.com/alecthomas/chroma/v2 v2.27.0
-	github.com/bmatcuk/doublestar/v4 v4.10.4
+	github.com/bmatcuk/doublestar/v4 v4.10.7
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
 	github.com/gofrs/flock v0.13.2
 	github.com/google/go-github/v74 v74.0.0
