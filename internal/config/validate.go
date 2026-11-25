@@ -13,6 +13,9 @@ import (
 var ErrNoModel = errors.New("no reviewer model configured")
 
 // onlyNoModel reports whether every validation error is missing model settings.
+// maxVotes bounds review.votes: each run is a full generation call.
+const maxVotes = 5
+
 func onlyNoModel(err error) bool {
 	if err == nil {
 		return false
@@ -281,6 +284,9 @@ func (r Review) validate() []error {
 	}
 	if !r.FailOn.Valid() {
 		errs = append(errs, fmt.Errorf("review.fail_on %q is not a severity", r.FailOn))
+	}
+	if r.Votes < 0 || r.Votes > maxVotes {
+		errs = append(errs, fmt.Errorf("review.votes must be from 0 to %d, got %d", maxVotes, r.Votes))
 	}
 	errs = append(errs, r.Deep.validate()...)
 	switch r.Verify {

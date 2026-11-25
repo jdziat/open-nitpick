@@ -532,6 +532,34 @@ type Review struct {
 	// Off by default: it costs about eight model calls a finding.
 	Verify VerifyMode `yaml:"verify"`
 
+	// WholePullRequest sends each pull request to the model in one request
+	// instead of batches of review.max_files_per_request files, so a defect
+	// whose cause and effect sit in different files is read together. Unset,
+	// nitpick review reads whole and the other commands keep their batches;
+	// false keeps the batches this config sets. On 25 benchmark pull requests it
+	// raised F1 by 0.08 and cost less. A pull request too large for one request
+	// is still split. See docs/findings.md.
+	WholePullRequest *bool `yaml:"whole_pull_request"`
+
+	// Votes reviews each batch of files this many times at once and keeps the
+	// findings a majority of the runs report, so a finding only one run
+	// produced is dropped before the critique and triage see it. Zero and one
+	// review once. It multiplies the cost of generation by the number, not the
+	// wall clock; on 25 benchmark pull requests 3 runs cost 2.5 times as much as
+	// one and no measured difference separated their scores. The runs differ only by what the provider does at one
+	// temperature, and a resumed review reuses one saved answer for all of them.
+	// Unlike models.ensemble, which asks different models, this asks one model
+	// again.
+	Votes int `yaml:"votes"`
+
+	// Critique grades each model finding against the diff around the line it
+	// cites, in one call for the whole review, and withholds the ones the code
+	// does not support. It is the stage that makes deep review precise, without
+	// deep review's agents. Withheld findings are listed with the grade.
+	// Analyzer findings are never graded. Unset, nitpick review turns it on and
+	// the other commands leave it off; false turns it off everywhere.
+	Critique *bool `yaml:"critique"`
+
 	// Jev adds an optional second opinion on each model finding, from TypeSafe's
 	// Jev decision model through OpenRouter, and withholds the findings it
 	// rates unlikely to be defects. Off unless jev.threshold is set. It runs

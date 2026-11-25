@@ -50,8 +50,61 @@ type reviewFlags struct {
 	pr       int
 }
 
+// scopedReview runs a review under a command's scope. It is a variable so a
+// test can observe what runReview passes it.
+var scopedReview = reviewWithScope
+
 func runReview(ctx context.Context, args []string) error {
-	return reviewWithScope(ctx, "review", args, nil, nil)
+	return scopedReview(ctx, "review", args, applyReviewScope, configureReview)
+}
+
+// applyReviewScope reads a pull request whole and grades each finding against
+// the code it cites, each unless the operator chose otherwise. Voting is not in
+// the default: it tripled the cost of generation and no measured difference
+// separated it from one run. See docs/findings.md.
+func applyReviewScope(cfg *config.Config) {
+	if cfg.Review.WholePullRequest == nil || *cfg.Review.WholePullRequest {
+		cfg.Review.MaxFilesPerRequest = wholeReviewFiles
+		cfg.Review.TokenBudgetPerRequest = wholeReviewTokens
+	}
+	if cfg.Review.Critique == nil {
+		on := true
+		cfg.Review.Critique = &on
+	}
+}
+
+const (
+	// wholeReviewFiles and wholeReviewTokens bound one request when review
+	// reads a pull request whole: the limits deep review reads under.
+	wholeReviewFiles  = 60
+	wholeReviewTokens = 120000
+)
+
+// configureReview keeps the review scope on a policy resolved for each pull
+// request.
+func configureReview(engine *review.Engine) {
+	engine.Policy = reviewScoped{inner: engine.Policy}
+}
+
+// reviewScoped applies the review scope to a policy resolved for one pull
+// request. The engine replaces its whole Config with the resolver's answer, so
+// a scope applied only to the loaded one is lost on exactly the change that
+// edits the configuration.
+type reviewScoped struct{ inner review.PolicyResolver }
+
+// ResolvePolicy applies the review scope to the resolved policy without
+// changing the original.
+func (r reviewScoped) ResolvePolicy(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest, changed []string) (*config.Config, bool, error) {
+	if r.inner == nil {
+		return nil, false, nil
+	}
+	cfg, modified, err := r.inner.ResolvePolicy(ctx, ref, pr, changed)
+	if cfg == nil {
+		return nil, modified, err
+	}
+	scoped := *cfg
+	applyReviewScope(&scoped)
+	return &scoped, modified, err
 }
 
 // reviewWithScope loads operator settings and applies a command-specific scope.
