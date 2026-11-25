@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.9.0](https://github.com/nitpick-oss/nitpick/compare/v2.8.0...v2.9.0) (2026-11-25)
+
+
+### Features
+
+* **deep:** default to Mira's adapted prompts, prompts: nitpick restores the old ones ([108d1ec](https://github.com/nitpick-oss/nitpick/commit/108d1eca27e3300f16fa6934a686edc0834edd07))
+* **review:** add review.votes, off by default ([108d1ec](https://github.com/nitpick-oss/nitpick/commit/108d1eca27e3300f16fa6934a686edc0834edd07))
+* **review:** read pull requests whole and critique findings by default, a cost and time change and not a measured quality gain, engineering profile excluded ([108d1ec](https://github.com/nitpick-oss/nitpick/commit/108d1eca27e3300f16fa6934a686edc0834edd07))
+
+
+### Fixes
+
+* **config:** apply runner model overrides to the review role ([#227](https://github.com/nitpick-oss/nitpick/issues/227)) ([298271c](https://github.com/nitpick-oss/nitpick/commit/298271cbad1a7efd3c1e540bc12594a1efccdcdb)), closes [#226](https://github.com/nitpick-oss/nitpick/issues/226)
+* **review:** keep operator limits and forgive a failed critique ([108d1ec](https://github.com/nitpick-oss/nitpick/commit/108d1eca27e3300f16fa6934a686edc0834edd07))
+
+
+### Documentation
+
+* name the bench repository under nitpick-oss ([#233](https://github.com/nitpick-oss/nitpick/issues/233)) ([5b34089](https://github.com/nitpick-oss/nitpick/commit/5b34089d9395c00aed655b5fc978b52ae0e6a931))
+* say when to run deep-review and record the benchmark ([108d1ec](https://github.com/nitpick-oss/nitpick/commit/108d1eca27e3300f16fa6934a686edc0834edd07))
+
 ## [2.8.0](https://github.com/nitpick-oss/nitpick/compare/v2.7.0...v2.8.0) (2026-11-21)
 
 
