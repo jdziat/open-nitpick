@@ -59,9 +59,9 @@ func TestFileStoreRefusesNonHashKeys(t *testing.T) {
 	}
 }
 
-// A settings entry equal to a section marker used to be indistinguishable from
-// the marker, so these two inputs hashed alike and one review's stored answers
-// would have replayed for the other.
+// Two inputs that differ only in where a list ends must hash apart, or one
+// review's stored answers would replay for the other. A setting may equal any
+// marker word, so the lists are separated by their lengths.
 func TestInputsWithADelimiterShapedSettingHashApart(t *testing.T) {
 	a := Inputs{System: "s", Settings: []string{"batches"}, Batches: []string{"x"}}
 	b := Inputs{System: "s", Batches: []string{"batches", "x"}}
