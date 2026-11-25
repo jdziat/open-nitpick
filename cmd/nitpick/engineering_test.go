@@ -438,20 +438,30 @@ func TestReviewBoundaryApplicabilityKeepsMissingGoInputsIncomplete(t *testing.T)
 		name         string
 		file         *diff.File
 		inapplicable bool
+		reRead       bool
 	}{
-		{"empty diff", nil, false},
-		{"documentation", &diff.File{Path: "README.md"}, true},
-		{"configuration", &diff.File{Path: ".nitpick.yaml"}, true},
-		{"missing source", &diff.File{Path: "missing.go"}, false},
-		{"deleted source", &diff.File{Path: "api.go", Kind: diff.ChangeDeleted}, false},
-		{"renamed source", &diff.File{Path: "api.txt", OldPath: "api.go", Kind: diff.ChangeRenamed}, false},
-		{"module", &diff.File{Path: "go.mod"}, false},
-		{"workspace", &diff.File{Path: "go.work"}, false},
+		{"empty diff", nil, false, true},
+		{"documentation", &diff.File{Path: "README.md"}, true, true},
+		// An incremental run that moved nothing re-reads no file, so Files is
+		// empty while the change is still the documentation edit.
+		{"documentation not re-read", &diff.File{Path: "README.md"}, true, false},
+		{"source not re-read", &diff.File{Path: "api.go"}, false, false},
+		{"configuration", &diff.File{Path: ".nitpick.yaml"}, true, true},
+		{"missing source", &diff.File{Path: "missing.go"}, false, true},
+		{"deleted source", &diff.File{Path: "api.go", Kind: diff.ChangeDeleted}, false, true},
+		{"renamed source", &diff.File{Path: "api.txt", OldPath: "api.go", Kind: diff.ChangeRenamed}, false, true},
+		{"module", &diff.File{Path: "go.mod"}, false, true},
+		{"workspace", &diff.File{Path: "go.work"}, false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			report := &review.Report{Head: "HEAD", Plan: &bundle.Plan{}}
 			if tc.file != nil {
-				report.Files = diff.Files{tc.file}
+				// The engine sets both: Change before incremental narrowing,
+				// Files after. The boundary check reads Change.
+				report.Change = diff.Files{tc.file}
+				if tc.reRead {
+					report.Files = report.Change
+				}
 			}
 			result := assessReviewPractices(t.Context(), root, cfg, vcs.Ref{Base: "main"}, nil, report, vcs.NewLocal(root, nil))
 			for _, check := range result.Checks {

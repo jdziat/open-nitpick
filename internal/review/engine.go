@@ -586,6 +586,13 @@ type Report struct {
 	// review's comments against the lines they anchor to.
 	Files diff.Files
 
+	// Change is the same diff before incremental narrowing. A check that asks
+	// what the pull request touched, as opposed to what this run re-read, must
+	// use it: after a push that moved nothing Files is empty, and an empty set
+	// answers "touches no Go" the same way for a change that has none and for
+	// one that was only not re-read.
+	Change diff.Files
+
 	// Head is the revision this review looked at, when the provider knows
 	// it. It is published with the review so the next run can tell what has
 	// already been read.
@@ -928,6 +935,7 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		narrowPrior = nil
 	}
 	narrowStart := time.Now()
+	report.Change = files
 	files, report.Incremental = e.narrowToChangedSince(ctx, ref, pr, files, narrowPrior)
 	e.log().Info("narrowed to changes since the last review", "elapsed", time.Since(narrowStart).Round(time.Millisecond))
 	// Cleared per run: Review may be called more than once on one Engine, and a
