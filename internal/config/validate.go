@@ -529,9 +529,9 @@ func (d DeepReview) validate() []error {
 		seen[a] = true
 	}
 	switch d.Prompts {
-	case "", DeepPromptsMira:
+	case "", DeepPromptsMira, DeepPromptsNitpick:
 	default:
-		errs = append(errs, fmt.Errorf("review.deep.prompts %q is not %s; leave it empty for this tool's own", d.Prompts, DeepPromptsMira))
+		errs = append(errs, fmt.Errorf("review.deep.prompts %q is not %s or %s; leave it empty for this tool's own", d.Prompts, DeepPromptsMira, DeepPromptsNitpick))
 	}
 	if d.MaxTurns < 1 || d.MaxTurns > 30 {
 		errs = append(errs, fmt.Errorf("review.deep.max_turns must be between 1 and 30, got %d", d.MaxTurns))

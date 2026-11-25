@@ -1567,11 +1567,13 @@ type DeepReview struct {
 	// cites, and withholds the ones the code does not support. Default on.
 	Critique bool `yaml:"critique"`
 
-	// Prompts names the instructions the agents review under. Empty, the
-	// default, keeps this tool's own. "mira" replaces them with the general and
-	// security prompts of Mira (https://github.com/miracodeai/mira, Apache
-	// License 2.0), adapted to this tool's findings; see NOTICE for what was
-	// changed. The two do not differ in the schema, the tools or the selection.
+	// Prompts names the instructions the agents review under. "mira", the
+	// default, uses the general and security prompts of Mira
+	// (https://github.com/miracodeai/mira, Apache License 2.0), adapted to this
+	// tool's findings; see NOTICE for what was changed. "nitpick", or empty,
+	// keeps this tool's own. The two do not differ in the schema, the tools or
+	// the selection. Over 25 benchmark pull requests Mira's scored F1 0.555 over
+	// three passes and this tool's own about 0.46 over six; see docs/findings.md.
 	Prompts string `yaml:"prompts"`
 
 	// MaxFilesPerRequest replaces review.max_files_per_request, so a pull
@@ -1585,8 +1587,12 @@ type DeepReview struct {
 	TokenBudgetPerRequest int `yaml:"token_budget_per_request"`
 }
 
-// DeepPromptsMira selects Mira's prompts, adapted, for the deep-review agents.
-const DeepPromptsMira = "mira"
+// The deep-review prompt sets. DeepPromptsMira is Mira's, adapted;
+// DeepPromptsNitpick, like the empty string, is this tool's own.
+const (
+	DeepPromptsMira    = "mira"
+	DeepPromptsNitpick = "nitpick"
+)
 
 // Deep review agent names.
 const (

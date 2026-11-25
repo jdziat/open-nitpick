@@ -1398,7 +1398,7 @@ MaxTurns bounds how many times each agent is asked before it must submit what it
 ### `review.deep.prompts`
 
 string, default `mira`.
-Prompts names the instructions the agents review under.
+Prompts names the instructions the agents review under. "mira", the default, uses the general and security prompts of Mira (https://github.com/miracodeai/mira, Apache License 2.0), adapted to this tool's findings; see NOTICE for what was changed. "nitpick", or empty, keeps this tool's own.
 
 ### `review.deep.reasoning`
 
