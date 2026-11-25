@@ -85,7 +85,9 @@ It reads each pull request whole, in one request of up to 60 files or 120,000
 tokens (`review.whole_pull_request`), and grades each finding with a critique
 (`review.critique`). A request limit you set is kept; one set to exactly the
 built-in 6 files or 60,000 tokens is replaced, unless `review.whole_pull_request`
-is `false`. `review.votes` reviews each batch several times and keeps
+is `false`. None of this applies under the engineering profile, chosen with
+`-profile engineering` or `practices.profile`: it keeps its own limits and no
+critique, because it packs its design tasks by those limits. `review.votes` reviews each batch several times and keeps
 what a majority reports; it is off, because three runs cost 2.5 times as much and
 no measured difference separated them from one. See [Choosing between review and
 deep-review](../usage.md#choosing-between-review-and-deep-review).

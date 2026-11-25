@@ -237,3 +237,78 @@ func TestReviewScopeKeepsALimitTheOperatorChanged(t *testing.T) {
 		})
 	}
 }
+
+// The engineering profile packs its design tasks by the request limits and
+// validates them under the token budget, so reading a pull request whole must
+// leave a profile run alone: the limits, the critique and whole_pull_request.
+func TestReviewScopeLeavesTheEngineeringProfileAlone(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.Practices.Profile = "engineering"
+	files, tokens := cfg.Review.MaxFilesPerRequest, cfg.Review.TokenBudgetPerRequest
+	applyReviewScope(cfg)
+	if cfg.Review.MaxFilesPerRequest != files || cfg.Review.TokenBudgetPerRequest != tokens {
+		t.Errorf("limits became %d files, %d tokens under the engineering profile; want %d and %d",
+			cfg.Review.MaxFilesPerRequest, cfg.Review.TokenBudgetPerRequest, files, tokens)
+	}
+	if got := critiqueOf(cfg); got != "unset" {
+		t.Errorf("the critique is %s under the engineering profile, want it left unset", got)
+	}
+}
+
+// -profile engineering selects the profile after the scope has run, so the
+// scope is told about it first. Other commands and other profile values are not
+// affected.
+func TestTheProfileFlagIsSeenByTheScope(t *testing.T) {
+	cases := []struct {
+		command, profile string
+		want             string
+	}{
+		{"review", "engineering", "engineering"},
+		{"review", "", ""},
+		{"deep-review", "engineering", ""},
+		{"improve", "engineering", ""},
+	}
+	for _, c := range cases {
+		cfg := config.Defaults()
+		profileForScope(c.command, c.profile, cfg)
+		if cfg.Practices.Profile != c.want {
+			t.Errorf("%s -profile %q left Practices.Profile %q, want %q", c.command, c.profile, cfg.Practices.Profile, c.want)
+		}
+	}
+	cfg := config.Defaults()
+	profileForScope("review", "engineering", cfg)
+	applyReviewScope(cfg)
+	if cfg.Review.MaxFilesPerRequest != config.Defaults().Review.MaxFilesPerRequest {
+		t.Errorf("a review run with -profile engineering still got %d files a request", cfg.Review.MaxFilesPerRequest)
+	}
+}
+
+// A policy resolved from the base revision may not carry the profile that the
+// flag or the working tree selected. The wrapper remembers it, so such a run is
+// not scoped, and a run that never selected it still is.
+func TestAResolvedPolicyIsNotScopedWhenTheRunIsAnEngineeringRun(t *testing.T) {
+	base := config.Defaults()
+	base.Models.Default = config.ModelSpec{Provider: "ollama", Model: "local"}
+
+	profiled := config.Defaults()
+	profiled.Practices.Profile = "engineering"
+	engine := &review.Engine{Config: profiled, Policy: fixedPolicy{cfg: base}}
+	configureReview(engine)
+	got, _, err := engine.Policy.ResolvePolicy(context.Background(), vcs.Ref{}, nil, []string{config.FileName})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Review.MaxFilesPerRequest != base.Review.MaxFilesPerRequest || critiqueOf(got) != "unset" {
+		t.Errorf("an engineering run's resolved policy was scoped: %d files, critique %s", got.Review.MaxFilesPerRequest, critiqueOf(got))
+	}
+
+	plain := &review.Engine{Config: config.Defaults(), Policy: fixedPolicy{cfg: base}}
+	configureReview(plain)
+	got, _, err = plain.Policy.ResolvePolicy(context.Background(), vcs.Ref{}, nil, []string{config.FileName})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Review.MaxFilesPerRequest != 60 || critiqueOf(got) != "on" {
+		t.Errorf("a plain run's resolved policy was not scoped: %d files, critique %s", got.Review.MaxFilesPerRequest, critiqueOf(got))
+	}
+}

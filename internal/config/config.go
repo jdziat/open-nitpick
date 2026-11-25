@@ -541,7 +541,8 @@ type Review struct {
 	// is kept. On 25 benchmark pull requests a whole read cost less than batches
 	// (2.4 cents a review against 4.4) and took longer (194 seconds against 145),
 	// and its F1 was not separated from theirs. A pull request too large for one
-	// request is still split. See docs/findings.md.
+	// request is still split. The engineering profile is left alone: it packs
+	// its design tasks by these limits. See docs/findings.md.
 	WholePullRequest *bool `yaml:"whole_pull_request"`
 
 	// Votes reviews each batch of files this many times at once and keeps the
