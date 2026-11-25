@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/nitpick-oss/nitpick/internal/diff"
 )
 
 // rejectUnrenderablePaths drops files whose path cannot be put in a prompt

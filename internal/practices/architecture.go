@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/standards"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/standards"
 	"golang.org/x/mod/modfile"
 )
 

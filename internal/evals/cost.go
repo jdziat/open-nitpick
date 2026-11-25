@@ -15,7 +15,7 @@ import (
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 	"gopkg.in/yaml.v3"
 
-	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/llm"
 )
 
 // EnvPrices names a price file to use instead of the shipped one, for an

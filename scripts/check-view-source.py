@@ -18,7 +18,7 @@ root = Path(__file__).resolve().parent.parent
 site = root / 'public'
 # The button the theme renders next to the page title, e.g.
 # <a href="https://github.com/o/r/raw/main/docs/guide.md" title="View source of this page" ...>
-button = re.compile(r'<a\s+href="(https://github\.com/jdziat/open-nitpick/(?:raw|blob)/main/([^"#?]*))"[^>]*title="View source of this page"')
+button = re.compile(r'<a\s+href="(https://github\.com/nitpick-oss/nitpick/(?:raw|blob)/main/([^"#?]*))"[^>]*title="View source of this page"')
 
 checked = 0
 missing = []

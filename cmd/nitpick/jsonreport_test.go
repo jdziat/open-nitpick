@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/execution"
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/execution"
+	"github.com/nitpick-oss/nitpick/internal/review"
 )
 
 func TestJSONRetainsUnavailableAndSuccessfulExecutionReceipts(t *testing.T) {

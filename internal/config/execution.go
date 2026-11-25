@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/jdziat/open-nitpick/internal/execution"
+	"github.com/nitpick-oss/nitpick/internal/execution"
 )
 
 // Execution configures optional checks in the operator-selected Docker image.

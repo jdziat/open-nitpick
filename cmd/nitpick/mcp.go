@@ -15,11 +15,11 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/fullreview"
-	"github.com/jdziat/open-nitpick/internal/practices"
-	"github.com/jdziat/open-nitpick/internal/review"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/fullreview"
+	"github.com/nitpick-oss/nitpick/internal/practices"
+	"github.com/nitpick-oss/nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // runMCP serves the review engine to an agent session over the Model

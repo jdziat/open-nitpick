@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/llm"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/bundle"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // configEditDiff is the shape of the attack: one commit edits the file that

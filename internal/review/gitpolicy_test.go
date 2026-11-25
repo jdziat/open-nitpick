@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // acceptedYAML is what the maintainers merged. Every setting in it has to

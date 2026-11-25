@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/config"
 )
 
 // Retriever answers a change with the entries it should be judged against.

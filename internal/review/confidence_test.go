@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // The reviewer has to be asked for a confidence, or a publish floor has nothing

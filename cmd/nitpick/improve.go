@@ -7,11 +7,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/converse"
-	"github.com/jdziat/open-nitpick/internal/llm"
-	"github.com/jdziat/open-nitpick/internal/review"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/converse"
+	"github.com/nitpick-oss/nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // The wider pass, on `@open-nitpick improve`.

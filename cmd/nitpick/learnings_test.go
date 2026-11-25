@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/learnings"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/learnings"
 )
 
 func TestScriptedDraftRequiresIndividualAcceptanceBeforeActivation(t *testing.T) {

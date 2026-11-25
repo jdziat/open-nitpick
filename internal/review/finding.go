@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/bundle"
+	"github.com/nitpick-oss/nitpick/internal/config"
 )
 
 // TaskContext retains the exact source rendering that produced a design claim.

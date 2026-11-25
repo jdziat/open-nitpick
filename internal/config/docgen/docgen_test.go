@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/config/docgen"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/config/docgen"
 )
 
 // TestRowsNameTheValuesTheyAccept guards the half of the reference that a

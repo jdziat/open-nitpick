@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/evals"
-	"github.com/jdziat/open-nitpick/internal/llm"
-	"github.com/jdziat/open-nitpick/internal/review"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/evals"
+	"github.com/nitpick-oss/nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // TestFastReviewLiveMeasuresReportedUsage exercises the shipped scope with a

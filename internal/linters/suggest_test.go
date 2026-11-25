@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/config"
 )
 
 func names(entries []CatalogEntry) []string {

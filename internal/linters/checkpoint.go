@@ -13,8 +13,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/diff"
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/diff"
+	"github.com/nitpick-oss/nitpick/internal/review"
 	"golang.org/x/mod/modfile"
 )
 

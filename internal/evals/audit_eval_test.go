@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/review"
 )
 
 func TestAuditRetainedQualityStages(t *testing.T) {

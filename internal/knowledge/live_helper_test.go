@@ -7,8 +7,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/llm"
 )
 
 func newLiveEmbedder(t *testing.T) Embedder {

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/llm"
-	"github.com/jdziat/open-nitpick/internal/review"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 type receiptFailureProvider struct{ vcs.Provider }

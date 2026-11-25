@@ -17,8 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/review"
 )
 
 // IncumbentModel is the pseudo-model id used for Incumbent in reports, so it
@@ -30,7 +30,7 @@ const EnvIncumbentRemote = "NITPICK_CR_REMOTE"
 
 // defaultIncumbentRemote is this repository, which is the remote the account
 // running the benchmark is expected to own. Nothing is ever pushed to it.
-const defaultIncumbentRemote = "https://github.com/jdziat/open-nitpick.git"
+const defaultIncumbentRemote = "https://github.com/nitpick-oss/nitpick.git"
 
 // incumbentRemote returns the URL to install as a fixture repository's origin.
 //

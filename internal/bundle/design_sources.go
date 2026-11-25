@@ -10,7 +10,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/config"
 )
 
 // SourceLimits bounds the inventory used to discover design dependencies and callers.

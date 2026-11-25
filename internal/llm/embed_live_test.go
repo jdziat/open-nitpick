@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/config"
 )
 
 // A live check that a provider can embed, run by hand.

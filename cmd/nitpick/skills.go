@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/plugins"
+	"github.com/nitpick-oss/nitpick/plugins"
 )
 
 // skillPrefix namespaces the installed folders. The shipped names (security,

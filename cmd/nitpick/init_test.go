@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/config"
 )
 
 // initRepo builds a checkout holding one file of each named kind.
@@ -275,7 +275,7 @@ func TestInitWritesAWorkflowPinnedToAMajorTag(t *testing.T) {
 	runInitIn(t, "-repo", root, "-provider", "synthetic", "-model", "hf:moonshotai/Kimi-K3", "-workflow")
 
 	wf := read(t, filepath.Join(root, ".github", "workflows", "nitpick.yml"))
-	if !strings.Contains(wf, "jdziat/open-nitpick@"+majorTag(version)) {
+	if !strings.Contains(wf, "nitpick-oss/nitpick@"+majorTag(version)) {
 		t.Errorf("workflow is not pinned to the major tag:\n%s", wf)
 	}
 	for _, want := range []string{"fetch-depth: 0", "provider: synthetic", "fail-on: none", "secrets."} {

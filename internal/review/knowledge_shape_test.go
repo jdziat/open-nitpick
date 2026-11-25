@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/knowledge"
+	"github.com/nitpick-oss/nitpick/internal/knowledge"
 )
 
 func shapedHit(id, path string, score float64) knowledge.Hit {

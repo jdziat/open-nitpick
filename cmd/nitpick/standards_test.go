@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/review"
-	"github.com/jdziat/open-nitpick/internal/standards"
+	"github.com/nitpick-oss/nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/standards"
 )
 
 // A disabled entry that names no probe is refused.

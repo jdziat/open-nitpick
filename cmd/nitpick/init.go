@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/linters"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/linters"
 )
 
 // nitpick init writes a working configuration for a checkout.
@@ -563,7 +563,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0        # the reviewer needs history to diff against base
-      - uses: jdziat/open-nitpick@%s
+      - uses: nitpick-oss/nitpick@%s
         with:
           provider: %s
           model: %s

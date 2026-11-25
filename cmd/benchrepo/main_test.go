@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/evals"
+	"github.com/nitpick-oss/nitpick/internal/evals"
 )
 
 func TestPresentationDoesNotPanicOnAnEmptyTitle(t *testing.T) {

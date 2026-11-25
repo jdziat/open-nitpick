@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // App credentials let a long run mint its own installation tokens instead of

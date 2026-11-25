@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/fence"
+	"github.com/nitpick-oss/nitpick/internal/fence"
 )
 
 func TestParseEventReadsBothCommentShapes(t *testing.T) {

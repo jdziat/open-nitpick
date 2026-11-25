@@ -4,7 +4,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/nitpick-oss/nitpick/internal/diff"
 )
 
 // ManifestChangesPackages reports whether a changed go.mod or go.work can

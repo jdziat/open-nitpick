@@ -2,7 +2,7 @@ package bundle
 
 import (
 	"fmt"
-	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/nitpick-oss/nitpick/internal/diff"
 	"strings"
 	"testing"
 )

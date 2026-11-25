@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/internal/config"
+import "github.com/nitpick-oss/nitpick/internal/config"
 
 // infoFixtures are the corpus's info-level plants.
 func infoFixtures() []Fixture {

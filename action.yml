@@ -221,7 +221,7 @@ runs:
       env:
         VERSION: ${{ inputs.version }}
         GH_TOKEN: ${{ inputs.github-token }}
-        REPO: jdziat/open-nitpick
+        REPO: nitpick-oss/nitpick
         API: ${{ github.api_url }}
       run: |
         set -euo pipefail

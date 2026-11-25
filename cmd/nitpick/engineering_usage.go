@@ -6,10 +6,10 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/evals"
-	"github.com/jdziat/open-nitpick/internal/llm"
-	"github.com/jdziat/open-nitpick/internal/practices"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/evals"
+	"github.com/nitpick-oss/nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/practices"
 )
 
 type engineeringUsage struct {

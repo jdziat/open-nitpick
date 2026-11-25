@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/fence"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/fence"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 func req() Request {

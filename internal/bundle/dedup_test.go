@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/nitpick-oss/nitpick/internal/diff"
 )
 
 // addedFile builds an entry for a file the change adds whole.

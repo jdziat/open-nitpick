@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/nitpick-oss/nitpick/internal/diff"
 )
 
 // Complexity ranks how much review attention a changed file warrants. When a

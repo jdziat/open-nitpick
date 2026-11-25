@@ -14,8 +14,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
-	"github.com/jdziat/open-nitpick/internal/standards"
+	"github.com/nitpick-oss/nitpick/internal/bundle"
+	"github.com/nitpick-oss/nitpick/internal/standards"
 )
 
 type designSourceInfo struct {

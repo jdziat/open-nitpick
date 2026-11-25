@@ -10,8 +10,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/bundle"
+	"github.com/nitpick-oss/nitpick/internal/config"
 )
 
 // The floor a count clears before it is written down as a standard.

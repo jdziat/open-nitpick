@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/review"
 )
 
 const redacted = "REDACTED"

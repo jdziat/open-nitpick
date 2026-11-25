@@ -10,13 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/practices"
-	"github.com/jdziat/open-nitpick/internal/review"
-	"github.com/jdziat/open-nitpick/internal/slop"
-	"github.com/jdziat/open-nitpick/internal/standards"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/bundle"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/practices"
+	"github.com/nitpick-oss/nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/slop"
+	"github.com/nitpick-oss/nitpick/internal/standards"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 func assessEngineering(ctx context.Context, root, configPath, base string, noModel bool, budget int, policy config.PracticePolicy, files []standards.File, measured RepoStandardsResult) practices.Report {

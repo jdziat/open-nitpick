@@ -107,9 +107,9 @@ practices:
     - go-test-name-sentence
     - go-test-helper-marks
   boundaries:
-    - from: github.com/jdziat/open-nitpick/internal/commits
+    - from: github.com/nitpick-oss/nitpick/internal/commits
       forbid: [os/exec, net/http]
       reason: Commit subject validation must not launch processes or make HTTP requests.
-    - from: github.com/jdziat/open-nitpick/internal/standards
+    - from: github.com/nitpick-oss/nitpick/internal/standards
       forbid: [os/exec, net/http]
       reason: Convention probes measure supplied source; analyzers run in internal/linters.

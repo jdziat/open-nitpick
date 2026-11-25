@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/internal/config"
+import "github.com/nitpick-oss/nitpick/internal/config"
 
 // KnowledgeFixtures is the knowledge corpus: defects a reviewer catches when
 // it holds one specific fact, and plausibly misses without it.

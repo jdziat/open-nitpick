@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 func pinnedBenchmarkTree(b *testing.B, content string) (string, vcs.Ref) {

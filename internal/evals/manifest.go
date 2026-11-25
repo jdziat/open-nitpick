@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/llm"
 )
 
 type qualityVariant struct {

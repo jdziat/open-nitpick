@@ -18,7 +18,7 @@ hide:
 
 <p class="np-fine"><a href="docs/guide/reviewing-changes/">Review changes</a> · <a href="docs/configuration/">Configure models and policy</a> · <a href="docs/guide/agents-and-mcp/">Use from an agent</a> · <a href="docs/usage/">All workflows</a> · <a href="docs/trust-model/">Trust model</a></p>
 
-<p class="np-fine">Read the <a href="docs/providers/">provider guidance</a> before selecting a hosted endpoint, inspect the <a href="docs/findings/">measurements</a>, or read the <a href="https://github.com/jdziat/open-nitpick">source on GitHub</a>.</p>
+<p class="np-fine">Read the <a href="docs/providers/">provider guidance</a> before selecting a hosted endpoint, inspect the <a href="docs/findings/">measurements</a>, or read the <a href="https://github.com/nitpick-oss/nitpick">source on GitHub</a>.</p>
 
 </div>
 
@@ -26,9 +26,9 @@ hide:
 
 ```bash
 # A release binary, or `go install …/cmd/nitpick@latest` with Go 1.26.0.
-v=$(gh release view --repo jdziat/open-nitpick --json tagName -q .tagName)
+v=$(gh release view --repo nitpick-oss/nitpick --json tagName -q .tagName)
 os=$(uname -s | tr 'A-Z' 'a-z'); arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-curl -fsSLo nitpick "https://github.com/jdziat/open-nitpick/releases/download/$v/nitpick_${v}_${os}_${arch}"
+curl -fsSLo nitpick "https://github.com/nitpick-oss/nitpick/releases/download/$v/nitpick_${v}_${os}_${arch}"
 chmod +x nitpick && sudo mv nitpick /usr/local/bin/
 
 export LLM_PROVIDER=openrouter

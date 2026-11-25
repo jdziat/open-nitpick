@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
+	"github.com/nitpick-oss/nitpick/internal/bundle"
 )
 
 // Receipt is the walkthrough written from facts instead of generated.

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/nitpick-oss/nitpick/internal/diff"
 )
 
 func TestFullSourcePrefetchOverlapsReadsWithinFileAndWorkerLimits(t *testing.T) {

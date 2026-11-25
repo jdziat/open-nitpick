@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/knowledge"
+	"github.com/nitpick-oss/nitpick/internal/knowledge"
 )
 
 // Rule 15 of docs/measurement.md: a corpus outside AllFixtures is not swept by

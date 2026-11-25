@@ -13,7 +13,7 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
-	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/llm"
 )
 
 const (

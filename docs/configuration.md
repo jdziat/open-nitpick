@@ -870,7 +870,7 @@ reviewed not at all, and says so.
     It is accepted and validated, and it currently behaves as `run`: prior
     spend on the same pull request is not recorded anywhere a later run can
     read it. The run logs that it is bounded as if it were the first. Track it
-    in [#12](https://github.com/jdziat/open-nitpick/issues/12).
+    in [#12](https://github.com/nitpick-oss/nitpick/issues/12).
 
 ## Choosing the model per batch
 

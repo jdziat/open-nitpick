@@ -13,7 +13,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/config"
 )
 
 // version is set at build time via -ldflags.

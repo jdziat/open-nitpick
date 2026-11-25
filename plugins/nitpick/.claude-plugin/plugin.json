@@ -5,8 +5,8 @@
   "author": {
     "name": "Jordan Dziat"
   },
-  "homepage": "https://github.com/jdziat/open-nitpick",
-  "repository": "https://github.com/jdziat/open-nitpick",
+  "homepage": "https://github.com/nitpick-oss/nitpick",
+  "repository": "https://github.com/nitpick-oss/nitpick",
   "license": "Apache-2.0",
   "keywords": ["code-review", "mcp", "slop", "security", "linters"]
 }

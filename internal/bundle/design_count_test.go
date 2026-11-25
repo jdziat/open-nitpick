@@ -3,7 +3,7 @@ package bundle
 import (
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/nitpick-oss/nitpick/internal/diff"
 )
 
 func TestDesignFileCountExcludesContextAndRepeatedPaths(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/nitpick-oss/nitpick/internal/diff"
 )
 
 // generatedMarkers are substrings that mark machine-generated files. The Go

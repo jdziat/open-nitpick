@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // ReadSnapshot fetches bounded source data at one immutable ref, without hooks.

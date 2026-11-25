@@ -20,10 +20,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/diff"
-	"github.com/jdziat/open-nitpick/internal/gomod"
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/diff"
+	"github.com/nitpick-oss/nitpick/internal/gomod"
+	"github.com/nitpick-oss/nitpick/internal/review"
 )
 
 // Analyzer configuration is policy, and policy comes from outside the change.

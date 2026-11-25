@@ -2,7 +2,7 @@ package bundle
 
 import (
 	"context"
-	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/nitpick-oss/nitpick/internal/diff"
 	"testing"
 )
 

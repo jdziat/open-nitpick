@@ -7,10 +7,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/practices"
-	"github.com/jdziat/open-nitpick/internal/standards"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/practices"
+	"github.com/nitpick-oss/nitpick/internal/standards"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 func readEngineeringTree(ctx context.Context, root string, policy config.PracticePolicy) ([]standards.File, []practices.Omission, []practices.Omission, error) {

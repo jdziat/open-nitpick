@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/standards"
+	"github.com/nitpick-oss/nitpick/internal/standards"
 )
 
 func designPlanningFixture(t *testing.T) ([]standards.File, DesignInventory) {

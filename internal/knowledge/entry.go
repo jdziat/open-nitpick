@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/config"
 )
 
 // Entry is one thing worth knowing, and where it came from.

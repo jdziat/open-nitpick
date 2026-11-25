@@ -8,10 +8,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
-	"github.com/jdziat/open-nitpick/internal/diff"
-	"github.com/jdziat/open-nitpick/internal/jev"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/bundle"
+	"github.com/nitpick-oss/nitpick/internal/diff"
+	"github.com/nitpick-oss/nitpick/internal/jev"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // The Jev stage is an optional second opinion on each model finding. A decision

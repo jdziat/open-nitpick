@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // forgedPathDiff is git's own output for a commit adding a file whose name

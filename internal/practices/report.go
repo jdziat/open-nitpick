@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
+	"github.com/nitpick-oss/nitpick/internal/bundle"
 )
 
 // State describes execution, independently of the findings a check produced.

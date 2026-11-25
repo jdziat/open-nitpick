@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/llm"
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 	"github.com/zalando/go-keyring"
 )
