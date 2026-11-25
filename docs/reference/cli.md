@@ -83,7 +83,9 @@ The normal change review. With no `-base`, it reviews uncommitted changes; with
 
 It reads each pull request whole, in one request of up to 60 files or 120,000
 tokens (`review.whole_pull_request`), and grades each finding with a critique
-(`review.critique`). `review.votes` reviews each batch several times and keeps
+(`review.critique`). A request limit you set is kept; one set to exactly the
+built-in 6 files or 60,000 tokens is replaced, unless `review.whole_pull_request`
+is `false`. `review.votes` reviews each batch several times and keeps
 what a majority reports; it is off, because three runs cost 2.5 times as much and
 no measured difference separated them from one. See [Choosing between review and
 deep-review](../usage.md#choosing-between-review-and-deep-review).

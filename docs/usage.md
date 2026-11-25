@@ -106,6 +106,11 @@ deep-review` adds two agents that read the repository over several turns before
 they file anything. It is opt in: run `nitpick deep-review`, or set `command:
 deep-review` on the Action.
 
+`review` keeps a request limit you set in `review.max_files_per_request` or
+`review.token_budget_per_request`. A limit set to exactly the built-in value, 6
+files or 60,000 tokens, cannot be told from no setting and is replaced. Set
+`review.whole_pull_request: false` to keep it.
+
 Measured on 25 pull requests from the Martian offline benchmark, with
 `deepseek/deepseek-v4.1-flash` and one judge, over six passes of `review` and
 three of `deep-review`:
