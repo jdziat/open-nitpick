@@ -90,9 +90,9 @@ func TestZeroIsTheDefaultAndMeansTheFilterIsOff(t *testing.T) {
 	}
 }
 
-func TestDeepPromptsAcceptsOnlyMiraOrNothing(t *testing.T) {
+func TestDeepPromptsAcceptsMiraNitpickOrNothing(t *testing.T) {
 	t.Setenv(EnvTrustConfigEndpoints, "1")
-	for value, ok := range map[string]bool{"''": true, "mira": true, "ours": false, "Mira": false} {
+	for value, ok := range map[string]bool{"''": true, "mira": true, "nitpick": true, "ours": false, "Mira": false} {
 		root := writeConfig(t, jevBase+"review:\n  deep: {prompts: "+value+"}\n")
 		_, err := Load(root)
 		if (err == nil) != ok {
@@ -104,13 +104,28 @@ func TestDeepPromptsAcceptsOnlyMiraOrNothing(t *testing.T) {
 	}
 }
 
-func TestDeepPromptsDefaultsToThisToolsOwn(t *testing.T) {
+func TestDeepPromptsDefaultToMirasAdaptedPrompts(t *testing.T) {
 	writeUser(t, jevBase)
 	cfg, err := Load(writeConfig(t, ""))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Review.Deep.Prompts != "" {
-		t.Errorf("review.deep.prompts = %q, want the empty default", cfg.Review.Deep.Prompts)
+	if cfg.Review.Deep.Prompts != "mira" {
+		t.Errorf("review.deep.prompts = %q, want the measured default mira", cfg.Review.Deep.Prompts)
+	}
+}
+
+// A repository that wants this tool's own prompts back says so, in either
+// spelling, and the empty string overrides the default as well as a value does.
+func TestDeepPromptsCanBeSetBackToThisToolsOwn(t *testing.T) {
+	t.Setenv(EnvTrustConfigEndpoints, "1")
+	for _, value := range []string{"nitpick", "''"} {
+		cfg, err := Load(writeConfig(t, jevBase+"review:\n  deep: {prompts: "+value+"}\n"))
+		if err != nil {
+			t.Fatalf("prompts %s: %v", value, err)
+		}
+		if got := cfg.Review.Deep.Prompts; got != "nitpick" && got != "" {
+			t.Errorf("prompts %s loaded as %q, want this tool's own", value, got)
+		}
 	}
 }

@@ -239,10 +239,10 @@ than the repository root.
 | `pr-number` | triggering pull request | set for `workflow_dispatch` and comment events |
 | `dry-run` | `false` | writes to log and job summary without publishing |
 | `skip-drafts` | `false` | skips draft pull requests |
-| `allow-degraded-triage` | `false` | when only triage failed, publishes the findings, applies `fail-on` and reports `result: degraded` instead of exiting 2 |
+| `allow-degraded-triage` | `false` | when only triage or the critique failed, publishes the findings, applies `fail-on` and reports `result: degraded` instead of exiting 2 |
 | `version` | `latest` | release tag or `latest`; falls back to building the Action checkout when its release is unavailable |
 | `analyzers` | empty | catalog names to install, comma separated; `auto` selects ones for changed languages; empty uses runner tools |
-| `command` | `review` | `review`, `fast-review`, `deep-review`, or `respond`; `deep-review` needs the repository checked out and makes many times the model calls |
+| `command` | `review` | `review`, `fast-review`, `deep-review`, or `respond`; `deep-review` needs the repository checked out and costs about 2.5 times as much as `review` on the benchmark model |
 | `args` | none | flags passed to `review`, `fast-review` and `deep-review` |
 
 ### What a run does

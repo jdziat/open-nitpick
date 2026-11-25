@@ -1131,6 +1131,24 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		}
 		return nil, err
 	}
+	if c := e.Config.Review.Critique; c != nil && *c && !e.Deep {
+		var model, analyzer []Finding
+		for _, f := range findings {
+			if f.FromAnalyzer {
+				analyzer = append(analyzer, f)
+			} else {
+				model = append(model, f)
+			}
+		}
+		if len(model) > 0 {
+			kept, dropped, failed := e.deepCritique(ctx, model, plan)
+			findings = slices.Concat(analyzer, kept)
+			withheldByTriage = append(withheldByTriage, dropped...)
+			if failed != nil {
+				report.Stages = append(report.Stages, *failed)
+			}
+		}
+	}
 	e.snapshot(Snapshot{Stage: "triage", Findings: findings, Withheld: withheldByTriage})
 	// The summary was written over what triage saw, which the advisories
 	// were not; a walkthrough that says the change is clean above four
@@ -1843,7 +1861,7 @@ func (e *Engine) analyze(ctx context.Context, pr *vcs.PullRequest, plan *bundle.
 			var result []Finding
 			if err == nil {
 				var esc []Escalation
-				result, esc, err = e.reviewWith(ctx, r, prContext, b)
+				result, esc, err = e.reviewVoted(ctx, r, prContext, b)
 				if len(esc) > 0 {
 					mu.Lock()
 					escalated = append(escalated, esc...)

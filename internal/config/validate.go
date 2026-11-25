@@ -12,6 +12,9 @@ import (
 // ErrNoModel distinguishes missing model settings from invalid configuration.
 var ErrNoModel = errors.New("no reviewer model configured")
 
+// maxVotes bounds review.votes: each run is a full generation call.
+const maxVotes = 5
+
 // onlyNoModel reports whether every validation error is missing model settings.
 func onlyNoModel(err error) bool {
 	if err == nil {
@@ -282,6 +285,9 @@ func (r Review) validate() []error {
 	if !r.FailOn.Valid() {
 		errs = append(errs, fmt.Errorf("review.fail_on %q is not a severity", r.FailOn))
 	}
+	if r.Votes < 0 || r.Votes > maxVotes {
+		errs = append(errs, fmt.Errorf("review.votes must be from 0 to %d, got %d", maxVotes, r.Votes))
+	}
 	errs = append(errs, r.Deep.validate()...)
 	switch r.Verify {
 	case "", VerifyConfirmed, VerifyNotRefuted:
@@ -523,9 +529,9 @@ func (d DeepReview) validate() []error {
 		seen[a] = true
 	}
 	switch d.Prompts {
-	case "", DeepPromptsMira:
+	case "", DeepPromptsMira, DeepPromptsNitpick:
 	default:
-		errs = append(errs, fmt.Errorf("review.deep.prompts %q is not %s; leave it empty for this tool's own", d.Prompts, DeepPromptsMira))
+		errs = append(errs, fmt.Errorf("review.deep.prompts %q is not %s or %s; leave it empty for this tool's own", d.Prompts, DeepPromptsMira, DeepPromptsNitpick))
 	}
 	if d.MaxTurns < 1 || d.MaxTurns > 30 {
 		errs = append(errs, fmt.Errorf("review.deep.max_turns must be between 1 and 30, got %d", d.MaxTurns))

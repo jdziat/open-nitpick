@@ -30,10 +30,39 @@ func agentPrompts(t *testing.T, prompts string) map[string]string {
 	return out
 }
 
-// Default is this tool's own prompt, and the security agent extends it. A
-// setting that changed the default would change every deep review in the field.
-func TestDeepAgentsKeepThisToolsPromptsUnlessMiraIsAsked(t *testing.T) {
-	got := agentPrompts(t, "")
+// An empty setting, or "nitpick", is this tool's own prompt, and the security
+// agent extends it. The default is Mira's, so this has to be asked for.
+func TestDeepAgentsKeepThisToolsPromptsWhenAskedFor(t *testing.T) {
+	for _, setting := range []string{"", config.DeepPromptsNitpick} {
+		checkOwnPrompts(t, agentPrompts(t, setting))
+	}
+}
+
+// Left unset, a deep review reviews under Mira's adapted prompts, because that
+// is what scored level with Mira on the benchmark and this tool's own did not.
+func TestDeepAgentsReviewUnderMirasPromptsByDefault(t *testing.T) {
+	e := newEngine(t, &scriptedLLM{}, &stubProvider{}, nil)
+	system, err := e.reviewPromptFor(e.Roles.Review)
+	if err != nil {
+		t.Fatal(err)
+	}
+	agents, err := e.deepAgents(e.Roles.Review, system)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var general string
+	for _, a := range agents {
+		if a.name == config.DeepAgentGeneral {
+			general = a.system
+		}
+	}
+	if !strings.Contains(general, "## Cross-Boundary Tracing") {
+		t.Error("the default general agent does not review under Mira's prompt")
+	}
+}
+
+func checkOwnPrompts(t *testing.T, got map[string]string) {
+	t.Helper()
 	general, security := got[config.DeepAgentGeneral], got[config.DeepAgentSecurity]
 	for name, text := range map[string]string{"general": general, "security": security} {
 		if !strings.Contains(text, "## The bar") {

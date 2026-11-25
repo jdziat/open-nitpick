@@ -38,10 +38,11 @@ const (
 	resultLimit    actionResult = "limit"    // review.max_rounds reached; no model was called
 )
 
-// allowDegradedTriage reclassifies the one failure a caller can choose to
-// live with. It applies only when triage is the sole stage that failed and no
-// file went unreviewed: the findings are real and merely unranked, and the
-// result says so ("degraded") instead of calling the run clean. Any other
+// allowDegradedTriage reclassifies the failure a caller can choose to live
+// with. It applies only when triage, or the critique, is the sole stage that
+// failed and no file went unreviewed: the findings are real and merely unranked
+// or unfiltered, and the result says so ("degraded") instead of calling the
+// run clean. Any other
 // failed stage, or an engineering report that owns its own completeness, stays
 // an error.
 func allowDegradedTriage(report *review.Report, gate config.Severity) actionResult {
@@ -53,7 +54,7 @@ func allowDegradedTriage(report *review.Report, gate config.Severity) actionResu
 	if report.FastReview && fastReviewSkippedFiles(report) {
 		return resultError
 	}
-	if len(report.Stages) != 1 || report.Stages[0].Stage != "triage" {
+	if len(report.Stages) != 1 || !degradable(report.Stages[0].Stage) {
 		return resultError
 	}
 	if report.Failed(gate) {
@@ -61,6 +62,10 @@ func allowDegradedTriage(report *review.Report, gate config.Severity) actionResu
 	}
 	return resultDegraded
 }
+
+// degradable names the stages whose failure leaves real findings that are only
+// less refined: triage ranks them and the critique filters them.
+func degradable(stage string) bool { return stage == "triage" || stage == "critique" }
 
 // actionsEnv reads the two files, when Actions provides them.
 type actionsEnv struct {
