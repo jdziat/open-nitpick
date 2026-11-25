@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/nitpick-oss/nitpick/internal/wire"
 )
@@ -162,7 +164,7 @@ func TestARecordWithAFieldTheServerDoesNotKnowIsRefusedNotTruncated(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status %d, want 400", resp.StatusCode)
 	}
@@ -225,5 +227,99 @@ func TestAnUnknownTokenCannotReadARecordThatExists(t *testing.T) {
 	}
 	if _, ok, err := as("view-secret").Get(ctx, hash); !ok || err != nil {
 		t.Errorf("read token: found=%v err=%v, want the record", ok, err)
+	}
+}
+
+// brokenStore fails every read the way a failing disk would.
+type brokenStore struct{ wire.Store }
+
+func (brokenStore) Get(context.Context, string) (wire.Record, bool, error) {
+	return wire.Record{}, false, errors.New("disk failed")
+}
+
+// A store fault is the server's, not the caller's. Reporting it as a 400 sent
+// it down the hard-failure path instead of the "notary unreachable, carry on"
+// path the sentinel exists for.
+func TestAStoreFaultReadsAsAnUnreachableNotaryNotABadRequest(t *testing.T) {
+	srv := httptest.NewServer(New(brokenStore{}, []Token{NewToken("ci", RoleAuthoritative, "s")}, false))
+	defer srv.Close()
+	client, err := wire.NewHTTPStore(srv.URL, "s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := client.Get(context.Background(), hash); !errors.Is(err, wire.ErrUnreachable) {
+		t.Fatalf("err = %v, want wire.ErrUnreachable", err)
+	}
+}
+
+// gatedStore holds a provisional write between its read and its write so a test
+// can land an authoritative write in the gap.
+type gatedStore struct {
+	wire.Store
+	inGet   chan struct{}
+	release chan struct{}
+	putSeen chan string
+}
+
+func (g *gatedStore) Get(ctx context.Context, h string) (wire.Record, bool, error) {
+	rec, ok, err := g.Store.Get(ctx, h)
+	select {
+	case g.inGet <- struct{}{}:
+		<-g.release
+	default:
+	}
+	return rec, ok, err
+}
+
+func (g *gatedStore) Put(ctx context.Context, rec wire.Record) error {
+	if err := g.Store.Put(ctx, rec); err != nil {
+		return err
+	}
+	select {
+	case g.putSeen <- rec.Source:
+	default:
+	}
+	return nil
+}
+
+func TestAnAuthoritativeWriteDuringAProvisionalWriteIsNotReplacedByIt(t *testing.T) {
+	fs, err := wire.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := &gatedStore{Store: fs, inGet: make(chan struct{}, 1), release: make(chan struct{}), putSeen: make(chan string, 4)}
+	srv := httptest.NewServer(New(g, []Token{
+		NewToken("ci", RoleAuthoritative, "ci-secret"),
+		NewToken("dev", RoleProvisional, "dev-secret"),
+	}, false))
+	defer srv.Close()
+	client := func(tok string) *wire.HTTPStore {
+		c, err := wire.NewHTTPStore(srv.URL, tok)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); _ = client("dev-secret").Put(context.Background(), rec(true)) }()
+	<-g.inGet
+	go func() { defer wg.Done(); _ = client("ci-secret").Put(context.Background(), rec(true)) }()
+	// Without serialization the authoritative write lands while the provisional
+	// one is still between its read and its write.
+	select {
+	case <-g.putSeen:
+	case <-time.After(300 * time.Millisecond):
+	}
+	close(g.release)
+	wg.Wait()
+
+	got, ok, err := fs.Get(context.Background(), hash)
+	if err != nil || !ok {
+		t.Fatalf("record: ok=%v err=%v", ok, err)
+	}
+	if got.Source != "ci" {
+		t.Fatalf("source = %q, want the authoritative write to be the one that stands", got.Source)
 	}
 }

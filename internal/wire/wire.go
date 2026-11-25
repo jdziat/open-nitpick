@@ -10,12 +10,13 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"strconv"
 	"time"
 )
 
 // Schema versions the record layout and the gate's behaviour. Bump it when
 // either changes: old records then hash differently and are never replayed.
-const Schema = 2
+const Schema = 3
 
 // Inputs is everything that decides what a review says. A change to any field
 // is a different review and gets a different hash.
@@ -39,14 +40,17 @@ func (in Inputs) Hash() string {
 		h.Write([]byte(s))
 	}
 	put("schema")
-	put(string(rune('0' + Schema)))
+	put(strconv.Itoa(Schema))
 	for _, s := range []string{in.Tool, in.Provider, in.Model, in.System} {
 		put(s)
 	}
+	// Each list is prefixed with its length. A delimiter word alone cannot
+	// separate Settings from Batches, because a setting may equal it.
+	put(strconv.Itoa(len(in.Settings)))
 	for _, s := range in.Settings {
 		put(s)
 	}
-	put("batches")
+	put(strconv.Itoa(len(in.Batches)))
 	for _, b := range in.Batches {
 		put(b)
 	}

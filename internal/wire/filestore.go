@@ -83,11 +83,21 @@ func (s *FileStore) Put(_ context.Context, rec Record) error {
 	if err != nil {
 		return fmt.Errorf("encode record: %w", err)
 	}
-	tmp := p + ".tmp"
+	return writeAtomic(p, b)
+}
+
+// writeAtomic replaces path through a temporary file, so a crash leaves the old
+// content or the new and never a truncated record that every later Get fails to
+// decode.
+func writeAtomic(path string, b []byte) error {
+	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, b, 0o640); err != nil {
-		return fmt.Errorf("write record: %w", err)
+		return fmt.Errorf("write %s: %w", filepath.Base(path), err)
 	}
-	return os.Rename(tmp, p)
+	if err := os.Rename(tmp, path); err != nil {
+		return fmt.Errorf("replace %s: %w", filepath.Base(path), err)
+	}
+	return nil
 }
 
 // Clear implements Store. The record moves to history/; the clear count and the
@@ -118,9 +128,9 @@ func (s *FileStore) Clear(_ context.Context, hash, by string) error {
 	}
 	// Leave a stub so the next Put can read the clear count.
 	stub := Record{Schema: rec.Schema, Hash: hash, Clears: rec.Clears, ClearedBy: rec.ClearedBy}
-	sb, _ := json.Marshal(stub)
-	if err := os.WriteFile(p, sb, 0o640); err != nil {
-		return fmt.Errorf("write stub: %w", err)
+	sb, err := json.Marshal(stub)
+	if err != nil {
+		return fmt.Errorf("encode stub: %w", err)
 	}
-	return nil
+	return writeAtomic(p, sb)
 }

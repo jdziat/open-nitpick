@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -37,6 +38,12 @@ func (s *HTTPStore) do(ctx context.Context, method, hash string, body []byte, qu
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.http.Do(req)
 	if err != nil {
+		// A cancelled or expired context is the caller stopping, not the
+		// notary being down. ErrUnreachable means "carry on without records",
+		// which an interrupted review must not do.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, fmt.Errorf("notary request: %w", ctxErr)
+		}
 		return nil, fmt.Errorf("%w: %w", ErrUnreachable, err)
 	}
 	return resp, nil
@@ -48,7 +55,7 @@ func (s *HTTPStore) Get(ctx context.Context, hash string) (Record, bool, error) 
 	if err != nil {
 		return Record{}, false, err
 	}
-	defer resp.Body.Close()
+	defer closeBody(resp)
 	switch resp.StatusCode {
 	case http.StatusOK:
 		var r Record
@@ -72,7 +79,7 @@ func (s *HTTPStore) Put(ctx context.Context, rec Record) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer closeBody(resp)
 	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
 		return nil
 	}
@@ -81,11 +88,11 @@ func (s *HTTPStore) Put(ctx context.Context, rec Record) error {
 
 // Clear implements Store.
 func (s *HTTPStore) Clear(ctx context.Context, hash, by string) error {
-	resp, err := s.do(ctx, http.MethodDelete, hash, nil, "?by="+by)
+	resp, err := s.do(ctx, http.MethodDelete, hash, nil, "?"+url.Values{"by": {by}}.Encode())
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer closeBody(resp)
 	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
 		return nil
 	}
@@ -102,3 +109,7 @@ func statusErr(resp *http.Response) error {
 	}
 	return fmt.Errorf("notary returned status %d: %s", resp.StatusCode, strings.TrimSpace(string(msg)))
 }
+
+// closeBody drops the unread remainder of a response. A close error here
+// changes nothing the caller can act on.
+func closeBody(resp *http.Response) { _ = resp.Body.Close() }

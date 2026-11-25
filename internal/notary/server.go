@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/nitpick-oss/nitpick/internal/wire"
 )
@@ -41,7 +42,10 @@ func NewToken(name string, role Role, secret string) Token {
 
 // Server is the notary HTTP handler.
 type Server struct {
-	store  wire.Store
+	store wire.Store
+	// writes serializes PUTs. The provisional rule reads a record and then writes
+	// one, and an authoritative write landing between the two would be replaced.
+	writes sync.Mutex
 	tokens []Token
 	// AllowProvisionalClear lets provisional tokens clear a record, for
 	// organisations that let a PR author re-review.
@@ -91,7 +95,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		rec, found, err := s.store.Get(r.Context(), hash)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		if !found {
@@ -103,7 +107,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPut:
 		s.put(w, r, tok, hash)
 	case http.MethodDelete:
-		if tok.Role != RoleAuthoritative && !(tok.Role == RoleProvisional && s.allowProvisionalClear) {
+		if tok.Role != RoleAuthoritative && (tok.Role != RoleProvisional || !s.allowProvisionalClear) {
 			http.Error(w, "this token may not clear records", http.StatusForbidden)
 			return
 		}
@@ -112,7 +116,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			by = tok.Name
 		}
 		if err := s.store.Clear(r.Context(), hash, by); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -140,6 +144,8 @@ func (s *Server) put(w http.ResponseWriter, r *http.Request, tok Token, hash str
 		http.Error(w, "record hash does not match the URL", http.StatusBadRequest)
 		return
 	}
+	s.writes.Lock()
+	defer s.writes.Unlock()
 	rec.Source = tok.Name
 	if tok.Role == RoleProvisional {
 		rec.Source = "provisional:" + tok.Name
@@ -149,7 +155,7 @@ func (s *Server) put(w http.ResponseWriter, r *http.Request, tok Token, hash str
 		}
 	}
 	if err := s.store.Put(r.Context(), rec); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
