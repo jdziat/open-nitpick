@@ -59,7 +59,7 @@ nitpick review                          # uncommitted changes
 nitpick review -base main               # working tree against main
 nitpick review -base main -head feature # a committed branch
 nitpick fast-review                     # changed diffs, top ten findings
-nitpick deep-review                     # agents that read the repository: 2.5 times the cost, 1.6 times the time
+nitpick deep-review                     # agents that read the repository: 2.5 times the cost, 1.6 times the time in the benchmark
 nitpick explain-config -path src/db.go  # what would be sent, and why
 nitpick providers                       # available model providers
 ```

@@ -2821,14 +2821,15 @@ entry is too narrow for comparing arms. A difference under about 0.06 F1 between
 three-pass arms is not resolved here. On six passes the pipeline is 0.039 below
 Mira (-0.114 to +0.034), which is neither level nor behind by this instrument.
 
-`review` with the critique but no vote costs 5.1 cents and two and a half minutes
-a pull request and scored 0.43 over three passes; voting three times first adds
-nothing that survived a repeat, see the voting section above. The deep pipeline
-costs 8 to 9.6 cents and about six minutes and scored 0.46 over six passes, so
-the vote is the cheaper route to the same place. A version of `review` routed
-through the deep pipeline was built and reverted for that reason. The general
-agent alone, at 3.3 cents, scored 0.46 over three passes (precision 0.65,
-recall 0.35).
+The default `review` costs 2.4 cents and 194 seconds a pull request and scored
+0.43 over six passes. Voting three times first costs 2.5 times as much and added
+nothing that survived a repeat, see the voting results below. The deep pipeline
+under this tool's own prompts cost 8 to 9.6 cents and scored 0.46 over six
+passes; under Mira's prompts it cost 6.2 cents and scored 0.54 over three, see
+the last table. A version of `review` routed through the deep pipeline was built
+and reverted: it costs 2.5 times as much, so `deep-review` stays a separate
+opt-in command. The general agent alone, at 3.3 cents, scored 0.46 over three
+passes (precision 0.65, recall 0.35).
 
 Voting across runs is the one lever that moved every pipeline in an offline
 simulation. Taking the three passes of each arm already scored, grouping findings
@@ -2944,7 +2945,9 @@ requests:
 | `review` default, six passes | 193 | 230 | 293 | 0.46 | 0.40 | 0.425 | 0.43 0.45 0.41 0.43 0.43 0.40 | 2.4 | 194 |
 | `deep-review`, Mira's prompts, three passes | 134 | 106 | 109 | 0.56 | 0.55 | 0.555 | 0.53 0.57 0.56 | 6.6 | 283 |
 
-Against Mira's first three passes (0.499): F1 +0.056 (-0.034 to +0.147), recall
+TP, FP and FN are totals over each row's passes, and the passes differ, so
+compare the rates beside them and not the counts (Rule 4). Against Mira's first
+three passes (0.499): F1 +0.056 (-0.034 to +0.147), recall
 +14 points (+5 to +24), precision -8 points (-17 to 0). Against all six, the
 difference of means is +0.043 (about -0.013 to +0.099). All three passes beat
 every one of the default's six and beat Mira's mean, but not every one of Mira's
@@ -3000,8 +3003,13 @@ seconds a review, against 2.4 cents and 194 seconds for the new one. Its F1 over
 one pass of the 25 was 0.41 against 0.43 over six, which is not a difference
 this benchmark resolves; the change is a cost change, not a quality one.
 
-Limits. One judge and one reviewer model (`deepseek/deepseek-v4.1-flash`), 25
-pull requests from one benchmark, and the arms differ from Mira in several ways
+Limits. Mira was run at commit 04d3491 (2026-11-13) on the same
+`deepseek/deepseek-v4.1-flash-1017` as the rest, not on its own default model,
+with its benchmark settings of `reasoning: medium` and a 16,384-token cap. The
+scoring files label every case "held-out", which is the preparation script's
+default and does not apply: the defaults here were chosen on these 25 pull
+requests. One judge and one reviewer model, 25 pull requests from one
+benchmark, and the arms differ from Mira in several ways
 at once, so the entry does not say which of them costs the precision. Some false
 positives read as real defects the golden set does not list, which costs every
 reviewer including Mira. Rerunning Mira three more times moved its pooled F1 from
