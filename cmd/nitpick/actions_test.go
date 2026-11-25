@@ -170,9 +170,10 @@ func TestActionsExposePracticeViolationsWithoutInlineFindings(t *testing.T) {
 // triage did not (#125). It must stay narrow: a second failed stage, an
 // unreviewed file or an engineering report is still an error, and the gate
 // still applies to the findings that were published.
-func TestAllowDegradedTriageForgivesOnlyAFailedTriage(t *testing.T) {
+func TestAllowDegradedTriageForgivesOnlyAFailedTriageOrCritique(t *testing.T) {
 	finding := review.Finding{Path: "a.go", Line: 1, Severity: "info", Title: "minor"}
 	triage := review.StageStatus{Stage: "triage", Reason: "rate-limited"}
+	critique := review.StageStatus{Stage: "critique", Reason: "no grades"}
 
 	for _, tc := range []struct {
 		name   string
@@ -182,6 +183,10 @@ func TestAllowDegradedTriageForgivesOnlyAFailedTriage(t *testing.T) {
 	}{
 		{"triage alone, below the gate", &review.Report{Findings: []review.Finding{finding}, Stages: []review.StageStatus{triage}}, config.SeverityError, resultDegraded},
 		{"triage alone, at the gate", &review.Report{Findings: []review.Finding{finding}, Stages: []review.StageStatus{triage}}, config.SeverityInfo, resultFindings},
+		{"critique alone, below the gate", &review.Report{Findings: []review.Finding{finding}, Stages: []review.StageStatus{critique}}, config.SeverityError, resultDegraded},
+		{"critique alone, at the gate", &review.Report{Findings: []review.Finding{finding}, Stages: []review.StageStatus{critique}}, config.SeverityInfo, resultFindings},
+		{"critique and triage", &review.Report{Stages: []review.StageStatus{critique, triage}}, config.SeverityError, resultError},
+		{"critique and a file left unreviewed", &review.Report{Incomplete: []string{"b.go"}, Stages: []review.StageStatus{critique}}, config.SeverityError, resultError},
 		{"triage and another stage", &review.Report{Stages: []review.StageStatus{triage, {Stage: "style", Reason: "timeout"}}}, config.SeverityError, resultError},
 		{"a stage other than triage", &review.Report{Stages: []review.StageStatus{{Stage: "analyzers", Reason: "failed"}}}, config.SeverityError, resultError},
 		{"a file left unreviewed", &review.Report{Incomplete: []string{"b.go"}, Stages: []review.StageStatus{triage}}, config.SeverityError, resultError},

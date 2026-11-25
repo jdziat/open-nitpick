@@ -59,7 +59,7 @@ nitpick review                          # uncommitted changes
 nitpick review -base main               # working tree against main
 nitpick review -base main -head feature # a committed branch
 nitpick fast-review                     # changed diffs, top ten findings
-nitpick deep-review                     # agents that read the repository; slower, more calls
+nitpick deep-review                     # agents that read the repository: 2.5 times the cost, 1.6 times the time in the benchmark
 nitpick explain-config -path src/db.go  # what would be sent, and why
 nitpick providers                       # available model providers
 ```
@@ -81,7 +81,7 @@ defect filed twice, a cap on info-level findings, and a critique that grades eac
 against the code it cites. The review lists what was withheld and why. It needs a git
 checkout to search, and it says so when it has none. On DeepSeek V4.1 Flash a review took
 about 19 agent turns and 35 lookups, plus a final submission for each agent and one
-critique, and cost about $0.04, with a median of three to four minutes. Its settings are under `review.deep`. When an agent fails, or a batch is reviewed in one call without tools, the
+critique, and cost about 6 cents and 314 seconds on average over 75 benchmark reviews. Its settings are under `review.deep`. When an agent fails, or a batch is reviewed in one call without tools, the
 review names the stage that did not complete. The model's context has to hold more than the
 pull request: `review.deep.token_budget_per_request`, 120,000 tokens by default, sizes an
 agent's first request, and the agent may then read up to 80,000 bytes and ask for an answer
@@ -96,6 +96,42 @@ and refuses the engineering profile. Its output lists omissions and
 lower-ranked findings withheld from the top ten. It never supplies an
 incremental baseline, closes earlier threads, or approves a pull request;
 use `nitpick review` for a complete review.
+
+## Choosing between review and deep-review
+
+`nitpick review` is the default, and it is what the GitHub Action runs. It reads
+each pull request whole, in one request of up to 60 files or 120,000 tokens, and
+a critique then grades each finding against the code it cites. `nitpick
+deep-review` adds two agents that read the repository over several turns before
+they file anything. It is opt in: run `nitpick deep-review`, or set `command:
+deep-review` on the Action.
+
+`review` keeps a request limit you set in `review.max_files_per_request` or
+`review.token_budget_per_request`. A limit set to exactly the built-in value, 6
+files or 60,000 tokens, cannot be told from no setting and is replaced. Set
+`review.whole_pull_request: false` to keep it.
+
+Measured on 25 pull requests from the Martian offline benchmark, with
+`deepseek/deepseek-v4.1-flash` and one judge, over six passes of `review` and
+three of `deep-review`:
+
+| | F1 | precision | recall | cost a review | time a review | cost a defect found |
+|---|---:|---:|---:|---:|---:|---:|
+| `review` | 0.43 | 0.46 | 0.40 | 2.4 cents | 194 s | 1.9 cents |
+| `deep-review` | 0.54 | 0.57 | 0.51 | 6.2 cents | 314 s | 3.7 cents |
+
+`deep-review` finds more of the benchmark's known defects and posts fewer wrong
+findings, at 2.5 times the cost and 1.6 times the time. A reasonable split is
+`review` on every push and `deep-review` on changes where a missed defect is
+expensive.
+
+Read the numbers as indicative. They come from one model, one judge and one
+benchmark, and the defaults were chosen on those same 25 pull requests, with no
+held-out set. Run-to-run spread is wide: one setting scored between 0.35 and 0.48
+F1 over five passes. The cost counts one attempt with no reported usage as zero.
+One of 75 `deep-review` runs needed a rerun because an agent's final submission
+came back as prose; the review names a failed agent when that happens.
+[Findings](findings.md) has the method and the variants that did not help.
 
 ## Evaluate repository standards
 

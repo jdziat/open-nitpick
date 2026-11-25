@@ -532,6 +532,40 @@ type Review struct {
 	// Off by default: it costs about eight model calls a finding.
 	Verify VerifyMode `yaml:"verify"`
 
+	// WholePullRequest sends each pull request to the model in one request
+	// instead of batches of review.max_files_per_request files, so a defect
+	// whose cause and effect sit in different files is read together. Unset,
+	// nitpick review reads whole and the other commands keep their batches;
+	// false keeps the batches this config sets. A limit set to anything but its
+	// built-in value (review.max_files_per_request, review.token_budget_per_request)
+	// is kept. On 25 benchmark pull requests a whole read cost less than batches
+	// (2.4 cents a review against 4.4) and took longer (194 seconds against 145),
+	// and its F1 was not separated from theirs. A pull request too large for one
+	// request is still split. The engineering profile is left alone: it packs
+	// its design tasks by these limits. See docs/findings.md.
+	WholePullRequest *bool `yaml:"whole_pull_request"`
+
+	// Votes reviews each batch of files this many times at once and keeps the
+	// findings a majority of the runs report, so a finding only one run
+	// produced is dropped before the critique and triage see it. Zero and one
+	// review once. It multiplies the cost of generation by the number, not the
+	// wall clock; on 25 benchmark pull requests 3 runs cost 2.5 times as much as
+	// one and no measured difference separated their scores. The runs differ only by what the provider does at one
+	// temperature, and a resumed review reuses one saved answer for all of them.
+	// A batch's runs share one concurrency slot, so it opens this many requests
+	// at once.
+	// Unlike models.ensemble, which asks different models, this asks one model
+	// again.
+	Votes int `yaml:"votes"`
+
+	// Critique grades each model finding against the diff around the line it
+	// cites, in one call for the whole review, and withholds the ones the code
+	// does not support. It is the stage that makes deep review precise, without
+	// deep review's agents. Withheld findings are listed with the grade.
+	// Analyzer findings are never graded. Unset, nitpick review turns it on and
+	// the other commands leave it off; false turns it off everywhere.
+	Critique *bool `yaml:"critique"`
+
 	// Jev adds an optional second opinion on each model finding, from TypeSafe's
 	// Jev decision model through OpenRouter, and withholds the findings it
 	// rates unlikely to be defects. Off unless jev.threshold is set. It runs
@@ -1539,11 +1573,13 @@ type DeepReview struct {
 	// cites, and withholds the ones the code does not support. Default on.
 	Critique bool `yaml:"critique"`
 
-	// Prompts names the instructions the agents review under. Empty, the
-	// default, keeps this tool's own. "mira" replaces them with the general and
-	// security prompts of Mira (https://github.com/miracodeai/mira, Apache
-	// License 2.0), adapted to this tool's findings; see NOTICE for what was
-	// changed. The two do not differ in the schema, the tools or the selection.
+	// Prompts names the instructions the agents review under. "mira", the
+	// default, uses the general and security prompts of Mira
+	// (https://github.com/miracodeai/mira, Apache License 2.0), adapted to this
+	// tool's findings; see NOTICE for what was changed. "nitpick", or empty,
+	// keeps this tool's own. The two do not differ in the schema, the tools or
+	// the selection. Over 25 benchmark pull requests Mira's scored F1 0.555 over
+	// three passes and this tool's own about 0.46 over six; see docs/findings.md.
 	Prompts string `yaml:"prompts"`
 
 	// MaxFilesPerRequest replaces review.max_files_per_request, so a pull
@@ -1557,8 +1593,12 @@ type DeepReview struct {
 	TokenBudgetPerRequest int `yaml:"token_budget_per_request"`
 }
 
-// DeepPromptsMira selects Mira's prompts, adapted, for the deep-review agents.
-const DeepPromptsMira = "mira"
+// The deep-review prompt sets. DeepPromptsMira is Mira's, adapted;
+// DeepPromptsNitpick, like the empty string, is this tool's own.
+const (
+	DeepPromptsMira    = "mira"
+	DeepPromptsNitpick = "nitpick"
+)
 
 // Deep review agent names.
 const (

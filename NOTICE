@@ -45,7 +45,9 @@ Adapted text
       Copyright the Mira contributors
       internal/prompt/templates/deep_mira_general.md and deep_mira_security.md
       are adapted from Mira's review.jinja2 and security_review.jinja2 at commit
-      04d3491, and are used only under review.deep.prompts: mira.
+      04d3491, and are the default prompts of nitpick deep-review. They are
+      prompts sent to a model as written, so they carry no header; the changes
+      made are listed here. review.deep.prompts: nitpick selects this tool's own.
 
       Changes made: the assistant's name, the Mira-only output fields
       (agent_prompt, key_issues, summary), the cache boundary and the context

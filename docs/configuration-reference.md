@@ -1355,6 +1355,11 @@ Scope says what the ceiling covers. One of: run, pull_request.
 integer, default `4`.
 Concurrency bounds in-flight model calls.
 
+### `review.critique`
+
+boolean, default `none`.
+Critique grades each model finding against the diff around the line it cites, in one call for the whole review, and withholds the ones the code does not support.
+
 ### `review.deep.agents`
 
 list of string, default `[general security]`.
@@ -1392,8 +1397,8 @@ MaxTurns bounds how many times each agent is asked before it must submit what it
 
 ### `review.deep.prompts`
 
-string, default `none`.
-Prompts names the instructions the agents review under.
+string, default `mira`.
+Prompts names the instructions the agents review under. "mira", the default, uses the general and security prompts of Mira (https://github.com/miracodeai/mira, Apache License 2.0), adapted to this tool's findings; see NOTICE for what was changed. "nitpick", or empty, keeps this tool's own.
 
 ### `review.deep.reasoning`
 
@@ -1644,6 +1649,16 @@ TriageNoNewClaims restores the reviewer's own words over anything triage rewrote
 
 string, default `none`.
 Verify turns on a pass that checks each model finding against the repository with read_file and grep_repo, and withholds the ones it does not confirm. "confirmed" keeps only findings the checker confirmed; "not_refuted" also keeps the ones it could not settle. Empty is off.
+
+### `review.votes`
+
+integer, default `0`.
+Votes reviews each batch of files this many times at once and keeps the findings a majority of the runs report, so a finding only one run produced is dropped before the critique and triage see it. Zero and one review once.
+
+### `review.whole_pull_request`
+
+boolean, default `none`.
+WholePullRequest sends each pull request to the model in one request instead of batches of review.max_files_per_request files, so a defect whose cause and effect sit in different files is read together.
 
 ## security
 

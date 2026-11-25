@@ -129,6 +129,7 @@ func Defaults() *Config {
 				ConfidenceFloor:       0.7,
 				LowPriorityCap:        5,
 				Critique:              true,
+				Prompts:               DeepPromptsMira,
 				MaxFilesPerRequest:    60,
 				TokenBudgetPerRequest: 120000,
 				Timeout:               15 * time.Minute,

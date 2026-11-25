@@ -50,8 +50,100 @@ type reviewFlags struct {
 	pr       int
 }
 
+// scopedReview runs a review under a command's scope. It is a variable so a
+// test can observe what runReview passes it.
+var scopedReview = reviewWithScope
+
 func runReview(ctx context.Context, args []string) error {
-	return reviewWithScope(ctx, "review", args, nil, nil)
+	return scopedReview(ctx, "review", args, applyReviewScope, configureReview)
+}
+
+// applyReviewScope reads a pull request whole and grades each finding against
+// the code it cites, each unless the operator chose otherwise. Voting is not in
+// the default: it tripled the cost of generation and no measured difference
+// separated it from one run. See docs/findings.md.
+func applyReviewScope(cfg *config.Config) {
+	// The engineering profile packs its design tasks by these same two limits,
+	// and its expert validation refuses evidence larger than the token budget.
+	// Sixty files a request grew those tasks to 113,000 tokens against a
+	// 120,000 limit, and a review of this repository failed to validate. The
+	// critique was not measured on its findings either: it withheld 58 of 86.
+	// So the profile keeps the limits and the critique setting it was given.
+	if cfg.Practices.Profile == "engineering" {
+		return
+	}
+	if cfg.Review.WholePullRequest == nil || *cfg.Review.WholePullRequest {
+		// A limit the operator changed is kept, whichever way: a small local
+		// model's context window is the operator's to know, and raising its
+		// budget behind their back would send requests it cannot hold. One set
+		// to the built-in value cannot be told from one left alone, so
+		// review.whole_pull_request: false is how to keep exactly those.
+		builtin := config.Defaults().Review
+		if cfg.Review.MaxFilesPerRequest == builtin.MaxFilesPerRequest {
+			cfg.Review.MaxFilesPerRequest = wholeReviewFiles
+		}
+		if cfg.Review.TokenBudgetPerRequest == builtin.TokenBudgetPerRequest {
+			cfg.Review.TokenBudgetPerRequest = wholeReviewTokens
+		}
+	}
+	if cfg.Review.Critique == nil {
+		on := true
+		cfg.Review.Critique = &on
+	}
+}
+
+const (
+	// wholeReviewFiles and wholeReviewTokens bound one request when review
+	// reads a pull request whole: the limits deep review reads under.
+	wholeReviewFiles  = 60
+	wholeReviewTokens = 120000
+)
+
+// configureReview keeps the review scope on a policy resolved for each pull
+// request.
+func configureReview(engine *review.Engine) {
+	engineering := engine.Config != nil && engine.Config.Practices.Profile == "engineering"
+	engine.Policy = reviewScoped{inner: engine.Policy, engineering: engineering}
+}
+
+// profileForScope tells the scope that -profile engineering selected the
+// engineering profile. The profile policy treats the flag and the
+// practices.profile setting alike, but it runs after the scope, which would
+// otherwise see neither.
+func profileForScope(command, profile string, cfg *config.Config) {
+	if command == "review" && profile == "engineering" {
+		cfg.Practices.Profile = "engineering"
+	}
+}
+
+// reviewScoped applies the review scope to a policy resolved for one pull
+// request. The engine replaces its whole Config with the resolver's answer, so
+// a scope applied only to the loaded one is lost on exactly the change that
+// edits the configuration.
+type reviewScoped struct {
+	inner review.PolicyResolver
+	// engineering is true when the loaded configuration selected the
+	// engineering profile, including by flag. A policy resolved from the base
+	// revision may not say so, and must not be scoped when the run is one.
+	engineering bool
+}
+
+// ResolvePolicy applies the review scope to the resolved policy without
+// changing the original.
+func (r reviewScoped) ResolvePolicy(ctx context.Context, ref vcs.Ref, pr *vcs.PullRequest, changed []string) (*config.Config, bool, error) {
+	if r.inner == nil {
+		return nil, false, nil
+	}
+	cfg, modified, err := r.inner.ResolvePolicy(ctx, ref, pr, changed)
+	if cfg == nil {
+		return nil, modified, err
+	}
+	if r.engineering {
+		return cfg, modified, err
+	}
+	scoped := *cfg
+	applyReviewScope(&scoped)
+	return &scoped, modified, err
 }
 
 // reviewWithScope loads operator settings and applies a command-specific scope.
@@ -75,7 +167,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	fs.IntVar(&f.pr, "pr", 0, "pull request number to review and comment on")
 	fs.BoolVar(&f.dryRun, "dry-run", false, "print the review instead of publishing it")
 	fs.BoolVar(&f.skipDraft, "skip-draft", false, "do nothing when the pull request is a draft")
-	fs.BoolVar(&f.allowDegradedTriage, "allow-degraded-triage", false, "publish and gate on the findings when only triage failed, reporting result=degraded instead of exiting 2")
+	fs.BoolVar(&f.allowDegradedTriage, "allow-degraded-triage", false, "publish and gate on the findings when only triage or the critique failed, reporting result=degraded instead of exiting 2")
 	fs.BoolVar(&f.noLinters, "no-linters", false, "skip linters even when configured")
 	fs.BoolVar(&f.full, "full", false, "review the whole change even if an earlier run reviewed part of it (no incremental narrowing)")
 	fs.BoolVar(&f.verbose, "v", false, "verbose logging")
@@ -177,6 +269,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	if f.full {
 		cfg.Review.Incremental = false
 	}
+	profileForScope(name, f.profile, cfg)
 	if scope != nil {
 		scope(cfg)
 	}

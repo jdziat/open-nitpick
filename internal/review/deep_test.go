@@ -200,6 +200,9 @@ func deepEngine(t *testing.T, reviewer *deepLLM, root string) (*Engine, *scripte
 	t.Helper()
 	e, model := verifyEngine(t, &toolLLM{}, "")
 	e.Roles.Review = llm.NewClientForTest(reviewer, e.Config.Models.Default)
+	// These tests are about the agent loop, and deepLLM finds the security agent
+	// by this tool's own focus section, which Mira's prompt does not carry.
+	e.Config.Review.Deep.Prompts = config.DeepPromptsNitpick
 	e.Deep = true
 	e.RepoRoot = root
 	return e, model
@@ -357,6 +360,7 @@ func TestADegradedDeepBatchIsNotServedFromTheCacheOnAResumedRun(t *testing.T) {
 	provider := &incrementalProvider{stubProvider: stubProvider{diff: engineDiff}, head: "abcdef"}
 	e := resumeEngine(t, &scriptedLLM{fallback: `{"findings":[]}`}, provider)
 	e.Roles.Review = llm.NewClientForTest(reviewer, e.Config.Models.Default)
+	e.Config.Review.Deep.Prompts = config.DeepPromptsNitpick
 	e.Deep = true
 	e.RepoRoot = appRepo(t)
 
