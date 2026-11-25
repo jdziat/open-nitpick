@@ -130,8 +130,8 @@ inputs:
     description: >-
       What to run: "review" (the default), "fast-review" for a quick
       changed-diff pass, "deep-review" for agents that read the repository
-      over many turns (it needs the repository checked out, and makes many
-      times the model calls of "review"), or "respond"
+      over many turns (it needs the repository checked out, and costs about 2.5
+      times as much as "review"), or "respond"
       answers a comment that mentioned the reviewer, for a workflow on
       issue_comment and pull_request_review_comment events.
     required: false

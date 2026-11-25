@@ -2729,3 +2729,280 @@ this does not show was the cause, and the log line for a capped call now records
 its elapsed time and token counts so the next slow one can be told apart. With
 `reasoning: off` set from the start, the same prompt took 4s twice.
 
+## Review precision against Mira on 25 benchmark pull requests (2026-11-23)
+
+`nitpick review` posted about four findings a pull request at 0.33 precision
+where Mira posted two at 0.64. Same reviewer model (`deepseek/deepseek-v4.1-flash`),
+same 25 pull requests from the Martian offline benchmark (entries 1, 2 and 4 to 6
+of each repository, 81 golden comments), one judge (`anthropic/claude-sonnet-4.5`).
+The first table is one pass per arm; the second is three.
+
+| arm | TP | FP | FN | precision | recall | F1 |
+|---|---:|---:|---:|---:|---:|---:|
+| Mira | 32 | 18 | 49 | 0.64 | 0.40 | 0.49 |
+| `review`, no selection | 42 | 84 | 39 | 0.33 | 0.52 | 0.41 |
+| `review`, verify `not_refuted` | 40 | 63 | 41 | 0.39 | 0.49 | 0.44 |
+| `review`, critique | 39 | 59 | 42 | 0.40 | 0.48 | 0.44 |
+
+`review` minus Mira, paired bootstrap over pull requests, for the first three
+rows: F1 -0.054 (-0.158 to +0.053), precision -25 points (-42 to -11), recall
++10 points (-2 to +22).
+
+The shipped binary, run with no configuration, three passes each of it and of
+Mira over the same 25 pull requests (243 golden comments per arm):
+
+| arm | TP | FP | FN | precision | recall | F1 |
+|---|---:|---:|---:|---:|---:|---:|
+| Mira | 99 | 55 | 144 | 0.64 | 0.41 | 0.50 |
+| `review`, shipped | 114 | 175 | 129 | 0.39 | 0.47 | 0.43 |
+
+Shipped minus Mira, paired bootstrap over pull requests: F1 -0.070 (-0.144 to
++0.006), precision -25 points (-36 to -15), recall +6 points (-2 to +14). Mira
+scored higher in each of the three passes (0.49, 0.56, 0.45 against 0.47, 0.43,
+0.38). Mira is ahead in F1 in all three passes. `review` has the higher
+recall and trails on precision: 175 false positives against 55, over the same 75
+reviews. The 0.47 first pass was the best of the three.
+
+What changed first: `nitpick review` grades each finding with the critique deep
+review already has, one call a review, unless `review.critique` says otherwise. Verify
+reached the same F1 at 44 model calls a pull request against 7 for the critique
+(15 pull requests; reported cost 4.6 cents each), so the critique is the default
+and `review.verify` stays opt in.
+
+Measured and not adopted:
+
+- Stacking the critique on verify scored F1 0.35 on 15 pull requests: 14 true
+  positives against 23 for the critique alone. Each stage is sound on its own and
+  together they cut 9 true positives.
+- Cutting `info` and `nit` raised F1 in two of three arms on the first 10 pull
+  requests (+0.06 and +0.07) and lowered it in the third (-0.02). On the other
+  15 it moved the two arms scored by -0.02 and +0.01 (for the shipped one, 3
+  true positives lost for 7 false positives). It was chosen after seeing the
+  first sample.
+- Keeping only findings the critique graded `proven` (dropping `plausible`)
+  scored F1 0.31 over the 25 pull requests, against 0.47 for the shipped
+  binary: precision 0.39 (no gain) and recall 0.26 (from 0.54).
+- A confidence floor. Over 300 findings from three passes, precision was 0.46 to
+  0.67 at confidence 0.85 and above and about 0.25 below, and 0.61 and 0.52 for a
+  pull request's top two findings by confidence against about 0.2 from the third.
+  A floor or cap on that ranking still lowers F1 in both samples, fitted on one
+  and tested on the other: at floor 0.85 F1 fell from 0.48 to 0.39 and from 0.35
+  to 0.32, because the recall lost outweighs the precision gained. A first reading
+  from one pass said confidence could not separate them; it can, and it does not
+  pay.
+- A cap of 3 to 6 findings a pull request moved F1 by under 0.03 and not in one
+  direction.
+- `review.generation_lookups` failed 4 of 10 reviews on this model with no
+  fallback to the ordinary call ("ended without submit_findings").
+- `deep-review` scored F1 0.62 on the first 10 pull requests and 0.38 on the
+  other 15 in its first pass, which misled: the two samples differ by more than
+  the arms do. See the table below.
+
+`deep-review` is the command built on Mira's settings (a ten-turn agent loop
+with repository tools, a 0.7 confidence floor, a cap on low-priority findings
+and a critique), with this tool's own prompts. Run twice for three passes each
+over the same 25 pull requests, with the same stages in the logs and the same
+number of findings posted (2.5 and 2.7 a pull request), it scored:
+
+| run | TP | FP | FN | precision | recall | F1 |
+|---|---:|---:|---:|---:|---:|---:|
+| Mira, 3 passes | 99 | 55 | 144 | 0.64 | 0.41 | 0.50 |
+| `deep-review`, run A | 96 | 54 | 147 | 0.64 | 0.40 | 0.49 |
+| `deep-review`, run B | 85 | 67 | 158 | 0.56 | 0.35 | 0.43 |
+| `deep-review`, A and B, 6 passes | 181 | 121 | 305 | 0.60 | 0.37 | 0.46 |
+
+Run B was `nitpick review` while it was routed through the deep pipeline; its
+per-review log and posted counts match run A's.
+
+**The two runs of one pipeline differ by F1 0.058, and the bootstrap reports
+that as excluding zero (-0.120 to -0.002).** The bootstrap resamples pull
+requests, so it does not see variation between runs, and every interval in this
+entry is too narrow for comparing arms. A difference under about 0.06 F1 between
+three-pass arms is not resolved here. On six passes the pipeline is 0.039 below
+Mira (-0.114 to +0.034), which is neither level nor behind by this instrument.
+
+`review` with the critique but no vote costs 5.1 cents and two and a half minutes
+a pull request and scored 0.43 over three passes; voting three times first adds
+nothing that survived a repeat, see the voting section above. The deep pipeline
+costs 8 to 9.6 cents and about six minutes and scored 0.46 over six passes, so
+the vote is the cheaper route to the same place. A version of `review` routed
+through the deep pipeline was built and reverted for that reason. The general
+agent alone, at 3.3 cents, scored 0.46 over three passes (precision 0.65,
+recall 0.35).
+
+Voting across runs is the one lever that moved every pipeline in an offline
+simulation. Taking the three passes of each arm already scored, grouping findings
+that two passes report as one defect (same file and within three lines, or titles
+sharing half their words), and keeping those at least two of three passes
+reported, over the 25 pull requests and counting unique golden comments:
+
+| arm | mean single pass F1 | 2 of 3 passes agree |
+|---|---:|---:|
+| Mira | 0.46 | 0.54 |
+| `review` with the critique | 0.40 | 0.51 |
+| `deep-review`, run A | 0.46 | 0.48 |
+| `deep-review`, run B | 0.40 | 0.43 |
+| general agent only | 0.43 | 0.44 |
+
+The simulation votes on final outputs, after each pass's own critique. The
+implementation, `review.votes`, votes before the critique and triage, so it is a
+different pipeline, and it was run for real: three runs of three ensembles per
+pull request, both samples, one `review.votes: 3` review per ensemble. The
+first attempt stopped when the key's monthly limit was reached; the five
+reviews it cut off were rerun after the limit was raised. Results are per
+ensemble, three ensembles against Mira's three passes:
+
+| arm | TP | FP | FN | precision | recall | F1 |
+|---|---:|---:|---:|---:|---:|---:|
+| Mira | 99 | 54 | 144 | 0.65 | 0.41 | 0.500 |
+| `review`, votes 3 and critique | 123 | 150 | 120 | 0.45 | 0.51 | 0.477 |
+
+`review` minus Mira: F1 -0.023 (-0.103 to +0.070), precision -20 points (-30 to
+-10), recall +10 points (+1 to +19). The vote is a large cut: over 171 batches it
+kept 467 of 1732 drafted findings and returned none at all in 44 batches. It
+costs 8.5 to 10.3 cents and about four and a half minutes a pull request.
+
+**That result did not reproduce.** Two later passes of the same setting on the
+same 25 pull requests, one through the shipped command and one with
+`critique: false`, scored F1 0.390 and 0.391 against Mira's 0.524 over the same
+two passes (-0.134, -0.215 to -0.055, and -0.133, -0.236 to -0.018). The shipped
+default, `votes: 3` and the critique, is 0.001 from the same setting without the
+critique (-0.066 to +0.077), so the critique is not what moved it. The first
+three ensembles scored 0.451, 0.524 and 0.458; the next two 0.417 and 0.361.
+Five ensembles of one setting span 0.36 to 0.52, which is wider than any
+difference between settings this entry has reported. The earlier 0.477 and the
++0.048 gain from voting are not supported, and the review as it shipped
+then was behind Mira on this benchmark.
+
+**Sending the pull request whole, and what a repeat showed.** Mira's trace for
+one pull request shows its prompt: every changed file's source and its imports
+in one request (up to 120,000 tokens), a per-language checklist of common
+mistakes, a list of valid paths, and a ten-turn loop of `read_file` and
+`grep_repo`. `review` sent batches of 6 files or 60,000 tokens, with no tools.
+Arms that match one of those at a time, two passes each over the 25 pull
+requests, with `votes: 3` and the critique unless stated:
+
+| arm | TP | FP | FN | precision | recall | F1 | $/PR |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Mira | 70 | 35 | 92 | 0.67 | 0.43 | 0.524 | |
+| batches of 6 (the earlier default) | 64 | 102 | 98 | 0.39 | 0.40 | 0.390 | 9.3 |
+| whole pull request | 68 | 59 | 94 | 0.54 | 0.42 | 0.471 | 7.1 |
+| whole pull request, plus caller walk | 64 | 57 | 98 | 0.53 | 0.40 | 0.452 | 7.1 |
+| whole pull request, no voting | 58 | 68 | 104 | 0.46 | 0.36 | 0.403 | 2.6 |
+| whole pull request, Mira's `reasoning: medium` and 16,384 tokens | 54 | 38 | 108 | 0.59 | 0.33 | 0.425 | 5.2 |
+| whole pull request, Mira's per-language checklist | 58 | 62 | 104 | 0.48 | 0.36 | 0.411 | |
+
+Read alone, the whole-pull-request row beats batches by F1 +0.080 (+0.019 to
++0.141) and Mira is 0.054 ahead of it (-0.156 to +0.048). **That did not
+survive a repeat.** The shipped command with no configuration file, which reads
+the pull request whole under the same settings (one batch, three votes, the
+critique, 2.3 and 2.5 findings posted a pull request in the two runs), scored
+F1 0.383 over the first two passes and 0.392 over three, against Mira's 0.499
+(-0.106, -0.184 to -0.021). Five passes of that one pipeline scored 0.463,
+0.479, 0.412, 0.354 and 0.408, pooled TP 149, FP 148, FN 256, precision 0.50,
+recall 0.37, F1 0.425. The 0.080 over batches was a lucky draw, and the interval
+that excluded zero was computed by resampling pull requests, which cannot see
+variation between runs of one setting.
+
+**Six passes of each, which settles the gap.** The shipped default (whole pull
+request, critique on, no voting, no configuration file) and Mira, six passes of
+each over the 25 pull requests, same judge:
+
+| arm | TP | FP | FN | precision | recall | F1 | per-pass F1 |
+|---|---:|---:|---:|---:|---:|---:|---|
+| Mira | 200 | 95 | 286 | 0.68 | 0.41 | 0.512 | 0.49 0.56 0.45 0.54 0.56 0.48 |
+| `review`, the default | 193 | 230 | 293 | 0.46 | 0.40 | 0.425 | 0.43 0.45 0.41 0.43 0.43 0.40 |
+
+`review` minus Mira: F1 -0.088 (-0.161 to -0.010 over pull requests; -0.036 to
+-0.140 from the six per-pass means, sd 0.019 against 0.046). Precision -22 points
+(-29 to -16), recall -1 point (-10 to +7). The gap is real and it is precision:
+the recall is level. It posts 3.2 and 2.6 findings a pull request against 2.3
+and 1.9 and about half of what it posts is wrong. By repository, `review` ties
+or leads on keycloak and sentry (F1 0.43 against 0.41, 0.50 against 0.50) and
+loses on calcom (0.29 against 0.46), discourse (0.42 against 0.57) and grafana
+(0.47 against 0.59).
+
+That makes the earlier figures read as follows. Five passes of this pipeline
+with `votes: 3` pooled to 0.425, and six without voting pool to 0.425: voting
+did nothing. Reading whole against batches of 6 (0.390 over two passes) is
+within what one setting varies by (0.35 to 0.48 over five passes with voting,
+0.40 to 0.45 over six without), so it is not shown to help either, and it is
+cheaper. Matching Mira's model settings or adding its language checklist did not
+help. The thing not matched is its tool loop, which `deep-review` supplies.
+
+**The one that matched: `deep-review` with Mira's prompts.** `deep-review`
+already reads each pull request whole with a general and a security agent that
+read the repository over up to ten turns, then applies a 0.7 confidence floor, a
+cap on low-priority findings and a critique, which is the shape of Mira's own
+pipeline. With `review.deep.prompts: mira`, which swaps in Mira's two prompts as
+adapted for this tool's findings (see NOTICE), three passes over the 25 pull
+requests:
+
+| arm | TP | FP | FN | precision | recall | F1 | per-pass F1 | $/PR | s/PR |
+|---|---:|---:|---:|---:|---:|---:|---|---:|---:|
+| Mira, six passes | 200 | 95 | 286 | 0.68 | 0.41 | 0.512 | 0.49 0.56 0.45 0.54 0.56 0.48 | | |
+| `review` default, six passes | 193 | 230 | 293 | 0.46 | 0.40 | 0.425 | 0.43 0.45 0.41 0.43 0.43 0.40 | 2.4 | 194 |
+| `deep-review`, Mira's prompts, three passes | 134 | 106 | 109 | 0.56 | 0.55 | 0.555 | 0.53 0.57 0.56 | 6.6 | 283 |
+
+Against Mira's first three passes (0.499): F1 +0.056 (-0.034 to +0.147), recall
++14 points (+5 to +24), precision -8 points (-17 to 0). Against all six, the
+difference of means is +0.043 (about -0.013 to +0.099). All three passes beat
+every one of the default's six and beat Mira's mean, but not every one of Mira's
+passes (0.56 and 0.56 sit level with 0.57). So it is level with Mira on F1 and
+trades precision for recall, and it is 0.13 F1 above the default `review`. One
+of its 75 reviews failed (a forced submission that came back as prose, on
+sentry-5) and was rerun once; the rerun is the one scored.
+
+Run through `nitpick deep-review` with no configuration file, after Mira's
+prompts became its default, three more passes scored F1 0.539 (0.529, 0.558,
+0.529; precision 0.57, recall 0.51; TP 125, FP 96, FN 118). That is +0.027
+against Mira's six (about -0.028 to +0.082) and +0.114 against the default
+`review`. The difference from the 0.555 above, which named the prompts in a
+configuration file, is inside one setting's own spread. It cost 6.2 cents and
+314 seconds a pull request.
+
+**`nitpick deep-review` is level with Mira on this benchmark and is not shown to
+beat it.** It reads each pull request whole, with two agents that read the
+repository, and it is the only variant here that closed the precision and recall
+gap together. `nitpick review` stays on the cheaper pipeline by default, which
+reads the whole pull request and critiques its findings, and `review.votes` is
+opt in. Those are cost decisions, not quality ones: `review` is behind Mira on
+this benchmark by about 0.09 F1, almost all of it in precision, and costs 2.4
+cents against 6.2.
+
+**Against the pre-publication checklist in [Measurement](measurement.md).**
+Replicated (Rule 3): six passes of `review` and Mira, three of `deep-review`,
+and per-pass scores are printed. Rates over comparable coverage (Rule 4): the
+same 25 pull requests in every arm, with the failed reviews named and rerun once.
+Cost per defect found (Rule 13): `review` 1.9 cents and `deep-review` 3.7 cents
+a true positive, from provider-reported usage; one of 225 attempts had none and
+counts as zero (Rule 11), and judge cost is excluded (Rule 12). No severity
+score is claimed (Rule 6). Two checks are **not** met. Same run (Rule 2): Mira,
+`review` and `deep-review` were reviewed on different days and scored in separate
+invocations of one scorer, which reuses its judge's cached answers for earlier
+arms, so the arms share a judge and its prompts but not a run. Held out (Rule
+7): the 25 pull requests were the only corpus, about a dozen variants were
+compared on them, and the defaults chosen are the winners there, so every
+"level with" or "better than" in this entry carries that selection. The judge is
+a model, not a deterministic column (Rule 1), and the gaps that are claimed
+(0.43 against 0.54 F1, per-pass spread 0.02) are wider than its noise only on
+this benchmark.
+
+Run-to-run variance is as large as the gaps among the variants in the earlier
+tables, which were one to five passes each: the critique configuration scored F1
+0.41 and 0.59 on the same first 10 pull requests in two passes, and the
+whole-pull-request setting scored 0.35 to 0.48 over five. Only the six-pass table
+is a comparison to rely on.
+
+The default this change replaced (batches of 6 files, no critique, no voting),
+run once config-free over 15 of the pull requests, cost 4.4 cents and took 145
+seconds a review, against 2.4 cents and 194 seconds for the new one. Its F1 over
+one pass of the 25 was 0.41 against 0.43 over six, which is not a difference
+this benchmark resolves; the change is a cost change, not a quality one.
+
+Limits. One judge and one reviewer model (`deepseek/deepseek-v4.1-flash`), 25
+pull requests from one benchmark, and the arms differ from Mira in several ways
+at once, so the entry does not say which of them costs the precision. Some false
+positives read as real defects the golden set does not list, which costs every
+reviewer including Mira. Rerunning Mira three more times moved its pooled F1 from
+0.499 to 0.512.

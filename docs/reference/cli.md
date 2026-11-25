@@ -21,6 +21,7 @@ from "could not run" (2). Use `-dry-run` with
 | You want to… | Start with |
 | --- | --- |
 | Review the change you are about to commit | [`review`](#review) |
+| Review a change where a missed defect is expensive, at 2.5 times the cost | [`deep-review`](#deep-review) |
 | Get a quick first pass on a pull request | [`fast-review`](#fast-review) |
 | Assess a whole repository or a focused directory | [`full-review`](#full-review) or [`repo-score`](#repo-score) |
 | Enforce conventions, commits, security, or prose in CI | [`repo-standards`](#repo-standards), [`commits`](#commits), [`security`](#security), or [`slop`](#slop) |
@@ -80,6 +81,13 @@ nitpick review -pr 42 -owner acme -repo-name service
 The normal change review. With no `-base`, it reviews uncommitted changes; with
 `-pr`, it fetches the pull request and can publish its findings to GitHub.
 
+It reads each pull request whole, in one request of up to 60 files or 120,000
+tokens (`review.whole_pull_request`), and grades each finding with a critique
+(`review.critique`). `review.votes` reviews each batch several times and keeps
+what a majority reports; it is off, because three runs cost 2.5 times as much and
+no measured difference separated them from one. See [Choosing between review and
+deep-review](../usage.md#choosing-between-review-and-deep-review).
+
 | Flag | Meaning |
 | --- | --- |
 | `-repo` | Repository root (default `.`). |
@@ -122,9 +130,10 @@ Reviews each pull request whole with two agents in parallel, a general reviewer
 and a security reviewer, that read files and search the repository over up to
 ten turns before they file anything. What they file then passes a confidence
 floor, a cap on low-priority findings, and a critique that grades each finding
-against the code it cites; the review lists what was withheld and why. It makes
-about twenty model calls a pull request where [`review`](#review) makes a few,
-and its settings are under `review.deep`. Without a git checkout to search, it
+against the code it cites; the review lists what was withheld and why. In the
+benchmark it cost 6.2 cents and 314 seconds a pull request, 2.5 times and 1.6
+times [`review`](#review). Its settings are under `review.deep`, and the agents
+review under Mira's prompts, adapted, unless `review.deep.prompts` is `nitpick`. Without a git checkout to search, it
 reviews from the diff. Its walkthrough is always the receipt, because the prose
 style is written by triage, which it does not run. It accepts the same flags as
 [`review`](#review).
