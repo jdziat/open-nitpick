@@ -1,0 +1,104 @@
+package wire
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+)
+
+// HTTPStore talks to a notary server.
+type HTTPStore struct {
+	base  string
+	token string
+	http  *http.Client
+}
+
+// NewHTTPStore builds a client. The base URL and token are both required.
+func NewHTTPStore(base, token string) (*HTTPStore, error) {
+	if base == "" || token == "" {
+		return nil, errors.New("notary needs a URL and a token")
+	}
+	return &HTTPStore{base: strings.TrimRight(base, "/"), token: token, http: &http.Client{Timeout: 15 * time.Second}}, nil
+}
+
+func (s *HTTPStore) do(ctx context.Context, method, hash string, body []byte, query string) (*http.Response, error) {
+	u := s.base + "/v1/records/" + hash + query
+	req, err := http.NewRequestWithContext(ctx, method, u, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("build notary request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+s.token)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrUnreachable, err)
+	}
+	return resp, nil
+}
+
+// Get implements Store.
+func (s *HTTPStore) Get(ctx context.Context, hash string) (Record, bool, error) {
+	resp, err := s.do(ctx, http.MethodGet, hash, nil, "")
+	if err != nil {
+		return Record{}, false, err
+	}
+	defer resp.Body.Close()
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var r Record
+		if err := json.NewDecoder(io.LimitReader(resp.Body, 32<<20)).Decode(&r); err != nil {
+			return Record{}, false, fmt.Errorf("decode notary record: %w", err)
+		}
+		return r, true, nil
+	case http.StatusNotFound:
+		return Record{}, false, nil
+	}
+	return Record{}, false, statusErr(resp)
+}
+
+// Put implements Store.
+func (s *HTTPStore) Put(ctx context.Context, rec Record) error {
+	b, err := json.Marshal(rec)
+	if err != nil {
+		return fmt.Errorf("encode record: %w", err)
+	}
+	resp, err := s.do(ctx, http.MethodPut, rec.Hash, b, "")
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
+		return nil
+	}
+	return statusErr(resp)
+}
+
+// Clear implements Store.
+func (s *HTTPStore) Clear(ctx context.Context, hash, by string) error {
+	resp, err := s.do(ctx, http.MethodDelete, hash, nil, "?by="+by)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
+		return nil
+	}
+	return statusErr(resp)
+}
+
+func statusErr(resp *http.Response) error {
+	msg, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return fmt.Errorf("%w (status %d): %s", ErrForbidden, resp.StatusCode, strings.TrimSpace(string(msg)))
+	}
+	if resp.StatusCode >= 500 {
+		return fmt.Errorf("%w (status %d)", ErrUnreachable, resp.StatusCode)
+	}
+	return fmt.Errorf("notary returned status %d: %s", resp.StatusCode, strings.TrimSpace(string(msg)))
+}
