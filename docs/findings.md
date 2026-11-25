@@ -14,7 +14,7 @@ question, and the change that improved detection made noise worse.** That is
 the whole of what is supportable, and the two halves have to be read together.
 
 Counted, no judge, on real pull requests (2026-09-03, 44 pull requests on
-`jdziat/nitpick-bench`):
+`nitpick-oss/nitpick-bench`):
 
 | | open-nitpick | Incumbent |
 |---|---|---|
