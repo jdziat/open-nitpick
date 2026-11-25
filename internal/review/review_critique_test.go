@@ -2,6 +2,8 @@ package review
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"testing"
 
 	"github.com/jdziat/open-nitpick/internal/llm"
@@ -42,5 +44,27 @@ func TestReviewCritiqueOffPublishesFindingsTheCritiqueWouldCut(t *testing.T) {
 	report, _ := critiquedReview(t, false, "proven", "unsupported")
 	if got := titles(report); len(got) != 2 {
 		t.Errorf("published %v with review.critique off, want both findings", got)
+	}
+}
+
+// A critique that cannot run has judged nothing. The review keeps every finding
+// and names the stage, so a run whose filter did not work does not read as one
+// whose filter found nothing to remove.
+func TestReviewCritiqueThatFailsKeepsEveryFindingAndReportsTheStage(t *testing.T) {
+	fs := confident(twoFindings(), 0.9)
+	reviewer := &deepLLM{ordinary: mustJSON(t, Result{Findings: fs}), critiqueErr: errors.New("upstream 503")}
+	e, _ := verifyEngine(t, &toolLLM{}, "")
+	e.Roles.Review = llm.NewClientForTest(reviewer, e.Config.Models.Default)
+	on := true
+	e.Config.Review.Critique = &on
+	report, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := titles(report); len(got) != 2 {
+		t.Errorf("published %v after the critique failed, want both findings", got)
+	}
+	if !slices.Contains(report.FailedStages(), "critique") {
+		t.Errorf("failed stages = %v, want the critique named", report.FailedStages())
 	}
 }

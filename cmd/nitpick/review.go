@@ -64,8 +64,18 @@ func runReview(ctx context.Context, args []string) error {
 // separated it from one run. See docs/findings.md.
 func applyReviewScope(cfg *config.Config) {
 	if cfg.Review.WholePullRequest == nil || *cfg.Review.WholePullRequest {
-		cfg.Review.MaxFilesPerRequest = wholeReviewFiles
-		cfg.Review.TokenBudgetPerRequest = wholeReviewTokens
+		// A limit the operator changed is kept, whichever way: a small local
+		// model's context window is the operator's to know, and raising its
+		// budget behind their back would send requests it cannot hold. One set
+		// to the built-in value cannot be told from one left alone, so
+		// review.whole_pull_request: false is how to keep exactly those.
+		builtin := config.Defaults().Review
+		if cfg.Review.MaxFilesPerRequest == builtin.MaxFilesPerRequest {
+			cfg.Review.MaxFilesPerRequest = wholeReviewFiles
+		}
+		if cfg.Review.TokenBudgetPerRequest == builtin.TokenBudgetPerRequest {
+			cfg.Review.TokenBudgetPerRequest = wholeReviewTokens
+		}
 	}
 	if cfg.Review.Critique == nil {
 		on := true
@@ -128,7 +138,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	fs.IntVar(&f.pr, "pr", 0, "pull request number to review and comment on")
 	fs.BoolVar(&f.dryRun, "dry-run", false, "print the review instead of publishing it")
 	fs.BoolVar(&f.skipDraft, "skip-draft", false, "do nothing when the pull request is a draft")
-	fs.BoolVar(&f.allowDegradedTriage, "allow-degraded-triage", false, "publish and gate on the findings when only triage failed, reporting result=degraded instead of exiting 2")
+	fs.BoolVar(&f.allowDegradedTriage, "allow-degraded-triage", false, "publish and gate on the findings when only triage or the critique failed, reporting result=degraded instead of exiting 2")
 	fs.BoolVar(&f.noLinters, "no-linters", false, "skip linters even when configured")
 	fs.BoolVar(&f.full, "full", false, "review the whole change even if an earlier run reviewed part of it (no incremental narrowing)")
 	fs.BoolVar(&f.verbose, "v", false, "verbose logging")

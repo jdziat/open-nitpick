@@ -99,10 +99,10 @@ inputs:
 
   allow-degraded-triage:
     description: >-
-      When the review finished and only triage failed, publish the findings,
-      apply fail-on to them, and set result to "degraded" instead of exiting
-      2. Any other failed stage, or a file that went unreviewed, is still an
-      error.
+      When the review finished and only triage or the critique failed, publish
+      the findings, apply fail-on to them, and set result to "degraded" instead
+      of exiting 2. Any other failed stage, or a file that went unreviewed, is
+      still an error.
     required: false
     default: "false"
 
@@ -131,7 +131,7 @@ inputs:
       What to run: "review" (the default), "fast-review" for a quick
       changed-diff pass, "deep-review" for agents that read the repository
       over many turns (it needs the repository checked out, and costs about 2.5
-      times as much as "review"), or "respond"
+      times as much as "review" on the benchmark model), or "respond"
       answers a comment that mentioned the reviewer, for a workflow on
       issue_comment and pull_request_review_comment events.
     required: false
@@ -145,7 +145,8 @@ outputs:
     description: >-
       One of "clean" (no findings at or above fail-on), "findings" (the gate
       was tripped), "skipped" (a draft, with skip-drafts), "degraded"
-      (findings published but triage did not run, with allow-degraded-triage),
+      (findings published but triage or the critique did not run, with
+      allow-degraded-triage),
       "settled" (findings remain, all below stop-at), "limit" (max-rounds
       reached, no model called), or "error" (the review could not run).
       Distinguishing the last is the point: a broken reviewer must not read

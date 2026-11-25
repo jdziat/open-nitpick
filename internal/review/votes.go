@@ -54,6 +54,10 @@ func (e *Engine) reviewVoted(ctx context.Context, r reviewers, prContext string,
 	if len(lists) < need {
 		return nil, escalations, errors.Join(errs...)
 	}
+	if len(errs) > 0 {
+		e.log().Warn("some vote runs failed; counting the rest", "files", b.Paths(),
+			"runs", runs, "failed", len(errs), "error", errors.Join(errs...))
+	}
 	voted := voteFindings(lists, need)
 	e.log().Info("votes counted", "files", b.Paths(), "runs", runs, "answered", len(lists),
 		"reported", countFindings(lists), "kept", len(voted))

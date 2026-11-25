@@ -205,3 +205,35 @@ func TestRunReviewPassesTheReviewScopeAndEngineSetup(t *testing.T) {
 		t.Errorf("runReview's engine setup left a resolved policy with %v files (err %v)", got, err)
 	}
 }
+
+// A limit the operator changed is theirs: a small local model's context window
+// is not something the default can know, and the scope must not raise the
+// budget past what they set. A limit left at the built-in value is replaced.
+func TestReviewScopeKeepsALimitTheOperatorChanged(t *testing.T) {
+	builtin := config.Defaults().Review
+	cases := []struct {
+		name      string
+		files     int
+		tokens    int
+		wantFiles int
+		wantToks  int
+	}{
+		{"both left alone", builtin.MaxFilesPerRequest, builtin.TokenBudgetPerRequest, 60, 120000},
+		{"a smaller token budget is kept", builtin.MaxFilesPerRequest, 8000, 60, 8000},
+		{"a larger token budget is kept", builtin.MaxFilesPerRequest, 500000, 60, 500000},
+		{"a smaller file limit is kept", 3, builtin.TokenBudgetPerRequest, 3, 120000},
+		{"both changed are both kept", 3, 8000, 3, 8000},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cfg := config.Defaults()
+			cfg.Review.MaxFilesPerRequest = c.files
+			cfg.Review.TokenBudgetPerRequest = c.tokens
+			applyReviewScope(cfg)
+			if cfg.Review.MaxFilesPerRequest != c.wantFiles || cfg.Review.TokenBudgetPerRequest != c.wantToks {
+				t.Errorf("limits = %d files, %d tokens; want %d and %d",
+					cfg.Review.MaxFilesPerRequest, cfg.Review.TokenBudgetPerRequest, c.wantFiles, c.wantToks)
+			}
+		})
+	}
+}

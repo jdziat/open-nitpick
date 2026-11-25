@@ -536,9 +536,12 @@ type Review struct {
 	// instead of batches of review.max_files_per_request files, so a defect
 	// whose cause and effect sit in different files is read together. Unset,
 	// nitpick review reads whole and the other commands keep their batches;
-	// false keeps the batches this config sets. On 25 benchmark pull requests it
-	// raised F1 by 0.08 and cost less. A pull request too large for one request
-	// is still split. See docs/findings.md.
+	// false keeps the batches this config sets. A limit set to anything but its
+	// built-in value (review.max_files_per_request, review.token_budget_per_request)
+	// is kept. On 25 benchmark pull requests a whole read cost less than batches
+	// (2.4 cents a review against 4.4) and took longer (194 seconds against 145),
+	// and its F1 was not separated from theirs. A pull request too large for one
+	// request is still split. See docs/findings.md.
 	WholePullRequest *bool `yaml:"whole_pull_request"`
 
 	// Votes reviews each batch of files this many times at once and keeps the
@@ -548,6 +551,8 @@ type Review struct {
 	// wall clock; on 25 benchmark pull requests 3 runs cost 2.5 times as much as
 	// one and no measured difference separated their scores. The runs differ only by what the provider does at one
 	// temperature, and a resumed review reuses one saved answer for all of them.
+	// A batch's runs share one concurrency slot, so it opens this many requests
+	// at once.
 	// Unlike models.ensemble, which asks different models, this asks one model
 	// again.
 	Votes int `yaml:"votes"`

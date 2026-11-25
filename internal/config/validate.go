@@ -12,10 +12,10 @@ import (
 // ErrNoModel distinguishes missing model settings from invalid configuration.
 var ErrNoModel = errors.New("no reviewer model configured")
 
-// onlyNoModel reports whether every validation error is missing model settings.
 // maxVotes bounds review.votes: each run is a full generation call.
 const maxVotes = 5
 
+// onlyNoModel reports whether every validation error is missing model settings.
 func onlyNoModel(err error) bool {
 	if err == nil {
 		return false

@@ -21,7 +21,7 @@ from "could not run" (2). Use `-dry-run` with
 | You want to… | Start with |
 | --- | --- |
 | Review the change you are about to commit | [`review`](#review) |
-| Review a change where a missed defect is expensive, at 2.5 times the cost | [`deep-review`](#deep-review) |
+| Review a change where a missed defect is expensive, at 2.5 times the cost in the benchmark | [`deep-review`](#deep-review) |
 | Get a quick first pass on a pull request | [`fast-review`](#fast-review) |
 | Assess a whole repository or a focused directory | [`full-review`](#full-review) or [`repo-score`](#repo-score) |
 | Enforce conventions, commits, security, or prose in CI | [`repo-standards`](#repo-standards), [`commits`](#commits), [`security`](#security), or [`slop`](#slop) |
@@ -102,7 +102,7 @@ deep-review](../usage.md#choosing-between-review-and-deep-review).
 | `-owner`, `-repo-name`, `-pr` | GitHub repository and pull request to review. |
 | `-dry-run` | Print the review instead of publishing it. |
 | `-skip-draft` | Exit without work for a draft pull request. |
-| `-allow-degraded-triage` | When only triage failed, publish the findings and apply the gate to them; `result` is `degraded` and the exit status is 0 or 1. Any other failed stage still exits 2. |
+| `-allow-degraded-triage` | When only triage or the critique failed, publish the findings and apply the gate to them; `result` is `degraded` and the exit status is 0 or 1. Any other failed stage still exits 2. A model that cannot call tools fails the critique on every run: set `review.critique: false`, or use this flag. |
 | `-no-linters` | Skip configured linters. |
 | `-full` | Review the whole change, even when a prior run would narrow it incrementally. |
 | `-log-format` | Log format: `text` (default) or `json`. |
