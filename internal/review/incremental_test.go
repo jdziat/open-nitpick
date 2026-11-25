@@ -544,3 +544,32 @@ func TestIncrementalRunResolvesSupersededComments(t *testing.T) {
 		t.Errorf("resolved with the switch off: %v", provider.resolved)
 	}
 }
+
+// A push that moves no file narrows the re-read set to zero, and Files with it.
+// Report.Change keeps the pull request's whole diff, because a check that asks
+// what the change touches reads an empty Files as "touches nothing" and
+// cannot tell a change with no Go from one that was only not re-read.
+func TestNarrowingToNothingKeepsTheWholeChangeOnTheReport(t *testing.T) {
+	model := &scriptedLLM{fallback: mustJSON(t, Result{})}
+	provider := &incrementalProvider{
+		stubProvider: stubProvider{diff: incrementalDiff},
+		head:         "new",
+		prior:        &vcs.PriorReview{Head: "old"},
+		ok:           true,
+	}
+
+	report, err := newEngine(t, model, provider, nil).Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatalf("Review: %v", err)
+	}
+
+	if report.Incremental == nil || len(report.Incremental.Reviewed) != 0 {
+		t.Fatalf("incremental = %+v, want a run that re-read no file", report.Incremental)
+	}
+	if len(report.Files) != 0 {
+		t.Fatalf("files = %v, want none: narrowing left nothing to read", report.Files.Paths())
+	}
+	if got := strings.Join(report.Change.Paths(), ","); got != "app.go,other.go" {
+		t.Errorf("change = %q, want the whole diff", got)
+	}
+}

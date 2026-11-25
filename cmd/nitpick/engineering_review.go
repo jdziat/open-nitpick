@@ -188,9 +188,7 @@ func assessReviewPractices(ctx context.Context, root string, cfg *config.Config,
 		inventoryFiles, metadataErrors = designContextFiles(ctx, provider, ref, files)
 	}
 	inventory, boundaries := practices.InspectDesign(inventoryFiles, cfg.Practices.Boundaries)
-	if boundaries.State == practices.Unavailable && len(reviewReport.Files) > 0 && !goBoundaryChange(reviewReport.Files) {
-		boundaries.State, boundaries.Reason = practices.NotApplicable, "change contains no Go source or module boundary changes"
-	}
+	relaxBoundaries(&boundaries, reviewReport.Change)
 	inventory.Errors = append(inventory.Errors, metadataErrors...)
 	if len(metadataErrors) > 0 && len(cfg.Practices.Boundaries) > 0 {
 		boundaries.State, boundaries.Reason = practices.Partial, strings.Join(metadataErrors, "; ")
@@ -349,6 +347,18 @@ func designContextFiles(ctx context.Context, provider vcs.Provider, ref vcs.Ref,
 		}
 	}
 	return out, problems
+}
+
+// relaxBoundaries turns an unavailable design-boundaries check into an
+// inapplicable one when the whole pull request, not only the part this run
+// re-read, provably holds nothing that can move a Go package edge. An empty
+// change proves nothing and stays unavailable: it is how a run that read no
+// diff at all looks.
+func relaxBoundaries(check *practices.Check, change diff.Files) {
+	if check.State != practices.Unavailable || len(change) == 0 || goBoundaryChange(change) {
+		return
+	}
+	check.State, check.Reason = practices.NotApplicable, "change contains no Go source or module boundary changes"
 }
 
 // goBoundaryChange reports whether the change can move a Go package edge. A

@@ -85,3 +85,33 @@ func TestADependencyBumpIsNotAGoBoundaryChange(t *testing.T) {
 		})
 	}
 }
+
+// A push that moves nothing narrows the re-read set to zero files. The required
+// design-boundaries check then saw an empty change, stayed unavailable, and
+// failed the review of a release pull request that holds only a changelog and
+// a manifest, on every run after the first.
+func TestAnIncrementalRunWithNoReReadFilesStillJudgesTheWholeChange(t *testing.T) {
+	unavailable := func() practices.Check {
+		return practices.Check{ID: "design-boundaries", State: practices.Unavailable, Reason: "configured Go boundary rules have no Go source to inspect", Required: true}
+	}
+	doc := &diff.File{Path: "CHANGELOG.md", Kind: diff.ChangeModified}
+	goSrc := &diff.File{Path: "app.go", Kind: diff.ChangeModified}
+
+	for _, tc := range []struct {
+		name   string
+		change diff.Files
+		want   practices.State
+	}{
+		{"whole change holds no Go", diff.Files{doc}, practices.NotApplicable},
+		{"whole change holds Go", diff.Files{doc, goSrc}, practices.Unavailable},
+		{"no diff was read at all", nil, practices.Unavailable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			check := unavailable()
+			relaxBoundaries(&check, tc.change)
+			if check.State != tc.want {
+				t.Fatalf("state = %s, want %s", check.State, tc.want)
+			}
+		})
+	}
+}
