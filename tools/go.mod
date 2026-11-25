@@ -7,7 +7,7 @@
 // golangci-lint's dependency graph is enormous and the root module's go.sum is
 // 66 lines. Everyone who installs `nitpick` would download that graph to build
 // a CLI that never imports it.
-module github.com/jdziat/open-nitpick/tools
+module github.com/nitpick-oss/nitpick/tools
 
 go 1.26.11
 

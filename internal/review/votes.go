@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
+	"github.com/nitpick-oss/nitpick/internal/bundle"
 )
 
 // reviewVoted reviews one batch review.votes times at once and keeps the

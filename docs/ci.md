@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0        # the reviewer needs history to diff against base
-      - uses: jdziat/open-nitpick@v1
+      - uses: nitpick-oss/nitpick@v1
         with:
           provider: openrouter
           model: z-ai/glm-5.3-flash
@@ -78,7 +78,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: jdziat/open-nitpick@v1
+      - uses: nitpick-oss/nitpick@v1
         with:
           command: respond
           provider: openrouter
@@ -97,7 +97,7 @@ so far as its context; forge-authored text is fenced as untrusted, so a
 comment cannot instruct the model. The comment gets an eyes reaction when
 the run starts and a thumbs-up when it has answered. The handle is
 `review.mention` in `.nitpick.yaml`. This repository's own is
-[.github/workflows/nitpick-respond.yml](https://github.com/jdziat/open-nitpick/blob/main/.github/workflows/nitpick-respond.yml).
+[.github/workflows/nitpick-respond.yml](https://github.com/nitpick-oss/nitpick/blob/main/.github/workflows/nitpick-respond.yml).
 
 ### Replying to a finding
 
@@ -195,7 +195,7 @@ The Action can mint and refresh its own installation tokens. This avoids handing
 it a one-hour static token, which can expire before a long review publishes:
 
 ```yaml
-      - uses: jdziat/open-nitpick@v1
+      - uses: nitpick-oss/nitpick@v1
         env:
           NITPICK_APP_ID: ${{ vars.NITPICK_APP_ID }}
         with:

@@ -1,4 +1,4 @@
-module github.com/jdziat/open-nitpick
+module github.com/nitpick-oss/nitpick
 
 go 1.26.11
 

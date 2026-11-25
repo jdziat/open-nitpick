@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/llm"
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 )
 

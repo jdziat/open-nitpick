@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/llm"
 )
 
 func TestCompositeFixtureReviewsRetainTheirRawResponses(t *testing.T) {

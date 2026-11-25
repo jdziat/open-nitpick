@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/knowledge"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/knowledge"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 func hitOn(id, path string) knowledge.Hit {

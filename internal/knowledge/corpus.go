@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/config"
 )
 
 // The corpus is files rather than Go literals for the reason the expert

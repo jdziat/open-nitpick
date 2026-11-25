@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/diff"
 )
 
 func prefetchFullFiles(ctx context.Context, cfg *config.Config, files diff.Files, fetch ContentFetcher, kept func() int) (ContentFetcher, func()) {

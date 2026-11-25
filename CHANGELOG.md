@@ -1,188 +1,188 @@
 # Changelog
 
-## [2.8.0](https://github.com/jdziat/open-nitpick/compare/v2.7.0...v2.8.0) (2026-11-21)
+## [2.8.0](https://github.com/nitpick-oss/nitpick/compare/v2.7.0...v2.8.0) (2026-11-21)
 
 
 ### Features
 
-* add deep reviews and persistent checkpoints ([#220](https://github.com/jdziat/open-nitpick/issues/220)) ([056c2ec](https://github.com/jdziat/open-nitpick/commit/056c2ece986a88cf1773df5e2463a790d2041ec8))
-* bound paid requests, add bounded lookups, audit lost findings ([#222](https://github.com/jdziat/open-nitpick/issues/222)) ([4171b6c](https://github.com/jdziat/open-nitpick/commit/4171b6cb142778ad7b5a790bc7f41db59535c546))
+* add deep reviews and persistent checkpoints ([#220](https://github.com/nitpick-oss/nitpick/issues/220)) ([056c2ec](https://github.com/nitpick-oss/nitpick/commit/056c2ece986a88cf1773df5e2463a790d2041ec8))
+* bound paid requests, add bounded lookups, audit lost findings ([#222](https://github.com/nitpick-oss/nitpick/issues/222)) ([4171b6c](https://github.com/nitpick-oss/nitpick/commit/4171b6cb142778ad7b5a790bc7f41db59535c546))
 
 
 ### Fixes
 
-* **llm:** log what a capped call spent, and record the retry timings ([#216](https://github.com/jdziat/open-nitpick/issues/216)) ([fc0ec89](https://github.com/jdziat/open-nitpick/commit/fc0ec89b38a31a8e1419b63aa35938177be74cf6))
+* **llm:** log what a capped call spent, and record the retry timings ([#216](https://github.com/nitpick-oss/nitpick/issues/216)) ([fc0ec89](https://github.com/nitpick-oss/nitpick/commit/fc0ec89b38a31a8e1419b63aa35938177be74cf6))
 
-## [2.7.0](https://github.com/jdziat/open-nitpick/compare/v2.6.1...v2.7.0) (2026-11-12)
+## [2.7.0](https://github.com/nitpick-oss/nitpick/compare/v2.6.1...v2.7.0) (2026-11-12)
 
 
 ### Features
 
-* **review:** end a review series with a round limit and stop_at ([#213](https://github.com/jdziat/open-nitpick/issues/213)) ([73736e7](https://github.com/jdziat/open-nitpick/commit/73736e7cae86a8fddb0ac173c4ec3bf021c50ce3))
+* **review:** end a review series with a round limit and stop_at ([#213](https://github.com/nitpick-oss/nitpick/issues/213)) ([73736e7](https://github.com/nitpick-oss/nitpick/commit/73736e7cae86a8fddb0ac173c4ec3bf021c50ce3))
 
 
 ### Fixes
 
-* **llm:** cap OpenRouter reasoning calls so a runaway ends ([#215](https://github.com/jdziat/open-nitpick/issues/215)) ([8a0dfdb](https://github.com/jdziat/open-nitpick/commit/8a0dfdb1f6c1272fa8974412d97136b04fec32b0))
+* **llm:** cap OpenRouter reasoning calls so a runaway ends ([#215](https://github.com/nitpick-oss/nitpick/issues/215)) ([8a0dfdb](https://github.com/nitpick-oss/nitpick/commit/8a0dfdb1f6c1272fa8974412d97136b04fec32b0))
 
 
 ### Documentation
 
-* apply the copy rules to every documentation page ([#210](https://github.com/jdziat/open-nitpick/issues/210)) ([b2d8244](https://github.com/jdziat/open-nitpick/commit/b2d82441eb3df7f93ea5b825b56c32b47edba7b1))
+* apply the copy rules to every documentation page ([#210](https://github.com/nitpick-oss/nitpick/issues/210)) ([b2d8244](https://github.com/nitpick-oss/nitpick/commit/b2d82441eb3df7f93ea5b825b56c32b47edba7b1))
 
-## [2.6.1](https://github.com/jdziat/open-nitpick/compare/v2.6.0...v2.6.1) (2026-11-11)
+## [2.6.1](https://github.com/nitpick-oss/nitpick/compare/v2.6.0...v2.6.1) (2026-11-11)
 
 
 ### Documentation
 
-* replace slogans, arrows and dashes with plain statements ([#208](https://github.com/jdziat/open-nitpick/issues/208)) ([0607ee5](https://github.com/jdziat/open-nitpick/commit/0607ee5f6d80c2720fc4656cdc10eb12770989ea))
+* replace slogans, arrows and dashes with plain statements ([#208](https://github.com/nitpick-oss/nitpick/issues/208)) ([0607ee5](https://github.com/nitpick-oss/nitpick/commit/0607ee5f6d80c2720fc4656cdc10eb12770989ea))
 
-## [2.6.0](https://github.com/jdziat/open-nitpick/compare/v2.5.0...v2.6.0) (2026-10-21)
+## [2.6.0](https://github.com/nitpick-oss/nitpick/compare/v2.5.0...v2.6.0) (2026-10-21)
 
 
 ### Features
 
-* **review:** draw call flow around edited Go functions ([#195](https://github.com/jdziat/open-nitpick/issues/195)) ([bebc511](https://github.com/jdziat/open-nitpick/commit/bebc511092fe69e4871342807c34482fea75bee4))
-* **review:** draw Use middleware and route groups in the flow diagram ([#199](https://github.com/jdziat/open-nitpick/issues/199)) ([4330856](https://github.com/jdziat/open-nitpick/commit/43308568e9b5bcefa2977b2cc471440594cce40f))
-* **review:** let a run whose only failure is triage finish ([#193](https://github.com/jdziat/open-nitpick/issues/193)) ([1f57474](https://github.com/jdziat/open-nitpick/commit/1f574741e104ff5ad00b3b8d53aea920905e63f7))
-* **review:** link flow diagram to source, show routes and storage ([#197](https://github.com/jdziat/open-nitpick/issues/197)) ([34caa3a](https://github.com/jdziat/open-nitpick/commit/34caa3acb261dc94254515cf0abd7f35c785e8da))
+* **review:** draw call flow around edited Go functions ([#195](https://github.com/nitpick-oss/nitpick/issues/195)) ([bebc511](https://github.com/nitpick-oss/nitpick/commit/bebc511092fe69e4871342807c34482fea75bee4))
+* **review:** draw Use middleware and route groups in the flow diagram ([#199](https://github.com/nitpick-oss/nitpick/issues/199)) ([4330856](https://github.com/nitpick-oss/nitpick/commit/43308568e9b5bcefa2977b2cc471440594cce40f))
+* **review:** let a run whose only failure is triage finish ([#193](https://github.com/nitpick-oss/nitpick/issues/193)) ([1f57474](https://github.com/nitpick-oss/nitpick/commit/1f574741e104ff5ad00b3b8d53aea920905e63f7))
+* **review:** link flow diagram to source, show routes and storage ([#197](https://github.com/nitpick-oss/nitpick/issues/197)) ([34caa3a](https://github.com/nitpick-oss/nitpick/commit/34caa3acb261dc94254515cf0abd7f35c785e8da))
 
 
 ### Fixes
 
-* **mcp:** report progress and bound review duration ([#204](https://github.com/jdziat/open-nitpick/issues/204)) ([7421828](https://github.com/jdziat/open-nitpick/commit/74218281b4fb8aa2785999154711fef650a4f5ae))
-* **practices:** trim interaction task context instead of skipping it ([#196](https://github.com/jdziat/open-nitpick/issues/196)) ([47d2f05](https://github.com/jdziat/open-nitpick/commit/47d2f05f2b246ef1c188c02dece761d825242ced))
-* **review:** do not require boundaries for a dependency bump ([#191](https://github.com/jdziat/open-nitpick/issues/191)) ([4bf2e7a](https://github.com/jdziat/open-nitpick/commit/4bf2e7a02b9d98d3b456ce9de1bd6be3a8783865))
-* **review:** keep both callers and effects in a full flow diagram ([#198](https://github.com/jdziat/open-nitpick/issues/198)) ([b9da292](https://github.com/jdziat/open-nitpick/commit/b9da2923e8f5a42525558b5ce977fa1de060bc03))
-* **review:** leave go.sum out of what the reviewer reads ([#190](https://github.com/jdziat/open-nitpick/issues/190)) ([8a8dbc6](https://github.com/jdziat/open-nitpick/commit/8a8dbc61b7afaf452f0f14f015750fa18c98b91e))
-* **review:** prefix group routes with the group path in flow diagrams ([#200](https://github.com/jdziat/open-nitpick/issues/200)) ([37a9b93](https://github.com/jdziat/open-nitpick/commit/37a9b93b7a01dd738bcff345d577411f5dafb72c))
-* **review:** skip design planning for requirement-only go.mod edits ([#184](https://github.com/jdziat/open-nitpick/issues/184)) ([b3bd39e](https://github.com/jdziat/open-nitpick/commit/b3bd39ef8e66b43a880709e881cb906cb1e09d0a))
+* **mcp:** report progress and bound review duration ([#204](https://github.com/nitpick-oss/nitpick/issues/204)) ([7421828](https://github.com/nitpick-oss/nitpick/commit/74218281b4fb8aa2785999154711fef650a4f5ae))
+* **practices:** trim interaction task context instead of skipping it ([#196](https://github.com/nitpick-oss/nitpick/issues/196)) ([47d2f05](https://github.com/nitpick-oss/nitpick/commit/47d2f05f2b246ef1c188c02dece761d825242ced))
+* **review:** do not require boundaries for a dependency bump ([#191](https://github.com/nitpick-oss/nitpick/issues/191)) ([4bf2e7a](https://github.com/nitpick-oss/nitpick/commit/4bf2e7a02b9d98d3b456ce9de1bd6be3a8783865))
+* **review:** keep both callers and effects in a full flow diagram ([#198](https://github.com/nitpick-oss/nitpick/issues/198)) ([b9da292](https://github.com/nitpick-oss/nitpick/commit/b9da2923e8f5a42525558b5ce977fa1de060bc03))
+* **review:** leave go.sum out of what the reviewer reads ([#190](https://github.com/nitpick-oss/nitpick/issues/190)) ([8a8dbc6](https://github.com/nitpick-oss/nitpick/commit/8a8dbc61b7afaf452f0f14f015750fa18c98b91e))
+* **review:** prefix group routes with the group path in flow diagrams ([#200](https://github.com/nitpick-oss/nitpick/issues/200)) ([37a9b93](https://github.com/nitpick-oss/nitpick/commit/37a9b93b7a01dd738bcff345d577411f5dafb72c))
+* **review:** skip design planning for requirement-only go.mod edits ([#184](https://github.com/nitpick-oss/nitpick/issues/184)) ([b3bd39e](https://github.com/nitpick-oss/nitpick/commit/b3bd39ef8e66b43a880709e881cb906cb1e09d0a))
 
 
 ### Performance
 
-* **review:** build each file anchor set once per filter pass ([#187](https://github.com/jdziat/open-nitpick/issues/187)) ([a0f9c11](https://github.com/jdziat/open-nitpick/commit/a0f9c118b8fffc406f320aa7afc26e3c6b0ae928))
+* **review:** build each file anchor set once per filter pass ([#187](https://github.com/nitpick-oss/nitpick/issues/187)) ([a0f9c11](https://github.com/nitpick-oss/nitpick/commit/a0f9c118b8fffc406f320aa7afc26e3c6b0ae928))
 
 
 ### Documentation
 
-* finish the comment prose pass across the Go tree ([#194](https://github.com/jdziat/open-nitpick/issues/194)) ([288bf6b](https://github.com/jdziat/open-nitpick/commit/288bf6b0ff1498f3b3591138ac7b3223521a8424))
-* plain website cards and block YAML, add heading and blurb slop rules ([#186](https://github.com/jdziat/open-nitpick/issues/186)) ([cf40296](https://github.com/jdziat/open-nitpick/commit/cf402963219a7eb70de244b6da789a4354b1ca40))
-* shorten the home page feature cards ([#201](https://github.com/jdziat/open-nitpick/issues/201)) ([81ecee5](https://github.com/jdziat/open-nitpick/commit/81ecee514522581615141ed3766fb2f1c2a49c4b))
+* finish the comment prose pass across the Go tree ([#194](https://github.com/nitpick-oss/nitpick/issues/194)) ([288bf6b](https://github.com/nitpick-oss/nitpick/commit/288bf6b0ff1498f3b3591138ac7b3223521a8424))
+* plain website cards and block YAML, add heading and blurb slop rules ([#186](https://github.com/nitpick-oss/nitpick/issues/186)) ([cf40296](https://github.com/nitpick-oss/nitpick/commit/cf402963219a7eb70de244b6da789a4354b1ca40))
+* shorten the home page feature cards ([#201](https://github.com/nitpick-oss/nitpick/issues/201)) ([81ecee5](https://github.com/nitpick-oss/nitpick/commit/81ecee514522581615141ed3766fb2f1c2a49c4b))
 
-## [2.5.0](https://github.com/jdziat/open-nitpick/compare/v2.4.0...v2.5.0) (2026-10-17)
-
-
-### Features
-
-* **review:** invite replies to findings and resolve on a good one ([#182](https://github.com/jdziat/open-nitpick/issues/182)) ([0103921](https://github.com/jdziat/open-nitpick/commit/01039219d025a75dcc9e2a31ab757ed24ad61e04))
-
-## [2.4.0](https://github.com/jdziat/open-nitpick/compare/v2.3.0...v2.4.0) (2026-10-16)
+## [2.5.0](https://github.com/nitpick-oss/nitpick/compare/v2.4.0...v2.5.0) (2026-10-17)
 
 
 ### Features
 
-* **cli:** add setup for every detected agent harness ([#174](https://github.com/jdziat/open-nitpick/issues/174)) ([ec353b2](https://github.com/jdziat/open-nitpick/commit/ec353b2cb4cfc9daf29b8d18da296f1146abd15a))
-* **cli:** ask before setup writes project files ([#176](https://github.com/jdziat/open-nitpick/issues/176)) ([3aa56be](https://github.com/jdziat/open-nitpick/commit/3aa56be2d0710c0d99ecdfbf378f0aedb1f1a15d))
-* **config:** accept xhigh and max reasoning levels ([#175](https://github.com/jdziat/open-nitpick/issues/175)) ([0eb4052](https://github.com/jdziat/open-nitpick/commit/0eb40522b553e75783d5e459f748d9e0d352631c))
-* **review:** make fast-review cover every changed diff ([#154](https://github.com/jdziat/open-nitpick/issues/154)) ([941832c](https://github.com/jdziat/open-nitpick/commit/941832c54ba10e790e410f110d3df31296111df5))
-* **vcs:** let the GitHub client refresh its own App tokens ([#153](https://github.com/jdziat/open-nitpick/issues/153)) ([0af0be5](https://github.com/jdziat/open-nitpick/commit/0af0be5ac754d8afaf83d4e8347f22665b8fcf16))
+* **review:** invite replies to findings and resolve on a good one ([#182](https://github.com/nitpick-oss/nitpick/issues/182)) ([0103921](https://github.com/nitpick-oss/nitpick/commit/01039219d025a75dcc9e2a31ab757ed24ad61e04))
+
+## [2.4.0](https://github.com/nitpick-oss/nitpick/compare/v2.3.0...v2.4.0) (2026-10-16)
+
+
+### Features
+
+* **cli:** add setup for every detected agent harness ([#174](https://github.com/nitpick-oss/nitpick/issues/174)) ([ec353b2](https://github.com/nitpick-oss/nitpick/commit/ec353b2cb4cfc9daf29b8d18da296f1146abd15a))
+* **cli:** ask before setup writes project files ([#176](https://github.com/nitpick-oss/nitpick/issues/176)) ([3aa56be](https://github.com/nitpick-oss/nitpick/commit/3aa56be2d0710c0d99ecdfbf378f0aedb1f1a15d))
+* **config:** accept xhigh and max reasoning levels ([#175](https://github.com/nitpick-oss/nitpick/issues/175)) ([0eb4052](https://github.com/nitpick-oss/nitpick/commit/0eb40522b553e75783d5e459f748d9e0d352631c))
+* **review:** make fast-review cover every changed diff ([#154](https://github.com/nitpick-oss/nitpick/issues/154)) ([941832c](https://github.com/nitpick-oss/nitpick/commit/941832c54ba10e790e410f110d3df31296111df5))
+* **vcs:** let the GitHub client refresh its own App tokens ([#153](https://github.com/nitpick-oss/nitpick/issues/153)) ([0af0be5](https://github.com/nitpick-oss/nitpick/commit/0af0be5ac754d8afaf83d4e8347f22665b8fcf16))
 
 
 ### Fixes
 
-* **llm:** bound failing-batch retries and escalate them ([#162](https://github.com/jdziat/open-nitpick/issues/162)) ([ea3f2fc](https://github.com/jdziat/open-nitpick/commit/ea3f2fcb7e82bc467a7cba7d4cbfd20e3194182a)), closes [#161](https://github.com/jdziat/open-nitpick/issues/161)
-* **mcp:** preserve custom settings during installation ([#181](https://github.com/jdziat/open-nitpick/issues/181)) ([fb094bb](https://github.com/jdziat/open-nitpick/commit/fb094bb14569f6da2375e7dfb4447625fbedc7b6))
-* **review:** close threads a standing recheck kept alive ([e779ec6](https://github.com/jdziat/open-nitpick/commit/e779ec6ce40de9bc886d1896f75c5b8069e6c733))
-* **review:** halve a single-file batch along its hunks ([#180](https://github.com/jdziat/open-nitpick/issues/180)) ([bb6dfb5](https://github.com/jdziat/open-nitpick/commit/bb6dfb5fc76ee9c476de5188aee5ef8cd7845c56))
-* **review:** keep a standing recheck off the progress cache ([f884e0b](https://github.com/jdziat/open-nitpick/commit/f884e0b9f27b9ba546c31bb9f6210e56a11e2946))
-* **review:** keep standing-only to files this run read ([08420a2](https://github.com/jdziat/open-nitpick/commit/08420a2d153ba5c70f8ec99102d0c54a8d2943be))
-* **review:** let design-pass batches merge past the per-diff file cap ([#160](https://github.com/jdziat/open-nitpick/issues/160)) ([6b4d87e](https://github.com/jdziat/open-nitpick/commit/6b4d87e96b5a531a8af9a2d1c708e86663928188))
-* **review:** stop design-task skips from blocking thread resolution ([2f37a4e](https://github.com/jdziat/open-nitpick/commit/2f37a4e57851a01cbaf79836da837e02113d873b))
-* **vcs:** verify a thread closed before reporting it resolved ([#173](https://github.com/jdziat/open-nitpick/issues/173)) ([2191591](https://github.com/jdziat/open-nitpick/commit/219159137cf257379ba97ba049bc7e775978f60d))
+* **llm:** bound failing-batch retries and escalate them ([#162](https://github.com/nitpick-oss/nitpick/issues/162)) ([ea3f2fc](https://github.com/nitpick-oss/nitpick/commit/ea3f2fcb7e82bc467a7cba7d4cbfd20e3194182a)), closes [#161](https://github.com/nitpick-oss/nitpick/issues/161)
+* **mcp:** preserve custom settings during installation ([#181](https://github.com/nitpick-oss/nitpick/issues/181)) ([fb094bb](https://github.com/nitpick-oss/nitpick/commit/fb094bb14569f6da2375e7dfb4447625fbedc7b6))
+* **review:** close threads a standing recheck kept alive ([e779ec6](https://github.com/nitpick-oss/nitpick/commit/e779ec6ce40de9bc886d1896f75c5b8069e6c733))
+* **review:** halve a single-file batch along its hunks ([#180](https://github.com/nitpick-oss/nitpick/issues/180)) ([bb6dfb5](https://github.com/nitpick-oss/nitpick/commit/bb6dfb5fc76ee9c476de5188aee5ef8cd7845c56))
+* **review:** keep a standing recheck off the progress cache ([f884e0b](https://github.com/nitpick-oss/nitpick/commit/f884e0b9f27b9ba546c31bb9f6210e56a11e2946))
+* **review:** keep standing-only to files this run read ([08420a2](https://github.com/nitpick-oss/nitpick/commit/08420a2d153ba5c70f8ec99102d0c54a8d2943be))
+* **review:** let design-pass batches merge past the per-diff file cap ([#160](https://github.com/nitpick-oss/nitpick/issues/160)) ([6b4d87e](https://github.com/nitpick-oss/nitpick/commit/6b4d87e96b5a531a8af9a2d1c708e86663928188))
+* **review:** stop design-task skips from blocking thread resolution ([2f37a4e](https://github.com/nitpick-oss/nitpick/commit/2f37a4e57851a01cbaf79836da837e02113d873b))
+* **vcs:** verify a thread closed before reporting it resolved ([#173](https://github.com/nitpick-oss/nitpick/issues/173)) ([2191591](https://github.com/nitpick-oss/nitpick/commit/219159137cf257379ba97ba049bc7e775978f60d))
 
 
 ### Performance
 
-* **bundle:** read design sources concurrently ([#169](https://github.com/jdziat/open-nitpick/issues/169)) ([be8c8c2](https://github.com/jdziat/open-nitpick/commit/be8c8c23fb9009aa5c4d0444782b68f355b18c37))
-* **config:** review with glm-5.3-flash at low reasoning ([#163](https://github.com/jdziat/open-nitpick/issues/163)) ([aeedd8b](https://github.com/jdziat/open-nitpick/commit/aeedd8bc4b53c1f378efff778bb61106a88ce6d8)), closes [#161](https://github.com/jdziat/open-nitpick/issues/161)
-* **vcs:** read the reviewed commit from the checkout ([#171](https://github.com/jdziat/open-nitpick/issues/171)) ([9c3d98c](https://github.com/jdziat/open-nitpick/commit/9c3d98c4bddd2e22ccb8a22b079219726417ac85))
+* **bundle:** read design sources concurrently ([#169](https://github.com/nitpick-oss/nitpick/issues/169)) ([be8c8c2](https://github.com/nitpick-oss/nitpick/commit/be8c8c23fb9009aa5c4d0444782b68f355b18c37))
+* **config:** review with glm-5.3-flash at low reasoning ([#163](https://github.com/nitpick-oss/nitpick/issues/163)) ([aeedd8b](https://github.com/nitpick-oss/nitpick/commit/aeedd8bc4b53c1f378efff778bb61106a88ce6d8)), closes [#161](https://github.com/nitpick-oss/nitpick/issues/161)
+* **vcs:** read the reviewed commit from the checkout ([#171](https://github.com/nitpick-oss/nitpick/issues/171)) ([9c3d98c](https://github.com/nitpick-oss/nitpick/commit/9c3d98c4bddd2e22ccb8a22b079219726417ac85))
 
 
 ### Documentation
 
-* **findings:** record the CI timings under low reasoning ([#166](https://github.com/jdziat/open-nitpick/issues/166)) ([3ac13d1](https://github.com/jdziat/open-nitpick/commit/3ac13d1fa9cf4c7bae8dcbc47da47411c21359d1)), closes [#161](https://github.com/jdziat/open-nitpick/issues/161)
-* overhaul the guide and CLI documentation ([#158](https://github.com/jdziat/open-nitpick/issues/158)) ([758fc07](https://github.com/jdziat/open-nitpick/commit/758fc07a6e0f4dcc250e415204944643dc54d7f2))
-* recommend OpenRouter and remove referrals ([#157](https://github.com/jdziat/open-nitpick/issues/157)) ([00b6fd2](https://github.com/jdziat/open-nitpick/commit/00b6fd2f6181ea85c07dba922fc29367b11718dd))
+* **findings:** record the CI timings under low reasoning ([#166](https://github.com/nitpick-oss/nitpick/issues/166)) ([3ac13d1](https://github.com/nitpick-oss/nitpick/commit/3ac13d1fa9cf4c7bae8dcbc47da47411c21359d1)), closes [#161](https://github.com/nitpick-oss/nitpick/issues/161)
+* overhaul the guide and CLI documentation ([#158](https://github.com/nitpick-oss/nitpick/issues/158)) ([758fc07](https://github.com/nitpick-oss/nitpick/commit/758fc07a6e0f4dcc250e415204944643dc54d7f2))
+* recommend OpenRouter and remove referrals ([#157](https://github.com/nitpick-oss/nitpick/issues/157)) ([00b6fd2](https://github.com/nitpick-oss/nitpick/commit/00b6fd2f6181ea85c07dba922fc29367b11718dd))
 
-## [2.3.0](https://github.com/jdziat/open-nitpick/compare/v2.2.0...v2.3.0) (2026-09-29)
-
-
-### Features
-
-* assess design interactions with explicit coverage ([e2e2492](https://github.com/jdziat/open-nitpick/commit/e2e2492d66c0fde93aeb2dbf0fd0dd00e7f55cd5))
-* **review:** approve near-clean PRs via residual judge ([#138](https://github.com/jdziat/open-nitpick/issues/138)) ([0958057](https://github.com/jdziat/open-nitpick/commit/095805747a28ed76f6f7bd4446cebd4af77c0482))
-* **review:** resume unfinished reviews and add an explicit restart ([#141](https://github.com/jdziat/open-nitpick/issues/141)) ([9984889](https://github.com/jdziat/open-nitpick/commit/9984889c96c701ce75dd8ce707c8f600795d46ce))
-
-
-### Fixes
-
-* **actions:** run comment responses from current source ([#144](https://github.com/jdziat/open-nitpick/issues/144)) ([dd4d658](https://github.com/jdziat/open-nitpick/commit/dd4d6586436465f6aff49d2fd2b4fc8838c4ca7b))
-* **linters:** let golangci-lint cover build-tagged files ([#142](https://github.com/jdziat/open-nitpick/issues/142)) ([08a6b1f](https://github.com/jdziat/open-nitpick/commit/08a6b1fdb27754f90add92442cc17bd47b74a84a))
-* **review:** narrow standing-comment rereads to changed and standing files ([#149](https://github.com/jdziat/open-nitpick/issues/149)) ([0518fb6](https://github.com/jdziat/open-nitpick/commit/0518fb6312942453d091ec3a3314bedc0453ea52))
-* **review:** stop design-task limits from blocking completion ([#151](https://github.com/jdziat/open-nitpick/issues/151)) ([9548008](https://github.com/jdziat/open-nitpick/commit/9548008b060ca9b5279b61666e061825a29857f1))
-* **review:** stop unrelated packing limits from failing gates ([#143](https://github.com/jdziat/open-nitpick/issues/143)) ([6f5f9be](https://github.com/jdziat/open-nitpick/commit/6f5f9beaa62fdf0c95ef6b712dc0b92614f0c40c))
-
-## [2.2.0](https://github.com/jdziat/open-nitpick/compare/v2.1.0...v2.2.0) (2026-09-19)
+## [2.3.0](https://github.com/nitpick-oss/nitpick/compare/v2.2.0...v2.3.0) (2026-09-29)
 
 
 ### Features
 
-* assess engineering practices with explicit coverage ([#114](https://github.com/jdziat/open-nitpick/issues/114)) ([cd63852](https://github.com/jdziat/open-nitpick/commit/cd638524a2194375798b2519f9d24f1cfce9dc35))
-* evaluate and enforce repository standards ([4f36b0c](https://github.com/jdziat/open-nitpick/commit/4f36b0c3a9c530cebd89a4967ac4705e8a8bf6c7))
-* evaluate repository standards with linter enforcement ([2f6b861](https://github.com/jdziat/open-nitpick/commit/2f6b8612cd2662d7a6829f12786296feb3af6f5b))
-* measure Python JavaScript Java and Ruby standards ([6c14794](https://github.com/jdziat/open-nitpick/commit/6c1479426b765927e377804faf1d20f3c402fa44))
-* measure standards in Python JavaScript Java and Ruby ([b3f0420](https://github.com/jdziat/open-nitpick/commit/b3f04206d94cbe7e2269d7727b44996eee4c6d31))
-* plan and bind package design review tasks ([47b39d4](https://github.com/jdziat/open-nitpick/commit/47b39d4b04c82a3c5ca14363bd266af06a7651cf))
-* **security:** add tree scan command and hard eval corpus ([#134](https://github.com/jdziat/open-nitpick/issues/134)) ([1590d42](https://github.com/jdziat/open-nitpick/commit/1590d422c7ca9e40f334b147c87acf2d00240633))
+* assess design interactions with explicit coverage ([e2e2492](https://github.com/nitpick-oss/nitpick/commit/e2e2492d66c0fde93aeb2dbf0fd0dd00e7f55cd5))
+* **review:** approve near-clean PRs via residual judge ([#138](https://github.com/nitpick-oss/nitpick/issues/138)) ([0958057](https://github.com/nitpick-oss/nitpick/commit/095805747a28ed76f6f7bd4446cebd4af77c0482))
+* **review:** resume unfinished reviews and add an explicit restart ([#141](https://github.com/nitpick-oss/nitpick/issues/141)) ([9984889](https://github.com/nitpick-oss/nitpick/commit/9984889c96c701ce75dd8ce707c8f600795d46ce))
 
 
 ### Fixes
 
-* distinguish Ruby appends from heredoc openers ([8eaa316](https://github.com/jdziat/open-nitpick/commit/8eaa3163c4c18b73db6e8804f399ce2b9773035f))
-* empty length-cap retries, context framing, and laguna full-review notes ([#133](https://github.com/jdziat/open-nitpick/issues/133)) ([7d01a6e](https://github.com/jdziat/open-nitpick/commit/7d01a6ebc4237015ca09355077c44b9695390820))
-* enforce pull request squash titles ([#116](https://github.com/jdziat/open-nitpick/issues/116)) ([05aa782](https://github.com/jdziat/open-nitpick/commit/05aa78270862f2175fdc66e1a286b56c4efdf472))
-* harden engineering profile checks ([#122](https://github.com/jdziat/open-nitpick/issues/122)) ([53f451f](https://github.com/jdziat/open-nitpick/commit/53f451fd8904b8536e567d4c013f8e23f4d8b228))
-* preserve coverage across intentional exclusions ([43eb94d](https://github.com/jdziat/open-nitpick/commit/43eb94dcfdcc9a07f42f622351c632ae6ce55a79))
-* preserve GitHub content lookup failures ([#117](https://github.com/jdziat/open-nitpick/issues/117)) ([6cf7fda](https://github.com/jdziat/open-nitpick/commit/6cf7fda713ab5326ae97a4009e38f8e3e0e03e22))
-* preserve review integrity across retries ([333cd6e](https://github.com/jdziat/open-nitpick/commit/333cd6ee3ce9e8512619773adea7698108709161))
-* preserve review integrity across retries and publication ([ed1d676](https://github.com/jdziat/open-nitpick/commit/ed1d676500ead9a5a92b5c2b266b1fcec8f46dea))
-* **security:** address PR [#134](https://github.com/jdziat/open-nitpick/issues/134) review findings ([#135](https://github.com/jdziat/open-nitpick/issues/135)) ([ee87717](https://github.com/jdziat/open-nitpick/commit/ee8771724d41bf12669fa522c5aceede1017bad2))
-* stop rechecking confirmed resolved threads ([2a340a0](https://github.com/jdziat/open-nitpick/commit/2a340a02c941b78cabc59a2ec7ceafb88e8ec08c))
+* **actions:** run comment responses from current source ([#144](https://github.com/nitpick-oss/nitpick/issues/144)) ([dd4d658](https://github.com/nitpick-oss/nitpick/commit/dd4d6586436465f6aff49d2fd2b4fc8838c4ca7b))
+* **linters:** let golangci-lint cover build-tagged files ([#142](https://github.com/nitpick-oss/nitpick/issues/142)) ([08a6b1f](https://github.com/nitpick-oss/nitpick/commit/08a6b1fdb27754f90add92442cc17bd47b74a84a))
+* **review:** narrow standing-comment rereads to changed and standing files ([#149](https://github.com/nitpick-oss/nitpick/issues/149)) ([0518fb6](https://github.com/nitpick-oss/nitpick/commit/0518fb6312942453d091ec3a3314bedc0453ea52))
+* **review:** stop design-task limits from blocking completion ([#151](https://github.com/nitpick-oss/nitpick/issues/151)) ([9548008](https://github.com/nitpick-oss/nitpick/commit/9548008b060ca9b5279b61666e061825a29857f1))
+* **review:** stop unrelated packing limits from failing gates ([#143](https://github.com/nitpick-oss/nitpick/issues/143)) ([6f5f9be](https://github.com/nitpick-oss/nitpick/commit/6f5f9beaa62fdf0c95ef6b712dc0b92614f0c40c))
 
-## [2.1.0](https://github.com/jdziat/open-nitpick/compare/v2.0.1...v2.1.0) (2026-09-11)
+## [2.2.0](https://github.com/nitpick-oss/nitpick/compare/v2.1.0...v2.2.0) (2026-09-19)
 
 
 ### Features
 
-* **review:** hand the reviewer what this repository was measured to do ([#104](https://github.com/jdziat/open-nitpick/issues/104)) ([641dc47](https://github.com/jdziat/open-nitpick/commit/641dc4777c494cfb15da8d30c5c5b2d71edfccb0))
-* **review:** NewEngine names the wiring a review cannot do without ([#107](https://github.com/jdziat/open-nitpick/issues/107)) ([9bfa4b5](https://github.com/jdziat/open-nitpick/commit/9bfa4b5d82ae64d8abe26aa3f97d195fd38655f7))
-* **standards:** measure conformity from the analyzers ([#106](https://github.com/jdziat/open-nitpick/issues/106)) ([ce581c3](https://github.com/jdziat/open-nitpick/commit/ce581c3f77ac71b94f459acb5f9a1f38b4994667))
-* **standards:** measure repo conventions and generate AGENTS.md ([#103](https://github.com/jdziat/open-nitpick/issues/103)) ([64e82a1](https://github.com/jdziat/open-nitpick/commit/64e82a1aa2f0ae2342173aaa339f55908d7772a5))
+* assess engineering practices with explicit coverage ([#114](https://github.com/nitpick-oss/nitpick/issues/114)) ([cd63852](https://github.com/nitpick-oss/nitpick/commit/cd638524a2194375798b2519f9d24f1cfce9dc35))
+* evaluate and enforce repository standards ([4f36b0c](https://github.com/nitpick-oss/nitpick/commit/4f36b0c3a9c530cebd89a4967ac4705e8a8bf6c7))
+* evaluate repository standards with linter enforcement ([2f6b861](https://github.com/nitpick-oss/nitpick/commit/2f6b8612cd2662d7a6829f12786296feb3af6f5b))
+* measure Python JavaScript Java and Ruby standards ([6c14794](https://github.com/nitpick-oss/nitpick/commit/6c1479426b765927e377804faf1d20f3c402fa44))
+* measure standards in Python JavaScript Java and Ruby ([b3f0420](https://github.com/nitpick-oss/nitpick/commit/b3f04206d94cbe7e2269d7727b44996eee4c6d31))
+* plan and bind package design review tasks ([47b39d4](https://github.com/nitpick-oss/nitpick/commit/47b39d4b04c82a3c5ca14363bd266af06a7651cf))
+* **security:** add tree scan command and hard eval corpus ([#134](https://github.com/nitpick-oss/nitpick/issues/134)) ([1590d42](https://github.com/nitpick-oss/nitpick/commit/1590d422c7ca9e40f334b147c87acf2d00240633))
 
 
 ### Fixes
 
-* **respond:** a change may not supply the policy it is answered under ([#99](https://github.com/jdziat/open-nitpick/issues/99)) ([e9bd59f](https://github.com/jdziat/open-nitpick/commit/e9bd59fe42b74ed123e588c327ab433be68369c6))
-* **review:** catch bugs introduced by removal-only edits ([#98](https://github.com/jdziat/open-nitpick/issues/98)) ([9aab6da](https://github.com/jdziat/open-nitpick/commit/9aab6dad72f820ba9e4a871ba32abe2bb58b7508))
+* distinguish Ruby appends from heredoc openers ([8eaa316](https://github.com/nitpick-oss/nitpick/commit/8eaa3163c4c18b73db6e8804f399ce2b9773035f))
+* empty length-cap retries, context framing, and laguna full-review notes ([#133](https://github.com/nitpick-oss/nitpick/issues/133)) ([7d01a6e](https://github.com/nitpick-oss/nitpick/commit/7d01a6ebc4237015ca09355077c44b9695390820))
+* enforce pull request squash titles ([#116](https://github.com/nitpick-oss/nitpick/issues/116)) ([05aa782](https://github.com/nitpick-oss/nitpick/commit/05aa78270862f2175fdc66e1a286b56c4efdf472))
+* harden engineering profile checks ([#122](https://github.com/nitpick-oss/nitpick/issues/122)) ([53f451f](https://github.com/nitpick-oss/nitpick/commit/53f451fd8904b8536e567d4c013f8e23f4d8b228))
+* preserve coverage across intentional exclusions ([43eb94d](https://github.com/nitpick-oss/nitpick/commit/43eb94dcfdcc9a07f42f622351c632ae6ce55a79))
+* preserve GitHub content lookup failures ([#117](https://github.com/nitpick-oss/nitpick/issues/117)) ([6cf7fda](https://github.com/nitpick-oss/nitpick/commit/6cf7fda713ab5326ae97a4009e38f8e3e0e03e22))
+* preserve review integrity across retries ([333cd6e](https://github.com/nitpick-oss/nitpick/commit/333cd6ee3ce9e8512619773adea7698108709161))
+* preserve review integrity across retries and publication ([ed1d676](https://github.com/nitpick-oss/nitpick/commit/ed1d676500ead9a5a92b5c2b266b1fcec8f46dea))
+* **security:** address PR [#134](https://github.com/nitpick-oss/nitpick/issues/134) review findings ([#135](https://github.com/nitpick-oss/nitpick/issues/135)) ([ee87717](https://github.com/nitpick-oss/nitpick/commit/ee8771724d41bf12669fa522c5aceede1017bad2))
+* stop rechecking confirmed resolved threads ([2a340a0](https://github.com/nitpick-oss/nitpick/commit/2a340a02c941b78cabc59a2ec7ceafb88e8ec08c))
 
-## [2.0.1](https://github.com/jdziat/open-nitpick/compare/v1.12.0...v2.0.1) (2026-09-09)
+## [2.1.0](https://github.com/nitpick-oss/nitpick/compare/v2.0.1...v2.1.0) (2026-09-11)
+
+
+### Features
+
+* **review:** hand the reviewer what this repository was measured to do ([#104](https://github.com/nitpick-oss/nitpick/issues/104)) ([641dc47](https://github.com/nitpick-oss/nitpick/commit/641dc4777c494cfb15da8d30c5c5b2d71edfccb0))
+* **review:** NewEngine names the wiring a review cannot do without ([#107](https://github.com/nitpick-oss/nitpick/issues/107)) ([9bfa4b5](https://github.com/nitpick-oss/nitpick/commit/9bfa4b5d82ae64d8abe26aa3f97d195fd38655f7))
+* **standards:** measure conformity from the analyzers ([#106](https://github.com/nitpick-oss/nitpick/issues/106)) ([ce581c3](https://github.com/nitpick-oss/nitpick/commit/ce581c3f77ac71b94f459acb5f9a1f38b4994667))
+* **standards:** measure repo conventions and generate AGENTS.md ([#103](https://github.com/nitpick-oss/nitpick/issues/103)) ([64e82a1](https://github.com/nitpick-oss/nitpick/commit/64e82a1aa2f0ae2342173aaa339f55908d7772a5))
+
+
+### Fixes
+
+* **respond:** a change may not supply the policy it is answered under ([#99](https://github.com/nitpick-oss/nitpick/issues/99)) ([e9bd59f](https://github.com/nitpick-oss/nitpick/commit/e9bd59fe42b74ed123e588c327ab433be68369c6))
+* **review:** catch bugs introduced by removal-only edits ([#98](https://github.com/nitpick-oss/nitpick/issues/98)) ([9aab6da](https://github.com/nitpick-oss/nitpick/commit/9aab6dad72f820ba9e4a871ba32abe2bb58b7508))
+
+## [2.0.1](https://github.com/nitpick-oss/nitpick/compare/v1.12.0...v2.0.1) (2026-09-09)
 
 Same tree as the 2.0.0 release commit. The v2.0.0 tag was created and removed
 before its release ran, and tag immutability is on, so the name cannot be
 reused. The breaking changes below are 2.0.0's and land here instead.
 
-## [2.0.0](https://github.com/jdziat/open-nitpick/compare/v1.12.0...v2.0.0) (2026-09-09)
+## [2.0.0](https://github.com/nitpick-oss/nitpick/compare/v1.12.0...v2.0.0) (2026-09-09)
 
 
 ### ⚠ BREAKING CHANGES
@@ -191,65 +191,65 @@ reused. The breaking changes below are 2.0.0's and land here instead.
 
 ### Features
 
-* **config:** an opt-in for keys a newer nitpick added ([#94](https://github.com/jdziat/open-nitpick/issues/94)) ([ffbad30](https://github.com/jdziat/open-nitpick/commit/ffbad3083bb9ae180c80a3843e69dd51ac7d8a70))
-* **review:** findings carry what the reviewer read, and version-gated entries ([#91](https://github.com/jdziat/open-nitpick/issues/91)) ([1d1b2ba](https://github.com/jdziat/open-nitpick/commit/1d1b2ba2172dd496f59dfab50b9dea210e28d3df))
+* **config:** an opt-in for keys a newer nitpick added ([#94](https://github.com/nitpick-oss/nitpick/issues/94)) ([ffbad30](https://github.com/nitpick-oss/nitpick/commit/ffbad3083bb9ae180c80a3843e69dd51ac7d8a70))
+* **review:** findings carry what the reviewer read, and version-gated entries ([#91](https://github.com/nitpick-oss/nitpick/issues/91)) ([1d1b2ba](https://github.com/nitpick-oss/nitpick/commit/1d1b2ba2172dd496f59dfab50b9dea210e28d3df))
 
 
 ### Fixes
 
-* **fence:** one marker vocabulary, and a marker per request where it is written back ([#96](https://github.com/jdziat/open-nitpick/issues/96)) ([7c643c6](https://github.com/jdziat/open-nitpick/commit/7c643c6d475c0ae8adbf01418e70df8fa9b2ca08))
-* **review:** triage answers by number, so a finding keeps its metadata ([#97](https://github.com/jdziat/open-nitpick/issues/97)) ([74c1e9b](https://github.com/jdziat/open-nitpick/commit/74c1e9b2e338e05d6876895bcae740844e546bea))
+* **fence:** one marker vocabulary, and a marker per request where it is written back ([#96](https://github.com/nitpick-oss/nitpick/issues/96)) ([7c643c6](https://github.com/nitpick-oss/nitpick/commit/7c643c6d475c0ae8adbf01418e70df8fa9b2ca08))
+* **review:** triage answers by number, so a finding keeps its metadata ([#97](https://github.com/nitpick-oss/nitpick/issues/97)) ([74c1e9b](https://github.com/nitpick-oss/nitpick/commit/74c1e9b2e338e05d6876895bcae740844e546bea))
 
-## [1.12.0](https://github.com/jdziat/open-nitpick/compare/v1.11.2...v1.12.0) (2026-09-09)
+## [1.12.0](https://github.com/nitpick-oss/nitpick/compare/v1.11.2...v1.12.0) (2026-09-09)
 
 
 ### Features
 
-* **knowledge:** retrieval across every command, selectable bundles, class routing and a pre-registered evaluation ([#85](https://github.com/jdziat/open-nitpick/issues/85)) ([ffcc840](https://github.com/jdziat/open-nitpick/commit/ffcc8405f767f313812659e851ef4fd9fc6cf322)), closes [#84](https://github.com/jdziat/open-nitpick/issues/84)
-* **knowledge:** retrieve what the model was not taught ([#80](https://github.com/jdziat/open-nitpick/issues/80)) ([5709a07](https://github.com/jdziat/open-nitpick/commit/5709a075bb1c83e11bf223e8d8fda85410867971))
-* **knowledge:** ship voyage-code-4 and qwen3-embedding-8b bundles ([#89](https://github.com/jdziat/open-nitpick/issues/89)) ([2bb8c9b](https://github.com/jdziat/open-nitpick/commit/2bb8c9ba5e4e4dabb326a7622d3756f938371a92))
+* **knowledge:** retrieval across every command, selectable bundles, class routing and a pre-registered evaluation ([#85](https://github.com/nitpick-oss/nitpick/issues/85)) ([ffcc840](https://github.com/nitpick-oss/nitpick/commit/ffcc8405f767f313812659e851ef4fd9fc6cf322)), closes [#84](https://github.com/nitpick-oss/nitpick/issues/84)
+* **knowledge:** retrieve what the model was not taught ([#80](https://github.com/nitpick-oss/nitpick/issues/80)) ([5709a07](https://github.com/nitpick-oss/nitpick/commit/5709a075bb1c83e11bf223e8d8fda85410867971))
+* **knowledge:** ship voyage-code-4 and qwen3-embedding-8b bundles ([#89](https://github.com/nitpick-oss/nitpick/issues/89)) ([2bb8c9b](https://github.com/nitpick-oss/nitpick/commit/2bb8c9ba5e4e4dabb326a7622d3756f938371a92))
 
 
 ### Fixes
 
-* **bundle,llm:** stop sending an added file twice, and say when a call is slow ([#86](https://github.com/jdziat/open-nitpick/issues/86)) ([a5a4290](https://github.com/jdziat/open-nitpick/commit/a5a4290cf5d789b1107e1de531e95db148bfb132))
-* **knowledge:** check the embedding model at query time, not only at build ([#90](https://github.com/jdziat/open-nitpick/issues/90)) ([7bbd023](https://github.com/jdziat/open-nitpick/commit/7bbd023fe6f22e779b15cdcbfe58cf23da86f86b))
-* **review,bundle:** reasoning budget, concurrent style pass, framing-aware budget ([#87](https://github.com/jdziat/open-nitpick/issues/87)) ([0120e85](https://github.com/jdziat/open-nitpick/commit/0120e85052b55f8c08e8870084ad1c8ca9880814))
+* **bundle,llm:** stop sending an added file twice, and say when a call is slow ([#86](https://github.com/nitpick-oss/nitpick/issues/86)) ([a5a4290](https://github.com/nitpick-oss/nitpick/commit/a5a4290cf5d789b1107e1de531e95db148bfb132))
+* **knowledge:** check the embedding model at query time, not only at build ([#90](https://github.com/nitpick-oss/nitpick/issues/90)) ([7bbd023](https://github.com/nitpick-oss/nitpick/commit/7bbd023fe6f22e779b15cdcbfe58cf23da86f86b))
+* **review,bundle:** reasoning budget, concurrent style pass, framing-aware budget ([#87](https://github.com/nitpick-oss/nitpick/issues/87)) ([0120e85](https://github.com/nitpick-oss/nitpick/commit/0120e85052b55f8c08e8870084ad1c8ca9880814))
 
 
 ### Measurement
 
-* **knowledge:** freeze the 100-snapshot selection ([#88](https://github.com/jdziat/open-nitpick/issues/88)) ([6dd5872](https://github.com/jdziat/open-nitpick/commit/6dd5872ab5e2f2ea92f2af2cf29c525d1dd7cb73)), closes [#84](https://github.com/jdziat/open-nitpick/issues/84)
+* **knowledge:** freeze the 100-snapshot selection ([#88](https://github.com/nitpick-oss/nitpick/issues/88)) ([6dd5872](https://github.com/nitpick-oss/nitpick/commit/6dd5872ab5e2f2ea92f2af2cf29c525d1dd7cb73)), closes [#84](https://github.com/nitpick-oss/nitpick/issues/84)
 
-## [1.11.2](https://github.com/jdziat/open-nitpick/compare/v1.11.1...v1.11.2) (2026-09-08)
+## [1.11.2](https://github.com/nitpick-oss/nitpick/compare/v1.11.1...v1.11.2) (2026-09-08)
 
 
 ### Fixes
 
-* **review:** a failed stage stops reporting the run as clean ([#78](https://github.com/jdziat/open-nitpick/issues/78)) ([5d442e0](https://github.com/jdziat/open-nitpick/commit/5d442e0751c1aa9ba7c1352c590681b0c70475a6))
+* **review:** a failed stage stops reporting the run as clean ([#78](https://github.com/nitpick-oss/nitpick/issues/78)) ([5d442e0](https://github.com/nitpick-oss/nitpick/commit/5d442e0751c1aa9ba7c1352c590681b0c70475a6))
 
-## [1.11.1](https://github.com/jdziat/open-nitpick/compare/v1.11.0...v1.11.1) (2026-09-08)
+## [1.11.1](https://github.com/nitpick-oss/nitpick/compare/v1.11.0...v1.11.1) (2026-09-08)
 
 
 ### Documentation
 
-* generate the configuration reference, and fix what the site got wrong ([#75](https://github.com/jdziat/open-nitpick/issues/75)) ([cf7a41f](https://github.com/jdziat/open-nitpick/commit/cf7a41f6b4d16b74312f5c5a70fb09fecd12ec42))
+* generate the configuration reference, and fix what the site got wrong ([#75](https://github.com/nitpick-oss/nitpick/issues/75)) ([cf7a41f](https://github.com/nitpick-oss/nitpick/commit/cf7a41f6b4d16b74312f5c5a70fb09fecd12ec42))
 
-## [1.11.0](https://github.com/jdziat/open-nitpick/compare/v1.10.0...v1.11.0) (2026-09-08)
-
-
-### Features
-
-* **cli:** nitpick improve, the local half of the wider pass ([#72](https://github.com/jdziat/open-nitpick/issues/72)) ([f23cc93](https://github.com/jdziat/open-nitpick/commit/f23cc93f4b76f8ecbf3504eca20b725e9b064aed))
-* **review:** approve a clean review, when asked to ([#71](https://github.com/jdziat/open-nitpick/issues/71)) ([b168540](https://github.com/jdziat/open-nitpick/commit/b168540771e2438bee96844ba7c3fb1360c94f6b))
-
-## [1.10.0](https://github.com/jdziat/open-nitpick/compare/v1.9.0...v1.10.0) (2026-09-07)
+## [1.11.0](https://github.com/nitpick-oss/nitpick/compare/v1.10.0...v1.11.0) (2026-09-08)
 
 
 ### Features
 
-* **converse:** [@open-nitpick](https://github.com/open-nitpick) improve, the wider pass on request ([#68](https://github.com/jdziat/open-nitpick/issues/68)) ([08e44bc](https://github.com/jdziat/open-nitpick/commit/08e44bcefdfcb8cf61dfa2b392df5dfafcbe933f)), closes [#54](https://github.com/jdziat/open-nitpick/issues/54)
-* **config:** `models.fix`, the model that edits code on a fix command ([#61](https://github.com/jdziat/open-nitpick/issues/61)) ([1ab8ce5](https://github.com/jdziat/open-nitpick/commit/1ab8ce55cb9c254f9e2b955312883fb0441bf087))
+* **cli:** nitpick improve, the local half of the wider pass ([#72](https://github.com/nitpick-oss/nitpick/issues/72)) ([f23cc93](https://github.com/nitpick-oss/nitpick/commit/f23cc93f4b76f8ecbf3504eca20b725e9b064aed))
+* **review:** approve a clean review, when asked to ([#71](https://github.com/nitpick-oss/nitpick/issues/71)) ([b168540](https://github.com/nitpick-oss/nitpick/commit/b168540771e2438bee96844ba7c3fb1360c94f6b))
+
+## [1.10.0](https://github.com/nitpick-oss/nitpick/compare/v1.9.0...v1.10.0) (2026-09-07)
+
+
+### Features
+
+* **converse:** [@open-nitpick](https://github.com/open-nitpick) improve, the wider pass on request ([#68](https://github.com/nitpick-oss/nitpick/issues/68)) ([08e44bc](https://github.com/nitpick-oss/nitpick/commit/08e44bcefdfcb8cf61dfa2b392df5dfafcbe933f)), closes [#54](https://github.com/nitpick-oss/nitpick/issues/54)
+* **config:** `models.fix`, the model that edits code on a fix command ([#61](https://github.com/nitpick-oss/nitpick/issues/61)) ([1ab8ce5](https://github.com/nitpick-oss/nitpick/commit/1ab8ce55cb9c254f9e2b955312883fb0441bf087))
 
     There is no default and there should not be: every measurement in
     docs/findings.md scores a reviewer on recall and noise, and neither says
@@ -261,44 +261,44 @@ reused. The breaking changes below are 2.0.0's and land here instead.
 
 ### Fixes
 
-* **cli:** explain-config names the handle that ships ([#70](https://github.com/jdziat/open-nitpick/issues/70)) ([3ca56e1](https://github.com/jdziat/open-nitpick/commit/3ca56e11343ef733ed8fcc35120d8674b21e011d))
-* **vcs:** say so in the thread when a fix cannot be written ([#66](https://github.com/jdziat/open-nitpick/issues/66)) ([7e9adce](https://github.com/jdziat/open-nitpick/commit/7e9adce83d99888acc21d058fb35a0ab3fc2285f))
+* **cli:** explain-config names the handle that ships ([#70](https://github.com/nitpick-oss/nitpick/issues/70)) ([3ca56e1](https://github.com/nitpick-oss/nitpick/commit/3ca56e11343ef733ed8fcc35120d8674b21e011d))
+* **vcs:** say so in the thread when a fix cannot be written ([#66](https://github.com/nitpick-oss/nitpick/issues/66)) ([7e9adce](https://github.com/nitpick-oss/nitpick/commit/7e9adce83d99888acc21d058fb35a0ab3fc2285f))
 
 
 ### Documentation
 
-* the 44-PR regression is noise, and Status links out ([#60](https://github.com/jdziat/open-nitpick/issues/60)) ([7d5e920](https://github.com/jdziat/open-nitpick/commit/7d5e920abf36b5b6730213a587bbefa99d664631))
+* the 44-PR regression is noise, and Status links out ([#60](https://github.com/nitpick-oss/nitpick/issues/60)) ([7d5e920](https://github.com/nitpick-oss/nitpick/commit/7d5e920abf36b5b6730213a587bbefa99d664631))
 
-## [1.9.0](https://github.com/jdziat/open-nitpick/compare/v1.8.0...v1.9.0) (2026-09-07)
+## [1.9.0](https://github.com/nitpick-oss/nitpick/compare/v1.8.0...v1.9.0) (2026-09-07)
 
 
 ### Features
 
-* **converse:** apply a finding on [@open-nitpick](https://github.com/open-nitpick) fix ([#57](https://github.com/jdziat/open-nitpick/issues/57)) ([af1a546](https://github.com/jdziat/open-nitpick/commit/af1a54679f7b28ca646e933a66362cd027c0b33f))
+* **converse:** apply a finding on [@open-nitpick](https://github.com/open-nitpick) fix ([#57](https://github.com/nitpick-oss/nitpick/issues/57)) ([af1a546](https://github.com/nitpick-oss/nitpick/commit/af1a54679f7b28ca646e933a66362cd027c0b33f))
 
 
 ### Measurement
 
-* price one real multi-batch pull request ([#58](https://github.com/jdziat/open-nitpick/issues/58)) ([1fb93e1](https://github.com/jdziat/open-nitpick/commit/1fb93e13468d8027840ff2d45df122708a133f4e))
+* price one real multi-batch pull request ([#58](https://github.com/nitpick-oss/nitpick/issues/58)) ([1fb93e1](https://github.com/nitpick-oss/nitpick/commit/1fb93e13468d8027840ff2d45df122708a133f4e))
 
-## [1.8.0](https://github.com/jdziat/open-nitpick/compare/v1.7.0...v1.8.0) (2026-09-07)
+## [1.8.0](https://github.com/nitpick-oss/nitpick/compare/v1.7.0...v1.8.0) (2026-09-07)
 
 
 ### Features
 
-* **config:** a fallback model a role escalates to when the primary fails ([#52](https://github.com/jdziat/open-nitpick/issues/52)) ([a472ee8](https://github.com/jdziat/open-nitpick/commit/a472ee816b1b1b26f43257bdbe8f6b5444736e56))
-* **converse:** read a fix command, and keep the finding it names ([#55](https://github.com/jdziat/open-nitpick/issues/55)) ([f44adaa](https://github.com/jdziat/open-nitpick/commit/f44adaa76e42e8e275c07a1cbadc293d3f407da1))
-* nitpick init, a user-level config, and a binding spend ceiling ([#35](https://github.com/jdziat/open-nitpick/issues/35)) ([cb60a2d](https://github.com/jdziat/open-nitpick/commit/cb60a2d16b6c4ad1de48d4149528442058c9d292))
-* resolve credentials from the OS keystore, and document every provider ([#44](https://github.com/jdziat/open-nitpick/issues/44)) ([e84dee6](https://github.com/jdziat/open-nitpick/commit/e84dee61ad93525576625d619d379d808aaa1704))
-* **review:** a fix prompt an agent can act on, under each finding ([#53](https://github.com/jdziat/open-nitpick/issues/53)) ([b50ca6b](https://github.com/jdziat/open-nitpick/commit/b50ca6b21e104d114fdbe60d2e69055c93d2f383))
-* **vcs:** publish file edits as a branch and a draft pull request ([#56](https://github.com/jdziat/open-nitpick/issues/56)) ([2c878e0](https://github.com/jdziat/open-nitpick/commit/2c878e0e23f19ad0272af46cfb6d414869eb16ef))
+* **config:** a fallback model a role escalates to when the primary fails ([#52](https://github.com/nitpick-oss/nitpick/issues/52)) ([a472ee8](https://github.com/nitpick-oss/nitpick/commit/a472ee816b1b1b26f43257bdbe8f6b5444736e56))
+* **converse:** read a fix command, and keep the finding it names ([#55](https://github.com/nitpick-oss/nitpick/issues/55)) ([f44adaa](https://github.com/nitpick-oss/nitpick/commit/f44adaa76e42e8e275c07a1cbadc293d3f407da1))
+* nitpick init, a user-level config, and a binding spend ceiling ([#35](https://github.com/nitpick-oss/nitpick/issues/35)) ([cb60a2d](https://github.com/nitpick-oss/nitpick/commit/cb60a2d16b6c4ad1de48d4149528442058c9d292))
+* resolve credentials from the OS keystore, and document every provider ([#44](https://github.com/nitpick-oss/nitpick/issues/44)) ([e84dee6](https://github.com/nitpick-oss/nitpick/commit/e84dee61ad93525576625d619d379d808aaa1704))
+* **review:** a fix prompt an agent can act on, under each finding ([#53](https://github.com/nitpick-oss/nitpick/issues/53)) ([b50ca6b](https://github.com/nitpick-oss/nitpick/commit/b50ca6b21e104d114fdbe60d2e69055c93d2f383))
+* **vcs:** publish file edits as a branch and a draft pull request ([#56](https://github.com/nitpick-oss/nitpick/issues/56)) ([2c878e0](https://github.com/nitpick-oss/nitpick/commit/2c878e0e23f19ad0272af46cfb6d414869eb16ef))
 
 
 ### Fixes
 
-* **evals:** key composite cost meters by client, not by model id ([#48](https://github.com/jdziat/open-nitpick/issues/48)) ([110391f](https://github.com/jdziat/open-nitpick/commit/110391f9a7380f75f316269c63c5dcf362f8efa9)), closes [#45](https://github.com/jdziat/open-nitpick/issues/45)
-* **llm:** pin providers with only, and unwrap a single-element array ([#47](https://github.com/jdziat/open-nitpick/issues/47)) ([cae952e](https://github.com/jdziat/open-nitpick/commit/cae952e9ac17d9ae8e24ce75bb5559a7c1204beb))
-* **review:** the default mention is `@open-nitpick`, not `@nitpick` ([#34](https://github.com/jdziat/open-nitpick/issues/34)) ([38b4a41](https://github.com/jdziat/open-nitpick/commit/38b4a4162839c5d55ea6afa2819d2b9819af6e3e))
+* **evals:** key composite cost meters by client, not by model id ([#48](https://github.com/nitpick-oss/nitpick/issues/48)) ([110391f](https://github.com/nitpick-oss/nitpick/commit/110391f9a7380f75f316269c63c5dcf362f8efa9)), closes [#45](https://github.com/nitpick-oss/nitpick/issues/45)
+* **llm:** pin providers with only, and unwrap a single-element array ([#47](https://github.com/nitpick-oss/nitpick/issues/47)) ([cae952e](https://github.com/nitpick-oss/nitpick/commit/cae952e9ac17d9ae8e24ce75bb5559a7c1204beb))
+* **review:** the default mention is `@open-nitpick`, not `@nitpick` ([#34](https://github.com/nitpick-oss/nitpick/issues/34)) ([38b4a41](https://github.com/nitpick-oss/nitpick/commit/38b4a4162839c5d55ea6afa2819d2b9819af6e3e))
 
     `@nitpick` is a real GitHub account, and every published comment naming
     it tagged a person with no connection to this tool. **A repository that
@@ -307,59 +307,59 @@ reused. The breaking changes below are 2.0.0's and land here instead.
     skip markers are unchanged: `[skip review]` and `[skip nitpick]` both
     still work.
 
-## [1.7.0](https://github.com/jdziat/open-nitpick/compare/v1.6.0...v1.7.0) (2026-09-07)
+## [1.7.0](https://github.com/nitpick-oss/nitpick/compare/v1.6.0...v1.7.0) (2026-09-07)
 
 
 ### Features
 
-* **slop:** capitals doing a sentence's work, and comments that narrate ([#30](https://github.com/jdziat/open-nitpick/issues/30)) ([5c9f2b7](https://github.com/jdziat/open-nitpick/commit/5c9f2b7d5c694cedb079c2c455f99ade956e0e56))
-* **slop:** the cadence rule reads source comments too ([#28](https://github.com/jdziat/open-nitpick/issues/28)) ([ea0ee1d](https://github.com/jdziat/open-nitpick/commit/ea0ee1da8b55a4fdac2bc52dd095e37024d8b695))
+* **slop:** capitals doing a sentence's work, and comments that narrate ([#30](https://github.com/nitpick-oss/nitpick/issues/30)) ([5c9f2b7](https://github.com/nitpick-oss/nitpick/commit/5c9f2b7d5c694cedb079c2c455f99ade956e0e56))
+* **slop:** the cadence rule reads source comments too ([#28](https://github.com/nitpick-oss/nitpick/issues/28)) ([ea0ee1d](https://github.com/nitpick-oss/nitpick/commit/ea0ee1da8b55a4fdac2bc52dd095e37024d8b695))
 
-## [1.6.0](https://github.com/jdziat/open-nitpick/compare/v1.5.1...v1.6.0) (2026-09-07)
+## [1.6.0](https://github.com/nitpick-oss/nitpick/compare/v1.5.1...v1.6.0) (2026-09-07)
 
 
 ### Features
 
-* **review:** the receipt tells a routine skip from a hole ([#26](https://github.com/jdziat/open-nitpick/issues/26)) ([03dd406](https://github.com/jdziat/open-nitpick/commit/03dd4063978ef28505301e8ba67f18def733a88c))
-* **review:** the walkthrough is counted, not written ([#23](https://github.com/jdziat/open-nitpick/issues/23)) ([4c39920](https://github.com/jdziat/open-nitpick/commit/4c3992029f9c54dff804ce3387f5825f6adef8c7))
-* **triage:** the reviewer's words survive triage, behind a flag ([#21](https://github.com/jdziat/open-nitpick/issues/21)) ([80ca927](https://github.com/jdziat/open-nitpick/commit/80ca927dc7614bd981a38f77cfd4d1a3b727a5b3))
+* **review:** the receipt tells a routine skip from a hole ([#26](https://github.com/nitpick-oss/nitpick/issues/26)) ([03dd406](https://github.com/nitpick-oss/nitpick/commit/03dd4063978ef28505301e8ba67f18def733a88c))
+* **review:** the walkthrough is counted, not written ([#23](https://github.com/nitpick-oss/nitpick/issues/23)) ([4c39920](https://github.com/nitpick-oss/nitpick/commit/4c3992029f9c54dff804ce3387f5825f6adef8c7))
+* **triage:** the reviewer's words survive triage, behind a flag ([#21](https://github.com/nitpick-oss/nitpick/issues/21)) ([80ca927](https://github.com/nitpick-oss/nitpick/commit/80ca927dc7614bd981a38f77cfd4d1a3b727a5b3))
 
 
 ### Fixes
 
-* **review:** the receipt counts files, not the style-pass marker ([#24](https://github.com/jdziat/open-nitpick/issues/24)) ([e6a330d](https://github.com/jdziat/open-nitpick/commit/e6a330db3bb987f57f6d871dc53adeeccbcfb526))
+* **review:** the receipt counts files, not the style-pass marker ([#24](https://github.com/nitpick-oss/nitpick/issues/24)) ([e6a330d](https://github.com/nitpick-oss/nitpick/commit/e6a330db3bb987f57f6d871dc53adeeccbcfb526))
 
 
 ### Documentation
 
-* **triage:** a second opinion on the invention options, and my errors ([#20](https://github.com/jdziat/open-nitpick/issues/20)) ([8aa117c](https://github.com/jdziat/open-nitpick/commit/8aa117c44d6095328212d818d528969618cae039))
+* **triage:** a second opinion on the invention options, and my errors ([#20](https://github.com/nitpick-oss/nitpick/issues/20)) ([8aa117c](https://github.com/nitpick-oss/nitpick/commit/8aa117c44d6095328212d818d528969618cae039))
 
-## [1.5.1](https://github.com/jdziat/open-nitpick/compare/v1.5.0...v1.5.1) (2026-09-07)
+## [1.5.1](https://github.com/nitpick-oss/nitpick/compare/v1.5.0...v1.5.1) (2026-09-07)
 
 
 ### Fixes
 
-* **docs:** the prose tells the word rules could not see ([#17](https://github.com/jdziat/open-nitpick/issues/17)) ([9e0aac0](https://github.com/jdziat/open-nitpick/commit/9e0aac0196dc84ba491e377d2700878656c89762))
+* **docs:** the prose tells the word rules could not see ([#17](https://github.com/nitpick-oss/nitpick/issues/17)) ([9e0aac0](https://github.com/nitpick-oss/nitpick/commit/9e0aac0196dc84ba491e377d2700878656c89762))
 
 
 ### Documentation
 
-* the status section and the aphorisms the cadence rule misses ([#19](https://github.com/jdziat/open-nitpick/issues/19)) ([8ad4eea](https://github.com/jdziat/open-nitpick/commit/8ad4eea391e6fe453fa13e98b27ea5595c6b2a67))
+* the status section and the aphorisms the cadence rule misses ([#19](https://github.com/nitpick-oss/nitpick/issues/19)) ([8ad4eea](https://github.com/nitpick-oss/nitpick/commit/8ad4eea391e6fe453fa13e98b27ea5595c6b2a67))
 
-## [1.5.0](https://github.com/jdziat/open-nitpick/compare/v1.4.0...v1.5.0) (2026-09-07)
+## [1.5.0](https://github.com/nitpick-oss/nitpick/compare/v1.4.0...v1.5.0) (2026-09-07)
 
 
 ### Features
 
-* **budget:** a spending ceiling that reviews the top files under it ([#15](https://github.com/jdziat/open-nitpick/issues/15)) ([7d8d318](https://github.com/jdziat/open-nitpick/commit/7d8d318831a996b2228d02738bf2269deee79265))
-* **spend:** only the repository people can make the reviewer spend ([#16](https://github.com/jdziat/open-nitpick/issues/16)) ([aefb97c](https://github.com/jdziat/open-nitpick/commit/aefb97c2b9a48070e6cc875f07fad76530d7cae6))
+* **budget:** a spending ceiling that reviews the top files under it ([#15](https://github.com/nitpick-oss/nitpick/issues/15)) ([7d8d318](https://github.com/nitpick-oss/nitpick/commit/7d8d318831a996b2228d02738bf2269deee79265))
+* **spend:** only the repository people can make the reviewer spend ([#16](https://github.com/nitpick-oss/nitpick/issues/16)) ([aefb97c](https://github.com/nitpick-oss/nitpick/commit/aefb97c2b9a48070e6cc875f07fad76530d7cae6))
 
 
 ### Fixes
 
-* **launch:** pin the composite action and close the doc gaps ([#10](https://github.com/jdziat/open-nitpick/issues/10)) ([74aaf71](https://github.com/jdziat/open-nitpick/commit/74aaf71e9772170399f6cc9f71ac2177659cb55c))
+* **launch:** pin the composite action and close the doc gaps ([#10](https://github.com/nitpick-oss/nitpick/issues/10)) ([74aaf71](https://github.com/nitpick-oss/nitpick/commit/74aaf71e9772170399f6cc9f71ac2177659cb55c))
 
-## [1.4.0](https://github.com/jdziat/open-nitpick/compare/v1.3.0...v1.4.0) (2026-09-06)
+## [1.4.0](https://github.com/nitpick-oss/nitpick/compare/v1.3.0...v1.4.0) (2026-09-06)
 
 
 ### ⚠ BREAKING CHANGES
@@ -368,14 +368,14 @@ reused. The breaking changes below are 2.0.0's and land here instead.
 
 ### Fixes
 
-* **repo:** remove the contributor corpus, ten projects' source code ([a8a18bd](https://github.com/jdziat/open-nitpick/commit/a8a18bd2f3994c26e6a83ae46f93fd64c49e0190))
+* **repo:** remove the contributor corpus, ten projects' source code ([a8a18bd](https://github.com/nitpick-oss/nitpick/commit/a8a18bd2f3994c26e6a83ae46f93fd64c49e0190))
 
 
 ### Documentation
 
-* **site:** the magnifier mark replaces the four-bar logo ([cb6db6f](https://github.com/jdziat/open-nitpick/commit/cb6db6f0705d296412877a3c8aea180bf6b99749))
-* the corpus tooling is gone, so the docs stop pointing at it ([#8](https://github.com/jdziat/open-nitpick/issues/8)) ([22b2a14](https://github.com/jdziat/open-nitpick/commit/22b2a144d29e164b194bf43566cd19dc876ce84a))
-* the launch blockers two reviews found ([1736843](https://github.com/jdziat/open-nitpick/commit/1736843a086b2c3610175c80d73206cf192214f2))
+* **site:** the magnifier mark replaces the four-bar logo ([cb6db6f](https://github.com/nitpick-oss/nitpick/commit/cb6db6f0705d296412877a3c8aea180bf6b99749))
+* the corpus tooling is gone, so the docs stop pointing at it ([#8](https://github.com/nitpick-oss/nitpick/issues/8)) ([22b2a14](https://github.com/nitpick-oss/nitpick/commit/22b2a144d29e164b194bf43566cd19dc876ce84a))
+* the launch blockers two reviews found ([1736843](https://github.com/nitpick-oss/nitpick/commit/1736843a086b2c3610175c80d73206cf192214f2))
 
 ## 1.3.0 (2026-09-06)
 
@@ -387,179 +387,179 @@ reused. The breaking changes below are 2.0.0's and land here instead.
 
 ### Features
 
-* **bundle:** file batching under a token budget ([7217c7e](https://github.com/jdziat/open-nitpick/commit/7217c7e7d74dbd06a9faabc48f010b118087d835))
-* **bundle:** fit context to the budget, and stop a path forging the prompt ([d6ca00c](https://github.com/jdziat/open-nitpick/commit/d6ca00caca97371d00a9c918f54865089af98be8))
-* **cli:** full-review groups advisories, security risks and bugs ([ee77dc5](https://github.com/jdziat/open-nitpick/commit/ee77dc5a61c32997899380a22a4f693972f4b592))
-* **cli:** full-review reviews the whole tree with a remediation plan ([ac498c9](https://github.com/jdziat/open-nitpick/commit/ac498c9ac584e96aa7057eec42b219948c7f5e47))
-* **cli:** identify-model for TypeScript, from the experiment that cleared it ([c64cec4](https://github.com/jdziat/open-nitpick/commit/c64cec440c44de133ee1d0a99ac5a129b33574fd))
-* **cli:** nitpick slop scores AI slop and says how to fix it ([663eac2](https://github.com/jdziat/open-nitpick/commit/663eac2bec19d96f0722758d3170bfc9e9442055))
-* **cli:** nitpick slop scores AI slop and says how to fix it ([c52e0ae](https://github.com/jdziat/open-nitpick/commit/c52e0aefd71581a1b5ad826f32c442f0114d2a1f))
-* **cli:** progress logs during a review, and mcp install for agent clients ([7032bb5](https://github.com/jdziat/open-nitpick/commit/7032bb50c75c14b572247827ea9ab33c6e9e8b8b))
-* **cli:** progress logs during a review, and mcp install for eight agent clients ([2f65b7c](https://github.com/jdziat/open-nitpick/commit/2f65b7cab31f07f530a1974b1f5d0dfde921331f))
-* **cli:** remove identify-model, whose answer does not carry to real code ([3bc288e](https://github.com/jdziat/open-nitpick/commit/3bc288e5c47333ab1a4d47000d86023d391349be))
-* **cli:** repo-score, three numbers per language with their denominators ([586cee5](https://github.com/jdziat/open-nitpick/commit/586cee555acc5faaba4b441734d0e0aee090fb2b))
-* **cmd:** nitpick CLI ([cea2399](https://github.com/jdziat/open-nitpick/commit/cea23995c31c611f08da4450e4f215585682630c))
-* **config:** .nitpick.yaml policy, personas, and trust boundary ([df48ea0](https://github.com/jdziat/open-nitpick/commit/df48ea06eb9ec5ca8ab93140b285d9dc4191c85c))
-* **config:** split related_context into definitions (on) and callers (off) ([0063a6a](https://github.com/jdziat/open-nitpick/commit/0063a6a6efa05ab4194bdc41d04b3365e60e27de))
-* **diff:** unified diff parsing and GitHub position mapping ([6af6d90](https://github.com/jdziat/open-nitpick/commit/6af6d9071b77e34bfcdcbf7ba00b1d2fc0f62d77))
-* **evals:** balance the corpus and exercise batching for the first time ([e0b5d8f](https://github.com/jdziat/open-nitpick/commit/e0b5d8f9902f39c4cb02e13f5d7e752a0824c009))
-* **evals:** judge-swap on cached findings, and severity ground truth ([39a16cf](https://github.com/jdziat/open-nitpick/commit/39a16cfa22452cf44e58c540b7651a930ae7858d))
-* **evals:** let a run set the per-review timeout ([ce2762b](https://github.com/jdziat/open-nitpick/commit/ce2762bd7a36a38e9b92ddcc4c3a2daa66037eb2))
-* **evals:** model evaluation harness behind the eval build tag ([d9531f0](https://github.com/jdziat/open-nitpick/commit/d9531f0868ba33ecd224d05d23b62b99b89d797e))
-* **evals:** report grade spread, and run our side more than once ([bee8647](https://github.com/jdziat/open-nitpick/commit/bee864768e9ed881e371b6e53015ca440dd5fd26))
-* **evals:** retain the raw Incumbent review in the cache ([3c7f509](https://github.com/jdziat/open-nitpick/commit/3c7f5092cf0490f42b0a28cff3f31db233e5ec6e))
-* **evals:** score severity against ground truth, add held-out corpus ([8c127ee](https://github.com/jdziat/open-nitpick/commit/8c127ee396979212dd64c018ad16876118ebad99))
-* **evals:** stop scoring severity across vocabularies, and guard the description ([594bc32](https://github.com/jdziat/open-nitpick/commit/594bc327bf52385d7b65a674f4aad3c096c0c4d2))
-* **evals:** the full-review acceptance fixture and test ([fd632d8](https://github.com/jdziat/open-nitpick/commit/fd632d8227c2de0f83c2a3c5ac70f9e0a7000373))
-* full-review, the slop class, repo-score, identify-model ([8679dbf](https://github.com/jdziat/open-nitpick/commit/8679dbff65cdeb336e652cb5972af8b07c123b3a))
-* incremental review on push, and related context from files the change does not touch ([57500cd](https://github.com/jdziat/open-nitpick/commit/57500cd2849ea999162f497d3d2177f99bc776e6))
-* **linters:** analyzer runners as evidence for triage ([1dfc5e9](https://github.com/jdziat/open-nitpick/commit/1dfc5e9cde859babe294fccb72613eb876425e84))
-* **llm:** make openrouter a first-class provider and the default ([d745889](https://github.com/jdziat/open-nitpick/commit/d7458895489acdf2c594ac338b2c222fda2a2c87))
-* **llm:** provider registry and structured output extraction ([44bed33](https://github.com/jdziat/open-nitpick/commit/44bed331995b5cb974bd30d60bc326cc005667e8))
-* **mcp:** the review engine as MCP tools, with a plugin and skills ([bfce7b8](https://github.com/jdziat/open-nitpick/commit/bfce7b80f4871d886fa84c1973460f104c0594dd))
-* **mcp:** the review engine as MCP tools, with a plugin and skills ([b8cfc56](https://github.com/jdziat/open-nitpick/commit/b8cfc5643154c3b55836e09a667289aee142e5f3))
-* **modelid:** a cross-generation experiment, train on one corpus and test on the next ([e2ec2a3](https://github.com/jdziat/open-nitpick/commit/e2ec2a3af57ce2753640de6d8016bf860385b78e))
-* **modelid:** a fingerprint instrument clears every language ([5889a6c](https://github.com/jdziat/open-nitpick/commit/5889a6cc4ba2706fca4513d3278fd5de1119aa03))
-* **modelid:** fingerprints clear every language; the contributor experiment; docs without tells ([236d033](https://github.com/jdziat/open-nitpick/commit/236d033c23044a400cd4320b8ecd307086351a4a))
-* **modelid:** the model-identification experiment and its corpus generator ([5e58668](https://github.com/jdziat/open-nitpick/commit/5e5866878988b48a1658245e1bc70a99ac25e3d8))
-* **prompt:** layered templates with persona and nitpick scope ([170393f](https://github.com/jdziat/open-nitpick/commit/170393fca34578b09a0f6522f9d40dc19f9c4cea))
-* **review:** [skip review] in a title, body or head commit skips the run ([333e28f](https://github.com/jdziat/open-nitpick/commit/333e28fd855dc053151eeb847ccafe30fd866f01))
-* **review:** [skip review] in a title, body or head commit skips the run ([9fafb63](https://github.com/jdziat/open-nitpick/commit/9fafb63543ed13daeac758ac73d1676229ef788e))
-* **review:** an incremental run resolves the comments it has outgrown ([0877295](https://github.com/jdziat/open-nitpick/commit/0877295a130bcfd3ba6aa7cb106bc9647de2ad12))
-* **review:** an incremental run resolves the comments it has outgrown ([f8d5b74](https://github.com/jdziat/open-nitpick/commit/f8d5b74ceff8fec9868bc246cdbc116a197f7c8b))
-* **review:** engine, hand-authored schema, and rendering ([14627bb](https://github.com/jdziat/open-nitpick/commit/14627bb422d894a8d3c73b5665adec1c2f30ada2))
-* **review:** route each finding to a domain expert before publishing it ([b7d80c4](https://github.com/jdziat/open-nitpick/commit/b7d80c4594fb59596a736da568966303cc370dab))
-* **review:** the [@nitpick](https://github.com/nitpick) conversation on a pull request ([22347dd](https://github.com/jdziat/open-nitpick/commit/22347dd4f2743cdda0a2c5f9c8b8f2627c6a6980))
-* **review:** the [@nitpick](https://github.com/nitpick) conversation on a pull request ([9eaf42c](https://github.com/jdziat/open-nitpick/commit/9eaf42ca954f6e421287ca5b63fd33c5f7b27c87))
-* **review:** the slop class, its prompt layer, its expert and its corpus ([5c47d26](https://github.com/jdziat/open-nitpick/commit/5c47d260b2c4848a5ae50fb33623fedd3dfb2751))
-* **vcs:** github and local providers ([e7f4149](https://github.com/jdziat/open-nitpick/commit/e7f41495e91f7b82e506f28af7bc524cc300230f))
+* **bundle:** file batching under a token budget ([7217c7e](https://github.com/nitpick-oss/nitpick/commit/7217c7e7d74dbd06a9faabc48f010b118087d835))
+* **bundle:** fit context to the budget, and stop a path forging the prompt ([d6ca00c](https://github.com/nitpick-oss/nitpick/commit/d6ca00caca97371d00a9c918f54865089af98be8))
+* **cli:** full-review groups advisories, security risks and bugs ([ee77dc5](https://github.com/nitpick-oss/nitpick/commit/ee77dc5a61c32997899380a22a4f693972f4b592))
+* **cli:** full-review reviews the whole tree with a remediation plan ([ac498c9](https://github.com/nitpick-oss/nitpick/commit/ac498c9ac584e96aa7057eec42b219948c7f5e47))
+* **cli:** identify-model for TypeScript, from the experiment that cleared it ([c64cec4](https://github.com/nitpick-oss/nitpick/commit/c64cec440c44de133ee1d0a99ac5a129b33574fd))
+* **cli:** nitpick slop scores AI slop and says how to fix it ([663eac2](https://github.com/nitpick-oss/nitpick/commit/663eac2bec19d96f0722758d3170bfc9e9442055))
+* **cli:** nitpick slop scores AI slop and says how to fix it ([c52e0ae](https://github.com/nitpick-oss/nitpick/commit/c52e0aefd71581a1b5ad826f32c442f0114d2a1f))
+* **cli:** progress logs during a review, and mcp install for agent clients ([7032bb5](https://github.com/nitpick-oss/nitpick/commit/7032bb50c75c14b572247827ea9ab33c6e9e8b8b))
+* **cli:** progress logs during a review, and mcp install for eight agent clients ([2f65b7c](https://github.com/nitpick-oss/nitpick/commit/2f65b7cab31f07f530a1974b1f5d0dfde921331f))
+* **cli:** remove identify-model, whose answer does not carry to real code ([3bc288e](https://github.com/nitpick-oss/nitpick/commit/3bc288e5c47333ab1a4d47000d86023d391349be))
+* **cli:** repo-score, three numbers per language with their denominators ([586cee5](https://github.com/nitpick-oss/nitpick/commit/586cee555acc5faaba4b441734d0e0aee090fb2b))
+* **cmd:** nitpick CLI ([cea2399](https://github.com/nitpick-oss/nitpick/commit/cea23995c31c611f08da4450e4f215585682630c))
+* **config:** .nitpick.yaml policy, personas, and trust boundary ([df48ea0](https://github.com/nitpick-oss/nitpick/commit/df48ea06eb9ec5ca8ab93140b285d9dc4191c85c))
+* **config:** split related_context into definitions (on) and callers (off) ([0063a6a](https://github.com/nitpick-oss/nitpick/commit/0063a6a6efa05ab4194bdc41d04b3365e60e27de))
+* **diff:** unified diff parsing and GitHub position mapping ([6af6d90](https://github.com/nitpick-oss/nitpick/commit/6af6d9071b77e34bfcdcbf7ba00b1d2fc0f62d77))
+* **evals:** balance the corpus and exercise batching for the first time ([e0b5d8f](https://github.com/nitpick-oss/nitpick/commit/e0b5d8f9902f39c4cb02e13f5d7e752a0824c009))
+* **evals:** judge-swap on cached findings, and severity ground truth ([39a16cf](https://github.com/nitpick-oss/nitpick/commit/39a16cfa22452cf44e58c540b7651a930ae7858d))
+* **evals:** let a run set the per-review timeout ([ce2762b](https://github.com/nitpick-oss/nitpick/commit/ce2762bd7a36a38e9b92ddcc4c3a2daa66037eb2))
+* **evals:** model evaluation harness behind the eval build tag ([d9531f0](https://github.com/nitpick-oss/nitpick/commit/d9531f0868ba33ecd224d05d23b62b99b89d797e))
+* **evals:** report grade spread, and run our side more than once ([bee8647](https://github.com/nitpick-oss/nitpick/commit/bee864768e9ed881e371b6e53015ca440dd5fd26))
+* **evals:** retain the raw Incumbent review in the cache ([3c7f509](https://github.com/nitpick-oss/nitpick/commit/3c7f5092cf0490f42b0a28cff3f31db233e5ec6e))
+* **evals:** score severity against ground truth, add held-out corpus ([8c127ee](https://github.com/nitpick-oss/nitpick/commit/8c127ee396979212dd64c018ad16876118ebad99))
+* **evals:** stop scoring severity across vocabularies, and guard the description ([594bc32](https://github.com/nitpick-oss/nitpick/commit/594bc327bf52385d7b65a674f4aad3c096c0c4d2))
+* **evals:** the full-review acceptance fixture and test ([fd632d8](https://github.com/nitpick-oss/nitpick/commit/fd632d8227c2de0f83c2a3c5ac70f9e0a7000373))
+* full-review, the slop class, repo-score, identify-model ([8679dbf](https://github.com/nitpick-oss/nitpick/commit/8679dbff65cdeb336e652cb5972af8b07c123b3a))
+* incremental review on push, and related context from files the change does not touch ([57500cd](https://github.com/nitpick-oss/nitpick/commit/57500cd2849ea999162f497d3d2177f99bc776e6))
+* **linters:** analyzer runners as evidence for triage ([1dfc5e9](https://github.com/nitpick-oss/nitpick/commit/1dfc5e9cde859babe294fccb72613eb876425e84))
+* **llm:** make openrouter a first-class provider and the default ([d745889](https://github.com/nitpick-oss/nitpick/commit/d7458895489acdf2c594ac338b2c222fda2a2c87))
+* **llm:** provider registry and structured output extraction ([44bed33](https://github.com/nitpick-oss/nitpick/commit/44bed331995b5cb974bd30d60bc326cc005667e8))
+* **mcp:** the review engine as MCP tools, with a plugin and skills ([bfce7b8](https://github.com/nitpick-oss/nitpick/commit/bfce7b80f4871d886fa84c1973460f104c0594dd))
+* **mcp:** the review engine as MCP tools, with a plugin and skills ([b8cfc56](https://github.com/nitpick-oss/nitpick/commit/b8cfc5643154c3b55836e09a667289aee142e5f3))
+* **modelid:** a cross-generation experiment, train on one corpus and test on the next ([e2ec2a3](https://github.com/nitpick-oss/nitpick/commit/e2ec2a3af57ce2753640de6d8016bf860385b78e))
+* **modelid:** a fingerprint instrument clears every language ([5889a6c](https://github.com/nitpick-oss/nitpick/commit/5889a6cc4ba2706fca4513d3278fd5de1119aa03))
+* **modelid:** fingerprints clear every language; the contributor experiment; docs without tells ([236d033](https://github.com/nitpick-oss/nitpick/commit/236d033c23044a400cd4320b8ecd307086351a4a))
+* **modelid:** the model-identification experiment and its corpus generator ([5e58668](https://github.com/nitpick-oss/nitpick/commit/5e5866878988b48a1658245e1bc70a99ac25e3d8))
+* **prompt:** layered templates with persona and nitpick scope ([170393f](https://github.com/nitpick-oss/nitpick/commit/170393fca34578b09a0f6522f9d40dc19f9c4cea))
+* **review:** [skip review] in a title, body or head commit skips the run ([333e28f](https://github.com/nitpick-oss/nitpick/commit/333e28fd855dc053151eeb847ccafe30fd866f01))
+* **review:** [skip review] in a title, body or head commit skips the run ([9fafb63](https://github.com/nitpick-oss/nitpick/commit/9fafb63543ed13daeac758ac73d1676229ef788e))
+* **review:** an incremental run resolves the comments it has outgrown ([0877295](https://github.com/nitpick-oss/nitpick/commit/0877295a130bcfd3ba6aa7cb106bc9647de2ad12))
+* **review:** an incremental run resolves the comments it has outgrown ([f8d5b74](https://github.com/nitpick-oss/nitpick/commit/f8d5b74ceff8fec9868bc246cdbc116a197f7c8b))
+* **review:** engine, hand-authored schema, and rendering ([14627bb](https://github.com/nitpick-oss/nitpick/commit/14627bb422d894a8d3c73b5665adec1c2f30ada2))
+* **review:** route each finding to a domain expert before publishing it ([b7d80c4](https://github.com/nitpick-oss/nitpick/commit/b7d80c4594fb59596a736da568966303cc370dab))
+* **review:** the [@nitpick](https://github.com/nitpick) conversation on a pull request ([22347dd](https://github.com/nitpick-oss/nitpick/commit/22347dd4f2743cdda0a2c5f9c8b8f2627c6a6980))
+* **review:** the [@nitpick](https://github.com/nitpick) conversation on a pull request ([9eaf42c](https://github.com/nitpick-oss/nitpick/commit/9eaf42ca954f6e421287ca5b63fd33c5f7b27c87))
+* **review:** the slop class, its prompt layer, its expert and its corpus ([5c47d26](https://github.com/nitpick-oss/nitpick/commit/5c47d260b2c4848a5ae50fb33623fedd3dfb2751))
+* **vcs:** github and local providers ([e7f4149](https://github.com/nitpick-oss/nitpick/commit/e7f41495e91f7b82e506f28af7bc524cc300230f))
 
 
 ### Fixes
 
-* **bundle:** an unbalanced Rust use tree no longer overflows the stack ([2f381b8](https://github.com/jdziat/open-nitpick/commit/2f381b8ae78e0024a715cce19cbfdf0ace2b9e1a))
-* **bundle:** stop reporting diff-only reviews as unreviewed files ([7a70a27](https://github.com/jdziat/open-nitpick/commit/7a70a27f5182c583694226b0b3abb1c0b881ce35))
-* **cli:** explain-config prints through checked closures, as both linters ask ([8a8e0b0](https://github.com/jdziat/open-nitpick/commit/8a8e0b0f94e2e22ad9d230bceb7567ffd033e29c))
-* **cli:** the slop pass over cmd, its tells and its hidden findings ([d361e85](https://github.com/jdziat/open-nitpick/commit/d361e85d4b308fddcc211a93d7d91295a8cc13a6))
-* **cli:** the slop pass over cmd, its tells and its hidden findings ([9294d03](https://github.com/jdziat/open-nitpick/commit/9294d034103d8912483adb12ab17f968f87b46db))
-* **config:** a change may not supply the policy it is reviewed under ([90dbc9e](https://github.com/jdziat/open-nitpick/commit/90dbc9e2d746f576b922c5eb1ed357b8652aca75))
-* **config:** pin kimi-k3 on OpenRouter to Moonshot's endpoint, with fallbacks ([fa97821](https://github.com/jdziat/open-nitpick/commit/fa9782101bde57161ca13413795ca04a20561fdf))
-* **config:** pin kimi-k3 on OpenRouter to Moonshot's endpoint, with fallbacks ([759af03](https://github.com/jdziat/open-nitpick/commit/759af033779acd87f12eae63d914520bb796addf))
-* **contrib-corpus:** acknowledge the clone's removal error, as errcheck asks ([d8040f4](https://github.com/jdziat/open-nitpick/commit/d8040f4397b17836e56a1f60c19c1d8a2371a33c))
-* **evals:** close four cross-fixture keyword leaks, and revisit the major mapping ([0be72f0](https://github.com/jdziat/open-nitpick/commit/0be72f0c6ab1781f01c016d6267d9e667760862e))
-* **evals:** compare rates, and key comparability on fixture coverage ([7a2a75f](https://github.com/jdziat/open-nitpick/commit/7a2a75fb1bbd18eaa8f2778a64ea9e1e8cb2a4c7))
-* **evals:** make benchmark honour RUNS, and say what SPREAD measures ([ce41ef3](https://github.com/jdziat/open-nitpick/commit/ce41ef3850fb9ffdc4fe8f4f882bf4893a63b495))
-* **evals:** read Incumbent's secondary locations, and re-derive from raw ([21adad7](https://github.com/jdziat/open-nitpick/commit/21adad7883cb3fa7bcbada6eb7586bb3ef5684db))
-* **evals:** rebuild the Incumbent benchmark on plain-text mode ([3712dcc](https://github.com/jdziat/open-nitpick/commit/3712dcc04e35373809fb8fc8092c3ecbf936d1a5))
-* **evals:** repair keyword recall, and put the adversary inside the round ([a4fdf59](https://github.com/jdziat/open-nitpick/commit/a4fdf59f65c14143d6e69a09357c01cac5ce903b))
-* **evals:** report understated severities alongside inflated ones ([800b642](https://github.com/jdziat/open-nitpick/commit/800b642672729a44b817c330c71405c18b4cb5b0))
-* **evals:** run the degeneracy guards through the real scorer ([d38c0cb](https://github.com/jdziat/open-nitpick/commit/d38c0cbf14a8dc8200b9d3a42d31b7c00d3b6623))
-* **evals:** score a multi-line anchor from its nearest edge ([33e8858](https://github.com/jdziat/open-nitpick/commit/33e8858de0f45bf55d6b94db78717988973f2e10))
-* **evals:** withdraw the cross-tool severity score, and guard degeneracy ([dd4c9d2](https://github.com/jdziat/open-nitpick/commit/dd4c9d2c0f953bb118de7ea97e4eb41fb49ed765))
-* **fullreview:** coverage that cannot lie ([3b3493f](https://github.com/jdziat/open-nitpick/commit/3b3493fb3c3afa17950d02b79f54e8e638c2bda4))
-* **fullreview:** coverage that cannot lie, and the analyzers full review ([0506f4f](https://github.com/jdziat/open-nitpick/commit/0506f4f213f980c37b35765a919eec4dec22a807))
-* **github:** a pull request the API will not diff is diffed from the checkout ([8744279](https://github.com/jdziat/open-nitpick/commit/8744279e02db58715a524bfb460c382b5175fe59))
-* **linters:** a change may not supply the analyzer configuration it is reviewed under ([71d413b](https://github.com/jdziat/open-nitpick/commit/71d413be12211841ad888870e37eed7dc257deb1))
-* **linters:** close the source-level channels that silenced or moved a finding ([2a93c3e](https://github.com/jdziat/open-nitpick/commit/2a93c3eac16638fe86a0e6131825303cf0343dd4))
-* **linters:** let an analyzer's CRITICAL reach the gate, under an operator ceiling ([c343982](https://github.com/jdziat/open-nitpick/commit/c3439823a035899998700e4bdafa4b31657d9fcb))
-* **linters:** osv-scanner advisories reach the report ([f6ee183](https://github.com/jdziat/open-nitpick/commit/f6ee1830cbf72e9d797da6ed95a41c21e131f727))
-* **linters:** the full review's findings over the analyzers package ([98e686d](https://github.com/jdziat/open-nitpick/commit/98e686d05e29899699a9aefa79e564648325e968))
-* **make:** cover DUMP in the pass-through fix, by pattern not by list ([e95fc71](https://github.com/jdziat/open-nitpick/commit/e95fc7170c4244f26202658d89fea7263c981778))
-* **make:** stop empty variables clobbering an exported eval setting ([0ce18b3](https://github.com/jdziat/open-nitpick/commit/0ce18b31e4a50b2527fff13e208a4acc8f263629))
-* **modelid:** the third review's four findings ([84fae30](https://github.com/jdziat/open-nitpick/commit/84fae30d3879f3013699de88b0b587e8e04ea873))
-* **module:** the module path carries the v2 suffix ([3c35fc4](https://github.com/jdziat/open-nitpick/commit/3c35fc4a0f92bdfdf1ad6a486b74993c1a2af061))
-* **respond:** a comment event names its pull request itself ([243c185](https://github.com/jdziat/open-nitpick/commit/243c185bf0bd40208b57a874389af93e8858e620))
-* **respond:** a comment event names its pull request itself ([728d71b](https://github.com/jdziat/open-nitpick/commit/728d71b55818485006b7d1ad352c45717f1994af))
-* **review:** a code-smell and ai-slop pass over the tree with nitpick's own tools ([8d70682](https://github.com/jdziat/open-nitpick/commit/8d70682109ccbf88b2721b2b77617e996d60ed34))
-* **review:** the branch review's confirmed findings ([b5a24b9](https://github.com/jdziat/open-nitpick/commit/b5a24b9dc7a4ed500fde6c461c31db0e838c2580))
-* **review:** the eighth review's two findings ([bf9980d](https://github.com/jdziat/open-nitpick/commit/bf9980dfa14657d75e073c22846464451029622e))
-* **review:** the fifth review's findings ([1802cec](https://github.com/jdziat/open-nitpick/commit/1802cece5866dd7d462a6a75a4016b052da58fc0))
-* **review:** the first code-smell and ai-slop pass over the tree ([5b79413](https://github.com/jdziat/open-nitpick/commit/5b794135aa1f6da5d45fd63e4d8a63840ab7e127))
-* **review:** the five findings of the branch's own review ([c83b652](https://github.com/jdziat/open-nitpick/commit/c83b652e694b57c8f07c7d7fbc0b2dca10440b28))
-* **review:** the fourth review's findings ([d8c37f0](https://github.com/jdziat/open-nitpick/commit/d8c37f044681b68fbfa1360e280d507949c36558))
-* **review:** the second review's three findings ([7a3bef3](https://github.com/jdziat/open-nitpick/commit/7a3bef3e55263053b8c34c1e538834b87dba0590))
-* **review:** the sixth review's findings ([d7ea0eb](https://github.com/jdziat/open-nitpick/commit/d7ea0eb36f31e8316deb39fa308dfb88d12b8799))
-* **test:** the shipped default is synthetic ([6102968](https://github.com/jdziat/open-nitpick/commit/610296800a58b8d36c391d0f721bb629bf91fef9))
-* **vcs:** the unborn-HEAD check through the promoted method, as staticcheck asks ([473c2fb](https://github.com/jdziat/open-nitpick/commit/473c2fbd2cab027bf1891016c8e53d48a3ade5ce))
-* **voice:** the four findings its own review made ([40e8127](https://github.com/jdziat/open-nitpick/commit/40e81271a4644838046796ec84ae9760efaa349f))
+* **bundle:** an unbalanced Rust use tree no longer overflows the stack ([2f381b8](https://github.com/nitpick-oss/nitpick/commit/2f381b8ae78e0024a715cce19cbfdf0ace2b9e1a))
+* **bundle:** stop reporting diff-only reviews as unreviewed files ([7a70a27](https://github.com/nitpick-oss/nitpick/commit/7a70a27f5182c583694226b0b3abb1c0b881ce35))
+* **cli:** explain-config prints through checked closures, as both linters ask ([8a8e0b0](https://github.com/nitpick-oss/nitpick/commit/8a8e0b0f94e2e22ad9d230bceb7567ffd033e29c))
+* **cli:** the slop pass over cmd, its tells and its hidden findings ([d361e85](https://github.com/nitpick-oss/nitpick/commit/d361e85d4b308fddcc211a93d7d91295a8cc13a6))
+* **cli:** the slop pass over cmd, its tells and its hidden findings ([9294d03](https://github.com/nitpick-oss/nitpick/commit/9294d034103d8912483adb12ab17f968f87b46db))
+* **config:** a change may not supply the policy it is reviewed under ([90dbc9e](https://github.com/nitpick-oss/nitpick/commit/90dbc9e2d746f576b922c5eb1ed357b8652aca75))
+* **config:** pin kimi-k3 on OpenRouter to Moonshot's endpoint, with fallbacks ([fa97821](https://github.com/nitpick-oss/nitpick/commit/fa9782101bde57161ca13413795ca04a20561fdf))
+* **config:** pin kimi-k3 on OpenRouter to Moonshot's endpoint, with fallbacks ([759af03](https://github.com/nitpick-oss/nitpick/commit/759af033779acd87f12eae63d914520bb796addf))
+* **contrib-corpus:** acknowledge the clone's removal error, as errcheck asks ([d8040f4](https://github.com/nitpick-oss/nitpick/commit/d8040f4397b17836e56a1f60c19c1d8a2371a33c))
+* **evals:** close four cross-fixture keyword leaks, and revisit the major mapping ([0be72f0](https://github.com/nitpick-oss/nitpick/commit/0be72f0c6ab1781f01c016d6267d9e667760862e))
+* **evals:** compare rates, and key comparability on fixture coverage ([7a2a75f](https://github.com/nitpick-oss/nitpick/commit/7a2a75fb1bbd18eaa8f2778a64ea9e1e8cb2a4c7))
+* **evals:** make benchmark honour RUNS, and say what SPREAD measures ([ce41ef3](https://github.com/nitpick-oss/nitpick/commit/ce41ef3850fb9ffdc4fe8f4f882bf4893a63b495))
+* **evals:** read Incumbent's secondary locations, and re-derive from raw ([21adad7](https://github.com/nitpick-oss/nitpick/commit/21adad7883cb3fa7bcbada6eb7586bb3ef5684db))
+* **evals:** rebuild the Incumbent benchmark on plain-text mode ([3712dcc](https://github.com/nitpick-oss/nitpick/commit/3712dcc04e35373809fb8fc8092c3ecbf936d1a5))
+* **evals:** repair keyword recall, and put the adversary inside the round ([a4fdf59](https://github.com/nitpick-oss/nitpick/commit/a4fdf59f65c14143d6e69a09357c01cac5ce903b))
+* **evals:** report understated severities alongside inflated ones ([800b642](https://github.com/nitpick-oss/nitpick/commit/800b642672729a44b817c330c71405c18b4cb5b0))
+* **evals:** run the degeneracy guards through the real scorer ([d38c0cb](https://github.com/nitpick-oss/nitpick/commit/d38c0cbf14a8dc8200b9d3a42d31b7c00d3b6623))
+* **evals:** score a multi-line anchor from its nearest edge ([33e8858](https://github.com/nitpick-oss/nitpick/commit/33e8858de0f45bf55d6b94db78717988973f2e10))
+* **evals:** withdraw the cross-tool severity score, and guard degeneracy ([dd4c9d2](https://github.com/nitpick-oss/nitpick/commit/dd4c9d2c0f953bb118de7ea97e4eb41fb49ed765))
+* **fullreview:** coverage that cannot lie ([3b3493f](https://github.com/nitpick-oss/nitpick/commit/3b3493fb3c3afa17950d02b79f54e8e638c2bda4))
+* **fullreview:** coverage that cannot lie, and the analyzers full review ([0506f4f](https://github.com/nitpick-oss/nitpick/commit/0506f4f213f980c37b35765a919eec4dec22a807))
+* **github:** a pull request the API will not diff is diffed from the checkout ([8744279](https://github.com/nitpick-oss/nitpick/commit/8744279e02db58715a524bfb460c382b5175fe59))
+* **linters:** a change may not supply the analyzer configuration it is reviewed under ([71d413b](https://github.com/nitpick-oss/nitpick/commit/71d413be12211841ad888870e37eed7dc257deb1))
+* **linters:** close the source-level channels that silenced or moved a finding ([2a93c3e](https://github.com/nitpick-oss/nitpick/commit/2a93c3eac16638fe86a0e6131825303cf0343dd4))
+* **linters:** let an analyzer's CRITICAL reach the gate, under an operator ceiling ([c343982](https://github.com/nitpick-oss/nitpick/commit/c3439823a035899998700e4bdafa4b31657d9fcb))
+* **linters:** osv-scanner advisories reach the report ([f6ee183](https://github.com/nitpick-oss/nitpick/commit/f6ee1830cbf72e9d797da6ed95a41c21e131f727))
+* **linters:** the full review's findings over the analyzers package ([98e686d](https://github.com/nitpick-oss/nitpick/commit/98e686d05e29899699a9aefa79e564648325e968))
+* **make:** cover DUMP in the pass-through fix, by pattern not by list ([e95fc71](https://github.com/nitpick-oss/nitpick/commit/e95fc7170c4244f26202658d89fea7263c981778))
+* **make:** stop empty variables clobbering an exported eval setting ([0ce18b3](https://github.com/nitpick-oss/nitpick/commit/0ce18b31e4a50b2527fff13e208a4acc8f263629))
+* **modelid:** the third review's four findings ([84fae30](https://github.com/nitpick-oss/nitpick/commit/84fae30d3879f3013699de88b0b587e8e04ea873))
+* **module:** the module path carries the v2 suffix ([3c35fc4](https://github.com/nitpick-oss/nitpick/commit/3c35fc4a0f92bdfdf1ad6a486b74993c1a2af061))
+* **respond:** a comment event names its pull request itself ([243c185](https://github.com/nitpick-oss/nitpick/commit/243c185bf0bd40208b57a874389af93e8858e620))
+* **respond:** a comment event names its pull request itself ([728d71b](https://github.com/nitpick-oss/nitpick/commit/728d71b55818485006b7d1ad352c45717f1994af))
+* **review:** a code-smell and ai-slop pass over the tree with nitpick's own tools ([8d70682](https://github.com/nitpick-oss/nitpick/commit/8d70682109ccbf88b2721b2b77617e996d60ed34))
+* **review:** the branch review's confirmed findings ([b5a24b9](https://github.com/nitpick-oss/nitpick/commit/b5a24b9dc7a4ed500fde6c461c31db0e838c2580))
+* **review:** the eighth review's two findings ([bf9980d](https://github.com/nitpick-oss/nitpick/commit/bf9980dfa14657d75e073c22846464451029622e))
+* **review:** the fifth review's findings ([1802cec](https://github.com/nitpick-oss/nitpick/commit/1802cece5866dd7d462a6a75a4016b052da58fc0))
+* **review:** the first code-smell and ai-slop pass over the tree ([5b79413](https://github.com/nitpick-oss/nitpick/commit/5b794135aa1f6da5d45fd63e4d8a63840ab7e127))
+* **review:** the five findings of the branch's own review ([c83b652](https://github.com/nitpick-oss/nitpick/commit/c83b652e694b57c8f07c7d7fbc0b2dca10440b28))
+* **review:** the fourth review's findings ([d8c37f0](https://github.com/nitpick-oss/nitpick/commit/d8c37f044681b68fbfa1360e280d507949c36558))
+* **review:** the second review's three findings ([7a3bef3](https://github.com/nitpick-oss/nitpick/commit/7a3bef3e55263053b8c34c1e538834b87dba0590))
+* **review:** the sixth review's findings ([d7ea0eb](https://github.com/nitpick-oss/nitpick/commit/d7ea0eb36f31e8316deb39fa308dfb88d12b8799))
+* **test:** the shipped default is synthetic ([6102968](https://github.com/nitpick-oss/nitpick/commit/610296800a58b8d36c391d0f721bb629bf91fef9))
+* **vcs:** the unborn-HEAD check through the promoted method, as staticcheck asks ([473c2fb](https://github.com/nitpick-oss/nitpick/commit/473c2fbd2cab027bf1891016c8e53d48a3ade5ce))
+* **voice:** the four findings its own review made ([40e8127](https://github.com/nitpick-oss/nitpick/commit/40e81271a4644838046796ec84ae9760efaa349f))
 
 
 ### Measurement
 
-* a capability comparison, a per-language report from retained runs, and iteration 1 on noise ([a870685](https://github.com/jdziat/open-nitpick/commit/a870685b41514f11fa884e11767368f1b8c22e53))
-* a multi-file corpus, a Contender adapter, and the first spend of both ([9683a39](https://github.com/jdziat/open-nitpick/commit/9683a3997756ff8aaf42f251712715b7c38d08db))
-* an info corpus — ten info plants and two clean controls, the band no reviewer had located (workstream 6) ([a3b4bd4](https://github.com/jdziat/open-nitpick/commit/a3b4bd47acc6fded12ff62e7c20c933a386742d2))
-* callers corpus ([da7bebd](https://github.com/jdziat/open-nitpick/commit/da7bebd0baf90aa4c5438aa6724a1a4e3fd181dd))
-* denoise variants of the routed and ensemble configs; opus-5 priced ([19665eb](https://github.com/jdziat/open-nitpick/commit/19665eb6853bede1815560d8603bd9c13a642e2d))
-* denoise variants written properly ([447a908](https://github.com/jdziat/open-nitpick/commit/447a9089a58a10a9a2eb855bec9e01a0fba389ed))
-* glm-5.3-flash as the iteration model, priced, measured, and made the triage default ([f6eaed9](https://github.com/jdziat/open-nitpick/commit/f6eaed9df320968197e0e8b682b8f083e45b5e70))
-* incumbent caches for the callers corpus ([13eafd5](https://github.com/jdziat/open-nitpick/commit/13eafd5d2ab5c78bce32ed11bba6f50233807823))
-* make the head-to-head answer its own ship rule, and amend the rule ([8bb54c9](https://github.com/jdziat/open-nitpick/commit/8bb54c914879e7b97da5f6f2fda259d5cadd8b1d))
-* **modelid:** the contributor experiment on ten repositories, a mixed result ([f213e91](https://github.com/jdziat/open-nitpick/commit/f213e9139c48a71a84b5a3b4b1f50544f12e30c8))
-* **modelid:** the second corpus and the cross-generation result ([7ac0771](https://github.com/jdziat/open-nitpick/commit/7ac077181a4635f3448a5bf7cad8c94d84c475e3))
-* NITPICK_EVAL_ENGINE_LOG keeps the engine's warnings from a battery ([77524dd](https://github.com/jdziat/open-nitpick/commit/77524ddd6b47efc1d6cd34ae1eca58062717173d))
-* price five more models into the battery ([c5bd43b](https://github.com/jdziat/open-nitpick/commit/c5bd43b68575a98a37bab5961672d90a6c0d2235))
-* price qwen3.8-flash and glm-5.3 into the battery ([7f5ac62](https://github.com/jdziat/open-nitpick/commit/7f5ac62a4daf785e56c972d1a928014210ea250b))
-* prices for two Gemma 4 variants ([639d5bc](https://github.com/jdziat/open-nitpick/commit/639d5bc6e281aeca9f697c1d95cca672d0b52494))
-* re-collected Incumbent reviews for the two corrected fixtures ([ed32a92](https://github.com/jdziat/open-nitpick/commit/ed32a9271986dce203adcecb13bc63fa11fabd60))
-* remove two unplanted defects the corpus shipped, credit two phrasings the scorer missed ([f15586d](https://github.com/jdziat/open-nitpick/commit/f15586df34b6438be4804503f4147e6907d10351))
-* **slop:** keywords name only what the planted file holds ([46af023](https://github.com/jdziat/open-nitpick/commit/46af0233e357da4b4505ee1be6284e7d4e9fee98))
-* strong model moves from triage to validate; glm + kimi expert route ([c239c39](https://github.com/jdziat/open-nitpick/commit/c239c39fbedcc06aa784af17c3cd6637e87cd1d8))
-* Synthetic usage-based rates for its seven always-on models, operator-captured ([e294198](https://github.com/jdziat/open-nitpick/commit/e294198edb315857285cae38b239062aedc69853))
+* a capability comparison, a per-language report from retained runs, and iteration 1 on noise ([a870685](https://github.com/nitpick-oss/nitpick/commit/a870685b41514f11fa884e11767368f1b8c22e53))
+* a multi-file corpus, a Contender adapter, and the first spend of both ([9683a39](https://github.com/nitpick-oss/nitpick/commit/9683a3997756ff8aaf42f251712715b7c38d08db))
+* an info corpus — ten info plants and two clean controls, the band no reviewer had located (workstream 6) ([a3b4bd4](https://github.com/nitpick-oss/nitpick/commit/a3b4bd47acc6fded12ff62e7c20c933a386742d2))
+* callers corpus ([da7bebd](https://github.com/nitpick-oss/nitpick/commit/da7bebd0baf90aa4c5438aa6724a1a4e3fd181dd))
+* denoise variants of the routed and ensemble configs; opus-5 priced ([19665eb](https://github.com/nitpick-oss/nitpick/commit/19665eb6853bede1815560d8603bd9c13a642e2d))
+* denoise variants written properly ([447a908](https://github.com/nitpick-oss/nitpick/commit/447a9089a58a10a9a2eb855bec9e01a0fba389ed))
+* glm-5.3-flash as the iteration model, priced, measured, and made the triage default ([f6eaed9](https://github.com/nitpick-oss/nitpick/commit/f6eaed9df320968197e0e8b682b8f083e45b5e70))
+* incumbent caches for the callers corpus ([13eafd5](https://github.com/nitpick-oss/nitpick/commit/13eafd5d2ab5c78bce32ed11bba6f50233807823))
+* make the head-to-head answer its own ship rule, and amend the rule ([8bb54c9](https://github.com/nitpick-oss/nitpick/commit/8bb54c914879e7b97da5f6f2fda259d5cadd8b1d))
+* **modelid:** the contributor experiment on ten repositories, a mixed result ([f213e91](https://github.com/nitpick-oss/nitpick/commit/f213e9139c48a71a84b5a3b4b1f50544f12e30c8))
+* **modelid:** the second corpus and the cross-generation result ([7ac0771](https://github.com/nitpick-oss/nitpick/commit/7ac077181a4635f3448a5bf7cad8c94d84c475e3))
+* NITPICK_EVAL_ENGINE_LOG keeps the engine's warnings from a battery ([77524dd](https://github.com/nitpick-oss/nitpick/commit/77524ddd6b47efc1d6cd34ae1eca58062717173d))
+* price five more models into the battery ([c5bd43b](https://github.com/nitpick-oss/nitpick/commit/c5bd43b68575a98a37bab5961672d90a6c0d2235))
+* price qwen3.8-flash and glm-5.3 into the battery ([7f5ac62](https://github.com/nitpick-oss/nitpick/commit/7f5ac62a4daf785e56c972d1a928014210ea250b))
+* prices for two Gemma 4 variants ([639d5bc](https://github.com/nitpick-oss/nitpick/commit/639d5bc6e281aeca9f697c1d95cca672d0b52494))
+* re-collected Incumbent reviews for the two corrected fixtures ([ed32a92](https://github.com/nitpick-oss/nitpick/commit/ed32a9271986dce203adcecb13bc63fa11fabd60))
+* remove two unplanted defects the corpus shipped, credit two phrasings the scorer missed ([f15586d](https://github.com/nitpick-oss/nitpick/commit/f15586df34b6438be4804503f4147e6907d10351))
+* **slop:** keywords name only what the planted file holds ([46af023](https://github.com/nitpick-oss/nitpick/commit/46af0233e357da4b4505ee1be6284e7d4e9fee98))
+* strong model moves from triage to validate; glm + kimi expert route ([c239c39](https://github.com/nitpick-oss/nitpick/commit/c239c39fbedcc06aa784af17c3cd6637e87cd1d8))
+* Synthetic usage-based rates for its seven always-on models, operator-captured ([e294198](https://github.com/nitpick-oss/nitpick/commit/e294198edb315857285cae38b239062aedc69853))
 
 
 ### Prompts
 
-* keep the Qwen note, drop the GLM and DeepSeek ones after ablation; docs: the tuning pass and Synthetic results ([54cd1a4](https://github.com/jdziat/open-nitpick/commit/54cd1a42869597094c1f34885df9a2c204a46f72))
-* model-family guidance layer, two base rules on reachability and untouched helpers; llm: synthetic provider; evals: provider-prefixed model ids ([4399fff](https://github.com/jdziat/open-nitpick/commit/4399fff74d59d5a15efc686664ea46bd05c1d639))
-* **respond:** the answer is written without em dashes ([60d217f](https://github.com/jdziat/open-nitpick/commit/60d217fe5356e975320623e70c4b1b1fb41c5404))
-* **slop:** rules 5 and 8 as positive tests the model applies before filing ([c24c46f](https://github.com/jdziat/open-nitpick/commit/c24c46f82d150d817bf0e24363eca07c1d900188))
-* stop the severity ladder naming what the corpus plants, and guard it ([aec7876](https://github.com/jdziat/open-nitpick/commit/aec78763708b280736be2821fa3e226ee876591a))
-* the maintainability example was a correctness bug — and fixing it changed nothing ([3fae93a](https://github.com/jdziat/open-nitpick/commit/3fae93a3904975ae15c8a30bf0d1f08f9ce83d10))
-* **voice:** every role writes short, and the tells are scrubbed ([e016188](https://github.com/jdziat/open-nitpick/commit/e01618889fdab0ce47877894d37deba0d03c6916))
+* keep the Qwen note, drop the GLM and DeepSeek ones after ablation; docs: the tuning pass and Synthetic results ([54cd1a4](https://github.com/nitpick-oss/nitpick/commit/54cd1a42869597094c1f34885df9a2c204a46f72))
+* model-family guidance layer, two base rules on reachability and untouched helpers; llm: synthetic provider; evals: provider-prefixed model ids ([4399fff](https://github.com/nitpick-oss/nitpick/commit/4399fff74d59d5a15efc686664ea46bd05c1d639))
+* **respond:** the answer is written without em dashes ([60d217f](https://github.com/nitpick-oss/nitpick/commit/60d217fe5356e975320623e70c4b1b1fb41c5404))
+* **slop:** rules 5 and 8 as positive tests the model applies before filing ([c24c46f](https://github.com/nitpick-oss/nitpick/commit/c24c46f82d150d817bf0e24363eca07c1d900188))
+* stop the severity ladder naming what the corpus plants, and guard it ([aec7876](https://github.com/nitpick-oss/nitpick/commit/aec78763708b280736be2821fa3e226ee876591a))
+* the maintainability example was a correctness bug — and fixing it changed nothing ([3fae93a](https://github.com/nitpick-oss/nitpick/commit/3fae93a3904975ae15c8a30bf0d1f08f9ce83d10))
+* **voice:** every role writes short, and the tells are scrubbed ([e016188](https://github.com/nitpick-oss/nitpick/commit/e01618889fdab0ce47877894d37deba0d03c6916))
 
 
 ### Documentation
 
-* **config:** the OpenRouter config link survives the site build ([54b4d73](https://github.com/jdziat/open-nitpick/commit/54b4d73092ff1eeed23636dbeeb3c88716ad4c31))
-* **config:** the repository's policy on OpenRouter ([2e3f4a6](https://github.com/jdziat/open-nitpick/commit/2e3f4a6bedd26d5e0e04e511e799044e0363c471))
-* **config:** the repository's policy on OpenRouter, as .nitpick.openrouter.yaml ([e4f6035](https://github.com/jdziat/open-nitpick/commit/e4f6035ff13d455fc116e1c46c8da7578e962069))
-* cost/performance sweep across twelve models on three corpora ([c7a2086](https://github.com/jdziat/open-nitpick/commit/c7a2086ea538ead935887129d6341a68cc18e188))
-* **evals:** re-collect the incumbent on the full corpus, and correct the baseline ([f53e082](https://github.com/jdziat/open-nitpick/commit/f53e08224635b07f3da8897c6b35f383e058cafe))
-* **evals:** record the v1 head-to-head ([d501b03](https://github.com/jdziat/open-nitpick/commit/d501b033f9cfda2d42b027ed7c470f3bf23faf8d))
-* **findings:** the slop class, first run ([6403137](https://github.com/jdziat/open-nitpick/commit/64031378b9feefa21a0607b51cfbe543a8ebd7a2))
-* **findings:** the slop class, second run: the controls are not silent ([e353a6d](https://github.com/jdziat/open-nitpick/commit/e353a6d76b17252944f0228777edb0d0758eaecd))
-* gemma-4-31b pinned to deepinfra/turbo; providers in the README ([3c371bd](https://github.com/jdziat/open-nitpick/commit/3c371bdfb6dc71a1ed2fc008bc5da0bb481c65e6))
-* gpt-5.6-luna re-measured on the current prompt ([3541af3](https://github.com/jdziat/open-nitpick/commit/3541af316fc34e344f97ef70f2b2ac7528acd481))
-* Incumbent's first full run is the comparison figure ([9fd187b](https://github.com/jdziat/open-nitpick/commit/9fd187b95bcf60406134b4d4ee778ed4f6929dc7))
-* kimi-k3 priced and measured beside sonnet and glm; the second hop of related context on the fourteen-fixture corpus ([e57cf4a](https://github.com/jdziat/open-nitpick/commit/e57cf4ade156feec17eee9b1f583c2a601761192))
-* measured Synthetic cost per review at its usage-based rates ([099a134](https://github.com/jdziat/open-nitpick/commit/099a134b3ebdc1359fc9e47cb6929c620f4e71a8))
-* **plan:** full-review, the slop class, repo-score, model identification ([cc933e7](https://github.com/jdziat/open-nitpick/commit/cc933e712de86534ccdb3b913e39c5f57dd246a1))
-* **plan:** record the five decisions for full-review ([22f7fca](https://github.com/jdziat/open-nitpick/commit/22f7fca6d262135823bc13adb7913253fb20b327))
-* **plan:** repo-score acceptance, first run ([a97f887](https://github.com/jdziat/open-nitpick/commit/a97f887810a8d9056ffd8d5df77dd16c279ba10d))
-* **plan:** section 1 status; lint nits ([cb16f79](https://github.com/jdziat/open-nitpick/commit/cb16f79ef6db8fae5d16ce589da89072e588b379))
-* **plan:** sections 2 to 4 status; generator runs models in parallel ([6d16284](https://github.com/jdziat/open-nitpick/commit/6d16284508e4bd8074d42b85f540aab93e86998b))
-* pre-register the v1 ship decision before reading the battery ([1e55e6e](https://github.com/jdziat/open-nitpick/commit/1e55e6e91b44dc1efbb9981860ff0555fd0049d7))
-* price per review beside Incumbent's on-demand rate ([4a9fa58](https://github.com/jdziat/open-nitpick/commit/4a9fa5800657fc66335a0cea2dd027d51c01a186))
-* **readme:** the mark above the badges ([3161c60](https://github.com/jdziat/open-nitpick/commit/3161c6012e1adc4df375ca5143abeaadb58fb1b6))
-* **readme:** the mark above the badges ([934bb43](https://github.com/jdziat/open-nitpick/commit/934bb431f2549ea32c7684d33c04154d506f76fc))
-* **readme:** the mark resolves from the site's guide page ([af7591b](https://github.com/jdziat/open-nitpick/commit/af7591b6d73dee1314e127e0bcffd6f3b28357ed))
-* **readme:** the status names what is still not done ([bc5cb70](https://github.com/jdziat/open-nitpick/commit/bc5cb709b256127ba299a15b62b742e3e5a7dafe))
-* record what the harness can support, and what it got wrong ([e481e7c](https://github.com/jdziat/open-nitpick/commit/e481e7c047e945d8276e5cd8004424f5b9643947))
-* remediation plan for the benchmark misses, each traced to its cause on the pull request ([23983a7](https://github.com/jdziat/open-nitpick/commit/23983a78bf4c8ee108c363da6b160859b37684fe))
-* remediation status after every workstream, with what each measured and what it cost ([0d2b485](https://github.com/jdziat/open-nitpick/commit/0d2b485a4d861c98900a79d976c72d7f618a09dc))
-* remove the writing tells from the README and the docs ([d97288d](https://github.com/jdziat/open-nitpick/commit/d97288daf5901e3240e8c63a593de666c0e6ba97))
-* routing and ensemble results ([ddef062](https://github.com/jdziat/open-nitpick/commit/ddef062634b49f4febe7541a205c315edbf61d7f))
-* site, and the README recommends Synthetic ([6cf999c](https://github.com/jdziat/open-nitpick/commit/6cf999c0055f31c1d697db224f1b20b4beec57f3))
-* **site:** the four-bar mark as the site's logo, favicon and social card ([ba2c2d0](https://github.com/jdziat/open-nitpick/commit/ba2c2d022d4ab288ef9860a037463ba3c8af4393))
-* **site:** the four-bar mark as the site's logo, favicon and social card ([201f83b](https://github.com/jdziat/open-nitpick/commit/201f83ba4e52b86cf761a95a63c64045c21e62ef))
-* the benchmark re-run under the remediated code — four of eight misses recovered, and what the extra noise is ([6b2d3da](https://github.com/jdziat/open-nitpick/commit/6b2d3da3f60ddbc19f711cf83275ff307953774e))
-* the callers measurement, and the review-round corrections ([6b160c9](https://github.com/jdziat/open-nitpick/commit/6b160c9aa38bb2afd5caf56e45d1c4430f6a8624))
-* the expert pass measured (one plant for one noise finding, half again the cost) and left off; where the comparison stops ([e42c450](https://github.com/jdziat/open-nitpick/commit/e42c45061e906b79388dec3b485ef6646a890116))
-* the README as a home page, the guide as docs pages ([d9f9dab](https://github.com/jdziat/open-nitpick/commit/d9f9dabc74569e8199b8558a20aa0e425aaec5d9))
-* the README as a home page, the guide as docs pages ([15452ba](https://github.com/jdziat/open-nitpick/commit/15452ba8d1c0e5a6c61b35a23c377fdab1bac79c))
-* the v1 gate fails condition 3 of its own pre-registered rule ([ae4fb01](https://github.com/jdziat/open-nitpick/commit/ae4fb01172bacabe4a394b1ab8eade1f65f64ac8))
-* two Gemma 4 variants, and what the stall retry did for them ([0090a4d](https://github.com/jdziat/open-nitpick/commit/0090a4d05e4587e84ca33fa6a149cf6411d91635))
-* v1 passes all four conditions of Rule 14, on the second held-out spend ([c9e46bb](https://github.com/jdziat/open-nitpick/commit/c9e46bbabcede44aae5067fe243f148d63313c82))
+* **config:** the OpenRouter config link survives the site build ([54b4d73](https://github.com/nitpick-oss/nitpick/commit/54b4d73092ff1eeed23636dbeeb3c88716ad4c31))
+* **config:** the repository's policy on OpenRouter ([2e3f4a6](https://github.com/nitpick-oss/nitpick/commit/2e3f4a6bedd26d5e0e04e511e799044e0363c471))
+* **config:** the repository's policy on OpenRouter, as .nitpick.openrouter.yaml ([e4f6035](https://github.com/nitpick-oss/nitpick/commit/e4f6035ff13d455fc116e1c46c8da7578e962069))
+* cost/performance sweep across twelve models on three corpora ([c7a2086](https://github.com/nitpick-oss/nitpick/commit/c7a2086ea538ead935887129d6341a68cc18e188))
+* **evals:** re-collect the incumbent on the full corpus, and correct the baseline ([f53e082](https://github.com/nitpick-oss/nitpick/commit/f53e08224635b07f3da8897c6b35f383e058cafe))
+* **evals:** record the v1 head-to-head ([d501b03](https://github.com/nitpick-oss/nitpick/commit/d501b033f9cfda2d42b027ed7c470f3bf23faf8d))
+* **findings:** the slop class, first run ([6403137](https://github.com/nitpick-oss/nitpick/commit/64031378b9feefa21a0607b51cfbe543a8ebd7a2))
+* **findings:** the slop class, second run: the controls are not silent ([e353a6d](https://github.com/nitpick-oss/nitpick/commit/e353a6d76b17252944f0228777edb0d0758eaecd))
+* gemma-4-31b pinned to deepinfra/turbo; providers in the README ([3c371bd](https://github.com/nitpick-oss/nitpick/commit/3c371bdfb6dc71a1ed2fc008bc5da0bb481c65e6))
+* gpt-5.6-luna re-measured on the current prompt ([3541af3](https://github.com/nitpick-oss/nitpick/commit/3541af316fc34e344f97ef70f2b2ac7528acd481))
+* Incumbent's first full run is the comparison figure ([9fd187b](https://github.com/nitpick-oss/nitpick/commit/9fd187b95bcf60406134b4d4ee778ed4f6929dc7))
+* kimi-k3 priced and measured beside sonnet and glm; the second hop of related context on the fourteen-fixture corpus ([e57cf4a](https://github.com/nitpick-oss/nitpick/commit/e57cf4ade156feec17eee9b1f583c2a601761192))
+* measured Synthetic cost per review at its usage-based rates ([099a134](https://github.com/nitpick-oss/nitpick/commit/099a134b3ebdc1359fc9e47cb6929c620f4e71a8))
+* **plan:** full-review, the slop class, repo-score, model identification ([cc933e7](https://github.com/nitpick-oss/nitpick/commit/cc933e712de86534ccdb3b913e39c5f57dd246a1))
+* **plan:** record the five decisions for full-review ([22f7fca](https://github.com/nitpick-oss/nitpick/commit/22f7fca6d262135823bc13adb7913253fb20b327))
+* **plan:** repo-score acceptance, first run ([a97f887](https://github.com/nitpick-oss/nitpick/commit/a97f887810a8d9056ffd8d5df77dd16c279ba10d))
+* **plan:** section 1 status; lint nits ([cb16f79](https://github.com/nitpick-oss/nitpick/commit/cb16f79ef6db8fae5d16ce589da89072e588b379))
+* **plan:** sections 2 to 4 status; generator runs models in parallel ([6d16284](https://github.com/nitpick-oss/nitpick/commit/6d16284508e4bd8074d42b85f540aab93e86998b))
+* pre-register the v1 ship decision before reading the battery ([1e55e6e](https://github.com/nitpick-oss/nitpick/commit/1e55e6e91b44dc1efbb9981860ff0555fd0049d7))
+* price per review beside Incumbent's on-demand rate ([4a9fa58](https://github.com/nitpick-oss/nitpick/commit/4a9fa5800657fc66335a0cea2dd027d51c01a186))
+* **readme:** the mark above the badges ([3161c60](https://github.com/nitpick-oss/nitpick/commit/3161c6012e1adc4df375ca5143abeaadb58fb1b6))
+* **readme:** the mark above the badges ([934bb43](https://github.com/nitpick-oss/nitpick/commit/934bb431f2549ea32c7684d33c04154d506f76fc))
+* **readme:** the mark resolves from the site's guide page ([af7591b](https://github.com/nitpick-oss/nitpick/commit/af7591b6d73dee1314e127e0bcffd6f3b28357ed))
+* **readme:** the status names what is still not done ([bc5cb70](https://github.com/nitpick-oss/nitpick/commit/bc5cb709b256127ba299a15b62b742e3e5a7dafe))
+* record what the harness can support, and what it got wrong ([e481e7c](https://github.com/nitpick-oss/nitpick/commit/e481e7c047e945d8276e5cd8004424f5b9643947))
+* remediation plan for the benchmark misses, each traced to its cause on the pull request ([23983a7](https://github.com/nitpick-oss/nitpick/commit/23983a78bf4c8ee108c363da6b160859b37684fe))
+* remediation status after every workstream, with what each measured and what it cost ([0d2b485](https://github.com/nitpick-oss/nitpick/commit/0d2b485a4d861c98900a79d976c72d7f618a09dc))
+* remove the writing tells from the README and the docs ([d97288d](https://github.com/nitpick-oss/nitpick/commit/d97288daf5901e3240e8c63a593de666c0e6ba97))
+* routing and ensemble results ([ddef062](https://github.com/nitpick-oss/nitpick/commit/ddef062634b49f4febe7541a205c315edbf61d7f))
+* site, and the README recommends Synthetic ([6cf999c](https://github.com/nitpick-oss/nitpick/commit/6cf999c0055f31c1d697db224f1b20b4beec57f3))
+* **site:** the four-bar mark as the site's logo, favicon and social card ([ba2c2d0](https://github.com/nitpick-oss/nitpick/commit/ba2c2d022d4ab288ef9860a037463ba3c8af4393))
+* **site:** the four-bar mark as the site's logo, favicon and social card ([201f83b](https://github.com/nitpick-oss/nitpick/commit/201f83ba4e52b86cf761a95a63c64045c21e62ef))
+* the benchmark re-run under the remediated code — four of eight misses recovered, and what the extra noise is ([6b2d3da](https://github.com/nitpick-oss/nitpick/commit/6b2d3da3f60ddbc19f711cf83275ff307953774e))
+* the callers measurement, and the review-round corrections ([6b160c9](https://github.com/nitpick-oss/nitpick/commit/6b160c9aa38bb2afd5caf56e45d1c4430f6a8624))
+* the expert pass measured (one plant for one noise finding, half again the cost) and left off; where the comparison stops ([e42c450](https://github.com/nitpick-oss/nitpick/commit/e42c45061e906b79388dec3b485ef6646a890116))
+* the README as a home page, the guide as docs pages ([d9f9dab](https://github.com/nitpick-oss/nitpick/commit/d9f9dabc74569e8199b8558a20aa0e425aaec5d9))
+* the README as a home page, the guide as docs pages ([15452ba](https://github.com/nitpick-oss/nitpick/commit/15452ba8d1c0e5a6c61b35a23c377fdab1bac79c))
+* the v1 gate fails condition 3 of its own pre-registered rule ([ae4fb01](https://github.com/nitpick-oss/nitpick/commit/ae4fb01172bacabe4a394b1ab8eade1f65f64ac8))
+* two Gemma 4 variants, and what the stall retry did for them ([0090a4d](https://github.com/nitpick-oss/nitpick/commit/0090a4d05e4587e84ca33fa6a149cf6411d91635))
+* v1 passes all four conditions of Rule 14, on the second held-out spend ([c9e46bb](https://github.com/nitpick-oss/nitpick/commit/c9e46bbabcede44aae5067fe243f148d63313c82))
 
 ## Changelog

@@ -30,7 +30,7 @@ repository's workflow identity and nothing else:
 
 ```bash
 cosign verify-blob --bundle nitpick_v1.11.0_linux_amd64.sigstore.json \
-  --certificate-identity-regexp '^https://github.com/jdziat/open-nitpick/' \
+  --certificate-identity-regexp '^https://github.com/nitpick-oss/nitpick/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   nitpick_v1.11.0_linux_amd64
 ```

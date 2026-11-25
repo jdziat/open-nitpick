@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/internal/config"
+import "github.com/nitpick-oss/nitpick/internal/config"
 
 // goIDORWrongPrincipalFixture: the handler checks that a session exists, then
 // loads whatever ?id= names. Authz looks present; the principal is wrong.

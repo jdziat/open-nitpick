@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/internal/config"
+import "github.com/nitpick-oss/nitpick/internal/config"
 
 // dedupFixtures is the corpus's cross-batch DEDUP fixture, and it is here for
 // a

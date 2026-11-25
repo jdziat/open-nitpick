@@ -11,12 +11,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/linters"
-	"github.com/jdziat/open-nitpick/internal/practices"
-	"github.com/jdziat/open-nitpick/internal/review"
-	"github.com/jdziat/open-nitpick/internal/standards"
+	"github.com/nitpick-oss/nitpick/internal/bundle"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/linters"
+	"github.com/nitpick-oss/nitpick/internal/practices"
+	"github.com/nitpick-oss/nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/standards"
 )
 
 // RepoStandardsResult separates observed conventions from proposed enforcement.

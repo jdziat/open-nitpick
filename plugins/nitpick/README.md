@@ -5,7 +5,7 @@ MCP tools, with skills that say when to reach for each and what to do with
 what comes back.
 
 Requirements: the `nitpick` binary on PATH (`go install
-github.com/jdziat/open-nitpick/cmd/nitpick@latest`, or a release asset), a
+github.com/nitpick-oss/nitpick/cmd/nitpick@latest`, or a release asset), a
 model configured the way the CLI wants it (`.nitpick.yaml` in the
 repository, or `LLM_PROVIDER` and `LLM_MODEL` with the provider's key in the
 environment), and git.
@@ -13,7 +13,7 @@ environment), and git.
 Install from the marketplace in this repository:
 
 ```
-/plugin marketplace add jdziat/open-nitpick
+/plugin marketplace add nitpick-oss/nitpick
 /plugin install nitpick@open-nitpick
 ```
 

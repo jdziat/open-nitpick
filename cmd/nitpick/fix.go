@@ -9,11 +9,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/converse"
-	"github.com/jdziat/open-nitpick/internal/fix"
-	"github.com/jdziat/open-nitpick/internal/llm"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/converse"
+	"github.com/nitpick-oss/nitpick/internal/fix"
+	"github.com/nitpick-oss/nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // Applying a finding, on `@open-nitpick fix`.

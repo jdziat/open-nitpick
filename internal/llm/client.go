@@ -25,7 +25,7 @@ import (
 	"github.com/nocturnium/llm-go-sdk/v6/pkg/middleware/resilience"
 	_ "github.com/nocturnium/llm-go-sdk/v6/pkg/providers/all" // register every provider with llms.New
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/config"
 )
 
 // defaultMaxRetries bounds transient-failure retries when the config is silent.

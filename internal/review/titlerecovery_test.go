@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // TestMissingTitleDoesNotDiscardAnOtherwiseCompleteFinding pins the loss seen

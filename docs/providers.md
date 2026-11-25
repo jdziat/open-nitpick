@@ -330,7 +330,7 @@ Like `synthetic`, its endpoint is compiled into the binary, so a committed
 config can name it. The eval runner reaches every model in the sweep through
 it. This repository uses GLM-5.3-Flash for review and Qwen3.8-27B for triage through
 OpenRouter; its current policy is
-[.nitpick.yaml](https://github.com/jdziat/open-nitpick/blob/main/.nitpick.yaml).
+[.nitpick.yaml](https://github.com/nitpick-oss/nitpick/blob/main/.nitpick.yaml).
 
 `LLM_API_KEY` is accepted as a fallback, which is how the GitHub Action's
 `api-key` input arrives. `OPENROUTER_API_KEY` wins when both are set, so a

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/review"
 )
 
 // SampleMeasurement retains the outcome even when no findings could be produced.

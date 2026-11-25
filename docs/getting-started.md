@@ -9,13 +9,13 @@ the [trust model](trust-model.md) describe those boundaries.
 ## 1. Install the CLI
 
 Download a binary for your platform from the
-[releases page](https://github.com/jdziat/open-nitpick/releases), then put
+[releases page](https://github.com/nitpick-oss/nitpick/releases), then put
 `nitpick` on your `PATH`.
 
 Or, with Go 1.26 or later:
 
 ```bash
-go install github.com/jdziat/open-nitpick/cmd/nitpick@latest
+go install github.com/nitpick-oss/nitpick/cmd/nitpick@latest
 export PATH="$(go env GOPATH)/bin:$PATH" # add this to your shell profile
 nitpick version
 ```

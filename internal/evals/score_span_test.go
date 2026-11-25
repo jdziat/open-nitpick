@@ -5,7 +5,7 @@ package evals
 import (
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/review"
 )
 
 // TestAnchorSpanScoring pins the rule that a multi-line anchor is measured from

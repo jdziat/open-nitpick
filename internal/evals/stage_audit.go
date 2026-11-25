@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/internal/review"
+import "github.com/nitpick-oss/nitpick/internal/review"
 
 // StageAttribution separates matcher credit from evidence of where a claim was lost.
 type StageAttribution struct {

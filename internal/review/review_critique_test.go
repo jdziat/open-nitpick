@@ -6,8 +6,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/llm"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 func critiquedReview(t *testing.T, on bool, grades ...string) (*Report, []Finding) {

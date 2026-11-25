@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/jdziat/open-nitpick/internal/execution"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/execution"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // ExecutionReceipt ties an attempt and any abstention to the exact mapped claim.

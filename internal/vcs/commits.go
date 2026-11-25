@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/commits"
+	"github.com/nitpick-oss/nitpick/internal/commits"
 )
 
 // CommitRange pins the ancestry used to enumerate commit-policy targets.

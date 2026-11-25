@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
+	"github.com/nitpick-oss/nitpick/internal/bundle"
 )
 
 func (task DesignTask) contextRanges() (map[string][]bundle.SourceSpan, error) {

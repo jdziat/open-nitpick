@@ -2,7 +2,7 @@ package review
 
 import (
 	"context"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 	"testing"
 )
 

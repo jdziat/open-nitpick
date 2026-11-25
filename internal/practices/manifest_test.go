@@ -3,7 +3,7 @@ package practices
 import (
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/nitpick-oss/nitpick/internal/diff"
 )
 
 func modFile(kind diff.ChangeKind, path string, lines ...diff.Line) *diff.File {

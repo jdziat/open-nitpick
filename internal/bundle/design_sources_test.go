@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/config"
 )
 
 func TestDesignSourceCaptureKeepsBudgetOmissionsOutOfContext(t *testing.T) {

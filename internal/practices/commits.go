@@ -1,6 +1,6 @@
 package practices
 
-import "github.com/jdziat/open-nitpick/internal/commits"
+import "github.com/nitpick-oss/nitpick/internal/commits"
 
 // CommitCheck retains each commit as evidence, including exempt merge commits.
 func CommitCheck(entries []commits.Commit, policy commits.Policy) Check {

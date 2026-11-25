@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/internal/config"
+import "github.com/nitpick-oss/nitpick/internal/config"
 
 // warningFixtures are the corpus's warning-level plants.
 func warningFixtures() []Fixture {

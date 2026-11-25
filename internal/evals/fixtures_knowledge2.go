@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/internal/config"
+import "github.com/nitpick-oss/nitpick/internal/config"
 
 // time.After in a loop holds a timer per iteration until it fires.
 func knowTimeAfterLeakFixture() Fixture {

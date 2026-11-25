@@ -7,7 +7,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/review"
 )
 
 // QualityCell reports scheduled review quality without hiding missing attempts.

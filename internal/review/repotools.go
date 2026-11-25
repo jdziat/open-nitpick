@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/memo"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/memo"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // Limits on what a verification tool call may return. A checker that can read

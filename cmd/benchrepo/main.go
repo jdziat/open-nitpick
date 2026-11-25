@@ -23,8 +23,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/evals"
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/evals"
+	"github.com/nitpick-oss/nitpick/internal/review"
 )
 
 const (
@@ -193,7 +193,7 @@ func scaffold() map[string]string {
 	return map[string]string{
 		"README.md": `# nitpick-bench
 
-A private benchmark repository for [open-nitpick](https://github.com/jdziat/open-nitpick).
+A private benchmark repository for [open-nitpick](https://github.com/nitpick-oss/nitpick).
 
 Every directory under ` + "`services/`" + ` is one small service in its base state. Every pull request
 changes one of them. Some changes carry a defect and some are clean; which is which is recorded
@@ -246,7 +246,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: jdziat/open-nitpick@v1
+      - uses: nitpick-oss/nitpick@v1
         with:
           provider: openrouter
           model: anthropic/claude-sonnet-4.6

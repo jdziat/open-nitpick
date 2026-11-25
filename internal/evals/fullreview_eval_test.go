@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/fullreview"
-	"github.com/jdziat/open-nitpick/internal/linters"
-	"github.com/jdziat/open-nitpick/internal/llm"
-	"github.com/jdziat/open-nitpick/internal/review"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/fullreview"
+	"github.com/nitpick-oss/nitpick/internal/linters"
+	"github.com/nitpick-oss/nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // TestFullReviewFixture verifies that `nitpick full-review` finds the planted bug and the planted secret, says nothing about the

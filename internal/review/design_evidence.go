@@ -3,8 +3,8 @@ package review
 import (
 	"slices"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
-	"github.com/jdziat/open-nitpick/internal/diff"
+	"github.com/nitpick-oss/nitpick/internal/bundle"
+	"github.com/nitpick-oss/nitpick/internal/diff"
 )
 
 // filterTaskAnchors preserves valid task evidence outside the changed lines.

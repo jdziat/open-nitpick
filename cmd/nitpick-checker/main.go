@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/jdziat/open-nitpick/internal/execution"
+	"github.com/nitpick-oss/nitpick/internal/execution"
 )
 
 func main() {

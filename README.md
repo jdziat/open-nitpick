@@ -2,13 +2,13 @@
 
 # open-nitpick
 
-[![CI](https://github.com/jdziat/open-nitpick/actions/workflows/ci.yml/badge.svg)](https://github.com/jdziat/open-nitpick/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/jdziat/open-nitpick)](https://github.com/jdziat/open-nitpick/releases)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/jdziat/open-nitpick/blob/main/LICENSE)
+[![CI](https://github.com/nitpick-oss/nitpick/actions/workflows/ci.yml/badge.svg)](https://github.com/nitpick-oss/nitpick/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/nitpick-oss/nitpick)](https://github.com/nitpick-oss/nitpick/releases)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/nitpick-oss/nitpick/blob/main/LICENSE)
 
 Self-hosted, model-agnostic pull request review.
 
-Documentation: <https://jdziat.github.io/open-nitpick/>
+Documentation: <https://nitpick-oss.github.io/nitpick/>
 
 open-nitpick reads a pull request, reviews it with a model you choose, and posts
 inline comments. Run it as a GitHub Action, as a CLI in any CI system, as MCP
@@ -24,9 +24,9 @@ in your repository that you can read and edit.
 # A signed binary for your platform. Releases carry linux and darwin on amd64
 # and arm64, plus windows on amd64, each with a Sigstore bundle and a
 # checksums file.
-v=$(gh release view --repo jdziat/open-nitpick --json tagName -q .tagName)
+v=$(gh release view --repo nitpick-oss/nitpick --json tagName -q .tagName)
 os=$(uname -s | tr 'A-Z' 'a-z'); arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-curl -fsSLo nitpick "https://github.com/jdziat/open-nitpick/releases/download/$v/nitpick_${v}_${os}_${arch}"
+curl -fsSLo nitpick "https://github.com/nitpick-oss/nitpick/releases/download/$v/nitpick_${v}_${os}_${arch}"
 chmod +x nitpick && sudo mv nitpick /usr/local/bin/
 
 export LLM_PROVIDER=openrouter LLM_MODEL=z-ai/glm-5.3-flash
@@ -40,7 +40,7 @@ nitpick deep-review     # agents that read the repository: 2.5 times the cost, 1
 
 Verifying that download is one command and
 [Development](docs/development.md#releases) has it. Building from source
-instead is `go install github.com/jdziat/open-nitpick/cmd/nitpick@latest`,
+instead is `go install github.com/nitpick-oss/nitpick/cmd/nitpick@latest`,
 which needs Go 1.26.0 or newer, as required by `go.mod`.
 
 `init` is optional: with those two variables set, a review runs with no config

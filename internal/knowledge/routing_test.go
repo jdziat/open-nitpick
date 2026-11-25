@@ -3,7 +3,7 @@ package knowledge
 import (
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/config"
 )
 
 func entry(id string, langs []string, classes ...config.Class) Entry {

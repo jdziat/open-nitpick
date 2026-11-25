@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/execution"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/execution"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 func checkFix(ctx context.Context, provider vcs.Provider, ref vcs.Ref, settings config.Execution, edits []vcs.FileEdit) (string, bool) {

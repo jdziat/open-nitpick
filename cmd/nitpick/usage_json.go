@@ -1,6 +1,6 @@
 package main
 
-import "github.com/jdziat/open-nitpick/internal/llm"
+import "github.com/nitpick-oss/nitpick/internal/llm"
 
 type usageJSON struct {
 	SchemaVersion   int              `json:"schema_version"`

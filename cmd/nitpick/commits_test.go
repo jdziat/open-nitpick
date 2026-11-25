@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/practices"
+	"github.com/nitpick-oss/nitpick/internal/practices"
 )
 
 func TestCommitCommandReportsSubjectsAndKnownRangeCoverage(t *testing.T) {

@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/commits"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/commits"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 	"gopkg.in/yaml.v3"
 )
 

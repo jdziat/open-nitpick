@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 const testKey = `-----BEGIN PRIVATE KEY-----

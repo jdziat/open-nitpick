@@ -1,7 +1,7 @@
 package practices
 
 import (
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/config"
 	"strings"
 	"testing"
 )

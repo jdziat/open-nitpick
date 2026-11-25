@@ -43,7 +43,7 @@ jobs:
       # One Sigstore bundle per asset, checksums included, so a verifier
       # needs the asset, its bundle, and the identity below, nothing else:
       #   cosign verify-blob --bundle FILE.sigstore.json \
-      #     --certificate-identity-regexp '^https://github.com/jdziat/open-nitpick/' \
+      #     --certificate-identity-regexp '^https://github.com/nitpick-oss/nitpick/' \
       #     --certificate-oidc-issuer https://token.actions.githubusercontent.com FILE
       - name: Sign
         run: |

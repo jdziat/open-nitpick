@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/knowledge"
-	"github.com/jdziat/open-nitpick/internal/prompt"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/knowledge"
+	"github.com/nitpick-oss/nitpick/internal/prompt"
 )
 
 var referenceCorpus = map[string]knowledge.Entry{

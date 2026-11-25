@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/llm"
+	"github.com/nitpick-oss/nitpick/internal/llm"
 )
 
 func TestQualityVariantsPreserveInputsWithoutBuyingOtherModes(t *testing.T) {

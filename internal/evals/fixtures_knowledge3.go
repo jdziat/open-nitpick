@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/internal/config"
+import "github.com/nitpick-oss/nitpick/internal/config"
 
 // A mutable default argument is one object shared by every call.
 func knowMutableDefaultFixture() Fixture {

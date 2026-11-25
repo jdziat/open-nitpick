@@ -1,6 +1,6 @@
 package evals
 
-import "github.com/jdziat/open-nitpick/internal/config"
+import "github.com/nitpick-oss/nitpick/internal/config"
 
 // nitFixtures are the corpus's nit-level plants.
 func nitFixtures() []Fixture {

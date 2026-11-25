@@ -49,8 +49,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jdziat/open-nitpick/internal/config"
-	"github.com/jdziat/open-nitpick/internal/review"
+	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/review"
 )
 
 // EnvRejudgeDump names an existing dump file to re-judge.

@@ -3,7 +3,7 @@ package practices
 import (
 	"slices"
 
-	"github.com/jdziat/open-nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/config"
 )
 
 // ApplyPolicy makes unscheduled required checks visible before applying gates.

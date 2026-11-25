@@ -8,9 +8,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
-	"github.com/jdziat/open-nitpick/internal/learnings"
-	"github.com/jdziat/open-nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/bundle"
+	"github.com/nitpick-oss/nitpick/internal/learnings"
+	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
 // LearningsStatus records applicability and retrieval independently of the

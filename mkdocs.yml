@@ -1,8 +1,8 @@
 site_name: open-nitpick
 site_description: Self-hosted, model-agnostic pull request review.
-site_url: https://jdziat.github.io/open-nitpick/
-repo_url: https://github.com/jdziat/open-nitpick
-repo_name: jdziat/open-nitpick
+site_url: https://nitpick-oss.github.io/nitpick/
+repo_url: https://github.com/nitpick-oss/nitpick
+repo_name: nitpick-oss/nitpick
 edit_uri: blob/main/
 
 # `make docs` stages the docs tree under docs/ recursively and website/index.md
@@ -128,5 +128,5 @@ extra:
   generator: false
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/jdziat/open-nitpick
-copyright: 'Apache-2.0 &middot; <a href="https://github.com/jdziat/open-nitpick/blob/main/LICENSE">License</a>'
+      link: https://github.com/nitpick-oss/nitpick
+copyright: 'Apache-2.0 &middot; <a href="https://github.com/nitpick-oss/nitpick/blob/main/LICENSE">License</a>'

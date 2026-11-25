@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jdziat/open-nitpick/internal/knowledge"
+	"github.com/nitpick-oss/nitpick/internal/knowledge"
 )
 
 func hit(id, title string) knowledge.Hit {

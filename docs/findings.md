@@ -2397,7 +2397,7 @@ assessment completed.
 
 
 The internal-adoption boundary control used a temporary module named
-`github.com/jdziat/open-nitpick` and one tracked source file at
+`github.com/nitpick-oss/nitpick` and one tracked source file at
 `internal/commits/subject.go`. Under the proposed repository policy, the
 blank import `strings` completed the boundary check over one source with zero
 findings; replacing it with `net/http` completed the same check with one blocking
@@ -2429,9 +2429,9 @@ CI now passes the PR title to the shared validator and handles title-edit
 events. The historical commit remains visible as a violation.
 
 The live control on PR #116 changed only its proposed title.
-[Run 34656113186](https://github.com/jdziat/open-nitpick/actions/runs/34656113186)
+[Run 34656113186](https://github.com/nitpick-oss/nitpick/actions/runs/34656113186)
 rejected the invalid title with `commits.subject-format`;
-[run 34656158969](https://github.com/jdziat/open-nitpick/actions/runs/34656158969)
+[run 34656158969](https://github.com/nitpick-oss/nitpick/actions/runs/34656158969)
 passed after the valid title was restored on the same commit. Those edits
 started two commit-policy runs and no new main CI run.
 

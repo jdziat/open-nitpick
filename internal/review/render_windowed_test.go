@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jdziat/open-nitpick/internal/bundle"
+	"github.com/nitpick-oss/nitpick/internal/bundle"
 )
 
 // TestWindowedFilesAreDisclosed guards a disclosure that better context

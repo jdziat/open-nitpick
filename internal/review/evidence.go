@@ -3,7 +3,7 @@ package review
 import (
 	"sort"
 
-	"github.com/jdziat/open-nitpick/internal/knowledge"
+	"github.com/nitpick-oss/nitpick/internal/knowledge"
 )
 
 // Attributing retrieved knowledge to a finding.

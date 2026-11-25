@@ -332,12 +332,12 @@ tree, with the remediation plan and the coverage notice), `code_smell` and
 `ai_slop` (the tree review filtered to those classes), `security_scan` (required scanners plus optional security-class model pass), and `explain_config`. Every tool returns text and structured findings with
 path, line, severity, class, rationale and suggestion; nothing is
 published, and the session decides what to do with what comes back. The
-plugin under [plugins/nitpick](https://github.com/jdziat/open-nitpick/tree/main/plugins/nitpick) registers the server and
+plugin under [plugins/nitpick](https://github.com/nitpick-oss/nitpick/tree/main/plugins/nitpick) registers the server and
 adds skills that say when to reach for each tool and how to read the
 answer:
 
 ```
-/plugin marketplace add jdziat/open-nitpick
+/plugin marketplace add nitpick-oss/nitpick
 /plugin install nitpick@open-nitpick
 ```
 
