@@ -125,7 +125,7 @@ about Contender, or about a corpus anyone else wrote.
 ### Run through GitHub (2026-09-03)
 
 The corpora were materialised into a private repository
-(`jdziat/nitpick-bench`, one branch and one pull request per fixture, 44 in
+(`nitpick-oss/nitpick-bench`, one branch and one pull request per fixture, 44 in
 all) and reviewed by the shipped GitHub Action (release install, incremental
 review, the job summary, the lot) with `anthropic/claude-sonnet-4.6`, related
 context on, and `min_severity: nit`. `cmd/benchrepo score` reads the posted
