@@ -21,13 +21,8 @@ in your repository that you can read and edit.
 ## Quick start
 
 ```bash
-# A signed binary for your platform. Releases carry linux and darwin on amd64
-# and arm64, plus windows on amd64, each with a Sigstore bundle and a
-# checksums file.
-v=$(gh release view --repo nitpick-oss/nitpick --json tagName -q .tagName)
-os=$(uname -s | tr 'A-Z' 'a-z'); arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-curl -fsSLo nitpick "https://github.com/nitpick-oss/nitpick/releases/download/$v/nitpick_${v}_${os}_${arch}"
-chmod +x nitpick && sudo mv nitpick /usr/local/bin/
+# The latest release, checked against its published checksums.
+curl -fsSL https://nitpick-oss.github.io/nitpick/install.sh | sh
 
 export LLM_PROVIDER=openrouter LLM_MODEL=z-ai/glm-5.3-flash
 export OPENROUTER_API_KEY=sk-or-...
@@ -38,9 +33,18 @@ nitpick fast-review     # changed diffs, top ten findings
 nitpick deep-review     # agents that read the repository: 2.5 times the cost, 1.6 times the time of review in the benchmark
 ```
 
-Verifying that download is one command and
-[Development](docs/development.md#releases) has it. Building from source
-instead is `go install github.com/nitpick-oss/nitpick/cmd/nitpick@latest`,
+The script puts `nitpick` in `~/.local/bin` (`INSTALL_DIR` changes that), never
+uses `sudo`, and installs a chosen release with `VERSION=v2.10.0`. It checks the
+download against `checksums.txt`, and its Sigstore signature too when `cosign` is
+installed. On Windows, `irm https://nitpick-oss.github.io/nitpick/install.ps1 | iex`
+does the same into `%LOCALAPPDATA%\Programs\nitpick`. Both are short files you can
+read first: [install.sh](https://nitpick-oss.github.io/nitpick/install.sh),
+[install.ps1](https://nitpick-oss.github.io/nitpick/install.ps1).
+
+Releases carry linux and darwin on amd64 and arm64, plus windows on amd64, each
+with a Sigstore bundle, so you can also download one by hand;
+[Development](docs/development.md#releases) shows how to verify it. Building
+from source instead is `go install github.com/nitpick-oss/nitpick/cmd/nitpick@latest`,
 which needs Go 1.26.0 or newer, as required by `go.mod`.
 
 `init` is optional: with those two variables set, a review runs with no config
