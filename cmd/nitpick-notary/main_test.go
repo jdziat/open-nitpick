@@ -95,3 +95,27 @@ func TestTheLimitsDoNotRefuseAnOrdinaryRequest(t *testing.T) {
 		t.Errorf("status = %d, want 404 (authenticated, no such record)", resp.StatusCode)
 	}
 }
+
+func FuzzTokenFlag(f *testing.F) {
+	h := strings.Repeat("ab", 32)
+	for _, s := range []string{"ci:authoritative:x", "ci:read:sha256:" + h, "a:b:c:d:e", ":::", "ci:read:sha256:", "\x00:read:x", "ci:read:" + strings.Repeat("é", 100)} {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, s string) {
+		var tokens tokenFlags
+		if err := tokens.Set(s); err != nil {
+			if len(tokens) != 0 {
+				t.Fatalf("%q was refused but still added a token", s)
+			}
+			return
+		}
+		if len(tokens) != 1 || tokens[0].Name == "" {
+			t.Fatalf("%q accepted as %+v", s, tokens)
+		}
+		switch tokens[0].Role {
+		case notary.RoleAuthoritative, notary.RoleProvisional, notary.RoleRead:
+		default:
+			t.Fatalf("%q accepted with role %q", s, tokens[0].Role)
+		}
+	})
+}
