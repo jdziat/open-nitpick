@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.10.0](https://github.com/nitpick-oss/nitpick/compare/v2.9.0...v2.10.0) (2026-11-26)
+
+
+### Features
+
+* **notary:** add a container image, compose file and helm chart ([#243](https://github.com/nitpick-oss/nitpick/issues/243)) ([ae07e9f](https://github.com/nitpick-oss/nitpick/commit/ae07e9ff06f4447847c6efeff1e47097d5072d18))
+* **notary:** add the review record store and its server ([#237](https://github.com/nitpick-oss/nitpick/issues/237)) ([765e711](https://github.com/nitpick-oss/nitpick/commit/765e711e45ffb70f1d44b9545f9c308c73ad8b13))
+* **notary:** record, replay and resume reviews through the notary ([#239](https://github.com/nitpick-oss/nitpick/issues/239)) ([baaee64](https://github.com/nitpick-oss/nitpick/commit/baaee643687799f30c75cb559dd06e5f183d238f))
+
+
+### Fixes
+
+* **review:** judge the whole change when design-boundaries is unavailable ([#236](https://github.com/nitpick-oss/nitpick/issues/236)) ([29d686d](https://github.com/nitpick-oss/nitpick/commit/29d686d6a596bb2b1d497fdef32d40a04c4d99cc)), closes [#235](https://github.com/nitpick-oss/nitpick/issues/235)
+
 ## [2.9.0](https://github.com/nitpick-oss/nitpick/compare/v2.8.0...v2.9.0) (2026-11-25)
 
 
