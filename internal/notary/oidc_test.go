@@ -350,14 +350,23 @@ func TestTheHealthEndpointNeedsNoTokenAndServesNoRecord(t *testing.T) {
 		t.Fatalf("health = %d %q", resp.StatusCode, body)
 	}
 	// Anything else still needs a token.
-	resp, _ = http.Get(srv.URL + "/v1/records/" + hash)
+	resp, err = http.Get(srv.URL + "/v1/records/" + hash)
+	if err != nil {
+		t.Fatal(err)
+	}
 	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("a record was served without a token: %d", resp.StatusCode)
 	}
 	// And the exemption is for reading only.
-	req, _ := http.NewRequest(http.MethodDelete, srv.URL+"/healthz", nil)
-	resp, _ = http.DefaultClient.Do(req)
+	req, err := http.NewRequest(http.MethodDelete, srv.URL+"/healthz", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
 	_ = resp.Body.Close()
 	if resp.StatusCode == http.StatusOK {
 		t.Error("DELETE /healthz succeeded")

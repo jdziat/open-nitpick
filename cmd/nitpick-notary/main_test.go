@@ -214,3 +214,23 @@ func TestTheHealthProbeSucceedsOnlyAgainstAServerThatAnswersOK(t *testing.T) {
 		t.Error("an address with no port passed the probe")
 	}
 }
+
+func TestAPipedSecretLosesOneLineEndingAndNothingElse(t *testing.T) {
+	for in, want := range map[string]string{
+		"secret":         "secret",
+		"secret\n":       "secret",
+		"secret\r\n":     "secret",
+		"secret\n\n":     "secret\n",
+		"secret\r\n\r\n": "secret\r\n",
+		"secret ":        "secret ",
+		" secret":        " secret",
+		"secret\r":       "secret\r",
+		"":               "",
+		"\n":             "",
+		"\r\n":           "",
+	} {
+		if got := trimLineEnd(in); got != want {
+			t.Errorf("trimLineEnd(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

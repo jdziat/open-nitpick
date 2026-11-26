@@ -87,9 +87,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		// One trailing newline is forgiven so `echo` works; the secret itself
-		// is hashed exactly as a client will send it.
-		fmt.Println(hashPrefix + notary.HashSecret(strings.TrimSuffix(string(secret), "\n")))
+		fmt.Println(hashPrefix + notary.HashSecret(trimLineEnd(string(secret))))
 		return
 	}
 	// NITPICK_NOTARY_TOKENS carries whitespace-separated -token entries, so a
@@ -175,4 +173,14 @@ func probe(addr string) error {
 		return fmt.Errorf("health check answered %s", resp.Status)
 	}
 	return nil
+}
+
+// trimLineEnd drops one trailing line ending, "\n" or "\r\n", so a secret piped
+// from echo on any platform hashes as the client will send it. Nothing else is
+// trimmed: a space or a second newline is part of the secret.
+func trimLineEnd(s string) string {
+	if t, ok := strings.CutSuffix(s, "\r\n"); ok {
+		return t
+	}
+	return strings.TrimSuffix(s, "\n")
 }
