@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"math"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -506,7 +507,7 @@ func TestALiveAnswerAddedToACompleteRecordIsNotWrittenAsComplete(t *testing.T) {
 	session.arm(context.Background(), wire.Inputs{}, "", false)
 	session.rec = loaded
 	session.status.Mode = NotaryReplayed
-	session.Record(context.Background(), "a-new-request", &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop})
+	session.Record(context.Background(), "a-new-request", &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop}, true)
 	for i, p := range spy.puts {
 		if p.Complete {
 			t.Errorf("write %d marked a record complete while it held an answer that no review of these inputs had finished with", i)
@@ -612,8 +613,8 @@ func TestAnAnswerThatCannotBeEncodedLeavesTheRecordIncompleteNotComplete(t *test
 	store := fileStore(t)
 	s, _ := armedSession(t, store, &scriptedLLM{})
 	nan := math.NaN()
-	s.Record(context.Background(), "k1", &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop, Usage: llms.Usage{Cost: &nan}})
-	s.Record(context.Background(), "k2", &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop})
+	s.Record(context.Background(), "k1", &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop, Usage: llms.Usage{Cost: &nan}}, true)
+	s.Record(context.Background(), "k2", &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop}, true)
 	status := s.finish(context.Background(), true)
 	if status.Complete {
 		t.Fatalf("a record missing an answer was marked complete: %+v", status)
@@ -725,8 +726,8 @@ func TestADroppedWriteIsNotForgivenWhenTheRecordIsMissingAnAnswer(t *testing.T) 
 	s, _ := armedSession(t, store, &scriptedLLM{})
 	nan := math.NaN()
 	s.putFailed = true
-	s.Record(context.Background(), "lost", &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop, Usage: llms.Usage{Cost: &nan}})
-	s.Record(context.Background(), "kept", &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop})
+	s.Record(context.Background(), "lost", &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop, Usage: llms.Usage{Cost: &nan}}, true)
+	s.Record(context.Background(), "kept", &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop}, true)
 	if s.status.Err == "" {
 		t.Error("a later successful write cleared the error for an answer that was never recorded")
 	}
@@ -773,5 +774,116 @@ func TestTheNotaryAndNotTheForgeCheckpointIsTheResumeRecord(t *testing.T) {
 	}
 	if third.callCount() != 0 || replay.Notary.Mode != NotaryReplayed {
 		t.Errorf("a replay elsewhere asked the model %d times: %+v", third.callCount(), replay.Notary)
+	}
+}
+
+// cappedThenAnswered is what a reasoning model that spends its whole output
+// budget thinking does, then the answer to the client's retry with reasoning
+// off.
+type cappedThenAnswered struct {
+	mu    sync.Mutex
+	calls int
+}
+
+func (m *cappedThenAnswered) GenerateContent(context.Context, []llms.Message, ...llms.CallOption) (*llms.Response, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.calls++
+	if m.calls == 1 {
+		return &llms.Response{FinishReason: llms.FinishReasonLength, Usage: llms.Usage{CompletionTokens: 16384, ReasoningTokens: 16384},
+			Reasoning: &llms.ReasoningContent{Content: strings.Repeat("thinking ", 4000)}}, nil
+	}
+	return &llms.Response{Content: `{"findings":["x"]}`, FinishReason: llms.FinishReasonStop}, nil
+}
+func (m *cappedThenAnswered) Stream(context.Context, []llms.Message, ...llms.CallOption) (<-chan llms.StreamChunk, error) {
+	return nil, errors.New("no")
+}
+func (m *cappedThenAnswered) Provider() llms.Provider { return "capped" }
+func (m *cappedThenAnswered) Model() string           { return "capped" }
+
+type recoveredAnswer struct {
+	Findings []string `json:"findings"`
+}
+
+func sessionOn(t *testing.T, store wire.Store, model llms.LLM) (*notarySession, *llm.Client) {
+	t.Helper()
+	s := newNotarySession(store, slog.New(slog.DiscardHandler), "ci")
+	s.arm(context.Background(), wire.Inputs{Tool: "t", Batches: []string{"b"}}, "", false)
+	c := llm.NewClientForTest(model, config.ModelSpec{Provider: "openai", Model: "m"})
+	c.UseLedger(s)
+	return s, c
+}
+
+var recoveredAsk = []llms.Message{{Role: llms.RoleUser, Content: "q"}}
+
+func TestAFinishedReviewReplaysTheAttemptThatWasRetriedAtNoCost(t *testing.T) {
+	store := fileStore(t)
+	live := &cappedThenAnswered{}
+	s, c := sessionOn(t, store, live)
+	if _, err := llm.Extract[recoveredAnswer](context.Background(), c, recoveredAsk); err != nil {
+		t.Fatal(err)
+	}
+	if live.calls != 2 {
+		t.Fatalf("setup: the live run made %d calls, want the capped attempt and the retry", live.calls)
+	}
+	if status := s.finish(context.Background(), true); !status.Complete {
+		t.Fatalf("setup: the record must be complete: %+v", status)
+	}
+
+	again := &cappedThenAnswered{}
+	replay, c2 := sessionOn(t, store, again)
+	if _, err := llm.Extract[recoveredAnswer](context.Background(), c2, recoveredAsk); err != nil {
+		t.Fatal(err)
+	}
+	if again.calls != 0 {
+		t.Errorf("the replay reached the model %d times: the retried attempt was not served from the record", again.calls)
+	}
+	if st := replay.snapshot(); st.Mode != NotaryReplayed || st.Live != 0 || st.Replayed != 2 {
+		t.Errorf("replay status = %+v, want both answers replayed and none live", st)
+	}
+}
+
+func TestAnInterruptedRecordAsksAgainForAnAttemptThatFailedNotReplayingTheFailure(t *testing.T) {
+	store := fileStore(t)
+	live := &cappedThenAnswered{}
+	s, c := sessionOn(t, store, live)
+	if _, err := llm.Extract[recoveredAnswer](context.Background(), c, recoveredAsk); err != nil {
+		t.Fatal(err)
+	}
+	// The review that made these requests did not finish.
+	if status := s.finish(context.Background(), false); status.Complete {
+		t.Fatalf("setup: the record must be partial: %+v", status)
+	}
+
+	again := &cappedThenAnswered{}
+	_, c2 := sessionOn(t, store, again)
+	if _, err := llm.Extract[recoveredAnswer](context.Background(), c2, recoveredAsk); err != nil {
+		t.Fatal(err)
+	}
+	// The failed attempt is asked again (the model answers it as before and
+	// the retry is served from the record), so one call, not zero: a resume
+	// must not replay a failure it could still recover from.
+	if again.calls != 1 {
+		t.Errorf("the resume made %d calls, want exactly the one that failed", again.calls)
+	}
+}
+
+func TestTheReasoningTextOfAnAttemptCutAtTheCapIsNotStored(t *testing.T) {
+	store := fileStore(t)
+	s, c := sessionOn(t, store, &cappedThenAnswered{})
+	if _, err := llm.Extract[recoveredAnswer](context.Background(), c, recoveredAsk); err != nil {
+		t.Fatal(err)
+	}
+	s.finish(context.Background(), true)
+	rec, _, _ := store.Get(context.Background(), s.snapshot().Hash)
+	total := 0
+	for _, raw := range rec.Answers {
+		total += len(raw)
+		if strings.Contains(raw, "thinking thinking") {
+			t.Fatal("a record holds the reasoning text of a capped attempt")
+		}
+	}
+	if total > 2000 {
+		t.Errorf("the record is %d bytes for two one-line answers", total)
 	}
 }

@@ -16,7 +16,7 @@ import (
 
 // Schema versions the record layout and the gate's behaviour. Bump it when
 // either changes: old records then hash differently and are never replayed.
-const Schema = 3
+const Schema = 4
 
 // Inputs is everything that decides what a review says. A change to any field
 // is a different review and gets a different hash.

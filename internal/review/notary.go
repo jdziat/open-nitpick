@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -98,6 +99,11 @@ type notarySession struct {
 	gap bool
 	// putFailed is set while the last write to the notary has not landed.
 	putFailed bool
+	// serveUnusable is true when the record was complete at arm time. A
+	// finished review made every retry in it, so a replay must make them too and
+	// they must cost nothing. In an interrupted record they are skipped, so the
+	// request is asked again and a failure is not replayed forever.
+	serveUnusable bool
 }
 
 func newNotarySession(store wire.Store, log *slog.Logger, by string) *notarySession {
@@ -152,6 +158,7 @@ func (n *notarySession) arm(ctx context.Context, in wire.Inputs, effort string, 
 	}
 	if rec.Complete {
 		n.status.Mode = NotaryReplayed
+		n.serveUnusable = true
 		n.rec.Complete, n.rec.Batches, n.rec.Created = true, rec.Batches, rec.Created
 		n.status.Complete = true
 		return
@@ -169,6 +176,10 @@ func (n *notarySession) fail(err error) {
 	n.writable = false
 	n.log.Warn("notary unavailable; this review is unofficial", "error", err)
 }
+
+// unusableMark prefixes a stored response the caller rejected or retried. A
+// usable one is a JSON object, so the prefix cannot be mistaken for one.
+const unusableMark = "!"
 
 // slot names the n-th answer to one request. Identical requests are separate
 // answers: review.votes asks the same question several times to compare the
@@ -194,9 +205,13 @@ func (n *notarySession) Lookup(_ context.Context, key string) (*llms.Response, b
 		if n.used[name] {
 			continue
 		}
+		body, unusable := strings.CutPrefix(raw, unusableMark)
+		if unusable && !n.serveUnusable {
+			continue
+		}
 		n.used[name] = true
 		var resp llms.Response
-		if json.Unmarshal([]byte(raw), &resp) != nil {
+		if json.Unmarshal([]byte(body), &resp) != nil {
 			// An answer that does not decode costs a request, never a wrong
 			// answer.
 			return nil, false
@@ -207,7 +222,7 @@ func (n *notarySession) Lookup(_ context.Context, key string) (*llms.Response, b
 }
 
 // Record implements llm.Ledger.
-func (n *notarySession) Record(ctx context.Context, key string, resp *llms.Response) {
+func (n *notarySession) Record(ctx context.Context, key string, resp *llms.Response, usable bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if !n.armed {
@@ -217,7 +232,17 @@ func (n *notarySession) Record(ctx context.Context, key string, resp *llms.Respo
 	if n.status.Mode == NotaryUnreachable {
 		return
 	}
-	raw, err := json.Marshal(resp)
+	stored := resp
+	if !usable {
+		// What a caller needs to repeat its retry is the finish reason, the
+		// content and the usage. The reasoning text of an attempt that ran to
+		// the cap is tens of kilobytes nobody reads.
+		trimmed := *resp
+		trimmed.Reasoning = nil
+		trimmed.SearchResults = nil
+		stored = &trimmed
+	}
+	raw, err := json.Marshal(stored)
 	if err != nil {
 		// The answer is missing from the record, so the record must never be
 		// called complete: that would attest to answers it does not hold.
@@ -233,7 +258,11 @@ func (n *notarySession) Record(ctx context.Context, key string, resp *llms.Respo
 		}
 	}
 	name := slot(key, i)
-	n.rec.Answers[name] = string(raw)
+	if usable {
+		n.rec.Answers[name] = string(raw)
+	} else {
+		n.rec.Answers[name] = unusableMark + string(raw)
+	}
 	n.used[name] = true
 	// A replayed record that took a live call is a different review from the
 	// one that was recorded, so it can no longer be called complete.

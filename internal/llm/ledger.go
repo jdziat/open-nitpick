@@ -18,8 +18,13 @@ import (
 type Ledger interface {
 	// Lookup returns the recorded answer for a request key.
 	Lookup(ctx context.Context, key string) (*llms.Response, bool)
-	// Record keeps an answer a live call produced.
-	Record(ctx context.Context, key string, resp *llms.Response)
+	// Record keeps a response a live call produced. usable is false for one the
+	// caller will reject or retry (cut at the output cap, empty, not the JSON
+	// that was asked for). It is kept all the same, because replaying a review
+	// repeats the retry that followed it, and the retry is only free if the
+	// attempt before it is in the record too. Whether to serve it is the
+	// ledger's decision: a finished review's yes, an interrupted one's no.
+	Record(ctx context.Context, key string, resp *llms.Response, usable bool)
 }
 
 // ledgerLLM sits outside the resilience wrapper, so a recorded answer skips
@@ -52,8 +57,8 @@ func (l *ledgerLLM) GenerateContent(ctx context.Context, msgs []llms.Message, op
 		return resp, nil
 	}
 	resp, err := l.inner.GenerateContent(ctx, msgs, opts...)
-	if err == nil && recordable(resp) && wellFormed(resp, opts) {
-		box.l.Record(ctx, key, resp)
+	if err == nil && resp != nil {
+		box.l.Record(ctx, key, resp, recordable(resp) && wellFormed(resp, opts))
 	}
 	return resp, err
 }
