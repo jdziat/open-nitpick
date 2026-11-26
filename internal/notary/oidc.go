@@ -92,14 +92,17 @@ func (o *OIDC) key(ctx context.Context, kid string) (*rsa.PublicKey, error) {
 	if k, ok := o.keys[kid]; ok {
 		return k, nil
 	}
-	if time.Since(o.fetched) < keyRefresh && o.keys != nil {
+	if !o.fetched.IsZero() && time.Since(o.fetched) < keyRefresh {
 		return nil, fmt.Errorf("no key %q", kid)
 	}
 	keys, err := o.fetch(ctx)
+	// Stamped before the error check: a failing issuer must not be asked again
+	// by every token that names a key we do not have.
+	o.fetched = time.Now()
 	if err != nil {
 		return nil, err
 	}
-	o.keys, o.fetched = keys, time.Now()
+	o.keys = keys
 	if k, ok := keys[kid]; ok {
 		return k, nil
 	}

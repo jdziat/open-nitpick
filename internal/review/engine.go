@@ -2815,7 +2815,11 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 	if e.notarySess != nil {
 		report.Notary = e.notarySess.finish(ctx, report.PipelineComplete())
 	}
-	if e.RequireNotary && report.Plan != nil && len(report.Plan.Batches) > 0 && !report.Notary.Official() {
+	// With no batches there is no model answer to record, so a configured notary
+	// has nothing to certify. With no notary at all there is nothing to point at,
+	// and -require-notary withholds the review (an approval included).
+	needsRecord := report.Plan != nil && len(report.Plan.Batches) > 0
+	if e.RequireNotary && !report.Notary.Official() && (needsRecord || e.Notary == nil) {
 		report.Unofficial = true
 		e.log().Warn("UNOFFICIAL review: no notary kept its record, so it is not posted",
 			"notary", string(report.Notary.Mode), "error", report.Notary.Err)

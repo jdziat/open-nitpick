@@ -176,3 +176,45 @@ func TestAClientBuiltForARouteAfterTheLedgerIsSetIsRecordedToo(t *testing.T) {
 		t.Errorf("a routed model bypassed the ledger: %d calls", inner.calls)
 	}
 }
+
+func TestToolChatIsAnsweredFromTheLedgerToo(t *testing.T) {
+	l := newMemLedger()
+	c, inner := withLedger(&llms.Response{Content: `{"a":1}`, FinishReason: llms.FinishReasonStop}, l)
+	// A production client routes ToolChat past the wrapper the hook sits in.
+	c.observed = &observedLLM{inner: inner, model: "m"}
+	for range 2 {
+		if _, err := c.ToolChat(context.Background(), question); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if inner.calls != 1 {
+		t.Errorf("a repeated agent turn reached the model %d times, want 1", inner.calls)
+	}
+}
+
+func TestAFallbackClientIsRecordedThroughTheSameLedger(t *testing.T) {
+	l := newMemLedger()
+	primary, _ := withLedger(&llms.Response{Content: "p", FinishReason: llms.FinishReasonStop}, nil)
+	fallbackModel := &ledgerModel{reply: &llms.Response{Content: "f", FinishReason: llms.FinishReasonStop}}
+	fallback := NewClientForTest(fallbackModel, config.ModelSpec{Provider: "openai", Model: "fb"})
+	primary.fallback = fallback
+	roles := &Roles{Review: primary}
+	roles.UseLedger(l)
+	for range 2 {
+		_, _ = fallback.LLM.GenerateContent(context.Background(), question)
+	}
+	if fallbackModel.calls != 1 {
+		t.Errorf("the fallback was reached %d times, so its answers were not recorded", fallbackModel.calls)
+	}
+}
+
+func TestADegenerateJSONAnswerIsNotRecorded(t *testing.T) {
+	for _, body := range []string{"{}", "null", "[]", `"text"`, "3"} {
+		l := newMemLedger()
+		c, _ := withLedger(&llms.Response{Content: body, FinishReason: llms.FinishReasonStop}, l)
+		_, _ = c.LLM.GenerateContent(context.Background(), question, llms.WithJSONMode())
+		if len(l.answers) != 0 {
+			t.Errorf("%s was recorded, and the decoder rejects it on every replay", body)
+		}
+	}
+}

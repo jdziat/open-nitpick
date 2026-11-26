@@ -534,3 +534,30 @@ func TestTheInputHashDoesNotDependOnTheOrderBatchesWerePacked(t *testing.T) {
 		t.Error("a different batch kept the hash")
 	}
 }
+
+func TestRequireNotaryWithholdsAReviewWithNoBatchesOnlyWhenThereIsNoNotary(t *testing.T) {
+	empty := &stubProvider{diff: "diff --git a/x.png b/x.png\nBinary files a/x.png and b/x.png differ\n"}
+	for _, tc := range []struct {
+		name      string
+		store     wire.Store
+		wantAbort bool
+	}{
+		{"no notary configured", nil, true},
+		{"a notary is configured and has nothing to certify", fileStore(t), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEngine(t, notaryModel(t), empty, nil)
+			e.Notary, e.RequireNotary = tc.store, true
+			report, err := e.Review(context.Background(), vcs.Ref{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.Unofficial != tc.wantAbort {
+				t.Errorf("unofficial=%v, want %v (batches=%d)", report.Unofficial, tc.wantAbort, len(report.Plan.Batches))
+			}
+			if len(report.Plan.Batches) != 0 {
+				t.Fatalf("setup: the plan must pack nothing, got %d batches", len(report.Plan.Batches))
+			}
+		})
+	}
+}

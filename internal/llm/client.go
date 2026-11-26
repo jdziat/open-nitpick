@@ -119,6 +119,12 @@ func (c *Client) ToolChat(ctx context.Context, msgs []llms.Message, opts ...llms
 	} else if c.observed != nil {
 		inner = c.observed
 	}
+	// ToolChat skips the resilience wrapper where the hook sits, so it asks the
+	// ledger itself. Without this a deep review's agent turns would be paid for
+	// again on every replay.
+	if c.ledgered != nil {
+		inner = c.ledgered.over(inner)
+	}
 	resp, err := inner.GenerateContent(ctx, msgs, opts...)
 	if observe, ok := ctx.Value(toolChatObserverKey{}).(func(context.Context, ToolChatObservation) error); ok {
 		err = errors.Join(err, observe(ctx, ToolChatObservation{Client: c, Messages: msgs, Options: opts, Response: resp, Err: err}))

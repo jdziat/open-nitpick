@@ -75,6 +75,13 @@ func (l *ledgerLLM) requestKey(msgs []llms.Message, opts []llms.CallOption) (str
 	return hex.EncodeToString(sum[:]), true
 }
 
+// over returns a wrapper with the same ledger around another model.
+func (l *ledgerLLM) over(inner llms.LLM) llms.LLM {
+	next := &ledgerLLM{inner: inner}
+	next.ledger.Store(l.ledger.Load())
+	return next
+}
+
 // UseLedger routes this client's requests through l, and stops doing so for
 // nil. Calling it again swaps the ledger rather than stacking a second wrapper,
 // because one client serves every review a long-lived engine runs.
@@ -118,7 +125,7 @@ func recordable(resp *llms.Response) bool {
 	}
 }
 
-// wellFormed refuses to keep a JSON answer that is not JSON. The ledger sees
+// wellFormed refuses to keep a JSON answer that is not a usable JSON object. The ledger sees
 // the raw reply before the caller parses it, so without this a reply that
 // failed to parse would be recorded, replayed on the next run, and fail the
 // same way every time: a partial record that resume could never finish.
@@ -128,7 +135,11 @@ func wellFormed(resp *llms.Response, opts []llms.CallOption) bool {
 	if len(resp.ToolCalls) > 0 || llms.ApplyOptions(opts...).ResponseFormat == nil {
 		return true
 	}
-	return json.Valid([]byte(extractJSONText(resp.Content)))
+	// A populated object, because that is what every structured request in this
+	// tool decodes into. {} and null are valid JSON that the decoder rejects on
+	// every later run, and a record cannot be replaced once it holds one.
+	var object map[string]json.RawMessage
+	return json.Unmarshal([]byte(extractJSONText(resp.Content)), &object) == nil && len(object) > 0
 }
 
 // extractJSONText strips the fence a model sometimes wraps a JSON answer in.

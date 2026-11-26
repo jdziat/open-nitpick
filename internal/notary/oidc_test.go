@@ -265,3 +265,20 @@ func TestATokenHoldsOnlyTheHashOfItsSecret(t *testing.T) {
 		t.Error("the token does not hold the SHA-256 of its secret")
 	}
 }
+
+func TestAFailingIssuerIsNotAskedAgainByEveryTokenWithAnUnknownKey(t *testing.T) {
+	hits := 0
+	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits++
+		http.Error(w, "unavailable", http.StatusServiceUnavailable)
+	}))
+	t.Cleanup(down.Close)
+	p := newIDP(t)
+	v := &OIDC{Issuer: testIssuer, Audience: testAudience, JWKSURL: down.URL, Allow: []OIDCRule{newOIDCRule("*", RoleAuthoritative)}}
+	for range 20 {
+		v.Authenticate(context.Background(), p.token(t, nil))
+	}
+	if hits != 1 {
+		t.Errorf("a failing issuer was asked for its keys %d times by 20 tokens, want 1", hits)
+	}
+}

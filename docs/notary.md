@@ -92,6 +92,13 @@ findings still print and the gate still applies: unofficial describes the
 record, not the result. A replay of a record someone else wrote is official
 whoever reads it.
 
+A review whose plan packs no batch has no model answer to record. With a notary
+configured it posts. With none at all, `-require-notary` withholds it, an
+approval included.
+
+`-fresh`, `-clear-by` and `-notary-oidc-audience` need `-notary`, and are
+refused without it rather than ignored.
+
 Without `-require-notary` a failure of the notary never stops a review. It is
 logged, the review carries on without a record, and the report says so.
 

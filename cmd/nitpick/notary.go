@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -37,8 +36,12 @@ func (n *notaryFlags) register(fs *flag.FlagSet) {
 // without one is refused, since it would otherwise do nothing and say nothing.
 func (n *notaryFlags) apply(engine *review.Engine) error {
 	if n.url == "" {
-		if n.fresh {
-			return errors.New("-fresh clears a notary record and needs -notary")
+		// Each of these would do nothing and say nothing, which for a flag that
+		// names a credential or a record is worse than refusing.
+		for flagName, set := range map[string]bool{"-fresh": n.fresh, "-notary-oidc-audience": n.oidcAudience != "", "-clear-by": n.clearBy != ""} {
+			if set {
+				return fmt.Errorf("%s needs -notary", flagName)
+			}
 		}
 		engine.RequireNotary = n.require
 		return nil

@@ -109,7 +109,11 @@ review:
 func reviewJSON(t *testing.T, repo string, args ...string) (map[string]any, error) {
 	t.Helper()
 	t.Setenv(config.EnvTrustConfigEndpoints, "1")
-	t.Setenv("GITHUB_ACTIONS", "")
+	// A CI runner sets these, and RefFromEnv turns them into a pull request
+	// review against GitHub. The tests review a local repository.
+	for _, name := range []string{"GITHUB_ACTIONS", "GITHUB_REPOSITORY", "GITHUB_REF", "PR_NUMBER", "GITHUB_EVENT_PATH", "GITHUB_TOKEN", "NITPICK_GITHUB_TOKEN"} {
+		t.Setenv(name, "")
+	}
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatal(err)
@@ -308,15 +312,24 @@ func TestNotaryEndToEndRequireNotaryWithholdsAnUnofficialReview(t *testing.T) {
 
 func TestNotaryFlagsAreRefusedWhenTheyCannotWork(t *testing.T) {
 	t.Setenv(EnvNotaryToken, "")
-	repo := t.TempDir()
-	for name, args := range map[string][]string{
-		"fresh with no notary":      {"-fresh"},
-		"notary with no credential": {"-notary", "http://127.0.0.1:1"},
+	// A repository with a model configured: with none, every case fails on
+	// that first and the flag check is never reached.
+	repo := gitRepo(t, newFakeModel(t))
+	for name, tc := range map[string]struct {
+		args []string
+		want string
+	}{
+		"fresh with no notary":      {[]string{"-fresh"}, "-fresh needs -notary"},
+		"audience with no notary":   {[]string{"-notary-oidc-audience", "x"}, "-notary-oidc-audience needs -notary"},
+		"clear-by with no notary":   {[]string{"-clear-by", "alice"}, "-clear-by needs -notary"},
+		"notary with no credential": {[]string{"-notary", "http://127.0.0.1:1"}, "-notary needs a credential"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := reviewJSON(t, repo, args...)
-			if err == nil {
-				t.Fatal("accepted")
+			_, err := reviewJSON(t, repo, tc.args...)
+			// The message, not just an error: any other failure would satisfy a
+			// bare nil check.
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want one containing %q", err, tc.want)
 			}
 		})
 	}
