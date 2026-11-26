@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -36,6 +37,25 @@ type fakeModel struct {
 	// failTriage makes any request that asks for triage fail, the way a
 	// dropped connection would, so a run can be interrupted partway.
 	failTriage atomic.Bool
+	// severity is what the review finding is rated, "error" when unset. The
+	// residual approval judge only runs for findings at or below warning.
+	severity atomic.Pointer[string]
+	// seen counts requests by a marker the test asks about.
+	mu   sync.Mutex
+	seen []string
+}
+
+// callsMatching reports how many requests contained marker.
+func (m *fakeModel) callsMatching(marker string) int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, s := range m.seen {
+		if strings.Contains(s, marker) {
+			n++
+		}
+	}
+	return n
 }
 
 func newFakeModel(t *testing.T) *fakeModel {
@@ -45,6 +65,9 @@ func newFakeModel(t *testing.T) *fakeModel {
 		body, _ := io.ReadAll(r.Body)
 		m.calls.Add(1)
 		text := string(body)
+		m.mu.Lock()
+		m.seen = append(m.seen, text)
+		m.mu.Unlock()
 		var content string
 		switch {
 		case strings.Contains(text, "triaging findings"):
@@ -53,8 +76,14 @@ func newFakeModel(t *testing.T) *fakeModel {
 				return
 			}
 			content = `{"summary":"Adds a greeting.","verdicts":[]}`
+		case strings.Contains(text, "You decide whether a pull request review"):
+			content = `{"approve":true,"reason":"advisory only"}`
 		default:
-			content = `{"findings":[{"path":"hello.go","line":4,"severity":"error","category":"correctness","title":"Ignored error from http.Get","rationale":"resp may be nil, so the deferred Close panics.","confidence":0.9}]}`
+			severity := "error"
+			if v := m.severity.Load(); v != nil {
+				severity = *v
+			}
+			content = `{"findings":[{"path":"hello.go","line":4,"severity":"` + severity + `","category":"correctness","title":"Ignored error from http.Get","rationale":"resp may be nil, so the deferred Close panics.","confidence":0.9}]}`
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{

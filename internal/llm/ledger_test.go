@@ -13,25 +13,44 @@ import (
 )
 
 type memLedger struct {
-	mu      sync.Mutex
-	answers map[string]*llms.Response
-	lookups int
+	mu sync.Mutex
+	// answers holds what was recorded as usable. unusable holds the rest, which
+	// a finished review's replay serves and an interrupted one's skips.
+	answers  map[string]*llms.Response
+	unusable map[string]*llms.Response
+	// serveUnusable is set by a test that stands in for a record whose review
+	// finished. Left false, unusable responses are skipped, as an interrupted
+	// record skips them.
+	serveUnusable bool
+	lookups       int
 }
 
-func newMemLedger() *memLedger { return &memLedger{answers: map[string]*llms.Response{}} }
+func newMemLedger() *memLedger {
+	return &memLedger{answers: map[string]*llms.Response{}, unusable: map[string]*llms.Response{}}
+}
 
 func (m *memLedger) Lookup(_ context.Context, key string) (*llms.Response, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.lookups++
-	r, ok := m.answers[key]
+	if r, ok := m.answers[key]; ok {
+		return r, true
+	}
+	if !m.serveUnusable {
+		return nil, false
+	}
+	r, ok := m.unusable[key]
 	return r, ok
 }
 
-func (m *memLedger) Record(_ context.Context, key string, r *llms.Response) {
+func (m *memLedger) Record(_ context.Context, key string, r *llms.Response, usable bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.answers[key] = r
+	if usable {
+		m.answers[key] = r
+		return
+	}
+	m.unusable[key] = r
 }
 
 type ledgerModel struct {
@@ -226,9 +245,9 @@ type recordingLedger struct {
 	records int
 }
 
-func (r *recordingLedger) Record(ctx context.Context, key string, resp *llms.Response) {
+func (r *recordingLedger) Record(ctx context.Context, key string, resp *llms.Response, usable bool) {
 	r.records++
-	r.memLedger.Record(ctx, key, resp)
+	r.memLedger.Record(ctx, key, resp, usable)
 }
 
 func TestToolChatOnAClientWithNoObserverRecordsEachAnswerOnce(t *testing.T) {
@@ -283,5 +302,65 @@ func TestTwoSamplesOfOneRequestAreRecordedSeparately(t *testing.T) {
 	}
 	if inner.calls != 2 {
 		t.Errorf("model reached %d times for 2 distinct samples and one repeat, want 2", inner.calls)
+	}
+}
+
+// scriptedSequence answers each call in order, so a test can make a first
+// attempt fail the way a reasoning model does at its output cap and a retry
+// succeed.
+type scriptedSequence struct {
+	mu    sync.Mutex
+	calls int
+	steps []*llms.Response
+}
+
+func (s *scriptedSequence) GenerateContent(context.Context, []llms.Message, ...llms.CallOption) (*llms.Response, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	i := min(s.calls, len(s.steps)-1)
+	s.calls++
+	return s.steps[i], nil
+}
+func (s *scriptedSequence) Stream(context.Context, []llms.Message, ...llms.CallOption) (<-chan llms.StreamChunk, error) {
+	return nil, errors.New("no")
+}
+func (s *scriptedSequence) Provider() llms.Provider { return "sequence" }
+func (s *scriptedSequence) Model() string           { return "sequence" }
+
+type answer struct {
+	Findings []string `json:"findings"`
+}
+
+// cappedThenAnswered is what a reasoning model that spent its whole output
+// budget thinking does, followed by the retry the client sends with reasoning
+// off: an empty answer cut at the cap, then a real one.
+func cappedThenAnswered() []*llms.Response {
+	return []*llms.Response{
+		{Content: "", FinishReason: llms.FinishReasonLength, Usage: llms.Usage{CompletionTokens: 16384, ReasoningTokens: 16384}},
+		{Content: `{"findings":["x"]}`, FinishReason: llms.FinishReasonStop},
+	}
+}
+
+func TestAReplayOfAFinishedReviewDoesNotPayAgainForAnAttemptThatWasRetried(t *testing.T) {
+	l := newMemLedger()
+	first := &scriptedSequence{steps: cappedThenAnswered()}
+	c := NewClientForTest(first, config.ModelSpec{Provider: "openai", Model: "m"})
+	c.UseLedger(l)
+	if _, err := Extract[answer](context.Background(), c, question); err != nil {
+		t.Fatal(err)
+	}
+	if first.calls != 2 {
+		t.Fatalf("setup: the live run made %d calls, want the capped attempt and its retry", first.calls)
+	}
+
+	l.serveUnusable = true // the review above finished
+	replay := &scriptedSequence{steps: cappedThenAnswered()}
+	again := NewClientForTest(replay, config.ModelSpec{Provider: "openai", Model: "m"})
+	again.UseLedger(l)
+	if _, err := Extract[answer](context.Background(), again, question); err != nil {
+		t.Fatal(err)
+	}
+	if replay.calls != 0 {
+		t.Errorf("the replay reached the model %d times: the attempt that was cut at the cap was not in the record, so it was paid for again", replay.calls)
 	}
 }

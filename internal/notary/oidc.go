@@ -40,16 +40,31 @@ func ParseOIDCRule(v string) (OIDCRule, error) {
 	}
 	switch r := Role(role); r {
 	case RoleAuthoritative, RoleProvisional, RoleRead:
-		return newOIDCRule(pattern, r), nil
+		return compileRule(pattern, r)
 	default:
 		return OIDCRule{}, fmt.Errorf("unknown role %q: use authoritative, provisional or read", role)
 	}
 }
 
-func newOIDCRule(pattern string, role Role) OIDCRule {
+// compileRule turns a subject pattern into a rule. It returns an error and does
+// not panic: the pattern is an operator's input, and one that is not valid
+// UTF-8 is not a pattern a regular expression can be built from.
+func compileRule(pattern string, role Role) (OIDCRule, error) {
 	quoted := regexp.QuoteMeta(pattern)
-	re := regexp.MustCompile("^" + strings.ReplaceAll(quoted, `\*`, ".*") + "$")
-	return OIDCRule{Pattern: pattern, Role: role, re: re}
+	re, err := regexp.Compile("^" + strings.ReplaceAll(quoted, `\*`, ".*") + "$")
+	if err != nil {
+		return OIDCRule{}, fmt.Errorf("oidc subject pattern %q: %w", pattern, err)
+	}
+	return OIDCRule{Pattern: pattern, Role: role, re: re}, nil
+}
+
+// newOIDCRule is compileRule for a pattern the caller wrote in source.
+func newOIDCRule(pattern string, role Role) OIDCRule {
+	r, err := compileRule(pattern, role)
+	if err != nil {
+		panic(err)
+	}
+	return r
 }
 
 // OIDC lets a CI run authenticate with the identity token its platform issues
@@ -72,6 +87,8 @@ type OIDC struct {
 	mu      sync.Mutex
 	keys    map[string]*rsa.PublicKey
 	fetched time.Time
+	// fetchMu serializes fetches without holding mu across the network.
+	fetchMu sync.Mutex
 }
 
 // keyRefresh bounds how often an unknown key id triggers a fetch, so a flood
@@ -87,15 +104,20 @@ func (o *OIDC) jwksURL() string {
 }
 
 func (o *OIDC) key(ctx context.Context, kid string) (*rsa.PublicKey, error) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	if k, ok := o.keys[kid]; ok {
-		return k, nil
+	if k, done, err := o.cached(kid); done {
+		return k, err
 	}
-	if !o.fetched.IsZero() && time.Since(o.fetched) < keyRefresh {
-		return nil, fmt.Errorf("no key %q", kid)
+	// One fetch at a time, and the cache lock is not held while it runs: a slow
+	// issuer must not stall a token whose key is already cached, which one
+	// request with a made-up key id could otherwise do to every workflow.
+	o.fetchMu.Lock()
+	defer o.fetchMu.Unlock()
+	// A caller ahead of this one may have fetched while it waited.
+	if k, done, err := o.cached(kid); done {
+		return k, err
 	}
 	keys, err := o.fetch(ctx)
+	o.mu.Lock()
 	// Stamped before the error check: a failing issuer must not be asked again
 	// by every token that names a key we do not have. Not when the caller gave
 	// up: a cancelled request says nothing about the issuer, and stamping it
@@ -103,14 +125,31 @@ func (o *OIDC) key(ctx context.Context, kid string) (*rsa.PublicKey, error) {
 	if err == nil || ctx.Err() == nil {
 		o.fetched = time.Now()
 	}
+	if err == nil {
+		o.keys = keys
+	}
+	k, ok := o.keys[kid]
+	o.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
-	o.keys = keys
-	if k, ok := keys[kid]; ok {
-		return k, nil
+	if !ok {
+		return nil, fmt.Errorf("no key %q", kid)
 	}
-	return nil, fmt.Errorf("no key %q", kid)
+	return k, nil
+}
+
+// cached answers from the cache alone. done is false when only a fetch can say.
+func (o *OIDC) cached(kid string) (key *rsa.PublicKey, done bool, err error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if k, ok := o.keys[kid]; ok {
+		return k, true, nil
+	}
+	if !o.fetched.IsZero() && time.Since(o.fetched) < keyRefresh {
+		return nil, true, fmt.Errorf("no key %q", kid)
+	}
+	return nil, false, nil
 }
 
 func (o *OIDC) fetch(ctx context.Context) (map[string]*rsa.PublicKey, error) {

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -80,11 +79,16 @@ func TestAClearedRecordIsReplacedThroughATemporaryFileNotInPlace(t *testing.T) {
 	if err := s.Put(ctx, Record{Hash: h64, Complete: true, Source: "ci"}); err != nil {
 		t.Fatal(err)
 	}
-	// A directory squatting on the temporary name makes the temp write fail. An
-	// in-place write would ignore it and truncate the live record.
-	if err := os.Mkdir(filepath.Join(dir, h64+".json.tmp"), 0o750); err != nil {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores directory permissions, so a temporary file cannot be made to fail")
+	}
+	// A directory nothing can be created in makes the temporary file fail. An
+	// in-place write would ignore that, since the record file itself is writable,
+	// and truncate the live record.
+	if err := os.Chmod(dir, 0o500); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o750) })
 	if err := s.Clear(ctx, h64, "dev"); err == nil {
 		t.Fatal("clear succeeded although the stub could not be written")
 	}

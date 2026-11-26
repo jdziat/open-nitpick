@@ -71,12 +71,45 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// One server per directory: see FileStore.Lock.
+	if err := store.Lock(); err != nil {
+		log.Fatalf("nitpick-notary: %v (run one server per data directory)", err)
+	}
 	srvHandler := notary.New(store, tokens, *allowClear)
 	if *audience != "" {
 		srvHandler.WithOIDC(&notary.OIDC{Issuer: *issuer, Audience: *audience, Allow: rules, JWKSURL: *jwks})
 	}
 	h := srvHandler
-	srv := &http.Server{Addr: *addr, Handler: h, ReadHeaderTimeout: 10 * time.Second}
+	srv := newServer(*addr, h, defaultLimits)
 	log.Printf("nitpick-notary listening on %s, data in %s", *addr, *dir)
 	log.Fatal(srv.ListenAndServe())
+}
+
+// connLimits bound how long one connection may hold a goroutine and a file
+// descriptor. Without them a client with no token can open connections, send
+// one request each, and never close them: the server answers every one and then
+// waits on them for ever, until it has no descriptors left for anyone else.
+type connLimits struct {
+	// header is the time to read a request's headers.
+	header time.Duration
+	// read is the time to read a whole request, body included. A record can be
+	// tens of megabytes, so it is generous, and it ends a client that sends the
+	// headers and stalls.
+	read time.Duration
+	// write is the time to answer.
+	write time.Duration
+	// idle is how long a kept-alive connection may wait for its next request.
+	idle time.Duration
+}
+
+var defaultLimits = connLimits{header: 10 * time.Second, read: 2 * time.Minute, write: 2 * time.Minute, idle: 60 * time.Second}
+
+// newServer is the one place the HTTP server is configured, so a test can drive
+// the limits with real sockets.
+func newServer(addr string, h http.Handler, l connLimits) *http.Server {
+	return &http.Server{
+		Addr: addr, Handler: h,
+		ReadHeaderTimeout: l.header, ReadTimeout: l.read, WriteTimeout: l.write, IdleTimeout: l.idle,
+		MaxHeaderBytes: 64 << 10,
+	}
 }

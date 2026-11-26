@@ -66,7 +66,7 @@ code demonstrates. The evidence after each is a band, not a count: run
 - Wrap an error you are formatting into a new one with %w, not %v or %s. (every site of 300+ places)
 - Call t.Helper() at the top of a test helper. (every site of 200+ places)
 - Name Python functions and methods in snake_case. (every site of 100+ places)
-- Return named results explicitly; do not use a bare return. (every site of 60+ places)
+- Return named results explicitly; do not use a bare return. (every site of 70+ places)
 
 1 probe(s) have sites here and do not clear the floor, so they are not rules: python-class-pascal-case. `nitpick standards` has their counts.
 

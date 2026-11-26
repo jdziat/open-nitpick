@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,8 @@ import (
 
 	"github.com/nitpick-oss/nitpick/internal/bundle"
 	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/jev"
+	"github.com/nitpick-oss/nitpick/internal/llm"
 	"github.com/nitpick-oss/nitpick/internal/wire"
 )
 
@@ -98,6 +101,13 @@ type notarySession struct {
 	gap bool
 	// putFailed is set while the last write to the notary has not landed.
 	putFailed bool
+	// putFailures counts writes that failed in a row.
+	putFailures int
+	// serveUnusable is true when the record was complete at arm time. A
+	// finished review made every retry in it, so a replay must make them too and
+	// they must cost nothing. In an interrupted record they are skipped, so the
+	// request is asked again and a failure is not replayed forever.
+	serveUnusable bool
 }
 
 func newNotarySession(store wire.Store, log *slog.Logger, by string) *notarySession {
@@ -152,6 +162,7 @@ func (n *notarySession) arm(ctx context.Context, in wire.Inputs, effort string, 
 	}
 	if rec.Complete {
 		n.status.Mode = NotaryReplayed
+		n.serveUnusable = true
 		n.rec.Complete, n.rec.Batches, n.rec.Created = true, rec.Batches, rec.Created
 		n.status.Complete = true
 		return
@@ -169,6 +180,14 @@ func (n *notarySession) fail(err error) {
 	n.writable = false
 	n.log.Warn("notary unavailable; this review is unofficial", "error", err)
 }
+
+// maxPutFailures is how many writes in a row may fail before the notary is
+// treated as gone for the rest of the review.
+const maxPutFailures = 3
+
+// unusableMark prefixes a stored response the caller rejected or retried. A
+// usable one is a JSON object, so the prefix cannot be mistaken for one.
+const unusableMark = "!"
 
 // slot names the n-th answer to one request. Identical requests are separate
 // answers: review.votes asks the same question several times to compare the
@@ -194,9 +213,13 @@ func (n *notarySession) Lookup(_ context.Context, key string) (*llms.Response, b
 		if n.used[name] {
 			continue
 		}
+		body, unusable := strings.CutPrefix(raw, unusableMark)
+		if unusable && !n.serveUnusable {
+			continue
+		}
 		n.used[name] = true
 		var resp llms.Response
-		if json.Unmarshal([]byte(raw), &resp) != nil {
+		if json.Unmarshal([]byte(body), &resp) != nil {
 			// An answer that does not decode costs a request, never a wrong
 			// answer.
 			return nil, false
@@ -207,7 +230,7 @@ func (n *notarySession) Lookup(_ context.Context, key string) (*llms.Response, b
 }
 
 // Record implements llm.Ledger.
-func (n *notarySession) Record(ctx context.Context, key string, resp *llms.Response) {
+func (n *notarySession) Record(ctx context.Context, key string, resp *llms.Response, usable bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if !n.armed {
@@ -217,7 +240,17 @@ func (n *notarySession) Record(ctx context.Context, key string, resp *llms.Respo
 	if n.status.Mode == NotaryUnreachable {
 		return
 	}
-	raw, err := json.Marshal(resp)
+	stored := resp
+	if !usable {
+		// What a caller needs to repeat its retry is the finish reason, the
+		// content and the usage. The reasoning text of an attempt that ran to
+		// the cap is tens of kilobytes nobody reads.
+		trimmed := *resp
+		trimmed.Reasoning = nil
+		trimmed.SearchResults = nil
+		stored = &trimmed
+	}
+	raw, err := json.Marshal(stored)
 	if err != nil {
 		// The answer is missing from the record, so the record must never be
 		// called complete: that would attest to answers it does not hold.
@@ -233,7 +266,11 @@ func (n *notarySession) Record(ctx context.Context, key string, resp *llms.Respo
 		}
 	}
 	name := slot(key, i)
-	n.rec.Answers[name] = string(raw)
+	if usable {
+		n.rec.Answers[name] = string(raw)
+	} else {
+		n.rec.Answers[name] = unusableMark + string(raw)
+	}
 	n.used[name] = true
 	// A replayed record that took a live call is a different review from the
 	// one that was recorded, so it can no longer be called complete.
@@ -258,9 +295,20 @@ func (n *notarySession) put(ctx context.Context) {
 			n.writable = false
 			return
 		}
+		// Each write runs under the session lock and ends only when the
+		// client's own timeout does, so a notary that has stopped answering
+		// would cost every later answer a timeout of its own, in turn. A few
+		// failures in a row are enough to call it gone.
+		n.putFailures++
+		if n.putFailures >= maxPutFailures {
+			n.writable = false
+			n.log.Warn("notary stopped answering; no more answers will be recorded in this review", "error", err)
+			return
+		}
 		n.log.Warn("notary did not keep an answer", "error", err)
 		return
 	}
+	n.putFailures = 0
 	n.status.Recorded++
 	// Every write carries the whole record, so a later one that lands has
 	// stored what the failed one would have. Leaving the error would withhold
@@ -359,4 +407,39 @@ func (e *Engine) beginNotary(ctx context.Context, prContext string, plan *bundle
 	s := session.snapshot()
 	e.log().Info("notary", "mode", string(s.Mode), "hash", shortHash(s.Hash), "answers", len(session.rec.Answers))
 	return session
+}
+
+// ledgerDecider puts the review.jev decision model behind the notary. That
+// model is not an llm.Client, so the ledger that wraps clients never sees it,
+// and a replay would ask it again and could come back with other scores: a
+// replay that says something the recorded review did not. Its answers are
+// recorded in the same session, under a key no client request shares.
+type ledgerDecider struct {
+	inner  Decider
+	ledger llm.Ledger
+	model  string
+}
+
+func (d ledgerDecider) Classify(ctx context.Context, state string) (jev.Scores, error) {
+	sum := sha256.Sum256([]byte(d.model + "\x00" + state))
+	key := "jev:" + hex.EncodeToString(sum[:])
+	if resp, ok := d.ledger.Lookup(ctx, key); ok {
+		var scores jev.Scores
+		if json.Unmarshal([]byte(resp.Content), &scores) == nil {
+			return scores, nil
+		}
+		// An answer that does not decode costs a request, never a wrong one.
+	}
+	scores, err := d.inner.Classify(ctx, state)
+	if err != nil {
+		// A failed request is not an answer: the finding is kept and the stage
+		// reports the failure, so the record is not complete and a resume asks.
+		return nil, err
+	}
+	raw, merr := json.Marshal(scores)
+	if merr != nil {
+		return scores, nil
+	}
+	d.ledger.Record(ctx, key, &llms.Response{Content: string(raw), FinishReason: llms.FinishReasonStop}, true)
+	return scores, nil
 }

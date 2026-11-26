@@ -3014,3 +3014,176 @@ at once, so the entry does not say which of them costs the precision. Some false
 positives read as real defects the golden set does not list, which costs every
 reviewer including Mira. Rerunning Mira three more times moved its pooled F1 from
 0.499 to 0.512.
+
+## Notary replay and resume against a fixture model (2026-11-25)
+
+A notary stores the model answers of a review under a hash of its inputs, so the
+same inputs replay them and an interrupted review asks only for what is missing
+([Notary](notary.md)). This measures what that changes about a review's cost and
+repeatability. It does not measure review quality: the model is a local fixture
+that answers one finding per file, so nothing here says what a real model would
+find or how often real runs repeat the same inputs.
+
+Method. `TestNotaryBenchmarkComparesReplayAgainstNoNotary` in `cmd/nitpick` runs the real `review` command in
+process against a notary server and the fixture model over loopback, in a git
+repository whose working tree changes 1, 4 or 16 files, one batch each
+(`review.max_files_per_request: 1`). Each size runs at a model latency of 0 and
+200 ms, five replicates per cell, and every replicate runs every arm in turn
+(Rule 2): no notary, a notary on its first review, a replay, and `-fresh`. Model
+requests are counted by the fixture server, not by the engine. A run that
+returns anything but one finding per file fails the harness, and a replay that
+reports anything but `replayed` with a nonzero count of replayed answers fails
+it too (Rule 10). Dollar cost is not reported: the fixture has no price, so it is
+unknown (Rule 11).
+
+| files | arm | model requests | wall, free model (ms) | wall, 200 ms model (ms) |
+|---|---|---|---|---|
+| 1 | no notary | 2 | 17 (15-21) | 421 (419-423) |
+| 1 | notary, first review | 2 | 21 (20-26) | 425 (424-426) |
+| 1 | notary, replay | **0** | 17 (15-19) | 18 (17-19) |
+| 1 | notary, `-fresh` | 2 | 23 (20-25) | 426 (422-426) |
+| 4 | no notary | 5 | 19 (17-24) | 420 (419-424) |
+| 4 | notary, first review | 5 | 30 (24-31) | 432 (429-433) |
+| 4 | notary, replay | **0** | 21 (16-34) | 22 (20-24) |
+| 4 | notary, `-fresh` | 5 | 34 (27-40) | 430 (428-434) |
+| 16 | no notary | 17 | 32 (30-36) | 1038 (1030-1039) |
+| 16 | notary, first review | 17 | 57 (50-69) | 1067 (1064-1070) |
+| 16 | notary, replay | **0** | 29 (26-31) | 27 (24-30) |
+| 16 | notary, `-fresh` | 17 | 66 (61-69) | 1069 (1060-1085) |
+
+Medians, with the range of five in parentheses. Requests are one per file plus
+one triage request, identical in all five replicates of every cell. All 30
+replays in the table made 0 requests at the server, and every one's findings were
+identical to the review it replayed.
+
+A replay costs what a review costs with the model removed: with a free model it
+matches the no-notary arm (17 against 17, 21 against 19, 29 against 32 ms), and
+with a 200 ms model it takes 18, 22 and 27 ms against 421, 420 and 1038. How much
+wall time that saves is the model's latency times its batches, so the 200 ms is a
+free parameter of this table and no ratio is claimed.
+
+Recording costs time. A first review with a notary against none is separated by
+the ranges in four of the six size and latency pairs, at +4, +12, +25 and +29 ms
+in the medians (1 file and 200 ms; 4 files and 200 ms; 16 files at 0 and at 200
+ms), and the ranges overlap in the other two (1 and 4 files against a free
+model). That is about 1.5 to 2.4 ms per recorded answer over loopback, which a
+real network round trip would raise: each answer is a write of the whole record.
+`-fresh` costs a first review plus one clear (23, 34 and 66 ms against 21, 30
+and 57 with a free model). A record is 1240, 3064 and 10361 bytes for 2, 5 and
+17 answers of one line each; real answers are larger, and that is not measured.
+
+Repeatability. With a model that answers differently every time, five reviews of
+one change without a notary produced 5 distinct finding sets. Five reviews of it
+with a notary produced 1: one live review and four replays, each with 0 requests.
+The model's drift is built in, so this shows the mechanism and says nothing about
+how much a real model drifts.
+
+Resume. When the model loses every review answer after the first K, the second
+run of the same review asks it 3 times with a notary and 5 without at 4 files
+(K = 2), and 9 times against 17 at 16 files (K = 8): the missing batches and the
+triage request, against the whole review. Both second runs finished.
+
+Limits. A fixture model, loopback, one process, five replicates per cell. The
+first run of this harness compared empty finding sets, because the fixture read
+the request body as raw JSON and took a path with a trailing newline, so every
+finding was discarded as anchored to a file that is not in the change; its
+equality results were void, its request counts were not, and the harness now
+fails a run with fewer findings than files. The harness fails when replay is
+broken (with `Lookup` made to always miss, the replay arm fails), but it does not
+exercise two identical requests in one review, which `review.votes` sends and a
+unit test covers. Not measured: any real model, a dollar cost, how often CI
+repeats identical inputs, and record sizes or write times beyond 16 files.
+Run it with `NITPICK_NOTARY_BENCH=1 go test ./cmd/nitpick -run TestNotaryBenchmarkComparesReplayAgainstNoNotary
+-v -timeout 30m`.
+
+## Notary replay against a real model, and the bug it found (2026-11-25)
+
+The fixture benchmark above could not show how a notary behaves against a real
+model. `scripts/bench-notary-real.py` reviews two changes from this repository's
+history with `deepseek/deepseek-v4.1-flash` through OpenRouter: `fc0ec89`, 3
+files and 47 added lines, and `765e711`, 7 files and 1024 added lines. Per
+change, in one run (Rule 2): three reviews with no notary, a first review with
+one, three replays, and one `-fresh` review, interleaved. Requests, tokens and
+cost are what the provider reported, never estimated (Rule 11). The script was
+run twice, before and after a fix to the notary, and both runs are kept.
+
+Before the fix, the replays of the 1024-line change were not free: each of the 3
+made 1 live request, which cost $0.0115, $0.0096 and $0.0096 and took 106.8,
+71.0 and 93.1 seconds, while the notary reported them `replayed` with a complete
+record. The model had spent its whole output budget thinking and returned an
+empty answer cut at the cap, so the client retried with reasoning off; the
+ledger recorded only the retry, and a replay asked for the capped attempt again.
+The replays of the 3-file change made 0 requests, because that model did not hit
+the cap there. The mode and the record said nothing was wrong, which is why a
+test that counts requests at the provider, not a status the engine writes about
+itself, found it.
+
+After the fix (`internal/llm/ledger.go`: every response is recorded and one the
+caller cannot use is marked, a finished record serves it, an interrupted record
+skips it), all 6 replays made 0 requests, cost $0 and took 0.1 seconds, and each
+replay's findings were identical to the review it replayed, including the replay
+of the `-fresh` review, whose findings differed from the first review's.
+
+Five live reviews of the 1024-line change produced 5 distinct finding sets in
+each run, with 3, 4, 1, 1 and 4 findings before the fix and 3, 4, 4, 4 and 2
+after. Without a notary the same change gets a different review each time; with
+one, every review after the first is the first. A live review cost between
+$0.005 and $0.053 on the small change and between $0.014 and $0.029 on the
+large, and took between 23 and 158 seconds, so a replay saved about $0.02 and
+about 90 seconds at these sizes. What recording costs cannot be resolved here:
+the spread of a model call's wall time, tens of seconds, is a thousand times the
+milliseconds the fixture benchmark measured.
+
+Limits. One model, two changes, three to five reviews of each, one run of each
+kind. The small change produced no finding in the second run, so its
+replay-equals-review and drift results are void for that run (empty equals
+empty); its cost and request results stand. Run one reported $0.2379 and run two
+$0.2417, a probe review $0.0425, and one diagnostic review whose cost was not
+recorded. The large change was chosen because a probe review of the small one
+found nothing, and the equality and drift claims rest on it alone.
+
+## Adversarial testing of the notary (2026-11-25)
+
+Each defect below was found by a test or a run against the real binaries and has
+a test that fails without its fix.
+
+| defect | measured | fixed |
+|---|---|---|
+| A retried attempt cut at the output cap was not recorded, so a replay paid for it | 1 request, about $0.01 and 71 to 107 s per replay, 3 of 3 | yes |
+| The `review.jev` decision model is not an `llm.Client`, so the ledger never saw it | a replay asked it twice and published 0 findings and withheld 2, where the review published 2 and withheld 0 | yes |
+| The server had only a header timeout: idle keep-alive and stalled-body connections were held for ever | with a descriptor limit of 100, 94 idle connections from a client with no token left every legitimate request unanswered | yes, bounded: recovery took 61 s with the idle limit at 60 s, and a client that reconnects is not stopped |
+| A corrupt record file made every later write and clear for its hash fail | a hash stuck until someone deleted the file | yes, set aside in `history/` |
+| The temporary file had a fixed name | two stores on one directory failed a write with a rename error | yes |
+| Two servers on one directory share no lock | a partial write replaced a complete record in 210 of 400 races | yes, the second server refuses to start |
+| The key cache held its lock across the network fetch | a valid token waited 1.3 s behind a 1.5 s fetch of a key it did not need; one unauthenticated request could do it each minute | yes |
+| A rule pattern that is not valid UTF-8 panicked at startup | found by fuzzing within a second | yes |
+| Each answer is written under the session lock until the client's 15 s timeout | 20 writes against a store taking 150 ms to fail took 3.0 s, which is five minutes at the real timeout | yes, three failures in a row give the notary up |
+| A full disk answered a write with the raw filesystem error | the response named the server's data directory | yes |
+
+Held up: a record made in one directory, with the config at another path, keys in
+another order, a comment added, `-v` or `-log-format json` hashes the same, and
+changing the model, the instruction, `max_files_per_request`, the persona or
+`review.slop` changes it. 40 `kill -9` of the server under 6 writers, 1506
+successful writes, left 0 undecodable records. The full-disk run stored 7
+records, failed the rest with a 500, left 0 temporary files and every stored
+record intact. 18 malformed and traversing hash forms, each with GET, PUT and
+DELETE, touched no file. A 30 MB record was accepted and a 33 MB one refused,
+with the first intact. 40 batches at concurrency 8 ran 20 times under the race
+detector, and two identical reviews at once left one complete record that
+replays with no request. The plain, `review.votes: 3`, style-pass, residual-judge
+and `fast-review` modes each replay with no request and say the same thing. 5.7
+million hash and 13 million authentication fuzz executions found no collision and
+accepted nothing unsigned. With the notary killed 2.5 s into a six-file review,
+the review took the same 7.1 s, finished all 6 findings and reported the
+failure; after the notary came back the next run replayed 2 answers, asked for 5
+and completed the record, and the one after replayed all 7 with no request.
+
+Not fixed. `-fail-on`, `review.concurrency`, `models.*.timeout` and
+`models.*.max_retries` change the record's hash although none changes what the
+model is asked, so a record made with one setting does not replay under another;
+the per-request key already makes a changed prompt miss, so these cost replays
+and protect nothing. Records are written without `fsync`, so a power loss, as
+opposed to a killed process, can lose one. `deep-review` is not tested: its
+agents make tool calls the fixture cannot. The authorization scheme must be
+written `Bearer`. One pre-existing test, `TestCancellationKeepsEveryFinding`,
+failed once under load and passed 30 of 30 when run alone.
