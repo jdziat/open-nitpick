@@ -3,12 +3,14 @@ package review
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"math"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
@@ -885,5 +887,69 @@ func TestTheReasoningTextOfAnAttemptCutAtTheCapIsNotStored(t *testing.T) {
 	}
 	if total > 2000 {
 		t.Errorf("the record is %d bytes for two one-line answers", total)
+	}
+}
+
+// slowFailingStore reads from a real store and then stops answering: every
+// write takes a while and then fails, the way a notary behind a dropped
+// network does until the client's own timeout.
+type slowFailingStore struct {
+	wire.Store
+	delay time.Duration
+	puts  atomic.Int64
+}
+
+func (s *slowFailingStore) Put(context.Context, wire.Record) error {
+	s.puts.Add(1)
+	time.Sleep(s.delay)
+	return wire.ErrUnreachable
+}
+
+func TestANotaryThatStopsAnsweringCostsTheReviewOneTimeoutNotOnePerAnswer(t *testing.T) {
+	store := &slowFailingStore{Store: fileStore(t), delay: 150 * time.Millisecond}
+	s, _ := armedSession(t, store, &scriptedLLM{})
+	started := time.Now()
+	var wg sync.WaitGroup
+	for i := range 20 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.Record(context.Background(), fmt.Sprintf("k%d", i), &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop}, true)
+		}()
+	}
+	wg.Wait()
+	took := time.Since(started)
+	// Unbounded, 20 writes in turn is 20 x 150ms. A few failures are enough to
+	// know the notary is gone.
+	if took > 1200*time.Millisecond {
+		t.Errorf("20 answers took %v against a notary that stopped answering (%d writes tried): each one waited its own timeout in turn", took, store.puts.Load())
+	}
+	if st := s.snapshot(); st.Err == "" {
+		t.Error("the failure was not reported")
+	}
+}
+
+// everyThirdWriteLands fails two writes and lets the third through, so a
+// notary that is flaky but alive never fails three in a row.
+type everyThirdWriteLands struct {
+	wire.Store
+	n atomic.Int64
+}
+
+func (s *everyThirdWriteLands) Put(ctx context.Context, r wire.Record) error {
+	if s.n.Add(1)%3 != 0 {
+		return wire.ErrUnreachable
+	}
+	return s.Store.Put(ctx, r)
+}
+
+func TestAFlakyNotaryThatNeverFailsThreeInARowIsNotGivenUpOn(t *testing.T) {
+	store := &everyThirdWriteLands{Store: fileStore(t)}
+	s, _ := armedSession(t, store, &scriptedLLM{})
+	for i := range 30 {
+		s.Record(context.Background(), fmt.Sprintf("k%d", i), &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop}, true)
+	}
+	if st := s.snapshot(); st.Recorded != 10 {
+		t.Errorf("%d of 30 writes landed, want the 10 that the store accepted: the breaker opened on failures that were not consecutive", st.Recorded)
 	}
 }

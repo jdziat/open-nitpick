@@ -101,6 +101,8 @@ type notarySession struct {
 	gap bool
 	// putFailed is set while the last write to the notary has not landed.
 	putFailed bool
+	// putFailures counts writes that failed in a row.
+	putFailures int
 	// serveUnusable is true when the record was complete at arm time. A
 	// finished review made every retry in it, so a replay must make them too and
 	// they must cost nothing. In an interrupted record they are skipped, so the
@@ -178,6 +180,10 @@ func (n *notarySession) fail(err error) {
 	n.writable = false
 	n.log.Warn("notary unavailable; this review is unofficial", "error", err)
 }
+
+// maxPutFailures is how many writes in a row may fail before the notary is
+// treated as gone for the rest of the review.
+const maxPutFailures = 3
 
 // unusableMark prefixes a stored response the caller rejected or retried. A
 // usable one is a JSON object, so the prefix cannot be mistaken for one.
@@ -289,9 +295,20 @@ func (n *notarySession) put(ctx context.Context) {
 			n.writable = false
 			return
 		}
+		// Each write runs under the session lock and ends only when the
+		// client's own timeout does, so a notary that has stopped answering
+		// would cost every later answer a timeout of its own, in turn. A few
+		// failures in a row are enough to call it gone.
+		n.putFailures++
+		if n.putFailures >= maxPutFailures {
+			n.writable = false
+			n.log.Warn("notary stopped answering; no more answers will be recorded in this review", "error", err)
+			return
+		}
 		n.log.Warn("notary did not keep an answer", "error", err)
 		return
 	}
+	n.putFailures = 0
 	n.status.Recorded++
 	// Every write carries the whole record, so a later one that lands has
 	// stored what the failed one would have. Leaving the error would withhold
