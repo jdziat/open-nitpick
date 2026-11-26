@@ -77,6 +77,28 @@ decides the role. `*` matches any run of characters, `/` and `:` included. A
 subject no rule matches is refused, so an empty list admits nobody, and the
 two flags must be given together. Static tokens keep working beside it.
 
+## Limits
+
+One server may run on a data directory: it takes an exclusive lock, and a second
+exits with a message saying so, because the rule that a partial record never
+replaces a complete one is kept by a lock inside the process. The server closes
+a connection that is idle for 60 seconds or that takes two minutes to send a
+request, which bounds an outage from connections held open and does not stop a
+client that reconnects: put a proxy in front of it, or limit connections per
+address.
+
+A record file that cannot be decoded is set aside in `history/` by the next
+write or clear, and reading it is an error. A store error is logged on the
+server and the client is told only that the store could not be used.
+
+A review gives the notary up after three failed writes in a row, and is then
+unofficial. The `review.jev` decision model is recorded with the rest.
+
+The hash covers the whole resolved configuration, so `-fail-on`,
+`review.concurrency` and a model's timeout or retries change it, and a record
+made under one setting is not replayed under another. Each request is also keyed
+by its own content, so a changed prompt is always asked again.
+
 ## Using one
 
 ```sh
