@@ -111,7 +111,7 @@ only.
 ### Kubernetes
 
 ```sh
-helm install notary oci://ghcr.io/nitpick-oss/charts/nitpick-notary --version 2.9.0 \
+helm install notary oci://ghcr.io/nitpick-oss/charts/nitpick-notary \
   --set 'tokens[0].name=ci' --set 'tokens[0].role=authoritative' --set 'tokens[0].hash=<64 hex>'
 ```
 
