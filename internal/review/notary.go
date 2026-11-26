@@ -19,6 +19,8 @@ import (
 
 	"github.com/nitpick-oss/nitpick/internal/bundle"
 	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/jev"
+	"github.com/nitpick-oss/nitpick/internal/llm"
 	"github.com/nitpick-oss/nitpick/internal/wire"
 )
 
@@ -388,4 +390,39 @@ func (e *Engine) beginNotary(ctx context.Context, prContext string, plan *bundle
 	s := session.snapshot()
 	e.log().Info("notary", "mode", string(s.Mode), "hash", shortHash(s.Hash), "answers", len(session.rec.Answers))
 	return session
+}
+
+// ledgerDecider puts the review.jev decision model behind the notary. That
+// model is not an llm.Client, so the ledger that wraps clients never sees it,
+// and a replay would ask it again and could come back with other scores: a
+// replay that says something the recorded review did not. Its answers are
+// recorded in the same session, under a key no client request shares.
+type ledgerDecider struct {
+	inner  Decider
+	ledger llm.Ledger
+	model  string
+}
+
+func (d ledgerDecider) Classify(ctx context.Context, state string) (jev.Scores, error) {
+	sum := sha256.Sum256([]byte(d.model + "\x00" + state))
+	key := "jev:" + hex.EncodeToString(sum[:])
+	if resp, ok := d.ledger.Lookup(ctx, key); ok {
+		var scores jev.Scores
+		if json.Unmarshal([]byte(resp.Content), &scores) == nil {
+			return scores, nil
+		}
+		// An answer that does not decode costs a request, never a wrong one.
+	}
+	scores, err := d.inner.Classify(ctx, state)
+	if err != nil {
+		// A failed request is not an answer: the finding is kept and the stage
+		// reports the failure, so the record is not complete and a resume asks.
+		return nil, err
+	}
+	raw, merr := json.Marshal(scores)
+	if merr != nil {
+		return scores, nil
+	}
+	d.ledger.Record(ctx, key, &llms.Response{Content: string(raw), FinishReason: llms.FinishReasonStop}, true)
+	return scores, nil
 }

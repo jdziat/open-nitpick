@@ -60,6 +60,14 @@ func keepAfterJev(threshold float64, s jev.Scores) bool { return s.Defect() >= t
 // decider returns the engine's own Decider, or builds a client from
 // review.jev. The error says what is missing and is for the log, not the report.
 func (e *Engine) decider() (Decider, error) {
+	d, err := e.rawDecider()
+	if err != nil || e.notarySess == nil {
+		return d, err
+	}
+	return ledgerDecider{inner: d, ledger: e.notarySess, model: e.Config.Review.Jev.Model}, nil
+}
+
+func (e *Engine) rawDecider() (Decider, error) {
 	if e.Decider != nil {
 		return e.Decider, nil
 	}
