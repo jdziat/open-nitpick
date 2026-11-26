@@ -1,0 +1,276 @@
+# Tests for website/install.ps1: runs the script against a fake release server
+# and checks what it installs and what it refuses.
+#
+#   pwsh -NoProfile -File scripts/test-install-ps1.ps1
+#   powershell -NoProfile -File scripts/test-install-ps1.ps1   (Windows PowerShell 5.1)
+#
+# The script under test runs in a child process, so its exit code is what a user
+# sees. It runs in test mode (NITPICK_INSTALL_TEST), which skips the operating
+# system check and does not run the file it installs: the file is a stand-in.
+
+param(
+    [string]$Script = (Join-Path $PSScriptRoot '..\website\install.ps1')
+)
+
+$ErrorActionPreference = 'Stop'
+$Script = (Resolve-Path $Script).Path
+$isWin = ($PSVersionTable.PSEdition -ne 'Core') -or $IsWindows
+$shell = (Get-Process -Id $PID).Path
+$version = 'v9.9.9'
+$asset = "nitpick_${version}_windows_amd64.exe"
+$failures = New-Object System.Collections.ArrayList
+
+# Write-Information with Continue shows in every host.
+function Say([string]$Text) {
+    Write-Information -MessageData $Text -InformationAction Continue
+}
+
+function Check([bool]$Condition, [string]$Name, [string]$Detail = '') {
+    # Positional for the first two, named for the third: the call sites read as a sentence.
+    if ($Condition) {
+        Say "ok      $Name"
+    } else {
+        Say "FAILED  $Name"
+        if ($Detail) { Say ($Detail -replace '(?m)^', '        ') }
+        [void]$failures.Add($Name)
+    }
+}
+
+function Get-Sha([byte[]]$Bytes) {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { return ([System.BitConverter]::ToString($sha.ComputeHash($Bytes)) -replace '-', '').ToLowerInvariant() } finally { $sha.Dispose() }
+}
+
+# A server for the fake release, running in its own runspace. The port is found
+# by binding, with retries, and not by reserving one and releasing it: another
+# process could take a released port before the listener binds it.
+$listener = $null
+foreach ($attempt in 1..30) {
+    $port = Get-Random -Minimum 20000 -Maximum 60000
+    $candidate = [System.Net.HttpListener]::new()
+    $candidate.Prefixes.Add("http://127.0.0.1:$port/")
+    try { $candidate.Start(); $listener = $candidate; break } catch { $candidate.Close() }
+}
+if (-not $listener) { throw 'could not bind a port for the fake release server' }
+$base = "http://127.0.0.1:$port"
+$state = [hashtable]::Synchronized(@{
+    files  = [hashtable]::Synchronized(@{})
+    log    = [System.Collections.ArrayList]::Synchronized((New-Object System.Collections.ArrayList))
+    latest = ''
+})
+$server = [powershell]::Create()
+[void]$server.AddScript({
+    param($listener, $state)
+    while ($listener.IsListening) {
+        try { $ctx = $listener.GetContext() } catch { break }
+        $path = $ctx.Request.Url.AbsolutePath
+        [void]$state.log.Add($path)
+        $body = $null; $status = 200
+        if ($path.StartsWith('/latest/')) {
+            $key = "$($state.latest)/$($path.Substring(8))"
+            if ($state.latest -and $state.files.ContainsKey($key)) { $body = $state.files[$key] } else { $status = 404 }
+        } elseif ($path.StartsWith('/dl/') -and $state.files.ContainsKey($path.Substring(4))) {
+            $body = $state.files[$path.Substring(4)]
+        } else { $status = 404 }
+        $ctx.Response.StatusCode = $status
+        if ($body -ne $null) { $ctx.Response.ContentLength64 = $body.Length; $ctx.Response.OutputStream.Write($body, 0, $body.Length) }
+        $ctx.Response.Close()
+    }
+}).AddArgument($listener).AddArgument($state)
+[void]$server.BeginInvoke()
+
+function Publish([string]$Tag) {
+    $bin = [System.Text.Encoding]::UTF8.GetBytes("stand-in for nitpick $Tag")
+    $name = "nitpick_${Tag}_windows_amd64.exe"
+    $state.files["$Tag/$name"] = $bin
+    $state.files["$Tag/$name.sigstore.json"] = [System.Text.Encoding]::UTF8.GetBytes('{"bundle":"x"}')
+    $state.files["$Tag/checksums.txt"] = [System.Text.Encoding]::UTF8.GetBytes("$(Get-Sha $bin)  $name`n")
+    return $bin
+}
+
+function Clear-FakeRelease { $state.files.Clear(); $state.log.Clear(); $state.latest = '' }
+
+# Runs the script and returns its exit code, its output, and the install directory.
+function Invoke-Install([hashtable]$Env = @{}, [string]$Path = $env:PATH) {
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ('nitpick-test-' + [guid]::NewGuid().ToString('N'))
+    $vars = @{
+        INSTALL_DIR = $dir; NITPICK_INSTALL_TEST = '1'; NITPICK_RELEASE_BASE = "$base/dl"
+        NITPICK_LATEST_BASE = "$base/latest"; VERSION = ''; NITPICK_TEST_ARCH = ''; PATH = $Path
+    }
+    foreach ($k in $Env.Keys) { $vars[$k] = $Env[$k] }
+    $saved = @{}
+    foreach ($k in $vars.Keys) { $saved[$k] = [Environment]::GetEnvironmentVariable($k); [Environment]::SetEnvironmentVariable($k, $vars[$k]) }
+    # Windows PowerShell 5.1 turns a native command's stderr into a terminating
+    # error when the preference is Stop, and a refused install writes to stderr
+    # on purpose: so the preference is Continue for this one call.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $out = (& $shell -NoProfile -NonInteractive -File $Script 2>&1 | ForEach-Object { $_.ToString() }) -join "`n"
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+        foreach ($k in $saved.Keys) { [Environment]::SetEnvironmentVariable($k, $saved[$k]) }
+    }
+    return [pscustomobject]@{ Code = $code; Out = $out; Dir = $dir; Exe = (Join-Path $dir 'nitpick.exe') }
+}
+
+function Remaining([string]$Dir) {
+    if (-not (Test-Path $Dir)) { return @() }
+    return @(Get-ChildItem -Force -Path $Dir | ForEach-Object { $_.Name })
+}
+
+try {
+    # 1. the latest release installs
+    Clear-FakeRelease; $bin = Publish $version; $state.latest = $version
+    $r = Invoke-Install
+    Check ($r.Code -eq 0) 'installs the latest release' -Detail $r.Out
+    Check ((Test-Path $r.Exe) -and ((Get-Sha ([System.IO.File]::ReadAllBytes($r.Exe))) -eq (Get-Sha $bin))) 'the installed file is the release asset'
+    Check ($r.Out -match "Installing nitpick $version \(windows/amd64\)") 'says what it is about to install'
+    Check ((@(Remaining $r.Dir)).Count -eq 1) 'leaves only nitpick.exe in the directory' -Detail ((Remaining $r.Dir) -join ', ')
+
+    # 2. a pinned version skips the lookup, with or without the v
+    Clear-FakeRelease; [void](Publish 'v9.8.0'); [void](Publish $version); $state.latest = $version
+    foreach ($pin in 'v9.8.0', '9.8.0') {
+        $r = Invoke-Install @{ VERSION = $pin }
+        Check ($r.Code -eq 0 -and $r.Out -match 'v9\.8\.0') "VERSION=$pin installs that version" -Detail $r.Out
+    }
+    Check (-not ($state.log -contains '/latest/checksums.txt')) 'a pinned install never asks for the latest'
+
+    # 3. a tampered asset is refused and nothing is installed
+    Clear-FakeRelease; [void](Publish $version); $state.latest = $version
+    $state.files["$version/$asset"] = [System.Text.Encoding]::UTF8.GetBytes('owned')
+    $r = Invoke-Install
+    Check ($r.Code -ne 0 -and $r.Out -match 'checksum mismatch') 'a tampered asset is refused' -Detail $r.Out
+    Check ((@(Remaining $r.Dir)).Count -eq 0) 'a refused install leaves nothing behind' -Detail ((Remaining $r.Dir) -join ', ')
+
+    # 4. a tampered checksums.txt
+    Clear-FakeRelease; [void](Publish $version); $state.latest = $version
+    $state.files["$version/checksums.txt"] = [System.Text.Encoding]::UTF8.GetBytes(("0" * 64) + "  $asset`n")
+    $r = Invoke-Install
+    Check ($r.Code -ne 0 -and $r.Out -match 'checksum mismatch') 'a tampered checksums.txt is refused' -Detail $r.Out
+    Check ((@(Remaining $r.Dir)).Count -eq 0) 'nothing is installed after a refused checksums.txt'
+
+    # 5. an asset with no checksum of its own: other files, similar names, wrong case
+    Clear-FakeRelease; $bin = Publish $version; $state.latest = $version
+    $good = Get-Sha $bin
+    $state.files["$version/checksums.txt"] = [System.Text.Encoding]::UTF8.GetBytes("$good  $asset.sigstore.json`n$good  x$asset`n$good  $($asset.ToUpper())`n")
+    # Pinned, so the lookup of the latest version (which reads this same file and
+    # has its own refusal) is skipped and the per-asset check is what runs.
+    $r = Invoke-Install @{ VERSION = $version }
+    Check ($r.Code -ne 0 -and $r.Out -match 'does not list') 'a checksum under a similar name does not count' -Detail $r.Out
+
+    # 6. a refused install leaves an older binary as it was
+    Clear-FakeRelease; [void](Publish $version); $state.latest = $version
+    $state.files["$version/$asset"] = [System.Text.Encoding]::UTF8.GetBytes('tampered')
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ('nitpick-test-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $dir | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $dir 'nitpick.exe'), 'the old binary')
+    $r = Invoke-Install @{ INSTALL_DIR = $dir }
+    Check ($r.Code -ne 0 -and ([System.IO.File]::ReadAllText((Join-Path $dir 'nitpick.exe')) -eq 'the old binary')) 'a refused install keeps the old binary exactly' -Detail $r.Out
+
+    # 7. unsupported architectures are refused before any request
+    foreach ($a in 'Arm64', 'X86', 'Arm') {
+        Clear-FakeRelease; [void](Publish $version); $state.latest = $version
+        $r = Invoke-Install @{ NITPICK_TEST_ARCH = $a }
+        Check ($r.Code -ne 0 -and $r.Out -match 'unsupported architecture' -and $state.log.Count -eq 0 -and (@(Remaining $r.Dir)).Count -eq 0) "architecture $a is refused before any request" -Detail "$($r.Out) requests: $($state.log -join ',')"
+    }
+
+    # 8. versions that are not versions
+    foreach ($bad in 'latest', '../../x', 'v1.2.3/../../x', 'v1.2.3;id', 'v1 2', 'vv') {
+        Clear-FakeRelease; [void](Publish $version); $state.latest = $version
+        $r = Invoke-Install @{ VERSION = $bad }
+        Check ($r.Code -ne 0 -and $r.Out -match 'not a release version' -and $state.log.Count -eq 0) "VERSION='$bad' is refused before any request" -Detail $r.Out
+    }
+
+    # 9. a latest lookup that fails says how to pin a version
+    Clear-FakeRelease
+    $r = Invoke-Install
+    Check ($r.Code -ne 0 -and $r.Out -match 'VERSION') 'a failed latest lookup explains how to pin a version' -Detail $r.Out
+
+    # 9b. a latest release with no windows build, or only a lookalike, is an error
+    Clear-FakeRelease
+    $good = Get-Sha ([System.Text.Encoding]::UTF8.GetBytes('x'))
+    $state.files['v9.7.0/checksums.txt'] = [System.Text.Encoding]::UTF8.GetBytes("$good  nitpick_v9.7.0_linux_amd64`n$good  nitpick_v9.7.0_windows_amd64.exe.sigstore.json`n$good  helper_v1.0.0_windows_amd64.exe`n")
+    $state.latest = 'v9.7.0'
+    $r = Invoke-Install
+    Check ($r.Code -ne 0 -and $r.Out -match 'no build for windows/amd64' -and (@(Remaining $r.Dir)).Count -eq 0) 'a latest release with no windows build is refused' -Detail $r.Out
+
+    # 9c. an unrelated asset with the same suffix, listed first, does not set the version
+    Clear-FakeRelease; $bin = Publish $version; $state.latest = $version
+    $real = [System.Text.Encoding]::UTF8.GetString($state.files["$version/checksums.txt"])
+    $state.files["$version/checksums.txt"] = [System.Text.Encoding]::UTF8.GetBytes("$good  helper_v1.0.0_windows_amd64.exe`n$real")
+    $r = Invoke-Install
+    Check ($r.Code -eq 0 -and $r.Out -match "Installing nitpick $version") 'an unrelated asset listed first does not set the version' -Detail $r.Out
+
+    # 9d. a name in the wrong case is not an asset: the lookup is case-sensitive too
+    Clear-FakeRelease
+    $state.files['v9.6.0/checksums.txt'] = [System.Text.Encoding]::UTF8.GetBytes("$good  NITPICK_V9.6.0_WINDOWS_AMD64.EXE`n")
+    $state.latest = 'v9.6.0'
+    $r = Invoke-Install
+    Check ($r.Code -ne 0 -and $r.Out -match 'no build for windows/amd64') 'an asset name in the wrong case is not found' -Detail $r.Out
+
+    # 9e. a file that only looks like a version is not nitpick's binary
+    Clear-FakeRelease
+    $state.files['v9.5.0/checksums.txt'] = [System.Text.Encoding]::UTF8.GetBytes("$good  v1.0.0_windows_amd64.exe`n")
+    $state.latest = 'v9.5.0'
+    $r = Invoke-Install
+    Check ($r.Code -ne 0 -and $r.Out -match 'no build for windows/amd64') 'a name with no nitpick_ prefix is not the binary' -Detail $r.Out
+
+    # 10. the PATH hint appears only for a directory that is not on the PATH
+    Clear-FakeRelease; [void](Publish $version); $state.latest = $version
+    $r = Invoke-Install
+    Check ($r.Out -match 'to your PATH') 'a directory off the PATH gets a hint'
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ('nitpick-test-' + [guid]::NewGuid().ToString('N'))
+    $r = Invoke-Install @{ INSTALL_DIR = $dir } ($dir + [System.IO.Path]::PathSeparator + $env:PATH)
+    Check ($r.Code -eq 0 -and $r.Out -notmatch 'to your PATH') 'a directory already on the PATH gets none' -Detail $r.Out
+
+    # 11. cosign: present and failing stops the install; present and passing says so; absent says checksum only
+    $fakeDir = Join-Path ([System.IO.Path]::GetTempPath()) ('nitpick-cosign-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $fakeDir | Out-Null
+    function Use-FakeCosign([int]$ExitCode) {
+        if ($isWin) {
+            [System.IO.File]::WriteAllText((Join-Path $fakeDir 'cosign.cmd'), "@echo off`r`necho %* > `"$fakeDir\args.txt`"`r`nexit /b $ExitCode`r`n")
+        } else {
+            $p = Join-Path $fakeDir 'cosign'
+            [System.IO.File]::WriteAllText($p, "#!/bin/sh`necho `"`$@`" > '$fakeDir/args.txt'`nexit $ExitCode`n")
+            & chmod 755 $p
+        }
+    }
+    $withFake = $fakeDir + [System.IO.Path]::PathSeparator + $env:PATH
+    Clear-FakeRelease; [void](Publish $version); $state.latest = $version
+    $r = Invoke-Install @{} $env:PATH
+    Check ($r.Code -eq 0 -and $r.Out -match 'Verified the checksum only') 'without cosign the output says only the checksum was checked' -Detail $r.Out
+    Use-FakeCosign 1
+    $r = Invoke-Install @{} $withFake
+    Check ($r.Code -ne 0 -and $r.Out -match 'signature verification failed' -and (@(Remaining $r.Dir)).Count -eq 0) 'a bad signature stops the install' -Detail $r.Out
+    Use-FakeCosign 0
+    $r = Invoke-Install @{} $withFake
+    $cargs = if (Test-Path (Join-Path $fakeDir 'args.txt')) { Get-Content -Raw (Join-Path $fakeDir 'args.txt') } else { '' }
+    Check ($r.Code -eq 0 -and $r.Out -match 'Sigstore signature' -and $r.Out -notmatch 'checksum only') 'a good signature is reported' -Detail $r.Out
+    Check ($cargs -match 'verify-blob' -and $cargs -match '--bundle' -and $cargs -match 'nitpick-oss/nitpick' -and $cargs -match 'token\.actions\.githubusercontent\.com') 'cosign is called with the release identity' -Detail $cargs
+    $state.files.Remove("$version/$asset.sigstore.json")
+    $r = Invoke-Install @{} $withFake
+    Check ($r.Code -ne 0 -and $r.Out -match 'signature bundle') 'a missing bundle stops the install when cosign is present' -Detail $r.Out
+
+    # 12. a script cut off partway runs nothing
+    $lines = Get-Content -Path $Script
+    foreach ($keep in 3, [int]($lines.Count / 2), ($lines.Count - 2)) {
+        Clear-FakeRelease; [void](Publish $version); $state.latest = $version
+        $cut = Join-Path ([System.IO.Path]::GetTempPath()) ('cut-' + [guid]::NewGuid().ToString('N') + '.ps1')
+        [System.IO.File]::WriteAllText($cut, (($lines | Select-Object -First $keep) -join "`n"))
+        $saved = $Script; $Script = $cut
+        $r = Invoke-Install
+        $Script = $saved
+        Check ($state.log.Count -eq 0 -and (@(Remaining $r.Dir)).Count -eq 0) "a script cut after $keep lines installs nothing" -Detail "$($r.Out) requests: $($state.log -join ',')"
+    }
+} finally {
+    $listener.Stop(); $listener.Close()
+    $server.Dispose()
+}
+
+if ($failures.Count -gt 0) {
+    Say "`n$($failures.Count) check(s) failed"
+    exit 1
+}
+Say "`nall checks passed"

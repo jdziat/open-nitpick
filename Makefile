@@ -72,6 +72,8 @@ docs: docs-reference
 	# production until this line. logo.jpg joined them: 94 KB of the published
 	# site that no page, template or stylesheet names.
 	cp -r website/assets .website/assets && rm -rf .website/assets/logo-candidates .website/assets/logo.jpg
+	# The install scripts are served as they are, at /install.sh and /install.ps1.
+	cp website/install.sh website/install.ps1 .website/
 	for f in $$(find .website/docs -name '*.md'); do sed -E -e 's#\]\(\.\./(internal|cmd|action|notes|\.github)/#](https://github.com/nitpick-oss/nitpick/blob/main/\1/#g' "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"; done
 	mkdocs build
 	# edit_uri is resolved against the staged path, so a page staged under a

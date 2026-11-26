@@ -1,0 +1,137 @@
+---
+name: Install scripts
+
+# Runs the install scripts for real, on each platform they support, against the
+# latest published release. The Go tests in internal/installscript cover every
+# refusal against a fake release server; this checks that an install of an
+# actual release works, that its signature verifies, and that the PowerShell
+# script passes its own tests on Windows.
+#
+# It also runs weekly, because the scripts depend on release assets that
+# change under them: a release that renames an asset breaks users, not CI.
+# yamllint disable-line rule:truthy
+on:
+  pull_request:
+    paths:
+      - website/install.sh
+      - website/install.ps1
+      - scripts/test-install-ps1.ps1
+      - .github/workflows/install.yml
+  push:
+    branches: [main]
+    paths:
+      - website/install.sh
+      - website/install.ps1
+      - scripts/test-install-ps1.ps1
+      - .github/workflows/install.yml
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unix:
+    name: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux/amd64
+          - os: ubuntu-24.04-arm
+            platform: linux/arm64
+          - os: macos-latest
+            platform: darwin/arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Piped, as a user runs it, and not as a file: the script must work
+      # when it is read from standard input.
+      - name: Install the latest release
+        env:
+          INSTALL_DIR: ${{ runner.temp }}/latest
+        run: |
+          sh < website/install.sh
+          out=$("$INSTALL_DIR/nitpick" version)
+          echo "$out"
+          case "$out" in
+            "nitpick v"*) ;;
+            *) echo "unexpected version output: $out" >&2; exit 1 ;;
+          esac
+
+      - name: Install a pinned release
+        env:
+          INSTALL_DIR: ${{ runner.temp }}/pinned
+          VERSION: v2.10.0
+        run: |
+          sh website/install.sh
+          test "$("$INSTALL_DIR/nitpick" version)" = "nitpick v2.10.0"
+
+      # The signature check against a real release: the identity the script
+      # passes to cosign must match what release.yml signed with.
+      - name: Install cosign
+        if: matrix.os == 'ubuntu-latest'
+        # yamllint disable-line rule:line-length
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532  # v3.10.1
+
+      - name: Install with the signature verified
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          INSTALL_DIR: ${{ runner.temp }}/signed
+        run: |
+          out=$(sh website/install.sh)
+          echo "$out"
+          case "$out" in
+            *"Sigstore signature"*) ;;
+            *) echo "the signature was not verified" >&2; exit 1 ;;
+          esac
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the latest release
+        shell: pwsh
+        env:
+          INSTALL_DIR: ${{ runner.temp }}\latest
+        run: |
+          ./website/install.ps1
+          $out = & "$env:INSTALL_DIR\nitpick.exe" version
+          Write-Host $out
+          if ($out -notmatch '^nitpick v') {
+            throw "unexpected version output: $out"
+          }
+
+      # The script is for the PowerShell every Windows machine has, which is
+      # 5.1, as much as for PowerShell 7, so both run the tests.
+      # The way most Windows users run it: the file's text piped into iex, in
+      # the PowerShell that ships with Windows.
+      - name: Install the latest release under Windows PowerShell 5.1
+        shell: powershell
+        env:
+          INSTALL_DIR: ${{ runner.temp }}\latest51
+        run: |
+          Get-Content -Raw ./website/install.ps1 | Invoke-Expression
+          $out = & "$env:INSTALL_DIR\nitpick.exe" version
+          Write-Host $out
+          if ($out -notmatch '^nitpick v') {
+            throw "unexpected version output: $out"
+          }
+
+      - name: Test install.ps1 under PowerShell 7
+        shell: pwsh
+        run: ./scripts/test-install-ps1.ps1
+
+      - name: Test install.ps1 under Windows PowerShell 5.1
+        shell: powershell
+        run: ./scripts/test-install-ps1.ps1

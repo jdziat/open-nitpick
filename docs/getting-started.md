@@ -8,7 +8,32 @@ the [trust model](trust-model.md) describe those boundaries.
 
 ## 1. Install the CLI
 
-Download a binary for your platform from the
+On linux or macOS:
+
+```bash
+curl -fsSL https://nitpick-oss.github.io/nitpick/install.sh | sh
+nitpick version
+```
+
+On Windows, in PowerShell:
+
+```powershell
+irm https://nitpick-oss.github.io/nitpick/install.ps1 | iex
+nitpick version
+```
+
+The script installs the latest release into `~/.local/bin` (`%LOCALAPPDATA%\Programs\nitpick`
+on Windows), and prints a line to add to your `PATH` if that directory is not on it.
+It checks the download against the release's `checksums.txt`, and its Sigstore
+signature too when `cosign` is installed, and it says which checks ran. It never
+uses `sudo`. Set `INSTALL_DIR` to put the binary elsewhere, or `VERSION=v2.10.0`
+to install a particular release.
+
+The scripts are short files you can read before running them:
+[install.sh](https://nitpick-oss.github.io/nitpick/install.sh) and
+[install.ps1](https://nitpick-oss.github.io/nitpick/install.ps1).
+
+To install by hand, download a binary for your platform from the
 [releases page](https://github.com/nitpick-oss/nitpick/releases), then put
 `nitpick` on your `PATH`.
 
