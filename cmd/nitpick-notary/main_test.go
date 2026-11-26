@@ -100,7 +100,7 @@ func TestTheLimitsDoNotRefuseAnOrdinaryRequest(t *testing.T) {
 	}
 }
 
-func FuzzTokenFlag(f *testing.F) {
+func FuzzTokenFlagAcceptsOnlyUsableTokens(f *testing.F) {
 	h := strings.Repeat("ab", 32)
 	for _, s := range []string{"ci:authoritative:x", "ci:read:sha256:" + h, "a:b:c:d:e", ":::", "ci:read:sha256:", "\x00:read:x", "ci:read:" + strings.Repeat("é", 100)} {
 		f.Add(s)

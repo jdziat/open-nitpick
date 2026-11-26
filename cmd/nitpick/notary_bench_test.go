@@ -26,7 +26,7 @@ import (
 // nothing here says anything about what a real model would find.
 //
 //	NITPICK_NOTARY_BENCH=1 NITPICK_NOTARY_BENCH_OUT=/tmp/notary-bench.json \
-//	  go test ./cmd/nitpick -run TestNotaryBenchmark -v -timeout 30m
+//	  go test ./cmd/nitpick -run TestNotaryBenchmarkComparesReplayAgainstNoNotary -v -timeout 30m
 
 const benchReps = 5
 
@@ -222,7 +222,7 @@ func span(v []int64) string {
 	return fmt.Sprintf("%d-%d", s[0], s[len(s)-1])
 }
 
-func TestNotaryBenchmark(t *testing.T) {
+func TestNotaryBenchmarkComparesReplayAgainstNoNotary(t *testing.T) {
 	if os.Getenv("NITPICK_NOTARY_BENCH") == "" {
 		t.Skip("set NITPICK_NOTARY_BENCH=1 to run the notary benchmark")
 	}

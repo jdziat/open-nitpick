@@ -3024,7 +3024,7 @@ repeatability. It does not measure review quality: the model is a local fixture
 that answers one finding per file, so nothing here says what a real model would
 find or how often real runs repeat the same inputs.
 
-Method. `TestNotaryBenchmark` in `cmd/nitpick` runs the real `review` command in
+Method. `TestNotaryBenchmarkComparesReplayAgainstNoNotary` in `cmd/nitpick` runs the real `review` command in
 process against a notary server and the fixture model over loopback, in a git
 repository whose working tree changes 1, 4 or 16 files, one batch each
 (`review.max_files_per_request: 1`). Each size runs at a model latency of 0 and
@@ -3093,7 +3093,7 @@ broken (with `Lookup` made to always miss, the replay arm fails), but it does no
 exercise two identical requests in one review, which `review.votes` sends and a
 unit test covers. Not measured: any real model, a dollar cost, how often CI
 repeats identical inputs, and record sizes or write times beyond 16 files.
-Run it with `NITPICK_NOTARY_BENCH=1 go test ./cmd/nitpick -run TestNotaryBenchmark
+Run it with `NITPICK_NOTARY_BENCH=1 go test ./cmd/nitpick -run TestNotaryBenchmarkComparesReplayAgainstNoNotary
 -v -timeout 30m`.
 
 ## Notary replay against a real model, and the bug it found (2026-11-25)
