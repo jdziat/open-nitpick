@@ -13,7 +13,14 @@ hard budget aborts the run before it can overspend.
 Needs an OpenRouter key in the keystore (nitpick auth set openrouter), a
 nitpick and a nitpick-notary binary, and spends real money.
 """
-import argparse, hashlib, itertools, json, os, subprocess, sys, tempfile, time
+import argparse
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
 
 MODEL = "deepseek/deepseek-v4.1-flash"
 CHANGES = [("small", "fc0ec89"), ("medium", "765e711")]
