@@ -144,6 +144,15 @@ func generateTyped[T any](ctx context.Context, c *Client, msgs []llms.Message, c
 			continue
 		}
 		c.logRetryOutcome(attempt, err)
+		if err != nil && c.reasoningMandatory.Load() && emptyAtLengthCap(raw) {
+			// Ended here on purpose. Left as the decode error it is, the JSON
+			// fallback would ask the same model the same question and pay for
+			// the same runaway a second time; this error names the cause,
+			// and ShouldEscalate sends the batch to the fallback model. It does
+			// not wrap the decode error: that text reads as a schema the
+			// provider ignored, which the caller answers with the same retry.
+			err = errors.New("the model hit the output cap with no content, and reasoning is mandatory for this endpoint so it cannot be turned off")
+		}
 		return value, raw, markStalled(ctx, err)
 	}
 }
@@ -195,6 +204,13 @@ func (c *Client) retryAfter(ctx context.Context, attempt int, started time.Time,
 	if os.Getenv(EnvPurchaseBudget) != "" {
 		return nil, false
 	}
+	// A refusal to turn reasoning off is final for this model, so it is
+	// learned here and never asked for again. The caller escalates on it; see
+	// ShouldEscalate.
+	if RefusesReasoningOff(err) {
+		c.reasoningMandatory.Store(true)
+		return nil, false
+	}
 	// Not a retry of the transport and not counted against its budget: it fires
 	// at most once per call, since the options sent again carry no temperature.
 	if c.RejectsTemperature(err, call) {
@@ -240,6 +256,17 @@ func (c *Client) retryAfter(ctx context.Context, attempt int, started time.Time,
 		// budget, which another identical attempt does not change; it is
 		// surfaced for escalation instead.
 		if attempt > 0 {
+			return nil, false
+		}
+		// Asking a model that cannot stop reasoning to stop is a request that
+		// is refused (glm-5.3-flash, issue #214). The empty answer is then
+		// final, and is surfaced for escalation like a second one.
+		if c.reasoningMandatory.Load() {
+			c.logger().Warn("model hit the output cap with empty content and cannot turn reasoning off; not sending again",
+				"model", c.String(),
+				"elapsed", c.now().Sub(started).Round(time.Second),
+				"completion_tokens", resp.Usage.CompletionTokens,
+				"reasoning_tokens", resp.Usage.ReasoningTokens)
 			return nil, false
 		}
 		next := emptyAnswerRetryOptions(call)

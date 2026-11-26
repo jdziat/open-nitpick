@@ -63,6 +63,11 @@ type Client struct {
 	// refusal is paid for once and not on every call.
 	noTemperature atomic.Bool
 
+	// reasoningMandatory is set once the provider has refused to turn
+	// reasoning off for this model. It is per client, like noTemperature, so
+	// a retry that cannot work is not sent again on every batch.
+	reasoningMandatory atomic.Bool
+
 	// clock replaces time.Now for the retry budget. Nil outside tests.
 	clock func() time.Time
 
@@ -517,6 +522,17 @@ func (c *Client) RejectsTemperature(err error, call []llms.CallOption) bool {
 // the same call with one was refused, so later calls leave the temperature out
 // from the start.
 func (c *Client) NoteNoTemperature() { c.noTemperature.Store(true) }
+
+// RefusesReasoningOff reports whether err is a provider's refusal to turn
+// reasoning off for the model. The refusal is final for that model: the same
+// request is refused every time.
+func RefusesReasoningOff(err error) bool {
+	return err != nil && strings.Contains(strings.ToLower(err.Error()), "reasoning is mandatory for this endpoint")
+}
+
+// ReasoningIsMandatory reports whether this client has learned that its model
+// cannot be told to stop reasoning.
+func (c *Client) ReasoningIsMandatory() bool { return c.reasoningMandatory.Load() }
 
 // WithoutTemperature returns call with its temperature unset. Options apply in
 // order, so appending the unset is enough and no earlier option is edited.

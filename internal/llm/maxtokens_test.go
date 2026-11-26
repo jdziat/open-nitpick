@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"strings"
 	"testing"
 
@@ -189,5 +190,89 @@ func TestTheCapWarningSaysWhatTheCappedCallSpent(t *testing.T) {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("log lacks %q:\n%s", want, buf.String())
 		}
+	}
+}
+
+// mandatoryLLM is a model that always reasons: an empty answer at the cap, and
+// a 400 for any request that asks it to stop.
+type mandatoryLLM struct{ calls, refused int }
+
+func (m *mandatoryLLM) GenerateContent(_ context.Context, _ []llms.Message, opts ...llms.CallOption) (*llms.Response, error) {
+	m.calls++
+	var co llms.CallOptions
+	for _, o := range opts {
+		o(&co)
+	}
+	if r, _ := co.ExtraBody["reasoning"].(map[string]any); r["enabled"] == false {
+		m.refused++
+		return nil, errors.New("API error (status 400, code 400): Reasoning is mandatory for this endpoint and cannot be disabled.")
+	}
+	return &llms.Response{Content: "", FinishReason: llms.FinishReasonLength,
+		Usage: llms.Usage{CompletionTokens: 16384, ReasoningTokens: 16384}}, nil
+}
+func (m *mandatoryLLM) Stream(context.Context, []llms.Message, ...llms.CallOption) (<-chan llms.StreamChunk, error) {
+	return nil, errors.New("not supported")
+}
+func (m *mandatoryLLM) Provider() llms.Provider { return "mandatory" }
+func (m *mandatoryLLM) Model() string           { return "mandatory" }
+
+// A model that refuses to stop reasoning is asked once, on its first batch.
+// Every later batch that ends empty at the cap goes straight to escalation
+// without a request that is refused.
+func TestAModelThatCannotStopReasoningIsNotAskedToAgain(t *testing.T) {
+	inner := &mandatoryLLM{}
+	c := NewClientForTest(inner, config.ModelSpec{Provider: "openrouter", Model: "z-ai/glm-5.3-flash"})
+	type out struct {
+		Summary string `json:"summary"`
+	}
+	msgs := []llms.Message{{Role: llms.RoleUser, Content: "hi"}}
+
+	_, first := Extract[out](context.Background(), c, msgs)
+	if !ShouldEscalate(first) {
+		t.Fatalf("first batch error %v does not escalate", first)
+	}
+	if inner.refused != 1 || !c.ReasoningIsMandatory() {
+		t.Fatalf("first batch: refused=%d mandatory=%v, want one refusal learned", inner.refused, c.ReasoningIsMandatory())
+	}
+
+	before := inner.calls
+	_, second := Extract[out](context.Background(), c, msgs)
+	if !ShouldEscalate(second) {
+		t.Errorf("second batch error %v does not escalate", second)
+	}
+	if inner.refused != 1 {
+		t.Errorf("a refused request was sent again: refused=%d", inner.refused)
+	}
+	if got := inner.calls - before; got != 1 {
+		t.Errorf("second batch made %d requests, want the one capped call and no JSON-fallback repeat", got)
+	}
+}
+
+// Rule 10: a model that allows reasoning off must keep its retry, or the
+// learned flag has silenced a recovery that works.
+func TestAModelThatAllowsReasoningOffStillGetsTheRetry(t *testing.T) {
+	inner := &emptyLLM{}
+	c := NewClientForTest(inner, config.ModelSpec{Provider: "openrouter", Model: "deepseek/deepseek-v4.1-flash"})
+	type out struct {
+		Summary string `json:"summary"`
+	}
+	for i := 0; i < 2; i++ {
+		if _, err := Extract[out](context.Background(), c, []llms.Message{{Role: llms.RoleUser, Content: "hi"}}); err != nil {
+			t.Fatalf("batch %d: %v", i, err)
+		}
+	}
+	if c.ReasoningIsMandatory() {
+		t.Error("a model that accepted reasoning off was marked mandatory")
+	}
+	// Whatever one batch sends, the next sends the same: learning nothing
+	// from a model that accepted the retry.
+	half := len(inner.offSet) / 2
+	for i := 0; i < half; i++ {
+		if inner.offSet[i] != inner.offSet[half+i] {
+			t.Fatalf("second batch sent a different sequence: %v", inner.offSet)
+		}
+	}
+	if !slices.Contains(inner.offSet, true) {
+		t.Errorf("no reasoning-off retry was ever sent: %v", inner.offSet)
 	}
 }
