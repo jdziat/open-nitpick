@@ -17,7 +17,10 @@ import (
 type HTTPStore struct {
 	base  string
 	token string
-	http  *http.Client
+	// source, when set, supplies the token per request. A CI identity token
+	// lives for minutes and a review can outlast it.
+	source func(context.Context) (string, error)
+	http   *http.Client
 }
 
 // NewHTTPStore builds a client. The base URL and token are both required.
@@ -28,13 +31,29 @@ func NewHTTPStore(base, token string) (*HTTPStore, error) {
 	return &HTTPStore{base: strings.TrimRight(base, "/"), token: token, http: &http.Client{Timeout: 15 * time.Second}}, nil
 }
 
+// NewHTTPStoreWithSource builds a client whose token is fetched for every
+// request, for credentials that expire.
+func NewHTTPStoreWithSource(base string, source func(context.Context) (string, error)) (*HTTPStore, error) {
+	if base == "" || source == nil {
+		return nil, errors.New("notary needs a URL and a token source")
+	}
+	return &HTTPStore{base: strings.TrimRight(base, "/"), source: source, http: &http.Client{Timeout: 15 * time.Second}}, nil
+}
+
 func (s *HTTPStore) do(ctx context.Context, method, hash string, body []byte, query string) (*http.Response, error) {
 	u := s.base + "/v1/records/" + hash + query
 	req, err := http.NewRequestWithContext(ctx, method, u, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("build notary request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	token := s.token
+	if s.source != nil {
+		var err error
+		if token, err = s.source(ctx); err != nil {
+			return nil, fmt.Errorf("notary token: %w", err)
+		}
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.http.Do(req)
 	if err != nil {

@@ -7,6 +7,7 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.10.7
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
 	github.com/gofrs/flock v0.13.2
+	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/go-github/v74 v74.0.0
 	github.com/google/jsonschema-go v0.4.3
 	github.com/modelcontextprotocol/go-sdk v1.8.0
@@ -24,7 +25,6 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/godbus/dbus/v5 v5.2.4 // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/google/go-github/v88 v88.0.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect

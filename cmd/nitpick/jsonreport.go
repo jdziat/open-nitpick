@@ -25,6 +25,11 @@ type jsonReport struct {
 	Learnings            review.LearningsStatus  `json:"learnings"`
 	Execution            review.ExecutionSummary `json:"execution"`
 	ReusedAnalyzerStages int                     `json:"reused_analyzer_stages,omitempty"`
+	// Notary says what the notary did. Its mode is empty only when none was
+	// configured, which is how a clean replay is told from a run that asked
+	// nothing.
+	Notary     review.NotaryStatus `json:"notary"`
+	Unofficial bool                `json:"unofficial,omitempty"`
 }
 
 // jsonFinding is one published finding.
@@ -78,6 +83,8 @@ func writeJSONReport(w io.Writer, result actionResult, report *review.Report) er
 		out.Learnings = report.Learnings
 		out.Execution = report.Execution
 		out.ReusedAnalyzerStages = report.ReusedAnalyzerStages
+		out.Notary = report.Notary
+		out.Unofficial = report.Unofficial
 		out.Complete = report.PipelineComplete() && result != resultLimit && result != resultError
 		out.FailedStages = append(out.FailedStages, report.FailedStages()...)
 		for _, f := range report.Findings {

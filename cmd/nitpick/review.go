@@ -42,6 +42,7 @@ type reviewFlags struct {
 	format              string
 	noLinters           bool
 	full                bool
+	notary              notaryFlags
 
 	// Pull request selection. When unset, these are read from the GitHub
 	// Actions environment.
@@ -172,6 +173,11 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	fs.BoolVar(&f.full, "full", false, "review the whole change even if an earlier run reviewed part of it (no incremental narrowing)")
 	fs.BoolVar(&f.verbose, "v", false, "verbose logging")
 	fs.StringVar(&f.logFormat, "log-format", "text", "log format: text or json")
+	// improve prints locally and never publishes, so there is no review for a
+	// notary to certify and these flags would name something it cannot do.
+	if name != "improve" {
+		f.notary.register(fs)
+	}
 	fs.StringVar(&f.format, "format", "text", "output: text prints the review, json prints the result and published findings as one JSON object")
 
 	// improve only. review generates at config.GenerationLevel whatever the
@@ -362,6 +368,19 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	}
 	var note string
 	switch {
+	case err == nil && report.Unofficial:
+		// Reviewed, not posted. The findings are the operator's to read, and the
+		// gate below still applies: unofficial describes the record, not the
+		// result.
+		note = "UNOFFICIAL: no notary kept this review's record, so it was not posted; the review is below instead."
+		fmt.Fprintln(os.Stderr, note)
+		if actions.active() {
+			fmt.Printf("::warning::open-nitpick: %s\n", note)
+		}
+		if perr := (&dryRunProvider{source: provider, out: textOut(&f)}).PublishReview(ctx, ref,
+			review.Render(report, report.Files, cfg)); perr != nil {
+			log.Warn("could not print the unofficial review", "error", perr)
+		}
 	case err == nil:
 	case errors.Is(err, review.ErrPublish) && report != nil:
 		// The review happened; only the delivery failed. Print it where the
@@ -522,6 +541,9 @@ func newEngine(ctx context.Context, f *reviewFlags, repo string, cfg *config.Con
 	engine.Rounds = roundsOverride(f)
 	engine.Resume = true
 	engine.RepoRoot = repo
+	if err := f.notary.apply(engine); err != nil {
+		return nil, err
+	}
 
 	// Built per review from the resolved policy for the same reason. The
 	// analyzers read review.ignore themselves, so a change that edits.

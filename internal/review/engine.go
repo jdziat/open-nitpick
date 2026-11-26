@@ -28,6 +28,7 @@ import (
 	"github.com/nitpick-oss/nitpick/internal/practices"
 	"github.com/nitpick-oss/nitpick/internal/prompt"
 	"github.com/nitpick-oss/nitpick/internal/vcs"
+	"github.com/nitpick-oss/nitpick/internal/wire"
 )
 
 // Engine reviews changes. It is the library the CLI drives, and the same one a
@@ -163,11 +164,32 @@ type Engine struct {
 	Resume   bool
 	progress *reviewProgress
 
+	// Notary keeps the model answers of a review under a hash of its inputs.
+	// Nil is no notary, which is not the same as one that was unreachable:
+	// the report says which.
+	Notary wire.Store
+
+	// NotarySource names who writes the record, for the history it keeps.
+	NotarySource string
+
+	// Fresh clears the record for these inputs before the review, so the
+	// models are asked again. Meaningless without a Notary.
+	Fresh bool
+
+	// RequireNotary withholds publishing a review that did not go through a
+	// notary that kept its record. Off, an unofficial review still publishes,
+	// because a repository that never configured a notary has nothing to
+	// require; on, it is labelled UNOFFICIAL and goes nowhere but the report.
+	RequireNotary bool
+
 	// standingOnly names files pulled into this run's scope solely to
 	// recheck an open comment, set from Incremental.StandingOnly right after
 	// narrowing. analyzeBatchWith reads it to keep the progress cache from
 	// answering for a batch holding one of them.
 	standingOnly map[string]bool
+
+	// notarySess is this review's notary session, set on the per-review copy.
+	notarySess *notarySession
 }
 
 // LinterRunner produces deterministic findings for the changed files.
@@ -462,6 +484,14 @@ type Report struct {
 	Progress json.RawMessage
 	// ReusedRequests counts completed model results recovered from an earlier review.
 	ReusedRequests int
+
+	// Notary says what the notary did for this review. Its zero value is "no
+	// notary was configured", so a report that never reached the notary cannot
+	// read as a replay.
+	Notary NotaryStatus
+	// Unofficial is set when the review was withheld from the pull request
+	// because RequireNotary was on and no notary kept its record.
+	Unofficial bool
 	// ReusedAnalyzerStages counts complete deterministic stages restored separately.
 	ReusedAnalyzerStages int
 
@@ -996,6 +1026,14 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	}
 
 	report.Plan = plan
+
+	if len(plan.Batches) > 0 {
+		if sess := e.beginNotary(ctx, pullRequestContext(pr), plan); sess != nil {
+			e.notarySess = sess
+			defer e.Roles.UseLedger(nil)
+			defer func() { report.Notary = sess.snapshot() }()
+		}
+	}
 
 	if len(plan.Batches) == 0 {
 		e.log().Info("nothing to review")
@@ -2774,6 +2812,15 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 	}
 	report.Routes = e.routeDecisions
 	report.Progress, report.ReusedRequests = e.progress.snapshot(report.Head)
+	if e.notarySess != nil {
+		report.Notary = e.notarySess.finish(ctx, report.PipelineComplete())
+	}
+	if e.RequireNotary && report.Plan != nil && len(report.Plan.Batches) > 0 && !report.Notary.Official() {
+		report.Unofficial = true
+		e.log().Warn("UNOFFICIAL review: no notary kept its record, so it is not posted",
+			"notary", string(report.Notary.Mode), "error", report.Notary.Err)
+		return nil
+	}
 	if e.ModelUsage != nil {
 		report.ModelUsage = e.ModelUsage()
 	}

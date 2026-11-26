@@ -18,6 +18,9 @@ for prefix, path in (('mcp', 'cmd/nitpick/mcp.go'), ('auth', 'cmd/nitpick/auth.g
     subcommands = re.findall(r'^\s*case \"([a-z][a-z-]+)\"', Path(path).read_text(), re.M)
     commands.update(f'{prefix} {subcommand}' for subcommand in subcommands)
 inherits = {'fast-review': 'review', 'deep-review': 'review', 'improve': 'review', 'repo-score': 'full-review'}
+# Flags a command inherits in the docs but deliberately does not take. improve
+# never publishes, so a notary has no posted review to certify.
+not_taken = {'improve': {'-notary', '-notary-oidc-audience', '-fresh', '-clear-by', '-require-notary'}}
 errors = []
 for command in sorted(commands):
     if command not in sections:
@@ -39,7 +42,7 @@ for command in sorted(commands):
     tables = [line for line in section.splitlines() if line.startswith('|') and '`-' in line]
     if tables:
         section = '\n'.join(tables)
-    documented = set(re.findall(r'`(-[a-z][a-z0-9-]*)(?=[\s`=])', section)) - {'-h'}
+    documented = set(re.findall(r'`(-[a-z][a-z0-9-]*)(?=[\s`=])', section)) - {'-h'} - not_taken.get(command, set())
     for flag in sorted(flags - documented):
         errors.append(f'{command}: undocumented flag {flag}')
     for flag in sorted(documented - flags):
