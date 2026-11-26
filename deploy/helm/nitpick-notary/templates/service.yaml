@@ -1,3 +1,5 @@
+# yamllint disable-file
+# A Go template: not valid YAML until Helm renders it.
 apiVersion: v1
 kind: Service
 metadata:

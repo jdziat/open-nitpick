@@ -1,3 +1,4 @@
+---
 # A notary on this machine. From this directory:
 #
 #   cp .env.example .env     # then put token hashes in it (see the file)
@@ -18,7 +19,7 @@ services:
     ports:
       - "127.0.0.1:${NOTARY_PORT:-8484}:8484"
     environment:
-      NITPICK_NOTARY_TOKENS: ${NITPICK_NOTARY_TOKENS:?set NITPICK_NOTARY_TOKENS in .env, see .env.example}
+      NITPICK_NOTARY_TOKENS: ${NITPICK_NOTARY_TOKENS:?set it in .env}
     volumes:
       - notary-data:/data
     read_only: true

@@ -1,6 +1,7 @@
-# The notary keeps its records in files that one process owns, so this chart runs
-# exactly one replica on a ReadWriteOnce volume, and replaces it rather than
-# rolling it. There is deliberately no replicaCount.
+---
+# The notary keeps its records in files that one process owns, so this chart
+# runs exactly one replica on a ReadWriteOnce volume, and replaces it rather
+# than rolling it. There is deliberately no replicaCount.
 
 image:
   repository: ghcr.io/nitpick-oss/nitpick-notary
@@ -11,7 +12,7 @@ imagePullSecrets: []
 
 # Who may read and write records. Give hashes, never secrets: the server only
 # ever compares hashes, and a Secret holding hashes is not a credential.
-#   printf %s "$SECRET" | docker run --rm -i ghcr.io/nitpick-oss/nitpick-notary -hash
+#   printf %s "$SECRET" | nitpick-notary -hash
 tokens: []
 #  - name: ci
 #    role: authoritative        # authoritative | provisional | read

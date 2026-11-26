@@ -1,5 +1,10 @@
+# yamllint disable-file
+# A Go template: not valid YAML until Helm renders it.
 {{- if and .Values.oidc.audience (not .Values.oidc.allow) }}
 {{- fail "oidc.audience needs oidc.allow: a token no rule matches is refused, so an empty list admits nobody" }}
+{{- end }}
+{{- if and .Values.existingSecret .Values.tokens }}
+{{- fail "tokens and existingSecret are both set: the chart would use existingSecret and ignore tokens. Set one" }}
 {{- end }}
 {{- if and .Values.oidc.allow (not .Values.oidc.audience) }}
 {{- fail "oidc.allow needs oidc.audience" }}
