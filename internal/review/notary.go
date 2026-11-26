@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -90,10 +91,15 @@ type notarySession struct {
 	// writable turns false after the store refuses a write, so a read-only
 	// token costs one refused request and not one per answer.
 	writable bool
+	// used holds the answer slots this run has already taken, so a second
+	// identical request is not served the first one's answer.
+	used map[string]bool
+	// gap is set when an answer could not be kept.
+	gap bool
 }
 
 func newNotarySession(store wire.Store, log *slog.Logger, by string) *notarySession {
-	return &notarySession{store: store, log: log, by: by, writable: true}
+	return &notarySession{store: store, log: log, by: by, writable: true, used: map[string]bool{}}
 }
 
 // arm names the record, clears it first when asked, and loads what it holds.
@@ -162,25 +168,40 @@ func (n *notarySession) fail(err error) {
 	n.log.Warn("notary unavailable; this review is unofficial", "error", err)
 }
 
-// Lookup implements llm.Ledger.
+// slot names the n-th answer to one request. Identical requests are separate
+// answers: review.votes asks the same question several times to compare the
+// replies, and one shared key would hand every vote the first vote's answer.
+func slot(key string, n int) string { return key + "#" + strconv.Itoa(n) }
+
+// Lookup implements llm.Ledger. It serves the lowest recorded answer to this
+// request that this run has not used yet. Requests that are identical are
+// interchangeable, so which of two concurrent callers gets which does not
+// matter.
 func (n *notarySession) Lookup(_ context.Context, key string) (*llms.Response, bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if !n.armed || n.status.Mode == NotaryUnreachable {
 		return nil, false
 	}
-	raw, ok := n.rec.Answers[key]
-	if !ok {
-		return nil, false
+	for i := 0; ; i++ {
+		name := slot(key, i)
+		raw, ok := n.rec.Answers[name]
+		if !ok {
+			return nil, false
+		}
+		if n.used[name] {
+			continue
+		}
+		n.used[name] = true
+		var resp llms.Response
+		if json.Unmarshal([]byte(raw), &resp) != nil {
+			// An answer that does not decode costs a request, never a wrong
+			// answer.
+			return nil, false
+		}
+		n.status.Replayed++
+		return &resp, true
 	}
-	var resp llms.Response
-	if json.Unmarshal([]byte(raw), &resp) != nil {
-		// An answer that does not decode costs a request, never a wrong
-		// answer.
-		return nil, false
-	}
-	n.status.Replayed++
-	return &resp, true
 }
 
 // Record implements llm.Ledger.
@@ -196,9 +217,22 @@ func (n *notarySession) Record(ctx context.Context, key string, resp *llms.Respo
 	}
 	raw, err := json.Marshal(resp)
 	if err != nil {
+		// The answer is missing from the record, so the record must never be
+		// called complete: that would attest to answers it does not hold.
+		n.gap = true
+		n.status.Err = "an answer could not be encoded: " + err.Error()
+		n.log.Warn("notary could not encode an answer; the record stays incomplete", "error", err)
 		return
 	}
-	n.rec.Answers[key] = string(raw)
+	i := 0
+	for ; ; i++ {
+		if _, taken := n.rec.Answers[slot(key, i)]; !taken {
+			break
+		}
+	}
+	name := slot(key, i)
+	n.rec.Answers[name] = string(raw)
+	n.used[name] = true
 	// A replayed record that took a live call is a different review from the
 	// one that was recorded, so it can no longer be called complete.
 	n.rec.Complete = false
@@ -236,7 +270,7 @@ func (n *notarySession) finish(ctx context.Context, complete bool) NotaryStatus 
 	if !n.armed {
 		return n.status
 	}
-	if complete && n.status.Mode != NotaryUnreachable && len(n.rec.Answers) > 0 && !n.rec.Complete {
+	if complete && !n.gap && n.status.Mode != NotaryUnreachable && len(n.rec.Answers) > 0 && !n.rec.Complete {
 		n.rec.Complete = true
 		n.put(ctx)
 		n.status.Complete = n.status.Err == ""

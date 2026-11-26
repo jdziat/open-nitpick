@@ -25,9 +25,10 @@ type jsonReport struct {
 	Learnings            review.LearningsStatus  `json:"learnings"`
 	Execution            review.ExecutionSummary `json:"execution"`
 	ReusedAnalyzerStages int                     `json:"reused_analyzer_stages,omitempty"`
-	// Notary says what the notary did. Its mode is empty only when none was
-	// configured, which is how a clean replay is told from a run that asked
-	// nothing.
+	// Notary says what the notary did. Its mode is empty when none was
+	// configured and when no batch ran, because a review with nothing to ask a
+	// model has no record to keep. A clean replay has a mode, so it is not
+	// mistaken for either.
 	Notary     review.NotaryStatus `json:"notary"`
 	Unofficial bool                `json:"unofficial,omitempty"`
 }

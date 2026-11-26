@@ -122,7 +122,7 @@ func (c *Client) ToolChat(ctx context.Context, msgs []llms.Message, opts ...llms
 	// ToolChat skips the resilience wrapper where the hook sits, so it asks the
 	// ledger itself. Without this a deep review's agent turns would be paid for
 	// again on every replay.
-	if c.ledgered != nil {
+	if c.ledgered != nil && inner != llms.LLM(c.ledgered) {
 		inner = c.ledgered.over(inner)
 	}
 	resp, err := inner.GenerateContent(ctx, msgs, opts...)

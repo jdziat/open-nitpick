@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 	"testing"
@@ -216,5 +217,58 @@ func TestADegenerateJSONAnswerIsNotRecorded(t *testing.T) {
 		if len(l.answers) != 0 {
 			t.Errorf("%s was recorded, and the decoder rejects it on every replay", body)
 		}
+	}
+}
+
+// recordingLedger counts what is recorded, to see an answer kept twice.
+type recordingLedger struct {
+	*memLedger
+	records int
+}
+
+func (r *recordingLedger) Record(ctx context.Context, key string, resp *llms.Response) {
+	r.records++
+	r.memLedger.Record(ctx, key, resp)
+}
+
+func TestToolChatOnAClientWithNoObserverRecordsEachAnswerOnce(t *testing.T) {
+	l := &recordingLedger{memLedger: newMemLedger()}
+	c, _ := withLedger(&llms.Response{Content: `{"a":1}`, FinishReason: llms.FinishReasonStop}, l)
+	if _, err := c.ToolChat(context.Background(), question); err != nil {
+		t.Fatal(err)
+	}
+	if l.records != 1 || l.lookups != 1 {
+		t.Errorf("one live ToolChat made %d lookups and %d records, want 1 each: the ledger is wrapped twice", l.lookups, l.records)
+	}
+}
+
+func TestAnAnswerThatSharesNoKeyWithTheSchemaIsNotRecorded(t *testing.T) {
+	schema := llms.WithJSONSchema("findings", json.RawMessage(`{"type":"object","properties":{"findings":{"type":"array"}},"required":["findings"]}`), true)
+	for body, want := range map[string]bool{
+		`{"findings":[]}`:                 true,
+		`{"unrelated":1}`:                 false,
+		`{"findings":[],"extra":1}`:       true,
+		`{"extra":1}`:                     false,
+		"```json\n{\"findings\":[]}\n```": true,
+	} {
+		l := newMemLedger()
+		c, _ := withLedger(&llms.Response{Content: body, FinishReason: llms.FinishReasonStop}, l)
+		_, _ = c.LLM.GenerateContent(context.Background(), question, schema)
+		if kept := len(l.answers) == 1; kept != want {
+			t.Errorf("%q kept=%v want %v", body, kept, want)
+		}
+	}
+}
+
+func TestAnAnswerThatLeavesOutAnOptionalRequiredKeyIsStillRecorded(t *testing.T) {
+	// Strict schemas list every property as required. The decoder accepts an
+	// answer without the optional ones, so refusing it here would leave a
+	// record that never completes.
+	schema := llms.WithJSONSchema("r", json.RawMessage(`{"type":"object","properties":{"a":{},"b":{}},"required":["a","b"]}`), true)
+	l := newMemLedger()
+	c, _ := withLedger(&llms.Response{Content: `{"a":1}`, FinishReason: llms.FinishReasonStop}, l)
+	_, _ = c.LLM.GenerateContent(context.Background(), question, schema)
+	if len(l.answers) != 1 {
+		t.Error("an answer the decoder accepts was refused")
 	}
 }

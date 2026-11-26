@@ -125,21 +125,49 @@ func recordable(resp *llms.Response) bool {
 	}
 }
 
-// wellFormed refuses to keep a JSON answer that is not a usable JSON object. The ledger sees
+// wellFormed refuses to keep a JSON answer the caller will reject. The ledger sees
 // the raw reply before the caller parses it, so without this a reply that
 // failed to parse would be recorded, replayed on the next run, and fail the
 // same way every time: a partial record that resume could never finish.
 // Replies that carry tool calls, and requests that asked for no JSON, are kept
 // as they come.
 func wellFormed(resp *llms.Response, opts []llms.CallOption) bool {
-	if len(resp.ToolCalls) > 0 || llms.ApplyOptions(opts...).ResponseFormat == nil {
+	if len(resp.ToolCalls) > 0 {
+		return true
+	}
+	format := llms.ApplyOptions(opts...).ResponseFormat
+	if format == nil {
 		return true
 	}
 	// A populated object, because that is what every structured request in this
 	// tool decodes into. {} and null are valid JSON that the decoder rejects on
 	// every later run, and a record cannot be replaced once it holds one.
 	var object map[string]json.RawMessage
-	return json.Unmarshal([]byte(extractJSONText(resp.Content)), &object) == nil && len(object) > 0
+	if json.Unmarshal([]byte(extractJSONText(resp.Content)), &object) != nil || len(object) == 0 {
+		return false
+	}
+	if format.JSONSchema == nil {
+		return true
+	}
+	// Against the schema's own keys, the check the caller's decoder makes
+	// afterwards: an object that shares none of them is replayed, rejected and
+	// paid for again on every run. Required keys are not checked: a strict
+	// schema lists every property as required, optional ones included, and the
+	// decoder accepts an answer that leaves those out.
+	var schema struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	if json.Unmarshal(format.JSONSchema.Schema, &schema) != nil || len(schema.Properties) == 0 {
+		return true
+	}
+	known := false
+	for key := range object {
+		if _, ok := schema.Properties[key]; ok {
+			known = true
+			break
+		}
+	}
+	return known
 }
 
 // extractJSONText strips the fence a model sometimes wraps a JSON answer in.

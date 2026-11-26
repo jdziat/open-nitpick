@@ -16,10 +16,14 @@ length-prefixed field by field, so two different splits of the same bytes do
 not collide, and batches are sorted so the hash does not depend on the order
 they were packed in.
 
-The record holds one answer per model request, keyed by a hash of the request,
+The record holds one answer per model request (the n-th identical request has
+its own answer, so `review.votes` keeps its votes apart), keyed by a hash of the request,
 across every stage: batch review, triage, critique and the rest. That one
 mechanism is both replay (every request answered, so no model is called) and
 resume (some answered, so the rest are asked live).
+
+Requests are keyed by provider, model and messages, not by endpoint or
+credential, so a record made in CI replays on a developer machine.
 
 The reasoning level is stored with the record and left out of the hash, so a
 replay answers with what the recorded level produced whatever the configuration

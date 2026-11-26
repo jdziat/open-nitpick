@@ -3,6 +3,8 @@ package review
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"math"
 	"strings"
 	"testing"
 
@@ -559,5 +561,66 @@ func TestRequireNotaryWithholdsAReviewWithNoBatchesOnlyWhenThereIsNoNotary(t *te
 				t.Fatalf("setup: the plan must pack nothing, got %d batches", len(report.Plan.Batches))
 			}
 		})
+	}
+}
+
+// armedSession returns a session armed on a store, with a client whose every
+// request goes through it.
+func armedSession(t *testing.T, store wire.Store, model *scriptedLLM) (*notarySession, *llm.Client) {
+	t.Helper()
+	s := newNotarySession(store, slog.New(slog.DiscardHandler), "ci")
+	s.arm(context.Background(), wire.Inputs{Tool: "t", Batches: []string{"b"}}, "", false)
+	c := llm.NewClientForTest(model, config.ModelSpec{Provider: "openai", Model: "m"})
+	c.UseLedger(s)
+	return s, c
+}
+
+func TestIdenticalRequestsKeepSeparateAnswersSoVotesStayIndependent(t *testing.T) {
+	store := fileStore(t)
+	ask := []llms.Message{{Role: llms.RoleUser, Content: "same question"}}
+	model := &scriptedLLM{fallback: `{"v":1}`}
+	s, c := armedSession(t, store, model)
+	for range 3 {
+		if _, err := c.LLM.GenerateContent(context.Background(), ask); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if model.callCount() != 3 {
+		t.Fatalf("a live run asked the model %d times for 3 votes, want 3: later votes were answered from the first", model.callCount())
+	}
+	if got := len(s.rec.Answers); got != 3 {
+		t.Fatalf("the record holds %d answers, want 3", got)
+	}
+
+	replay := &scriptedLLM{fallback: `{"v":1}`}
+	_, c2 := armedSession(t, store, replay)
+	for range 3 {
+		if _, err := c2.LLM.GenerateContent(context.Background(), ask); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if replay.callCount() != 0 {
+		t.Errorf("the replay of 3 recorded votes asked the model %d times", replay.callCount())
+	}
+	if _, err := c2.LLM.GenerateContent(context.Background(), ask); err != nil || replay.callCount() != 1 {
+		t.Errorf("a fourth identical request must reach the model, got %d calls err=%v", replay.callCount(), err)
+	}
+}
+
+func TestAnAnswerThatCannotBeEncodedLeavesTheRecordIncompleteNotComplete(t *testing.T) {
+	store := fileStore(t)
+	s, _ := armedSession(t, store, &scriptedLLM{})
+	nan := math.NaN()
+	s.Record(context.Background(), "k1", &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop, Usage: llms.Usage{Cost: &nan}})
+	s.Record(context.Background(), "k2", &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop})
+	status := s.finish(context.Background(), true)
+	if status.Complete {
+		t.Fatalf("a record missing an answer was marked complete: %+v", status)
+	}
+	if status.Err == "" {
+		t.Error("the lost answer must be reported")
+	}
+	if rec, ok, _ := store.Get(context.Background(), status.Hash); ok && rec.Complete {
+		t.Error("the stored record attests to answers it does not hold")
 	}
 }
