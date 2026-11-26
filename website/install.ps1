@@ -33,17 +33,26 @@ function Install-Nitpick {
     # Windows PowerShell 5.1 can default to protocols GitHub no longer accepts,
     # which fails with "could not create SSL/TLS secure channel".
     if ($PSVersionTable.PSEdition -ne 'Core') {
-        try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
+        try {
+            [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        } catch {
+            Write-Verbose "could not enable TLS 1.2: $_"
+        }
     }
 
-    function Stop-Install([string]$Message) {
+    # Write-Information with Continue shows in every host, including one that
+    # captures or hides what Write-Host would print.
+    function Write-Line([string]$Message) {
+        Write-Information -MessageData $Message -InformationAction Continue
+    }
+    function Exit-Install([string]$Message) {
         throw "install.ps1: $Message"
     }
 
     # The platform, before any network request: an unsupported one must fail
     # without having downloaded anything.
     if (-not $testing -and $PSVersionTable.PSEdition -eq 'Core' -and -not $IsWindows) {
-        Stop-Install 'this script is for Windows; on linux and darwin run install.sh'
+        Exit-Install 'this script is for Windows; on linux and darwin run install.sh'
     }
     try {
         $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
@@ -54,7 +63,7 @@ function Install-Nitpick {
     }
     if ($testing -and $env:NITPICK_TEST_ARCH) { $arch = $env:NITPICK_TEST_ARCH }
     if ($arch -ne 'X64') {
-        Stop-Install "unsupported architecture ${arch}: Windows releases are built for amd64 only"
+        Exit-Install "unsupported architecture ${arch}: Windows releases are built for amd64 only"
     }
 
     if ($env:INSTALL_DIR) {
@@ -62,7 +71,7 @@ function Install-Nitpick {
     } elseif ($env:LOCALAPPDATA) {
         $dir = Join-Path $env:LOCALAPPDATA 'Programs\nitpick'
     } else {
-        Stop-Install 'LOCALAPPDATA is not set; set INSTALL_DIR to where nitpick.exe should go'
+        Exit-Install 'LOCALAPPDATA is not set; set INSTALL_DIR to where nitpick.exe should go'
     }
 
     $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('nitpick-install-' + [guid]::NewGuid().ToString('N'))
@@ -73,29 +82,29 @@ function Install-Nitpick {
             try {
                 $latest = Invoke-RestMethod -UseBasicParsing -Uri $latestUrl
             } catch {
-                Stop-Install 'could not find the latest release (GitHub may be rate limiting you); set $env:VERSION = ''vX.Y.Z'' to skip the lookup'
+                Exit-Install 'could not find the latest release (GitHub may be rate limiting you); set $env:VERSION = ''vX.Y.Z'' to skip the lookup'
             }
             $version = $latest.tag_name
-            if (-not $version) { Stop-Install 'the latest release answer held no tag_name' }
+            if (-not $version) { Exit-Install 'the latest release answer held no tag_name' }
         }
         if (-not $version.StartsWith('v')) { $version = "v$version" }
         # The version goes into a URL and a file name, so it is checked, not trusted.
-        if ($version -notmatch '^v[0-9][A-Za-z0-9.+-]*$') { Stop-Install "$version is not a release version" }
+        if ($version -notmatch '^v[0-9][A-Za-z0-9.+-]*$') { Exit-Install "$version is not a release version" }
 
         $asset = "nitpick_${version}_windows_amd64.exe"
-        Write-Host "Installing nitpick $version (windows/amd64) to $dir"
+        Write-Line "Installing nitpick $version (windows/amd64) to $dir"
 
         $file = Join-Path $tmp $asset
         $sums = Join-Path $tmp 'checksums.txt'
         try {
             Invoke-WebRequest -UseBasicParsing -Uri "$releaseBase/$version/$asset" -OutFile $file
         } catch {
-            Stop-Install "could not download $asset for $version"
+            Exit-Install "could not download $asset for $version"
         }
         try {
             Invoke-WebRequest -UseBasicParsing -Uri "$releaseBase/$version/checksums.txt" -OutFile $sums
         } catch {
-            Stop-Install "could not download checksums.txt for $version"
+            Exit-Install "could not download checksums.txt for $version"
         }
 
         # Compared as text, case-sensitively: the listed name must be exactly this
@@ -107,10 +116,10 @@ function Install-Nitpick {
                 break
             }
         }
-        if (-not $expected) { Stop-Install "checksums.txt does not list $asset; nothing was installed" }
+        if (-not $expected) { Exit-Install "checksums.txt does not list $asset; nothing was installed" }
         $actual = (Get-FileHash -Algorithm SHA256 -Path $file).Hash.ToLowerInvariant()
         if ($expected -ne $actual) {
-            Stop-Install "checksum mismatch for $asset (expected $expected, got $actual); nothing was installed"
+            Exit-Install "checksum mismatch for $asset (expected $expected, got $actual); nothing was installed"
         }
 
         if (Get-Command cosign -ErrorAction SilentlyContinue) {
@@ -118,24 +127,24 @@ function Install-Nitpick {
             try {
                 Invoke-WebRequest -UseBasicParsing -Uri "$releaseBase/$version/$asset.sigstore.json" -OutFile $bundle
             } catch {
-                Stop-Install "could not download the signature bundle for $asset; nothing was installed"
+                Exit-Install "could not download the signature bundle for $asset; nothing was installed"
             }
             & cosign verify-blob --bundle $bundle `
                 --certificate-identity-regexp "^https://github.com/$repo/" `
                 --certificate-oidc-issuer https://token.actions.githubusercontent.com `
                 $file | Out-Null
-            if ($LASTEXITCODE -ne 0) { Stop-Install "signature verification failed for $asset; nothing was installed" }
-            Write-Host 'Verified the checksum and the Sigstore signature.'
+            if ($LASTEXITCODE -ne 0) { Exit-Install "signature verification failed for $asset; nothing was installed" }
+            Write-Line 'Verified the checksum and the Sigstore signature.'
         } else {
-            Write-Host 'Verified the checksum only. The checksum is published beside the binary, so it'
-            Write-Host 'catches a corrupt download, not a compromised release; install cosign to also'
-            Write-Host 'check the signature.'
+            Write-Line 'Verified the checksum only. The checksum is published beside the binary, so it'
+            Write-Line 'catches a corrupt download, not a compromised release; install cosign to also'
+            Write-Line 'check the signature.'
         }
 
         try {
             New-Item -ItemType Directory -Force -Path $dir | Out-Null
         } catch {
-            Stop-Install "cannot create $dir; set `$env:INSTALL_DIR to a directory you own"
+            Exit-Install "cannot create $dir; set `$env:INSTALL_DIR to a directory you own"
         }
         # Written beside the target and renamed into place, so an interrupted install
         # never leaves a half-written nitpick.exe where the old one was.
@@ -146,20 +155,20 @@ function Install-Nitpick {
             Move-Item -Path $staged -Destination $target -Force
         } catch {
             Remove-Item -Path $staged -Force -ErrorAction SilentlyContinue
-            Stop-Install "could not install into $dir; if nitpick is running, close it and try again, or set `$env:INSTALL_DIR to a directory you own"
+            Exit-Install "could not install into $dir; if nitpick is running, close it and try again, or set `$env:INSTALL_DIR to a directory you own"
         }
 
         if (-not $testing) {
             $ran = & $target version 2>&1
-            if ($LASTEXITCODE -ne 0) { Stop-Install "installed, but $target does not run: $ran" }
-            Write-Host "Installed: $ran"
+            if ($LASTEXITCODE -ne 0) { Exit-Install "installed, but $target does not run: $ran" }
+            Write-Line "Installed: $ran"
         } else {
-            Write-Host "Installed: $target"
+            Write-Line "Installed: $target"
         }
         $onPath = @($env:PATH -split [System.IO.Path]::PathSeparator | ForEach-Object { $_.TrimEnd('\', '/') }) -contains $dir.TrimEnd('\', '/')
         if (-not $onPath) {
-            Write-Host "Add $dir to your PATH, for example:"
-            Write-Host "  [Environment]::SetEnvironmentVariable('Path', `"$dir;`" + [Environment]::GetEnvironmentVariable('Path', 'User'), 'User')"
+            Write-Line "Add $dir to your PATH, for example:"
+            Write-Line "  [Environment]::SetEnvironmentVariable('Path', `"$dir;`" + [Environment]::GetEnvironmentVariable('Path', 'User'), 'User')"
         }
     } finally {
         Remove-Item -Path $tmp -Recurse -Force -ErrorAction SilentlyContinue
