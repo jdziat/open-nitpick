@@ -8,7 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
+	"time"
 )
 
 var hashRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -45,6 +47,9 @@ func (s *FileStore) Get(_ context.Context, hash string) (Record, bool, error) {
 	return s.read(p)
 }
 
+// errCorrupt marks a record file that exists and cannot be decoded.
+var errCorrupt = errors.New("corrupt record")
+
 func (s *FileStore) read(p string) (Record, bool, error) {
 	b, err := os.ReadFile(p)
 	if errors.Is(err, os.ErrNotExist) {
@@ -55,7 +60,7 @@ func (s *FileStore) read(p string) (Record, bool, error) {
 	}
 	var r Record
 	if err := json.Unmarshal(b, &r); err != nil {
-		return Record{}, false, fmt.Errorf("decode record %s: %w", filepath.Base(p), err)
+		return Record{}, false, fmt.Errorf("decode record %s: %w: %w", filepath.Base(p), errCorrupt, err)
 	}
 	return r, true, nil
 }
@@ -69,9 +74,20 @@ func (s *FileStore) Put(_ context.Context, rec Record) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if old, ok, err := s.read(p); err != nil {
+	old, ok, err := s.read(p)
+	if errors.Is(err, errCorrupt) {
+		// Reading it stays an error, so a bad record is never taken for none.
+		// Writing over it must not be: failing here would wedge the hash for
+		// good, and only someone with a shell on the server could unstick it.
+		if qerr := s.quarantine(p); qerr != nil {
+			return qerr
+		}
+		old, ok, err = Record{}, false, nil
+	}
+	if err != nil {
 		return err
-	} else if ok {
+	}
+	if ok {
 		if old.Complete && !rec.Complete {
 			return nil
 		}
@@ -88,14 +104,38 @@ func (s *FileStore) Put(_ context.Context, rec Record) error {
 
 // writeAtomic replaces path through a temporary file, so a crash leaves the old
 // content or the new and never a truncated record that every later Get fails to
-// decode.
-func writeAtomic(path string, b []byte) error {
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o640); err != nil {
+// decode. The temporary name is unique: a fixed one let two processes on one
+// directory write into the same file and rename it from under each other.
+func writeAtomic(path string, b []byte) (err error) {
+	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
 		return fmt.Errorf("write %s: %w", filepath.Base(path), err)
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	tmp := f.Name()
+	defer func() {
+		if err != nil {
+			_ = os.Remove(tmp)
+		}
+	}()
+	if _, err = f.Write(b); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("write %s: %w", filepath.Base(path), err)
+	}
+	if err = f.Close(); err != nil {
+		return fmt.Errorf("write %s: %w", filepath.Base(path), err)
+	}
+	if err = os.Rename(tmp, path); err != nil {
 		return fmt.Errorf("replace %s: %w", filepath.Base(path), err)
+	}
+	return nil
+}
+
+// quarantine moves a record file that cannot be decoded into history/, so the
+// evidence is kept and the hash is free to be written again.
+func (s *FileStore) quarantine(p string) error {
+	name := fmt.Sprintf("%s.corrupt.%d.json", strings.TrimSuffix(filepath.Base(p), ".json"), time.Now().UnixNano())
+	if err := os.Rename(p, filepath.Join(s.dir, "history", name)); err != nil {
+		return fmt.Errorf("set aside a corrupt record: %w", err)
 	}
 	return nil
 }
@@ -110,6 +150,9 @@ func (s *FileStore) Clear(_ context.Context, hash, by string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	rec, ok, err := s.read(p)
+	if errors.Is(err, errCorrupt) {
+		return s.quarantine(p)
+	}
 	if err != nil {
 		return err
 	}
