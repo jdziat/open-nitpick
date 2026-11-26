@@ -624,3 +624,60 @@ func TestAnAnswerThatCannotBeEncodedLeavesTheRecordIncompleteNotComplete(t *test
 		t.Error("the stored record attests to answers it does not hold")
 	}
 }
+
+func TestAReplayIsZeroCallsEvenWhenTheResidualJudgeRanInTheFirstReview(t *testing.T) {
+	f := Finding{
+		Path: "app.go", Line: 4, Severity: "info", Class: "correctness",
+		Title: "document the ignored error", Rationale: "the blank identifier hides a failure mode",
+	}
+	script := func() *scriptedLLM {
+		return &scriptedLLM{byPrompt: map[string]string{
+			"Review the following changes":             mustJSON(t, Result{Findings: []Finding{f}}),
+			"triaging findings":                        mustJSON(t, TriageResult{Verdicts: verdictsFor([]Finding{f})}),
+			"You decide whether a pull request review": `{"approve":true,"reason":"advisory documentation only"}`,
+		}}
+	}
+	tune := func(c *config.Config) {
+		c.Review.Approve.Enabled = true
+		c.Review.Approve.Residual.Enabled = true
+		c.Review.MinSeverity = config.SeverityInfo
+	}
+	store := fileStore(t)
+
+	first := script()
+	e := newEngine(t, first, &stubProvider{diff: engineDiff}, tune)
+	e.Notary, e.NotarySource = store, "ci"
+	live, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	judged := false
+	for _, p := range first.prompts() {
+		judged = judged || strings.Contains(p, "You decide whether a pull request review")
+	}
+	if !judged || !live.ResidualApprove {
+		t.Fatalf("setup: the residual judge must run and approve in the first review (judged=%v approve=%v)", judged, live.ResidualApprove)
+	}
+	if !live.Notary.Complete {
+		t.Fatalf("the finished review left its record incomplete: %+v", live.Notary)
+	}
+
+	second := script()
+	e2 := newEngine(t, second, &stubProvider{diff: engineDiff}, tune)
+	e2.Notary, e2.NotarySource = store, "ci"
+	replay, err := e2.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.callCount() != 0 || replay.Notary.Mode != NotaryReplayed {
+		t.Errorf("the replay asked the model %d times: %+v", second.callCount(), replay.Notary)
+	}
+}
+
+func TestAShortOrEmptyHashIsLoggedWithoutSlicingPastItsEnd(t *testing.T) {
+	for in, want := range map[string]string{"": "", "abc": "abc", strings.Repeat("a", 64): strings.Repeat("a", 12)} {
+		if got := shortHash(in); got != want {
+			t.Errorf("shortHash(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

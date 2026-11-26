@@ -272,3 +272,16 @@ func TestAnAnswerThatLeavesOutAnOptionalRequiredKeyIsStillRecorded(t *testing.T)
 		t.Error("an answer the decoder accepts was refused")
 	}
 }
+
+func TestTwoSamplesOfOneRequestAreRecordedSeparately(t *testing.T) {
+	l := newMemLedger()
+	c, inner := withLedger(&llms.Response{Content: `{"a":1}`, FinishReason: llms.FinishReasonStop}, l)
+	for _, sample := range []string{"run/1", "run/2", "run/1"} {
+		if _, err := c.LLM.GenerateContent(WithResponseSample(context.Background(), sample), question); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if inner.calls != 2 {
+		t.Errorf("model reached %d times for 2 distinct samples and one repeat, want 2", inner.calls)
+	}
+}

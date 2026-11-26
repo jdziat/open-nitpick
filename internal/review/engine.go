@@ -2813,7 +2813,10 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 	report.Routes = e.routeDecisions
 	report.Progress, report.ReusedRequests = e.progress.snapshot(report.Head)
 	if e.notarySess != nil {
-		report.Notary = e.notarySess.finish(ctx, report.PipelineComplete())
+		// Completion waits for the last model call (the residual judge, below).
+		// An answer recorded after the record was marked complete would put it
+		// back to partial, and the next run would not be a replay.
+		report.Notary = e.notarySess.snapshot()
 	}
 	// With no batches there is no model answer to record, so a configured notary
 	// has nothing to certify. With no notary at all there is nothing to point at,
@@ -2859,6 +2862,9 @@ func (e *Engine) publish(ctx context.Context, ref vcs.Ref, report *Report, files
 	// Refresh only when the judge could have added usage; the meter is cumulative.
 	if judgeRan && e.ModelUsage != nil {
 		report.ModelUsage = e.ModelUsage()
+	}
+	if e.notarySess != nil {
+		report.Notary = e.notarySess.finish(ctx, report.PipelineComplete())
 	}
 	e.log().Info("publishing", "findings", len(report.Findings), "provider", e.Provider.Name())
 	review := Render(report, files, e.Config)

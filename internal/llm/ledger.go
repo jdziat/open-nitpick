@@ -44,7 +44,7 @@ func (l *ledgerLLM) GenerateContent(ctx context.Context, msgs []llms.Message, op
 	if box == nil || box.l == nil {
 		return l.inner.GenerateContent(ctx, msgs, opts...)
 	}
-	key, ok := l.requestKey(msgs, opts)
+	key, ok := l.requestKey(ctx, msgs, opts)
 	if !ok {
 		return l.inner.GenerateContent(ctx, msgs, opts...)
 	}
@@ -60,14 +60,17 @@ func (l *ledgerLLM) GenerateContent(ctx context.Context, msgs []llms.Message, op
 
 // requestKey names a request by everything that shapes its answer except the
 // reasoning level. Trace is dropped because it carries a per-call callback.
-func (l *ledgerLLM) requestKey(msgs []llms.Message, opts []llms.CallOption) (string, bool) {
+func (l *ledgerLLM) requestKey(ctx context.Context, msgs []llms.Message, opts []llms.CallOption) (string, bool) {
 	applied := *llms.ApplyOptions(opts...)
 	applied.Trace = nil
 	// The reasoning level is recorded beside the answers rather than keyed on:
 	// a replay must find the answers the recorded level produced, whatever the
 	// configuration says today. See wire.Record.Effort.
 	applied.Reasoning = nil
-	data, err := json.Marshal([]any{string(l.inner.Provider()), l.inner.Model(), msgs, applied})
+	// The sample names an independently planned run of an identical request,
+	// the same separation the response cache keeps.
+	sample, _ := ctx.Value(responseSampleKey{}).(string)
+	data, err := json.Marshal([]any{string(l.inner.Provider()), l.inner.Model(), msgs, applied, sample})
 	if err != nil {
 		return "", false
 	}

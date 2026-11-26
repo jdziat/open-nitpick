@@ -319,6 +319,16 @@ func (e *Engine) notaryInputs(prContext string, plan *bundle.Plan) (wire.Inputs,
 	}, effort, nil
 }
 
+// shortHash is the prefix of a hash that a log line shows. A session that
+// failed before it had inputs to hash has none, and slicing that would panic
+// in the one path that exists to report a failure.
+func shortHash(h string) string {
+	if len(h) > 12 {
+		return h[:12]
+	}
+	return h
+}
+
 // beginNotary arms the notary for this review. It returns the session so the
 // caller can finish it, or nil when no notary is configured.
 func (e *Engine) beginNotary(ctx context.Context, prContext string, plan *bundle.Plan) *notarySession {
@@ -335,6 +345,6 @@ func (e *Engine) beginNotary(ctx context.Context, prContext string, plan *bundle
 	session.arm(ctx, inputs, effort, e.Fresh)
 	e.Roles.UseLedger(session)
 	s := session.snapshot()
-	e.log().Info("notary", "mode", string(s.Mode), "hash", s.Hash[:12], "answers", len(session.rec.Answers))
+	e.log().Info("notary", "mode", string(s.Mode), "hash", shortHash(s.Hash), "answers", len(session.rec.Answers))
 	return session
 }
