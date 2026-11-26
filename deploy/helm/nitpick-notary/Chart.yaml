@@ -1,15 +1,11 @@
----
 apiVersion: v2
 name: nitpick-notary
 description: >-
   The nitpick notary, a server that keeps the model answers of code reviews so
   the same inputs replay them and an interrupted review resumes.
 type: application
-# release-please rewrites the two version lines below to each release, so a
-# checkout reports the version it was released as. The publish workflow also
-# packages with the tag's version for both fields.
-version: 2.9.0  # x-release-please-version
-appVersion: "2.9.0"  # x-release-please-version
+version: 2.10.0
+appVersion: 2.9.0
 home: https://github.com/nitpick-oss/nitpick
 sources:
   - https://github.com/nitpick-oss/nitpick
