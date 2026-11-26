@@ -7,4 +7,3 @@ dist
 bin
 node_modules
 *.md
-!go.mod

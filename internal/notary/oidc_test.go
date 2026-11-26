@@ -303,7 +303,10 @@ func TestAHashOnlyTokenAuthenticatesTheSecretAndHoldsNoSecret(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fs, _ := wire.NewFileStore(t.TempDir())
+	fs, err := wire.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	srv := httptest.NewServer(New(fs, []Token{tok}, false))
 	t.Cleanup(srv.Close)
 	ctx := context.Background()
@@ -333,7 +336,10 @@ func TestATokenHashThatIsNotASha256IsRefused(t *testing.T) {
 }
 
 func TestTheHealthEndpointNeedsNoTokenAndServesNoRecord(t *testing.T) {
-	fs, _ := wire.NewFileStore(t.TempDir())
+	fs, err := wire.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := fs.Put(context.Background(), rec(true)); err != nil {
 		t.Fatal(err)
 	}

@@ -89,7 +89,9 @@ printf %s "$SECRET" | nitpick-notary -hash      # sha256:<64 hex>
 
 `-token name:role:sha256:<hex>` and the `NITPICK_NOTARY_TOKENS` environment
 variable (whitespace-separated entries, for a container) take that form. The
-hash is not a bearer token: presenting it is refused. `GET /healthz` answers
+hash is not a bearer token: presenting it is refused. A plain secret must not
+start with `sha256:`, since that prefix means the rest is a hash; one that does
+is refused at startup unless the rest is 64 hex characters. `GET /healthz` answers
 `ok` with no token and serves no record, and `nitpick-notary -healthcheck` probes
 it, for an image with no shell.
 

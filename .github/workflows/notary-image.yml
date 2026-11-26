@@ -5,16 +5,18 @@ name: Notary image
 on:
   push:
     tags: ["v*"]
+  # A manual run re-publishes a tag that already exists: choose the tag as the
+  # ref when dispatching. It takes no version input, because a version typed in
+  # beside a branch would publish that branch's code under a release number.
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to publish, without the leading v (a manual run pushes this tag)"
-        required: true
 
 permissions: {}
 
 jobs:
   image:
+    # Only a release tag publishes. A dispatch on a branch is skipped, since the
+    # image is tagged latest and the chart is tagged with the release version.
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -27,9 +29,8 @@ jobs:
         id: version
         env:
           REF_NAME: ${{ github.ref_name }}
-          INPUT: ${{ inputs.version }}
         run: |
-          v="${INPUT:-${REF_NAME#v}}"
+          v="${REF_NAME#v}"
           # Anchored and without leading zeros: a shell glob let 1.2.3.4, 1.2.3x and
           # 01.2.3 through, and the image was then pushed before helm refused the
           # same string as a chart version.
