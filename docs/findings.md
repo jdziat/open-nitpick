@@ -3014,3 +3014,84 @@ at once, so the entry does not say which of them costs the precision. Some false
 positives read as real defects the golden set does not list, which costs every
 reviewer including Mira. Rerunning Mira three more times moved its pooled F1 from
 0.499 to 0.512.
+
+## Notary replay and resume against a fixture model (2026-11-25)
+
+A notary stores the model answers of a review under a hash of its inputs, so the
+same inputs replay them and an interrupted review asks only for what is missing
+([Notary](notary.md)). This measures what that changes about a review's cost and
+repeatability. It does not measure review quality: the model is a local fixture
+that answers one finding per file, so nothing here says what a real model would
+find or how often real runs repeat the same inputs.
+
+Method. `TestNotaryBenchmark` in `cmd/nitpick` runs the real `review` command in
+process against a notary server and the fixture model over loopback, in a git
+repository whose working tree changes 1, 4 or 16 files, one batch each
+(`review.max_files_per_request: 1`). Each size runs at a model latency of 0 and
+200 ms, five replicates per cell, and every replicate runs every arm in turn
+(Rule 2): no notary, a notary on its first review, a replay, and `-fresh`. Model
+requests are counted by the fixture server, not by the engine. A run that
+returns anything but one finding per file fails the harness, and a replay that
+reports anything but `replayed` with a nonzero count of replayed answers fails
+it too (Rule 10). Dollar cost is not reported: the fixture has no price, so it is
+unknown (Rule 11).
+
+| files | arm | model requests | wall, free model (ms) | wall, 200 ms model (ms) |
+|---|---|---|---|---|
+| 1 | no notary | 2 | 17 (15-21) | 421 (419-423) |
+| 1 | notary, first review | 2 | 21 (20-26) | 425 (424-426) |
+| 1 | notary, replay | **0** | 17 (15-19) | 18 (17-19) |
+| 1 | notary, `-fresh` | 2 | 23 (20-25) | 426 (422-426) |
+| 4 | no notary | 5 | 19 (17-24) | 420 (419-424) |
+| 4 | notary, first review | 5 | 30 (24-31) | 432 (429-433) |
+| 4 | notary, replay | **0** | 21 (16-34) | 22 (20-24) |
+| 4 | notary, `-fresh` | 5 | 34 (27-40) | 430 (428-434) |
+| 16 | no notary | 17 | 32 (30-36) | 1038 (1030-1039) |
+| 16 | notary, first review | 17 | 57 (50-69) | 1067 (1064-1070) |
+| 16 | notary, replay | **0** | 29 (26-31) | 27 (24-30) |
+| 16 | notary, `-fresh` | 17 | 66 (61-69) | 1069 (1060-1085) |
+
+Medians, with the range of five in parentheses. Requests are one per file plus
+one triage request, identical in all five replicates of every cell. All 30
+replays in the table made 0 requests at the server, and every one's findings were
+identical to the review it replayed.
+
+A replay costs what a review costs with the model removed: with a free model it
+matches the no-notary arm (17 against 17, 21 against 19, 29 against 32 ms), and
+with a 200 ms model it takes 18, 22 and 27 ms against 421, 420 and 1038. How much
+wall time that saves is the model's latency times its batches, so the 200 ms is a
+free parameter of this table and no ratio is claimed.
+
+Recording costs time. A first review with a notary against none is separated by
+the ranges in four of the six size and latency pairs, at +4, +12, +25 and +29 ms
+in the medians (1 file and 200 ms; 4 files and 200 ms; 16 files at 0 and at 200
+ms), and the ranges overlap in the other two (1 and 4 files against a free
+model). That is about 1.5 to 2.4 ms per recorded answer over loopback, which a
+real network round trip would raise: each answer is a write of the whole record.
+`-fresh` costs a first review plus one clear (23, 34 and 66 ms against 21, 30
+and 57 with a free model). A record is 1240, 3064 and 10361 bytes for 2, 5 and
+17 answers of one line each; real answers are larger, and that is not measured.
+
+Repeatability. With a model that answers differently every time, five reviews of
+one change without a notary produced 5 distinct finding sets. Five reviews of it
+with a notary produced 1: one live review and four replays, each with 0 requests.
+The model's drift is built in, so this shows the mechanism and says nothing about
+how much a real model drifts.
+
+Resume. When the model loses every review answer after the first K, the second
+run of the same review asks it 3 times with a notary and 5 without at 4 files
+(K = 2), and 9 times against 17 at 16 files (K = 8): the missing batches and the
+triage request, against the whole review. Both second runs finished.
+
+Limits. A fixture model, loopback, one process, five replicates per cell. The
+first run of this harness compared empty finding sets, because the fixture read
+the request body as raw JSON and took a path with a trailing newline, so every
+finding was discarded as anchored to a file that is not in the change; its
+equality results were void, its request counts were not, and the harness now
+fails a run with fewer findings than files. The harness fails when replay is
+broken (with `Lookup` made to always miss, the replay arm fails), but it does not
+exercise two identical requests in one review, which `review.votes` sends and a
+unit test covers. Not measured: any real model, a dollar cost, how often CI
+repeats identical inputs, and record sizes or write times beyond 16 files.
+Run it with `NITPICK_NOTARY_BENCH=1 go test ./cmd/nitpick -run TestNotaryBenchmark
+-v -timeout 30m`.
