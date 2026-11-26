@@ -78,6 +78,9 @@ type Client struct {
 	// replay answers a request it has already paid for from disk. Nil unless
 	// the operator set EnvResponseCache.
 	replay *replayLLM
+
+	// ledgered is the notary's hook. Nil until UseLedger is first called.
+	ledgered *ledgerLLM
 }
 
 // Provider returns the configured provider name.
@@ -115,6 +118,12 @@ func (c *Client) ToolChat(ctx context.Context, msgs []llms.Message, opts ...llms
 		inner = c.replay
 	} else if c.observed != nil {
 		inner = c.observed
+	}
+	// ToolChat skips the resilience wrapper where the hook sits, so it asks the
+	// ledger itself. Without this a deep review's agent turns would be paid for
+	// again on every replay.
+	if c.ledgered != nil && inner != llms.LLM(c.ledgered) {
+		inner = c.ledgered.over(inner)
 	}
 	resp, err := inner.GenerateContent(ctx, msgs, opts...)
 	if observe, ok := ctx.Value(toolChatObserverKey{}).(func(context.Context, ToolChatObservation) error); ok {
@@ -263,6 +272,9 @@ type Roles struct {
 	mu      sync.Mutex
 	clients map[string]*Client
 	log     *slog.Logger
+	// ledger is applied to clients built after UseLedger, so a route's model
+	// is recorded like the default one.
+	ledger Ledger
 }
 
 // Each calls fn for every client the roles hold, the named ones first and
@@ -321,6 +333,9 @@ func (r *Roles) For(spec config.ModelSpec) (*Client, error) {
 	}
 	if r.log != nil {
 		c.setLog(r.log)
+	}
+	if r.ledger != nil {
+		c.UseLedger(r.ledger)
 	}
 	if r.clients == nil {
 		r.clients = map[string]*Client{}

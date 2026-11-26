@@ -50,6 +50,14 @@ type Server struct {
 	// AllowProvisionalClear lets provisional tokens clear a record, for
 	// organisations that let a PR author re-review.
 	allowProvisionalClear bool
+	oidc                  *OIDC
+}
+
+// WithOIDC also accepts identity tokens that o verifies, beside the static
+// ones. It returns s for chaining.
+func (s *Server) WithOIDC(o *OIDC) *Server {
+	s.oidc = o
+	return s
 }
 
 // New builds a server. With no tokens every request is refused.
@@ -70,6 +78,9 @@ func (s *Server) auth(r *http.Request) (Token, bool) {
 		if subtle.ConstantTimeCompare(t.hash[:], sum[:]) == 1 {
 			found, ok = t, true
 		}
+	}
+	if !ok && s.oidc != nil {
+		return s.oidc.Authenticate(r.Context(), secret)
 	}
 	return found, ok
 }

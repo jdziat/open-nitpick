@@ -109,6 +109,11 @@ deep-review](../usage.md#choosing-between-review-and-deep-review).
 | `-allow-degraded-triage` | When only triage or the critique failed, publish the findings and apply the gate to them; `result` is `degraded` and the exit status is 0 or 1. Any other failed stage still exits 2. A model that cannot call tools fails the critique on every run: set `review.critique: false`, or use this flag. |
 | `-no-linters` | Skip configured linters. |
 | `-full` | Review the whole change, even when a prior run would narrow it incrementally. |
+| `-notary` | URL of a [notary](../notary.md). The same inputs replay the recorded model answers with no model call, an interrupted review asks only for what is missing, and a finished one is recorded. The credential is read from `NITPICK_NOTARY_TOKEN`. The JSON report's `notary` object says what happened: `mode` is `live`, `resumed`, `replayed` or `unreachable`, and empty only when no notary was configured. |
+| `-notary-oidc-audience` | Authenticate to the notary with a GitHub Actions identity token minted for this audience, instead of `NITPICK_NOTARY_TOKEN`. The job needs `permissions: id-token: write`. |
+| `-fresh` | Clear the notary's record for these inputs and review again. The cleared record is kept as history. Needs `-notary`. |
+| `-clear-by` | Name kept in the record's history when `-fresh` clears it. Defaults to the token's name. |
+| `-require-notary` | Label a review UNOFFICIAL and do not post it unless a notary kept its record. The findings still print, and the gate still applies. |
 | `-log-format` | Log format: `text` (default) or `json`. |
 | `-v` | Print verbose logs. |
 
@@ -248,7 +253,9 @@ configuration, instruction, linter, failure, logging, and narrowing controls
 from [`review`](#review), but rejects pull-request publishing coordinates:
 passing `-pr`, `-owner`, or `-repo-name`, or running in an Actions pull-request
 job, exits with an error instead of posting. So `-dry-run` and `-skip-draft`
-have nothing to act on here; every `improve` run prints locally. It also accepts
+have nothing to act on here; every `improve` run prints locally, and it takes
+none of the `-notary` flags, since there is no posted review for a notary to
+certify. It also accepts
 the following local-only controls.
 
 | Extra flag | Meaning |
