@@ -40,6 +40,10 @@
     }
   ],
   "packages": {
-    ".": {}
+    ".": {
+      "extra-files": [
+        "deploy/helm/nitpick-notary/Chart.yaml"
+      ]
+    }
   }
 }
