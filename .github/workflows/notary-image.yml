@@ -1,0 +1,98 @@
+---
+name: Notary image
+
+# Publishes the notary container image and its helm chart to ghcr.io when a
+# release tag is pushed, beside the binaries the Release workflow builds.
+# GitHub reads the key `on` as the trigger, and yamllint reads it as a boolean.
+# yamllint disable-line rule:truthy
+on:
+  push:
+    tags: ["v*"]
+  # A manual run re-publishes a tag that already exists: choose the tag as the
+  # ref when dispatching. It takes no version input, because a version typed in
+  # beside a branch would publish that branch's code under a release number.
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  image:
+    # Only a release tag publishes. A dispatch on a branch is skipped, since the
+    # image is tagged latest and the chart is tagged with the release version.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Pushing to ghcr.io/<owner>/ with the workflow's own token.
+      packages: write
+    steps:
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Version
+        id: version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          v="${REF_NAME#v}"
+          # Anchored and without leading zeros: a shell glob let 1.2.3.4, 1.2.3x
+          # and 01.2.3 through, and the image was then pushed before helm
+          # refused the same string as a chart version.
+          part='(0|[1-9][0-9]*)'
+          if ! [[ "$v" =~ ^$part\.$part\.$part$ ]]; then
+            echo "not a version: $v" >&2
+            exit 1
+          fi
+          echo "value=$v" >> "$GITHUB_OUTPUT"
+
+      # yamllint disable-line rule:line-length
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
+
+      # yamllint disable-line rule:line-length
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550  # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Lowercase because a registry path must be, and an owner may not be.
+      - name: Image name
+        id: image
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: echo "name=ghcr.io/${OWNER,,}/nitpick-notary" >> "$GITHUB_OUTPUT"
+
+      # yamllint disable-line rule:line-length
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          push: true
+          provenance: true
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ steps.version.outputs.value }}
+            ${{ steps.image.outputs.name }}:latest
+
+      # yamllint disable-line rule:line-length
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e  # v5.1.0
+
+      # The chart's version and appVersion are both the release, so the default
+      # image tag is the image this run just pushed.
+      - name: Package and push the chart
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+          OWNER: ${{ github.repository_owner }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          hash=$(printf 'a%.0s' $(seq 64))
+          helm lint deploy/helm/nitpick-notary \
+            --set 'tokens[0].name=ci' --set 'tokens[0].role=read' \
+            --set "tokens[0].hash=$hash"
+          helm package deploy/helm/nitpick-notary \
+            --version "$VERSION" --app-version "$VERSION" \
+            --destination dist-chart
+          printf %s "$TOKEN" | helm registry login ghcr.io \
+            --username "$ACTOR" --password-stdin
+          helm push "dist-chart/nitpick-notary-$VERSION.tgz" \
+            "oci://ghcr.io/${OWNER,,}/charts"

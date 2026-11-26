@@ -1,0 +1,10 @@
+The notary is installed as {{ include "notary.fullname" . }}, one replica.
+
+Point a review at it from inside the cluster:
+  nitpick review -notary http://{{ include "notary.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.service.port }}
+
+with NITPICK_NOTARY_TOKEN set to the secret whose hash you gave the chart.
+{{- if not .Values.persistence.enabled }}
+
+persistence.enabled is false: records are lost when the pod restarts.
+{{- end }}

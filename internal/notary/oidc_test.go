@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -293,5 +294,87 @@ func TestACancelledRequestDoesNotRefuseEveryTokenForAMinute(t *testing.T) {
 	}
 	if _, ok := v.Authenticate(context.Background(), p.token(t, nil)); !ok {
 		t.Error("one client disconnecting made the next valid token fail: the cancelled fetch was stamped as an issuer failure")
+	}
+}
+
+func TestAHashOnlyTokenAuthenticatesTheSecretAndHoldsNoSecret(t *testing.T) {
+	const secret = "a-secret-the-server-never-sees"
+	tok, err := TokenFromHash("ci", RoleAuthoritative, HashSecret(secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fs, err := wire.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(New(fs, []Token{tok}, false))
+	t.Cleanup(srv.Close)
+	ctx := context.Background()
+
+	good, _ := wire.NewHTTPStore(srv.URL, secret)
+	if err := good.Put(ctx, rec(true)); err != nil {
+		t.Fatalf("the secret the hash was made from was refused: %v", err)
+	}
+	// The hash is not a credential: presenting it must not work.
+	asHash, _ := wire.NewHTTPStore(srv.URL, HashSecret(secret))
+	if _, _, err := asHash.Get(ctx, hash); err == nil {
+		t.Error("the stored hash was accepted as a bearer token, so anyone who reads the config holds the credential")
+	}
+	for _, shown := range []string{fmt.Sprintf("%+v", tok), fmt.Sprintf("%#v", tok)} {
+		if strings.Contains(shown, secret) {
+			t.Fatal("the secret is reachable from the token")
+		}
+	}
+}
+
+func TestATokenHashThatIsNotASha256IsRefused(t *testing.T) {
+	for _, bad := range []string{"", "zz", strings.Repeat("a", 63), strings.Repeat("a", 65), strings.Repeat("g", 64)} {
+		if _, err := TokenFromHash("ci", RoleRead, bad); err == nil {
+			t.Errorf("%q was accepted", bad)
+		}
+	}
+}
+
+func TestTheHealthEndpointNeedsNoTokenAndServesNoRecord(t *testing.T) {
+	fs, err := wire.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fs.Put(context.Background(), rec(true)); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(New(fs, []Token{NewToken("ci", RoleAuthoritative, "s")}, false))
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Get(srv.URL + "/healthz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || strings.TrimSpace(string(body)) != "ok" {
+		t.Fatalf("health = %d %q", resp.StatusCode, body)
+	}
+	// Anything else still needs a token.
+	resp, err = http.Get(srv.URL + "/v1/records/" + hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("a record was served without a token: %d", resp.StatusCode)
+	}
+	// And the exemption is for reading only.
+	req, err := http.NewRequest(http.MethodDelete, srv.URL+"/healthz", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode == http.StatusOK {
+		t.Error("DELETE /healthz succeeded")
 	}
 }

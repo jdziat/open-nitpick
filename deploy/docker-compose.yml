@@ -1,0 +1,30 @@
+---
+# A notary on this machine. From this directory:
+#
+#   cp .env.example .env     # then put token hashes in it (see the file)
+#   docker compose up -d --build
+#   curl -s localhost:8484/healthz
+#
+# Point a review at it with -notary http://localhost:8484 and
+# NITPICK_NOTARY_TOKEN set to the secret whose hash is in .env.
+services:
+  notary:
+    image: ${NOTARY_IMAGE:-ghcr.io/nitpick-oss/nitpick-notary:latest}
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile
+    restart: unless-stopped
+    # Loopback only: a record server that anyone on the network can reach is an
+    # authentication boundary, and this is the local setup.
+    ports:
+      - "127.0.0.1:${NOTARY_PORT:-8484}:8484"
+    environment:
+      NITPICK_NOTARY_TOKENS: ${NITPICK_NOTARY_TOKENS:?set it in .env}
+    volumes:
+      - notary-data:/data
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  notary-data:

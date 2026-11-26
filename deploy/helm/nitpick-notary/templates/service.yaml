@@ -1,0 +1,17 @@
+# yamllint disable-file
+# A Go template: not valid YAML until Helm renders it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "notary.fullname" . }}
+  labels: {{- include "notary.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector: {{- include "notary.selector" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      {{- if and (eq .Values.service.type "NodePort") .Values.service.nodePort }}
+      nodePort: {{ .Values.service.nodePort }}
+      {{- end }}
