@@ -114,6 +114,20 @@ jobs:
 
       # The script is for the PowerShell every Windows machine has, which is
       # 5.1, as much as for PowerShell 7, so both run the tests.
+      # The way most Windows users run it: the file's text piped into iex, in
+      # the PowerShell that ships with Windows.
+      - name: Install the latest release under Windows PowerShell 5.1
+        shell: powershell
+        env:
+          INSTALL_DIR: ${{ runner.temp }}\latest51
+        run: |
+          Get-Content -Raw ./website/install.ps1 | Invoke-Expression
+          $out = & "$env:INSTALL_DIR\nitpick.exe" version
+          Write-Host $out
+          if ($out -notmatch '^nitpick v') {
+            throw "unexpected version output: $out"
+          }
+
       - name: Test install.ps1 under PowerShell 7
         shell: pwsh
         run: ./scripts/test-install-ps1.ps1

@@ -88,10 +88,16 @@ function Invoke-Install([hashtable]$Env = @{}, [string]$Path = $env:PATH) {
     foreach ($k in $Env.Keys) { $vars[$k] = $Env[$k] }
     $saved = @{}
     foreach ($k in $vars.Keys) { $saved[$k] = [Environment]::GetEnvironmentVariable($k); [Environment]::SetEnvironmentVariable($k, $vars[$k]) }
+    # Windows PowerShell 5.1 turns a native command's stderr into a terminating
+    # error when the preference is Stop, and a refused install writes to stderr
+    # on purpose: so the preference is Continue for this one call.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     try {
-        $out = & $shell -NoProfile -NonInteractive -File $Script 2>&1 | Out-String
+        $out = (& $shell -NoProfile -NonInteractive -File $Script 2>&1 | ForEach-Object { $_.ToString() }) -join "`n"
         $code = $LASTEXITCODE
     } finally {
+        $ErrorActionPreference = $previous
         foreach ($k in $saved.Keys) { [Environment]::SetEnvironmentVariable($k, $saved[$k]) }
     }
     return [pscustomobject]@{ Code = $code; Out = $out; Dir = $dir; Exe = (Join-Path $dir 'nitpick.exe') }
