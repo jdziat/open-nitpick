@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"math"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
@@ -679,5 +680,54 @@ func TestAShortOrEmptyHashIsLoggedWithoutSlicingPastItsEnd(t *testing.T) {
 		if got := shortHash(in); got != want {
 			t.Errorf("shortHash(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// flakyStore fails its first write, as one dropped request would.
+type flakyStore struct {
+	wire.Store
+	failed atomic.Bool
+}
+
+func (s *flakyStore) Put(ctx context.Context, r wire.Record) error {
+	if s.failed.CompareAndSwap(false, true) {
+		return errors.New("connection reset")
+	}
+	return s.Store.Put(ctx, r)
+}
+
+func TestOneDroppedWriteDoesNotMakeAReviewUnofficialWhenALaterWriteLands(t *testing.T) {
+	inner := fileStore(t)
+	flaky := &flakyStore{Store: inner}
+	e, provider := notaryEngine(t, notaryModel(t, notaryFinding()), flaky)
+	e.RequireNotary = true
+	report, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !flaky.failed.Load() {
+		t.Fatal("setup: no write was dropped, so nothing was tested")
+	}
+	rec, ok, _ := inner.Get(context.Background(), report.Notary.Hash)
+	if !ok || !rec.Complete || len(rec.Answers) < 2 {
+		t.Fatalf("setup: the notary must end up holding the complete record, got ok=%v %+v", ok, rec.Complete)
+	}
+	if report.Unofficial || provider.published == nil {
+		t.Errorf("a review whose record the notary holds complete was withheld: %+v", report.Notary)
+	}
+	if !report.Notary.Complete || report.Notary.Err != "" {
+		t.Errorf("status disagrees with the store: %+v", report.Notary)
+	}
+}
+
+func TestADroppedWriteIsNotForgivenWhenTheRecordIsMissingAnAnswer(t *testing.T) {
+	store := fileStore(t)
+	s, _ := armedSession(t, store, &scriptedLLM{})
+	nan := math.NaN()
+	s.putFailed = true
+	s.Record(context.Background(), "lost", &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop, Usage: llms.Usage{Cost: &nan}})
+	s.Record(context.Background(), "kept", &llms.Response{Content: "{}", FinishReason: llms.FinishReasonStop})
+	if s.status.Err == "" {
+		t.Error("a later successful write cleared the error for an answer that was never recorded")
 	}
 }

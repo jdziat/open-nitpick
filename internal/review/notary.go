@@ -96,6 +96,8 @@ type notarySession struct {
 	used map[string]bool
 	// gap is set when an answer could not be kept.
 	gap bool
+	// putFailed is set while the last write to the notary has not landed.
+	putFailed bool
 }
 
 func newNotarySession(store wire.Store, log *slog.Logger, by string) *notarySession {
@@ -251,6 +253,7 @@ func (n *notarySession) put(ctx context.Context) {
 	n.rec.Batches = len(n.rec.Answers)
 	if err := n.store.Put(ctx, n.rec); err != nil {
 		n.status.Err = err.Error()
+		n.putFailed = true
 		if errors.Is(err, wire.ErrForbidden) {
 			n.writable = false
 			return
@@ -259,6 +262,15 @@ func (n *notarySession) put(ctx context.Context) {
 		return
 	}
 	n.status.Recorded++
+	// Every write carries the whole record, so a later one that lands has
+	// stored what the failed one would have. Leaving the error would withhold
+	// a review whose record the notary holds, and report a record written
+	// complete as incomplete. An answer that could not be encoded is a
+	// different loss: no write brings it back.
+	if n.putFailed && !n.gap {
+		n.putFailed = false
+		n.status.Err = ""
+	}
 }
 
 // finish marks the record complete when the review it belongs to was. A review
