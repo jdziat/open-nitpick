@@ -71,6 +71,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// One server per directory: see FileStore.Lock.
+	if err := store.Lock(); err != nil {
+		log.Fatalf("nitpick-notary: %v (run one server per data directory)", err)
+	}
 	srvHandler := notary.New(store, tokens, *allowClear)
 	if *audience != "" {
 		srvHandler.WithOIDC(&notary.OIDC{Issuer: *issuer, Audience: *audience, Allow: rules, JWKSURL: *jwks})

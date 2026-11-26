@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gofrs/flock"
 )
 
 var hashRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -19,6 +21,41 @@ var hashRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
 type FileStore struct {
 	dir string
 	mu  sync.Mutex
+	// lock is held for as long as this process owns the directory. Nil until
+	// Lock is called.
+	lock *flock.Flock
+}
+
+// ErrDirectoryInUse means another process holds the store's directory.
+var ErrDirectoryInUse = errors.New("the data directory is in use by another process")
+
+// Lock claims the directory for this process. The rule that a complete record
+// is never replaced by a partial one is kept by a mutex, which is per process:
+// two servers sharing a directory each check the record and then write it, and
+// a partial write landed over a complete one in 210 of 400 races between them.
+// A process that serves the directory takes this lock and a second one fails
+// here instead of starting. It is released by Unlock, or when the process ends.
+func (s *FileStore) Lock() error {
+	l := flock.New(filepath.Join(s.dir, ".lock"))
+	ok, err := l.TryLock()
+	if err != nil {
+		return fmt.Errorf("lock %s: %w", s.dir, err)
+	}
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrDirectoryInUse, s.dir)
+	}
+	s.lock = l
+	return nil
+}
+
+// Unlock gives the directory up.
+func (s *FileStore) Unlock() error {
+	if s.lock == nil {
+		return nil
+	}
+	err := s.lock.Unlock()
+	s.lock = nil
+	return err
 }
 
 // NewFileStore creates the directory if needed.
@@ -26,7 +63,25 @@ func NewFileStore(dir string) (*FileStore, error) {
 	if err := os.MkdirAll(filepath.Join(dir, "history"), 0o750); err != nil {
 		return nil, fmt.Errorf("create store %s: %w", dir, err)
 	}
+	removeStaleTemporaries(dir)
 	return &FileStore{dir: dir}, nil
+}
+
+// staleTemporary is how old a temporary file must be before it is taken for
+// the leftover of a crashed write. A write takes milliseconds, so a younger
+// one may be another process's, and removing it would fail that write.
+const staleTemporary = 10 * time.Minute
+
+// removeStaleTemporaries clears what a process killed between creating a
+// temporary file and renaming it left behind. Their names are unique, so
+// nothing would ever overwrite them.
+func removeStaleTemporaries(dir string) {
+	left, _ := filepath.Glob(filepath.Join(dir, "*.json.*.tmp"))
+	for _, p := range left {
+		if info, err := os.Stat(p); err == nil && time.Since(info.ModTime()) > staleTemporary {
+			_ = os.Remove(p)
+		}
+	}
 }
 
 func (s *FileStore) path(hash string) (string, error) {

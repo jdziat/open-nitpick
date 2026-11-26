@@ -2,10 +2,14 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net"
 	"net/http"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -118,4 +122,49 @@ func FuzzTokenFlag(f *testing.F) {
 			t.Fatalf("%q accepted with role %q", s, tokens[0].Role)
 		}
 	})
+}
+
+// A second server on the same data directory must refuse to start. Run as a
+// real process: the lock is the operating system's, not a variable.
+func TestASecondServerOnTheSameDirectoryRefusesToStart(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds and starts the server binary")
+	}
+	bin := filepath.Join(t.TempDir(), "nitpick-notary")
+	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
+		t.Fatalf("build: %v\n%s", err, out)
+	}
+	data := t.TempDir()
+	start := func(addr string) *exec.Cmd {
+		c := exec.Command(bin, "-addr", addr, "-data", data, "-token", "ci:authoritative:s")
+		var stderr bytes.Buffer
+		c.Stderr = &stderr
+		return c
+	}
+	first := start("127.0.0.1:0")
+	if err := first.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = first.Process.Kill(); _ = first.Wait() }()
+	time.Sleep(700 * time.Millisecond)
+
+	// Bounded: a server that wrongly starts would serve for ever, and a guard
+	// test that hangs when its guard is broken is a poor way to find out.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	second := exec.CommandContext(ctx, bin, "-addr", "127.0.0.1:0", "-data", data, "-token", "ci:authoritative:s")
+	var buf bytes.Buffer
+	second.Stderr = &buf
+	err := second.Run()
+	out := buf.String()
+	if ctx.Err() != nil {
+		t.Fatal("the second server was still running after 5s: it started on a directory another server holds")
+	}
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || exit.ExitCode() == 0 {
+		t.Fatalf("the second server started on a held directory: err=%v output=%q", err, out)
+	}
+	if !strings.Contains(out, "in use") {
+		t.Errorf("the refusal does not say why: %q", out)
+	}
 }

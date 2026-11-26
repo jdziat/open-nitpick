@@ -3,12 +3,14 @@ package wire
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 var robustHash = strings.Repeat("c", 64)
@@ -167,4 +169,58 @@ func TestClearingARecordThatDoesNotExistCreatesNothing(t *testing.T) {
 	if len(entries) != 1 || len(hist) != 0 {
 		t.Errorf("a clear of nothing left %d entries and %d history files, want only the history directory", len(entries), len(hist))
 	}
+}
+
+func TestStartingAStoreClearsTheTemporariesACrashLeftButNotAnotherProcessesWrite(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := NewFileStore(dir); err != nil {
+		t.Fatal(err)
+	}
+	stale := filepath.Join(dir, robustHash+".json.123456.tmp")
+	fresh := filepath.Join(dir, robustHash+".json.654321.tmp")
+	other := filepath.Join(dir, "notes.tmp") // not a record's temporary: never touched
+	for _, p := range []string{stale, fresh, other} {
+		if err := os.WriteFile(p, []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := time.Now().Add(-time.Hour)
+	for _, p := range []string{stale, other} {
+		if err := os.Chtimes(p, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := NewFileStore(dir); err != nil {
+		t.Fatal(err)
+	}
+	exists := func(p string) bool { _, err := os.Stat(p); return err == nil }
+	if exists(stale) {
+		t.Error("a temporary from a crashed write an hour ago was kept for ever")
+	}
+	if !exists(fresh) {
+		t.Error("a temporary a minute old was removed: it may be another process's write in progress")
+	}
+	if !exists(other) {
+		t.Error("a file that is not a record's temporary was removed")
+	}
+}
+
+func TestOnlyOneProcessMayServeADirectoryAtATime(t *testing.T) {
+	dir := t.TempDir()
+	first, _ := NewFileStore(dir)
+	second, _ := NewFileStore(dir)
+	if err := first.Lock(); err != nil {
+		t.Fatalf("the first claim failed: %v", err)
+	}
+	err := second.Lock()
+	if !errors.Is(err, ErrDirectoryInUse) {
+		t.Fatalf("a second claim on a held directory returned %v, want ErrDirectoryInUse", err)
+	}
+	if err := first.Unlock(); err != nil {
+		t.Fatal(err)
+	}
+	if err := second.Lock(); err != nil {
+		t.Errorf("the directory was not free after the first server let go: %v", err)
+	}
+	_ = second.Unlock()
 }
