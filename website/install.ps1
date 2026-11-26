@@ -13,7 +13,8 @@
 #
 # Read by tests and by anyone mirroring releases:
 #   NITPICK_RELEASE_BASE  where assets are served, as <base>/<tag>/<asset>
-#   NITPICK_LATEST_URL    a URL that answers with JSON holding a "tag_name"
+#   NITPICK_LATEST_BASE   where the latest release's files are served, as
+#                         <base>/checksums.txt
 #   NITPICK_INSTALL_TEST  set by the tests only: skips the operating system
 #                         check and does not run the file it installed
 #   NITPICK_TEST_ARCH     with the line above, stands in for the architecture
@@ -27,7 +28,7 @@ function Install-Nitpick {
 
     $repo = 'nitpick-oss/nitpick'
     $releaseBase = if ($env:NITPICK_RELEASE_BASE) { $env:NITPICK_RELEASE_BASE } else { "https://github.com/$repo/releases/download" }
-    $latestUrl = if ($env:NITPICK_LATEST_URL) { $env:NITPICK_LATEST_URL } else { "https://api.github.com/repos/$repo/releases/latest" }
+    $latestBase = if ($env:NITPICK_LATEST_BASE) { $env:NITPICK_LATEST_BASE } else { "https://github.com/$repo/releases/latest/download" }
     $testing = [bool]$env:NITPICK_INSTALL_TEST
 
     # Windows PowerShell 5.1 can default to protocols GitHub no longer accepts,
@@ -79,13 +80,24 @@ function Install-Nitpick {
     try {
         $version = $env:VERSION
         if (-not $version) {
+            # The latest release is found through its checksums.txt, which lists
+            # every asset with its version in the name, and not through the GitHub
+            # API: unauthenticated API requests are limited to 60 an hour per
+            # address, and CI runners and offices share addresses.
+            $latestSums = Join-Path $tmp 'latest-checksums.txt'
             try {
-                $latest = Invoke-RestMethod -UseBasicParsing -Uri $latestUrl
+                Invoke-WebRequest -UseBasicParsing -Uri "$latestBase/checksums.txt" -OutFile $latestSums
             } catch {
-                Exit-Install 'could not find the latest release (GitHub may be rate limiting you); set $env:VERSION = ''vX.Y.Z'' to skip the lookup'
+                Exit-Install 'could not find the latest release; set $env:VERSION = ''vX.Y.Z'' to skip the lookup'
             }
-            $version = $latest.tag_name
-            if (-not $version) { Exit-Install 'the latest release answer held no tag_name' }
+            foreach ($line in Get-Content -Path $latestSums) {
+                # -cmatch: asset names are case-sensitive, and -match ignores case.
+                if ($line -cmatch '^[0-9a-fA-F]{64}\s+\*?nitpick_(v\S+?)_windows_amd64\.exe\s*$') {
+                    $version = $Matches[1]
+                    break
+                }
+            }
+            if (-not $version) { Exit-Install 'the latest release has no build for windows/amd64' }
         }
         if (-not $version.StartsWith('v')) { $version = "v$version" }
         # The version goes into a URL and a file name, so it is checked, not trusted.

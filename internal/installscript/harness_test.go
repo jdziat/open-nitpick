@@ -105,7 +105,7 @@ func assetName(t *testing.T, version string, tg target) string {
 }
 
 // fakeRelease serves one or more releases the way the install script fetches
-// them: <base>/<tag>/<file>, plus a latest endpoint answering with JSON.
+// them: <base>/<tag>/<file>, plus /latest/<file> for the latest release's files.
 type fakeRelease struct {
 	srv    *httptest.Server
 	mu     sync.Mutex
@@ -121,20 +121,22 @@ func newFakeRelease(t *testing.T) *fakeRelease {
 		f.mu.Lock()
 		f.log = append(f.log, r.URL.Path)
 		latest := f.latest
-		body, ok := f.files[strings.TrimPrefix(r.URL.Path, "/dl/")]
-		f.mu.Unlock()
+		var key string
 		switch {
-		case r.URL.Path == "/latest":
-			if latest == "" {
-				http.Error(w, "no release", http.StatusNotFound)
-				return
-			}
-			_, _ = fmt.Fprintf(w, `{"url":"x","tag_name": %q,"name":"x"}`, latest)
-		case strings.HasPrefix(r.URL.Path, "/dl/") && ok:
-			_, _ = w.Write(body)
-		default:
-			http.NotFound(w, r)
+		case strings.HasPrefix(r.URL.Path, "/dl/"):
+			key = strings.TrimPrefix(r.URL.Path, "/dl/")
+		case strings.HasPrefix(r.URL.Path, "/latest/") && latest != "":
+			// The files of whichever release is the latest, as GitHub redirects
+			// releases/latest/download/<file> to them.
+			key = latest + "/" + strings.TrimPrefix(r.URL.Path, "/latest/")
 		}
+		body, ok := f.files[key]
+		f.mu.Unlock()
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(body)
 	}))
 	t.Cleanup(f.srv.Close)
 	return f
@@ -300,7 +302,7 @@ func run(t *testing.T, o opts) result {
 		"INSTALL_DIR=" + dir,
 	}
 	if o.rel != nil {
-		env = append(env, "NITPICK_RELEASE_BASE="+o.rel.srv.URL+"/dl", "NITPICK_LATEST_URL="+o.rel.srv.URL+"/latest")
+		env = append(env, "NITPICK_RELEASE_BASE="+o.rel.srv.URL+"/dl", "NITPICK_LATEST_BASE="+o.rel.srv.URL+"/latest")
 	}
 	if o.version != "" {
 		env = append(env, "VERSION="+o.version)

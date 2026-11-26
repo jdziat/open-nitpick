@@ -58,7 +58,7 @@ func TestAPinnedVersionSkipsTheLatestLookup(t *testing.T) {
 		mustContain(t, res.stdout, "Installed: nitpick v9.8.0")
 	}
 	for _, p := range rel.requests() {
-		if p == "/latest" {
+		if strings.HasPrefix(p, "/latest/") {
 			t.Error("a pinned install still asked which release is the latest")
 		}
 	}
@@ -164,7 +164,9 @@ func TestAChecksumsFileThatDoesNotListTheAssetIsRefused(t *testing.T) {
 			good+"  x"+name+"\n"+
 			good+"  "+strings.Replace(name, "amd64", "arm64", 1)+"\n"))
 
-	res := run(t, opts{rel: rel})
+	// Pinned, so the lookup of the latest version (which reads this same file and
+	// has its own refusal) is skipped and the per-asset check is what runs.
+	res := run(t, opts{rel: rel, version: testVersion})
 	if res.code == 0 {
 		t.Fatal("an asset with no checksum of its own was installed")
 	}
@@ -497,15 +499,71 @@ func TestALatestLookupThatFailsExplainsHowToPinAVersion(t *testing.T) {
 	mustContain(t, res.stderr, "VERSION=vX.Y.Z")
 }
 
-func TestALatestAnswerWithNoTagIsAnErrorNotAnEmptyVersion(t *testing.T) {
+func TestALatestReleaseWithNoBuildForThisPlatformIsAnErrorNotAnEmptyVersion(t *testing.T) {
 	rel := newFakeRelease(t)
-	rel.put("x", "y", []byte(`{"name":"a release with no tag_name key"}`))
+	good := sum([]byte("x"))
+	// A release that lists only other platforms, and a file that is not an asset.
+	rel.put("v9.7.0", "checksums.txt", []byte(
+		good+"  nitpick_v9.7.0_darwin_arm64\n"+
+			good+"  nitpick_v9.7.0_linux_amd64.sigstore.json\n"+
+			good+"  notes.txt\n"))
+	rel.setLatest("v9.7.0")
 
-	res := run(t, opts{rel: rel, extraEnv: []string{"NITPICK_LATEST_URL=" + rel.srv.URL + "/dl/x/y"}})
+	res := run(t, opts{rel: rel})
 	if res.code == 0 {
-		t.Fatal("an answer with no tag was accepted")
+		t.Fatal("a latest release with no build for this platform was accepted")
 	}
-	mustContain(t, res.stderr, "tag_name")
+	mustContain(t, res.stderr, "no build for linux/amd64")
+	if names := installed(t, res.dir); len(names) != 0 {
+		t.Errorf("left %v behind", names)
+	}
+}
+
+func TestTheLatestVersionComesFromTheAssetNamedForThisPlatform(t *testing.T) {
+	rel := newFakeRelease(t)
+	rel.publish(t, "v9.9.9")
+	rel.setLatest("v9.9.9")
+	// A machine that is not the one listed first in checksums.txt.
+	res := run(t, opts{rel: rel, sysname: "Darwin", machine: "arm64"})
+	if res.code != 0 {
+		t.Fatalf("exit %d:\n%s", res.code, res.out())
+	}
+	mustContain(t, res.stdout, "Installing nitpick v9.9.9 (darwin/arm64)")
+}
+
+func TestAnUnrelatedAssetWithTheSamePlatformSuffixDoesNotSetTheVersion(t *testing.T) {
+	rel := newFakeRelease(t)
+	built := rel.publish(t, testVersion)
+	rel.setLatest(testVersion)
+	real := rel.files[testVersion+"/checksums.txt"]
+	// Another file with this platform's suffix, listed before the real asset.
+	rel.put(testVersion, "checksums.txt", append([]byte(sum([]byte("x"))+"  helper_v1.0.0_linux_amd64\n"), real...))
+
+	res := run(t, opts{rel: rel})
+	if res.code != 0 {
+		t.Fatalf("an unrelated asset listed first broke the lookup:\n%s", res.out())
+	}
+	mustContain(t, res.stdout, "Installing nitpick "+testVersion)
+	if !bytes.Equal(readFile(t, filepath.Join(res.dir, "nitpick")), built[target{"linux", "amd64"}]) {
+		t.Error("installed something other than the nitpick binary")
+	}
+}
+
+func TestTheLatestLookupDoesNotUseTheGitHubAPI(t *testing.T) {
+	// Unauthenticated API requests are limited to 60 an hour per address, and
+	// CI runners and offices share addresses: the first CI run of this script
+	// failed with a 403 for that reason.
+	for _, f := range []string{"website/install.sh", "website/install.ps1"} {
+		for i, line := range strings.Split(readRepoFile(t, f), "\n") {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "#") {
+				continue
+			}
+			if strings.Contains(line, "api.github.com") {
+				t.Errorf("%s line %d calls the GitHub API: %s", f, i+1, line)
+			}
+		}
+	}
 }
 
 func TestTheScriptRunsWhenItIsPipedToTheShell(t *testing.T) {

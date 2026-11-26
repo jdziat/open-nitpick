@@ -13,7 +13,8 @@
 #
 # Read by tests and by anyone mirroring releases:
 #   NITPICK_RELEASE_BASE  where assets are served, as <base>/<tag>/<asset>
-#   NITPICK_LATEST_URL    a URL that answers with JSON holding a "tag_name"
+#   NITPICK_LATEST_BASE   where the latest release's files are served, as
+#                         <base>/checksums.txt
 #
 # Everything is inside main, which runs on the last line. A download cut off
 # partway therefore runs nothing at all.
@@ -23,7 +24,7 @@ main() {
 
 	repo=nitpick-oss/nitpick
 	release_base=${NITPICK_RELEASE_BASE:-https://github.com/$repo/releases/download}
-	latest_url=${NITPICK_LATEST_URL:-https://api.github.com/repos/$repo/releases/latest}
+	latest_base=${NITPICK_LATEST_BASE:-https://github.com/$repo/releases/latest/download}
 
 	say() { printf '%s\n' "$*"; }
 	die() {
@@ -76,10 +77,20 @@ main() {
 
 	version=${VERSION:-}
 	if [ -z "$version" ]; then
-		fetch "$latest_url" "$tmp/latest.json" ||
-			die "could not find the latest release (GitHub may be rate limiting you); set VERSION=vX.Y.Z to skip the lookup"
-		version=$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp/latest.json" | head -n 1)
-		[ -n "$version" ] || die "the latest release answer held no tag_name"
+		# The latest release is found through its checksums.txt, which lists every
+		# asset with its version in the name, and not through the GitHub API:
+		# unauthenticated API requests are limited to 60 an hour per address, and
+		# CI runners and offices share addresses.
+		fetch "$latest_base/checksums.txt" "$tmp/latest-checksums.txt" ||
+			die "could not find the latest release; set VERSION=vX.Y.Z to skip the lookup"
+		suffix=_${os}_${arch}
+		name=$(awk -v suffix="$suffix" '{
+			n = $2; sub(/^\*/, "", n)
+			if (index(n, "nitpick_v") == 1 && substr(n, length(n) - length(suffix) + 1) == suffix) { print n; exit }
+		}' "$tmp/latest-checksums.txt")
+		[ -n "$name" ] || die "the latest release has no build for $os/$arch"
+		name=${name#nitpick_}
+		version=${name%"$suffix"}
 	fi
 	case $version in
 	v*) ;;

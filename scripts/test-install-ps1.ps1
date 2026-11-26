@@ -66,8 +66,9 @@ $server = [powershell]::Create()
         $path = $ctx.Request.Url.AbsolutePath
         [void]$state.log.Add($path)
         $body = $null; $status = 200
-        if ($path -eq '/latest') {
-            if ($state.latest) { $body = [System.Text.Encoding]::UTF8.GetBytes("{`"tag_name`": `"$($state.latest)`"}") } else { $status = 404 }
+        if ($path.StartsWith('/latest/')) {
+            $key = "$($state.latest)/$($path.Substring(8))"
+            if ($state.latest -and $state.files.ContainsKey($key)) { $body = $state.files[$key] } else { $status = 404 }
         } elseif ($path.StartsWith('/dl/') -and $state.files.ContainsKey($path.Substring(4))) {
             $body = $state.files[$path.Substring(4)]
         } else { $status = 404 }
@@ -94,7 +95,7 @@ function Invoke-Install([hashtable]$Env = @{}, [string]$Path = $env:PATH) {
     $dir = Join-Path ([System.IO.Path]::GetTempPath()) ('nitpick-test-' + [guid]::NewGuid().ToString('N'))
     $vars = @{
         INSTALL_DIR = $dir; NITPICK_INSTALL_TEST = '1'; NITPICK_RELEASE_BASE = "$base/dl"
-        NITPICK_LATEST_URL = "$base/latest"; VERSION = ''; NITPICK_TEST_ARCH = ''; PATH = $Path
+        NITPICK_LATEST_BASE = "$base/latest"; VERSION = ''; NITPICK_TEST_ARCH = ''; PATH = $Path
     }
     foreach ($k in $Env.Keys) { $vars[$k] = $Env[$k] }
     $saved = @{}
@@ -134,7 +135,7 @@ try {
         $r = Invoke-Install @{ VERSION = $pin }
         Check ($r.Code -eq 0 -and $r.Out -match 'v9\.8\.0') "VERSION=$pin installs that version" -Detail $r.Out
     }
-    Check (-not ($state.log -contains '/latest')) 'a pinned install never asks for the latest'
+    Check (-not ($state.log -contains '/latest/checksums.txt')) 'a pinned install never asks for the latest'
 
     # 3. a tampered asset is refused and nothing is installed
     Clear-FakeRelease; [void](Publish $version); $state.latest = $version
@@ -154,7 +155,9 @@ try {
     Clear-FakeRelease; $bin = Publish $version; $state.latest = $version
     $good = Get-Sha $bin
     $state.files["$version/checksums.txt"] = [System.Text.Encoding]::UTF8.GetBytes("$good  $asset.sigstore.json`n$good  x$asset`n$good  $($asset.ToUpper())`n")
-    $r = Invoke-Install
+    # Pinned, so the lookup of the latest version (which reads this same file and
+    # has its own refusal) is skipped and the per-asset check is what runs.
+    $r = Invoke-Install @{ VERSION = $version }
     Check ($r.Code -ne 0 -and $r.Out -match 'does not list') 'a checksum under a similar name does not count' -Detail $r.Out
 
     # 6. a refused install leaves an older binary as it was
@@ -184,6 +187,35 @@ try {
     Clear-FakeRelease
     $r = Invoke-Install
     Check ($r.Code -ne 0 -and $r.Out -match 'VERSION') 'a failed latest lookup explains how to pin a version' -Detail $r.Out
+
+    # 9b. a latest release with no windows build, or only a lookalike, is an error
+    Clear-FakeRelease
+    $good = Get-Sha ([System.Text.Encoding]::UTF8.GetBytes('x'))
+    $state.files['v9.7.0/checksums.txt'] = [System.Text.Encoding]::UTF8.GetBytes("$good  nitpick_v9.7.0_linux_amd64`n$good  nitpick_v9.7.0_windows_amd64.exe.sigstore.json`n$good  helper_v1.0.0_windows_amd64.exe`n")
+    $state.latest = 'v9.7.0'
+    $r = Invoke-Install
+    Check ($r.Code -ne 0 -and $r.Out -match 'no build for windows/amd64' -and (@(Remaining $r.Dir)).Count -eq 0) 'a latest release with no windows build is refused' -Detail $r.Out
+
+    # 9c. an unrelated asset with the same suffix, listed first, does not set the version
+    Clear-FakeRelease; $bin = Publish $version; $state.latest = $version
+    $real = [System.Text.Encoding]::UTF8.GetString($state.files["$version/checksums.txt"])
+    $state.files["$version/checksums.txt"] = [System.Text.Encoding]::UTF8.GetBytes("$good  helper_v1.0.0_windows_amd64.exe`n$real")
+    $r = Invoke-Install
+    Check ($r.Code -eq 0 -and $r.Out -match "Installing nitpick $version") 'an unrelated asset listed first does not set the version' -Detail $r.Out
+
+    # 9d. a name in the wrong case is not an asset: the lookup is case-sensitive too
+    Clear-FakeRelease
+    $state.files['v9.6.0/checksums.txt'] = [System.Text.Encoding]::UTF8.GetBytes("$good  NITPICK_V9.6.0_WINDOWS_AMD64.EXE`n")
+    $state.latest = 'v9.6.0'
+    $r = Invoke-Install
+    Check ($r.Code -ne 0 -and $r.Out -match 'no build for windows/amd64') 'an asset name in the wrong case is not found' -Detail $r.Out
+
+    # 9e. a file that only looks like a version is not nitpick's binary
+    Clear-FakeRelease
+    $state.files['v9.5.0/checksums.txt'] = [System.Text.Encoding]::UTF8.GetBytes("$good  v1.0.0_windows_amd64.exe`n")
+    $state.latest = 'v9.5.0'
+    $r = Invoke-Install
+    Check ($r.Code -ne 0 -and $r.Out -match 'no build for windows/amd64') 'a name with no nitpick_ prefix is not the binary' -Detail $r.Out
 
     # 10. the PATH hint appears only for a directory that is not on the PATH
     Clear-FakeRelease; [void](Publish $version); $state.latest = $version
