@@ -1,0 +1,24 @@
+{{- define "notary.name" -}}{{ .Chart.Name }}{{- end -}}
+
+{{- define "notary.fullname" -}}
+{{- if contains .Chart.Name .Release.Name -}}{{ .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- else -}}{{ printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" }}{{- end -}}
+{{- end -}}
+
+{{- define "notary.labels" -}}
+app.kubernetes.io/name: {{ include "notary.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" }}
+{{- end -}}
+
+{{- define "notary.selector" -}}
+app.kubernetes.io/name: {{ include "notary.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end -}}
+
+{{/* The Secret the pod reads tokens from: the operator's, or the one this chart makes. */}}
+{{- define "notary.secretName" -}}
+{{- if .Values.existingSecret -}}{{ .Values.existingSecret }}{{- else -}}{{ include "notary.fullname" . }}{{- end -}}
+{{- end -}}

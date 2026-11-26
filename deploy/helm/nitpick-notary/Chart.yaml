@@ -1,0 +1,11 @@
+apiVersion: v2
+name: nitpick-notary
+description: The nitpick notary, a server that keeps the model answers of code reviews so the same inputs replay them and an interrupted review resumes.
+type: application
+# The release workflow packages with the tag's version for both fields, so the
+# values here are what a checkout of the repository reports.
+version: 0.1.0
+appVersion: "2.9.0"
+home: https://github.com/nitpick-oss/nitpick
+sources:
+  - https://github.com/nitpick-oss/nitpick

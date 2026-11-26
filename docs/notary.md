@@ -77,6 +77,52 @@ decides the role. `*` matches any run of characters, `/` and `:` included. A
 subject no rule matches is refused, so an empty list admits nobody, and the
 two flags must be given together. Static tokens keep working beside it.
 
+## Deploying one
+
+Tokens for a deployment are given as hashes, so a configuration file or a
+Kubernetes Secret never holds a usable credential. Hash a secret with the server
+itself:
+
+```sh
+printf %s "$SECRET" | nitpick-notary -hash      # sha256:<64 hex>
+```
+
+`-token name:role:sha256:<hex>` and the `NITPICK_NOTARY_TOKENS` environment
+variable (whitespace-separated entries, for a container) take that form. The
+hash is not a bearer token: presenting it is refused. `GET /healthz` answers
+`ok` with no token and serves no record, and `nitpick-notary -healthcheck` probes
+it, for an image with no shell.
+
+### Docker
+
+```sh
+cd deploy
+cp .env.example .env            # put token hashes in it
+docker compose up -d --build
+curl -s localhost:8484/healthz
+```
+
+The image is about 9 MB, runs as an unprivileged user on a read-only root filesystem,
+and keeps records on the `notary-data` volume. The compose file binds loopback
+only.
+
+### Kubernetes
+
+```sh
+helm install notary oci://ghcr.io/nitpick-oss/charts/nitpick-notary --version 2.9.0 \
+  --set 'tokens[0].name=ci' --set 'tokens[0].role=authoritative' --set 'tokens[0].hash=<64 hex>'
+```
+
+The chart refuses a hash that is not 64 lowercase hex characters (a secret put
+there by mistake), an unknown role, and a configuration with no way to
+authenticate. It runs one replica on a `ReadWriteOnce` volume and replaces the pod
+rather than rolling it, because the record files are owned by one process. The
+volume claim is kept when the release is deleted, and installing again under the
+same release name picks it up with its records. Set `existingSecret` to supply
+the `tokens` entry from a Secret you manage, and `oidc.*` for GitHub Actions
+identity tokens. The image and chart are published to `ghcr.io` when a release
+tag is pushed by the `Notary image` workflow.
+
 ## Limits
 
 One server may run on a data directory: it takes an exclusive lock, and a second
@@ -98,6 +144,7 @@ The hash covers the whole resolved configuration, so `-fail-on`,
 `review.concurrency` and a model's timeout or retries change it, and a record
 made under one setting is not replayed under another. Each request is also keyed
 by its own content, so a changed prompt is always asked again.
+
 
 ## Using one
 

@@ -1,0 +1,98 @@
+{{- if and .Values.oidc.audience (not .Values.oidc.allow) }}
+{{- fail "oidc.audience needs oidc.allow: a token no rule matches is refused, so an empty list admits nobody" }}
+{{- end }}
+{{- if and .Values.oidc.allow (not .Values.oidc.audience) }}
+{{- fail "oidc.allow needs oidc.audience" }}
+{{- end }}
+{{- if not (or .Values.tokens .Values.existingSecret .Values.oidc.audience) }}
+{{- fail "give the notary a way to authenticate: set tokens, existingSecret or oidc.audience. With none, every request is refused" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "notary.fullname" . }}
+  labels: {{- include "notary.labels" . | nindent 4 }}
+spec:
+  # One process owns the record files. Recreate stops the old pod before the new
+  # one starts, so two never write the same volume.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {{- include "notary.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "notary.selector" . | nindent 8 }}
+      annotations:
+        {{- if and (not .Values.existingSecret) .Values.tokens }}
+        checksum/tokens: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}{{ toYaml . | nindent 8 }}{{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: notary
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - -addr=:8484
+            - -data=/data
+            {{- if .Values.authorClear }}
+            - -author-clear
+            {{- end }}
+            {{- if .Values.oidc.audience }}
+            - -oidc-audience={{ .Values.oidc.audience }}
+            - -oidc-issuer={{ .Values.oidc.issuer }}
+            {{- range .Values.oidc.allow }}
+            - -oidc-allow={{ . }}
+            {{- end }}
+            {{- end }}
+          {{- if or .Values.tokens .Values.existingSecret }}
+          env:
+            - name: NITPICK_NOTARY_TOKENS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "notary.secretName" . }}
+                  key: tokens
+          {{- end }}
+          ports:
+            - {name: http, containerPort: 8484}
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (include "notary.fullname" .) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -4,7 +4,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -18,7 +20,11 @@ type tokenFlags []notary.Token
 
 func (t *tokenFlags) String() string { return fmt.Sprint(len(*t)) }
 
-// Set parses name:role:secret.
+// hashPrefix marks a token whose secret field is already the hex SHA-256.
+const hashPrefix = "sha256:"
+
+// Set parses name:role:secret, or name:role:sha256:<hex> for a deployment that
+// should not hold the secret at all.
 func (t *tokenFlags) Set(v string) error {
 	p := strings.SplitN(v, ":", 3)
 	if len(p) != 3 || p[0] == "" || p[2] == "" {
@@ -26,6 +32,14 @@ func (t *tokenFlags) Set(v string) error {
 	}
 	switch r := notary.Role(p[1]); r {
 	case notary.RoleAuthoritative, notary.RoleProvisional, notary.RoleRead:
+		if h, ok := strings.CutPrefix(p[2], hashPrefix); ok {
+			tok, err := notary.TokenFromHash(p[0], r, h)
+			if err != nil {
+				return err
+			}
+			*t = append(*t, tok)
+			return nil
+		}
 		*t = append(*t, notary.NewToken(p[0], r, p[2]))
 	default:
 		return fmt.Errorf("unknown role %q: use authoritative, provisional or read", p[1])
@@ -58,7 +72,34 @@ func main() {
 	issuer := flag.String("oidc-issuer", notary.GitHubIssuer, "issuer the identity tokens must name")
 	jwks := flag.String("oidc-jwks-url", "", "where the issuer publishes its keys (default: issuer/.well-known/jwks)")
 	flag.Var(&rules, "oidc-allow", "role:subject-pattern, first match wins, * matches any run (repeatable)")
+	healthcheck := flag.Bool("healthcheck", false, "probe /healthz on -addr and exit 0 if the server answers, for a container with no shell")
+	hash := flag.Bool("hash", false, "read a secret from stdin, print the sha256:<hex> form -token accepts, and exit")
 	flag.Parse()
+	if *healthcheck {
+		if err := probe(*addr); err != nil {
+			fmt.Fprintln(os.Stderr, "nitpick-notary:", err)
+			os.Exit(1)
+		}
+		return
+	}
+	if *hash {
+		secret, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			log.Fatal(err)
+		}
+		// One trailing newline is forgiven so `echo` works; the secret itself
+		// is hashed exactly as a client will send it.
+		fmt.Println(hashPrefix + notary.HashSecret(strings.TrimSuffix(string(secret), "\n")))
+		return
+	}
+	// NITPICK_NOTARY_TOKENS carries whitespace-separated -token entries, so a
+	// container orchestrator can supply them from a secret and not from argv.
+	for _, entry := range strings.Fields(os.Getenv("NITPICK_NOTARY_TOKENS")) {
+		if err := tokens.Set(entry); err != nil {
+			fmt.Fprintf(os.Stderr, "nitpick-notary: NITPICK_NOTARY_TOKENS: %v\n", err)
+			os.Exit(2)
+		}
+	}
 	if (*audience == "") != (len(rules) == 0) {
 		fmt.Fprintln(os.Stderr, "nitpick-notary: -oidc-audience and -oidc-allow go together; a token no rule matches is refused")
 		os.Exit(2)
@@ -112,4 +153,26 @@ func newServer(addr string, h http.Handler, l connLimits) *http.Server {
 		ReadHeaderTimeout: l.header, ReadTimeout: l.read, WriteTimeout: l.write, IdleTimeout: l.idle,
 		MaxHeaderBytes: 64 << 10,
 	}
+}
+
+// probe asks a running server whether it is serving. A listen address of ":8484"
+// has no host, and the probe runs in the same container, so it asks localhost.
+func probe(addr string) error {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return fmt.Errorf("bad -addr %q: %w", addr, err)
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "127.0.0.1"
+	}
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get("http://" + net.JoinHostPort(host, port) + "/healthz")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("health check answered %s", resp.Status)
+	}
+	return nil
 }

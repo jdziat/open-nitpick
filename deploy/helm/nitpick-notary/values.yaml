@@ -1,0 +1,64 @@
+# The notary keeps its records in files that one process owns, so this chart runs
+# exactly one replica on a ReadWriteOnce volume, and replaces it rather than
+# rolling it. There is deliberately no replicaCount.
+
+image:
+  repository: ghcr.io/nitpick-oss/nitpick-notary
+  # Empty means the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# Who may read and write records. Give hashes, never secrets: the server only
+# ever compares hashes, and a Secret holding hashes is not a credential.
+#   printf %s "$SECRET" | docker run --rm -i ghcr.io/nitpick-oss/nitpick-notary -hash
+tokens: []
+#  - name: ci
+#    role: authoritative        # authoritative | provisional | read
+#    hash: <64 hex characters>
+
+# Or a Secret you manage yourself, with one key, `tokens`, holding
+# whitespace-separated name:role:sha256:<hash> entries.
+existingSecret: ""
+
+# Accept GitHub Actions identity tokens instead of, or beside, static tokens.
+oidc:
+  audience: ""
+  issuer: https://token.actions.githubusercontent.com
+  # role:subject-pattern, first match wins.
+  allow: []
+  #  - "authoritative:repo:acme/app:ref:refs/heads/main"
+  #  - "provisional:repo:acme/app:*"
+
+# Let provisional tokens clear a record (nitpick review -fresh).
+authorClear: false
+
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+  existingClaim: ""
+
+service:
+  type: ClusterIP
+  port: 8484
+  # Only for type NodePort.
+  nodePort: null
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  #  - host: notary.example.com
+  #    paths: [/]
+  tls: []
+
+resources:
+  requests: {cpu: 20m, memory: 32Mi}
+  limits: {memory: 256Mi}
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

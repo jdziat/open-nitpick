@@ -4,7 +4,9 @@ package notary
 import (
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -47,6 +49,24 @@ func NewToken(name string, role Role, secret string) Token {
 func storeFault(w http.ResponseWriter, r *http.Request, err error) {
 	log.Printf("notary: %s %s: %v", r.Method, r.URL.Path, err)
 	http.Error(w, "the notary could not use its store", http.StatusInternalServerError)
+}
+
+// TokenFromHash builds a token from the hex SHA-256 of its secret, so a
+// deployment can be configured without the secret ever being on the server.
+func TokenFromHash(name string, role Role, hexHash string) (Token, error) {
+	raw, err := hex.DecodeString(hexHash)
+	if err != nil || len(raw) != sha256.Size {
+		return Token{}, errors.New("a token hash must be 64 hex characters")
+	}
+	t := Token{Name: name, Role: role}
+	copy(t.hash[:], raw)
+	return t, nil
+}
+
+// HashSecret returns the hex SHA-256 that TokenFromHash takes.
+func HashSecret(secret string) string {
+	sum := sha256.Sum256([]byte(secret))
+	return hex.EncodeToString(sum[:])
 }
 
 // Server is the notary HTTP handler.
@@ -97,6 +117,13 @@ func (s *Server) auth(r *http.Request) (Token, bool) {
 // ServeHTTP implements http.Handler. Routes: GET, PUT and DELETE on
 // /v1/records/{hash}.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Before the token check, because a probe has no token and must not be able
+	// to read a record: it reports that the process is serving and nothing else.
+	if r.URL.Path == "/healthz" && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = io.WriteString(w, "ok\n")
+		return
+	}
 	hash, ok := strings.CutPrefix(r.URL.Path, "/v1/records/")
 	if !ok || hash == "" || strings.Contains(hash, "/") {
 		http.NotFound(w, r)

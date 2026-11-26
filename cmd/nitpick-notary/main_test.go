@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -166,5 +167,50 @@ func TestASecondServerOnTheSameDirectoryRefusesToStart(t *testing.T) {
 	}
 	if !strings.Contains(out, "in use") {
 		t.Errorf("the refusal does not say why: %q", out)
+	}
+}
+
+func TestATokenFlagTakesASecretOrItsHashAndNothingElse(t *testing.T) {
+	var tokens tokenFlags
+	hash := strings.Repeat("ab", 32)
+	for _, ok := range []string{"ci:authoritative:plain", "dev:provisional:sha256:" + hash, "v:read:sha256:" + hash} {
+		if err := tokens.Set(ok); err != nil {
+			t.Errorf("%q refused: %v", ok, err)
+		}
+	}
+	if len(tokens) != 3 {
+		t.Fatalf("tokens = %d, want 3", len(tokens))
+	}
+	for _, bad := range []string{
+		"", "ci", "ci:authoritative", "ci:authoritative:", ":read:x", "ci:root:x",
+		"ci:read:sha256:", "ci:read:sha256:short", "ci:read:sha256:" + strings.Repeat("z", 64),
+	} {
+		if err := (&tokenFlags{}).Set(bad); err == nil {
+			t.Errorf("%q was accepted", bad)
+		}
+	}
+}
+
+func TestTheHealthProbeSucceedsOnlyAgainstAServerThatAnswersOK(t *testing.T) {
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) }))
+	t.Cleanup(up.Close)
+	if err := probe(strings.TrimPrefix(up.URL, "http://")); err != nil {
+		t.Errorf("a serving server failed the probe: %v", err)
+	}
+
+	sick := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { http.Error(w, "no", http.StatusServiceUnavailable) }))
+	t.Cleanup(sick.Close)
+	if err := probe(strings.TrimPrefix(sick.URL, "http://")); err == nil {
+		t.Error("a server answering 503 passed the probe")
+	}
+
+	down := httptest.NewServer(http.NotFoundHandler())
+	addr := strings.TrimPrefix(down.URL, "http://")
+	down.Close()
+	if err := probe(addr); err == nil {
+		t.Error("a closed port passed the probe")
+	}
+	if err := probe("no-port"); err == nil {
+		t.Error("an address with no port passed the probe")
 	}
 }
