@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -38,6 +39,14 @@ type Token struct {
 // NewToken builds a token from its plain secret.
 func NewToken(name string, role Role, secret string) Token {
 	return Token{Name: name, Role: role, hash: sha256.Sum256([]byte(secret))}
+}
+
+// storeFault answers a failed store call without its text. A filesystem error
+// names the directory the records are kept in, which a client has no use for;
+// the operator reads the detail in the server's log.
+func storeFault(w http.ResponseWriter, r *http.Request, err error) {
+	log.Printf("notary: %s %s: %v", r.Method, r.URL.Path, err)
+	http.Error(w, "the notary could not use its store", http.StatusInternalServerError)
 }
 
 // Server is the notary HTTP handler.
@@ -106,7 +115,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		rec, found, err := s.store.Get(r.Context(), hash)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			storeFault(w, r, err)
 			return
 		}
 		if !found {
@@ -127,7 +136,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			by = tok.Name
 		}
 		if err := s.store.Clear(r.Context(), hash, by); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			storeFault(w, r, err)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -166,7 +175,7 @@ func (s *Server) put(w http.ResponseWriter, r *http.Request, tok Token, hash str
 		}
 	}
 	if err := s.store.Put(r.Context(), rec); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		storeFault(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -307,5 +308,37 @@ func TestManySimultaneousUnknownKeysCostTheIssuerOneRequest(t *testing.T) {
 	wg.Wait()
 	if n := hits.Load(); n != 1 {
 		t.Errorf("20 simultaneous tokens with an unknown key id made %d requests to the issuer, want 1", n)
+	}
+}
+
+// diskErrorStore fails every call with an error that names a filesystem path, as
+// a full or unwritable disk does.
+type diskErrorStore struct{}
+
+const diskErrorPath = "/srv/secret-data-dir/records"
+
+func (diskErrorStore) Get(context.Context, string) (wire.Record, bool, error) {
+	return wire.Record{}, false, errors.New("read " + diskErrorPath + ": input/output error")
+}
+func (diskErrorStore) Put(context.Context, wire.Record) error {
+	return errors.New("write " + diskErrorPath + ": no space left on device")
+}
+func (diskErrorStore) Clear(context.Context, string, string) error {
+	return errors.New("write history " + diskErrorPath + ": permission denied")
+}
+
+func TestAStoreFailureIsReportedWithoutNamingTheServersDirectories(t *testing.T) {
+	srv := httptest.NewServer(New(diskErrorStore{}, []Token{NewToken("ci", RoleAuthoritative, "s")}, false))
+	t.Cleanup(srv.Close)
+	h := strings.Repeat("a", 64)
+	body := `{"schema":4,"hash":"` + h + `","answers":{"k":"{}"},"batches":1,"complete":true}`
+	for _, m := range []string{http.MethodGet, http.MethodPut, http.MethodDelete} {
+		status, got := do(t, m, srv.URL+"/v1/records/"+h, map[string]string{"Authorization": "Bearer s"}, strings.NewReader(body))
+		if status != http.StatusInternalServerError {
+			t.Errorf("%s = %d, want 500", m, status)
+		}
+		if strings.Contains(got, diskErrorPath) || strings.Contains(got, "secret-data-dir") {
+			t.Errorf("%s answered %q, which names the server's directory", m, got)
+		}
 	}
 }
