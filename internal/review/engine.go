@@ -1030,6 +1030,15 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 	if len(plan.Batches) > 0 {
 		if sess := e.beginNotary(ctx, pullRequestContext(pr), plan); sess != nil {
 			e.notarySess = sess
+			// The checkpoint stored on the pull request sits above the ledger:
+			// an answer it serves never reaches the notary, which would then
+			// mark a record complete that lacks it. With a usable notary the
+			// notary is the resume record, and every model request goes through
+			// it. An unreachable one keeps the checkpoint, since that review is
+			// unofficial anyway.
+			if sess.snapshot().Mode != NotaryUnreachable {
+				e.progress = nil
+			}
 			defer e.Roles.UseLedger(nil)
 			defer func() { report.Notary = sess.snapshot() }()
 		}

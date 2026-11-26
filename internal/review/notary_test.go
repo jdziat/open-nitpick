@@ -731,3 +731,47 @@ func TestADroppedWriteIsNotForgivenWhenTheRecordIsMissingAnAnswer(t *testing.T) 
 		t.Error("a later successful write cleared the error for an answer that was never recorded")
 	}
 }
+
+func TestTheNotaryAndNotTheForgeCheckpointIsTheResumeRecord(t *testing.T) {
+	// A first review with no notary leaves a checkpoint on the pull request.
+	model := &scriptedLLM{fallback: `{"findings":[]}`}
+	provider := &incrementalProvider{stubProvider: stubProvider{diff: incrementalDiff}, head: "abcdef"}
+	first := resumeEngine(t, model, provider)
+	if _, err := first.Review(context.Background(), vcs.Ref{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(provider.published.Progress) == 0 {
+		t.Fatal("setup: the first review left no checkpoint")
+	}
+	provider.prior = &vcs.PriorReview{Progress: provider.published.Progress}
+
+	// The same change reviewed with a notary must not be answered from it.
+	store := fileStore(t)
+	second := &scriptedLLM{fallback: `{"findings":[]}`}
+	e := resumeEngine(t, second, provider)
+	e.Notary, e.NotarySource = store, "ci"
+	report, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.callCount() == 0 {
+		t.Fatal("the checkpoint answered the review, so the notary never saw those answers")
+	}
+	rec, ok, _ := store.Get(context.Background(), report.Notary.Hash)
+	if !ok || !rec.Complete || len(rec.Answers) != second.callCount() {
+		t.Fatalf("the record must hold every answer behind the review: ok=%v complete=%v answers=%d calls=%d",
+			ok, rec.Complete, len(rec.Answers), second.callCount())
+	}
+
+	// So a machine with no checkpoint replays it, with no model call.
+	third := &scriptedLLM{fallback: `{"findings":[]}`}
+	other := resumeEngine(t, third, &incrementalProvider{stubProvider: stubProvider{diff: incrementalDiff}, head: "abcdef"})
+	other.Notary, other.NotarySource = store, "ci"
+	replay, err := other.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if third.callCount() != 0 || replay.Notary.Mode != NotaryReplayed {
+		t.Errorf("a replay elsewhere asked the model %d times: %+v", third.callCount(), replay.Notary)
+	}
+}

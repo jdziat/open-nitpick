@@ -282,3 +282,16 @@ func TestAFailingIssuerIsNotAskedAgainByEveryTokenWithAnUnknownKey(t *testing.T)
 		t.Errorf("a failing issuer was asked for its keys %d times by 20 tokens, want 1", hits)
 	}
 }
+
+func TestACancelledRequestDoesNotRefuseEveryTokenForAMinute(t *testing.T) {
+	p := newIDP(t)
+	v := p.verifier(newOIDCRule("*", RoleAuthoritative))
+	gone, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, ok := v.Authenticate(gone, p.token(t, nil)); ok {
+		t.Fatal("a cancelled request authenticated")
+	}
+	if _, ok := v.Authenticate(context.Background(), p.token(t, nil)); !ok {
+		t.Error("one client disconnecting made the next valid token fail: the cancelled fetch was stamped as an issuer failure")
+	}
+}

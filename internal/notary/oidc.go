@@ -97,8 +97,12 @@ func (o *OIDC) key(ctx context.Context, kid string) (*rsa.PublicKey, error) {
 	}
 	keys, err := o.fetch(ctx)
 	// Stamped before the error check: a failing issuer must not be asked again
-	// by every token that names a key we do not have.
-	o.fetched = time.Now()
+	// by every token that names a key we do not have. Not when the caller gave
+	// up: a cancelled request says nothing about the issuer, and stamping it
+	// would refuse every workflow token for a minute.
+	if err == nil || ctx.Err() == nil {
+		o.fetched = time.Now()
+	}
 	if err != nil {
 		return nil, err
 	}

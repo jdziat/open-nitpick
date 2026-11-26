@@ -30,6 +30,11 @@ replay answers with what the recorded level produced whatever the configuration
 says today. A partial record made at another level is not resumed, because its
 answers would sit beside live ones from a different level.
 
+With a usable notary the checkpoint that a review stores on its pull request is
+not used: the notary is the resume record, and every model request goes through
+it. Otherwise an answer served from the checkpoint would be missing from a record
+marked complete.
+
 A record is complete only when the review it belongs to finished with no
 failed batch or stage. A review that lost one leaves the record partial, which
 is what lets the next run resume instead of replaying a hole. An answer is kept
