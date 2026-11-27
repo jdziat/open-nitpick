@@ -147,8 +147,8 @@ func (p *gateParser) primary() (any, error) {
 	if p.pos >= len(p.src) {
 		return nil, fmt.Errorf("expression ends early")
 	}
-	switch c := p.src[p.pos]; {
-	case c == '(':
+	switch p.src[p.pos] {
+	case '(':
 		p.pos++
 		v, err := p.or()
 		if err != nil {
@@ -158,7 +158,7 @@ func (p *gateParser) primary() (any, error) {
 			return nil, fmt.Errorf("missing ) at %d", p.pos)
 		}
 		return v, nil
-	case c == '\'':
+	case '\'':
 		return p.str()
 	}
 	start := p.pos

@@ -204,7 +204,7 @@ func fromSlash(body string) (at int, rest string, ok bool) {
 				fence = ""
 			}
 		} else if fence == "" && startsWithCommand(line) {
-			return offset, body[offset+len(SlashCommand) : len(body)], true
+			return offset, body[offset+len(SlashCommand):], true
 		}
 		offset = next
 	}
