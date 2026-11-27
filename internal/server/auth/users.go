@@ -40,6 +40,10 @@ type Users struct {
 	// when an account does not exist, so a name that is not an account takes as long to refuse as one that
 	// is and the response time does not say which names exist.
 	decoy parsedHash
+
+	// observe, when set, is called around each hash. Tests use it to count hashes
+	// in flight; production leaves it nil.
+	observe func() func()
 }
 
 type user struct {
@@ -184,6 +188,9 @@ func (h parsedHash) verify(password string) bool {
 // Verify checks a password. It does the same work whether or not the account
 // exists, and reports the account's groups on success.
 func (u *Users) Verify(name, password string) (account string, groups []string, ok bool) {
+	if u.observe != nil {
+		defer u.observe()()
+	}
 	us, exists := u.byName[strings.ToLower(name)]
 	if !exists {
 		u.decoy.verify(password)

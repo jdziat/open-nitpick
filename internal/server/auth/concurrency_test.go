@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -222,8 +223,10 @@ func TestACorrectPasswordGivesBackItsCharge(t *testing.T) {
 // arrive. The semaphore is the only thing holding memory to 4 x 64 MiB.
 func TestConcurrentHashesAreBounded(t *testing.T) {
 	pw := newPassword(t)
-	if cap(pw.hashing) != maxConcurrentHashes || maxConcurrentHashes < 1 {
-		t.Fatalf("the hashing bound is %d, want %d", cap(pw.hashing), maxConcurrentHashes)
+	// The literal, not the constant: each hash holds 64 MiB, so 4 is a memory
+	// ceiling of 256 MiB, and raising it is a decision this test makes visible.
+	if cap(pw.hashing) != 4 || maxConcurrentHashes != 4 {
+		t.Fatalf("the hashing bound is %d (constant %d), want 4", cap(pw.hashing), maxConcurrentHashes)
 	}
 	// With every slot held, a request waits and gives up with its client, and
 	// does not hash.
@@ -316,4 +319,55 @@ func inFlight(l *Limiter, key string) int {
 		return e.inFlight
 	}
 	return 0
+}
+
+// Measured, not read from the constant: under a burst of sign-ins no more than
+// four argon2id hashes are ever in flight.
+func TestNoMoreThanFourHashesRunAtOnceUnderABurst(t *testing.T) {
+	var running, peak atomic.Int64
+	hold := make(chan struct{})
+	pw := newPassword(t)
+	pw.ByAddress = &Limiter{Max: 10000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
+	pw.ByAccount = &Limiter{Max: 10000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
+	pw.Users.observe = func() func() {
+		n := running.Add(1)
+		for {
+			p := peak.Load()
+			if n <= p || peak.CompareAndSwap(p, n) {
+				break
+			}
+		}
+		<-hold
+		return func() { running.Add(-1) }
+	}
+	s := newSite(t, pw)
+	resp, err := s.c.Get(s.ts.URL + "/auth/login")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	i := strings.Index(string(page), `name="csrf_token" value="`) + len(`name="csrf_token" value="`)
+	token := string(page)[i : i+strings.Index(string(page)[i:], `"`)]
+
+	var wg sync.WaitGroup
+	for n := 0; n < 40; n++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			r, err := s.c.PostForm(s.ts.URL+"/auth/password/login", url.Values{"username": {"alice"}, "password": {fmt.Sprintf("g%d", n)}, "csrf_token": {token}})
+			if err == nil {
+				_ = r.Body.Close()
+			}
+		}(n)
+	}
+	time.Sleep(400 * time.Millisecond) // let the burst pile up behind the semaphore
+	if got := running.Load(); got != 4 {
+		t.Errorf("%d hashes in flight while 40 sign-ins wait, want exactly 4", got)
+	}
+	close(hold)
+	wg.Wait()
+	if p := peak.Load(); p != 4 {
+		t.Errorf("peak concurrent hashes = %d, want 4", p)
+	}
 }
