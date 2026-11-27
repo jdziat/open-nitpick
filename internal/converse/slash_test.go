@@ -124,3 +124,43 @@ func TestTheSlashCommandWorksWhateverTheMentionIs(t *testing.T) {
 		t.Errorf("= (%q, %v), want a review", kind, ok)
 	}
 }
+
+// A mention pasted inside a fenced block (a log, a quoted workflow) must not
+// shadow the request that follows it. The same mention outside the fence is a
+// request and comes first, as before.
+func TestAFencedMentionDoesNotShadowASlashCommandAfterIt(t *testing.T) {
+	fenced := "```\n" + config.DefaultMention + " fix\n```\n/nitpick review"
+	if kind, _, ok := Command(fenced, config.DefaultMention); !ok || kind != KindReview {
+		t.Errorf("a fenced mention before a slash command = (%q, %v), want the slash command's review", kind, ok)
+	}
+
+	// Rule 10: the same text with the mention outside the fence is the mention's
+	// fix. So the result above is the fence's doing, not the parser ignoring it.
+	open := config.DefaultMention + " fix\n```\nlog\n```\n/nitpick review"
+	if kind, _, ok := Command(open, config.DefaultMention); !ok || kind != KindFix {
+		t.Errorf("an unfenced mention before a slash command = (%q, %v), want the mention's fix", kind, ok)
+	}
+}
+
+// A mention that is alone in a fenced block still counts: this change adds a
+// trigger and does not take one away.
+func TestAFencedMentionWithNoSlashCommandStillCounts(t *testing.T) {
+	for _, body := range []string{
+		"```\n" + config.DefaultMention + " fix\n```",
+		"```\n" + config.DefaultMention + " fix",
+		"~~~\n" + config.LegacyMention + " fix\n~~~",
+	} {
+		if kind, _, ok := Command(body, config.DefaultMention); !ok || kind != KindFix {
+			t.Errorf("%q = (%q, %v), want the fenced mention read as it always was", body, kind, ok)
+		}
+	}
+}
+
+// The slash command inside a fence, after a mention inside the same fence, is
+// still nothing: both are pasted text, and the mention keeps its old reading.
+func TestASlashCommandInsideTheSameFenceAsAMentionDoesNotWin(t *testing.T) {
+	body := "```\n" + config.DefaultMention + " resolve\n/nitpick fix\n```"
+	if kind, _, ok := Command(body, config.DefaultMention); !ok || kind != KindResolve {
+		t.Errorf("= (%q, %v), want the mention's resolve", kind, ok)
+	}
+}

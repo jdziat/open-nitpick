@@ -147,16 +147,25 @@ const SlashCommand = "/nitpick"
 
 // Command reads what a comment asks of the reviewer: the kind, and the text
 // after the trigger. The trigger is the mention, or a line starting with
-// SlashCommand, whichever the person wrote first. ok is false when the comment
-// has neither, or has one with nothing after it.
+// SlashCommand. ok is false when the comment has neither, or has one with
+// nothing after it.
+//
+// Where both are present the one written first decides, with one exception: a
+// mention inside a fenced block gives way to a slash command outside it. A
+// pasted log that mentions the reviewer is not a request, and it must not
+// shadow the request that follows it. A mention that is alone in a fence still
+// counts, as it always did.
 //
 // This is the only authority on what a comment means. The workflow gates that
 // decide whether to start a runner are looser prefilters over the same
 // triggers, kept in step by a test.
 func Command(body, mention string) (Kind, string, bool) {
+	spans := fencedLines(body)
 	mentionAt, mentionRest, mentionOK := fromMention(body, mention)
-	slashAt, slashRest, slashOK := fromSlash(body)
+	slashAt, slashRest, slashOK := fromSlash(body, spans)
 	switch {
+	case mentionOK && slashOK && spans.contain(mentionAt):
+		return classify(slashRest)
 	case mentionOK && (!slashOK || mentionAt <= slashAt):
 		return classify(mentionRest)
 	case slashOK:
@@ -175,40 +184,74 @@ func fromMention(body, mention string) (at int, rest string, ok bool) {
 	return loc[0], body[loc[1]:], true
 }
 
-// fromSlash finds the first line that starts with SlashCommand and returns
-// where it starts and what follows it, from the original text.
+// fromSlash finds the first line outside a fenced block that starts with
+// SlashCommand and returns where it starts and what follows it, from the
+// original text.
 //
 // Quoted lines and fenced code cannot start a run: a person replying to a
 // maintainer's "/nitpick fix" quotes it, and a pasted log may hold any line at
 // all. A line has to begin with the command itself, so a quote (">") never
 // qualifies and needs no separate rule. A fence is the one thing that has to be
-// tracked, because it hides lines that do begin with it. An unclosed fence hides
-// the rest of the comment, as it does where the comment is rendered.
-func fromSlash(body string) (at int, rest string, ok bool) {
-	var fence string
+// tracked, because it hides lines that do begin with it.
+func fromSlash(body string, fenced fenceSpans) (at int, rest string, ok bool) {
 	for offset := 0; offset < len(body); {
-		end := strings.IndexByte(body[offset:], '\n')
-		next := len(body)
-		line := body[offset:]
-		if end >= 0 {
-			line = body[offset : offset+end]
-			next = offset + end + 1
-		}
-		line = strings.TrimSuffix(line, "\r")
-
-		if marker := fenceMarker(line); marker != "" {
-			switch {
-			case fence == "":
-				fence = marker
-			case strings.HasPrefix(marker, fence[:1]) && len(marker) >= len(fence) && strings.TrimSpace(line)[len(marker):] == "":
-				fence = ""
-			}
-		} else if fence == "" && startsWithCommand(line) {
+		line, next := lineAt(body, offset)
+		if !fenced.contain(offset) && startsWithCommand(line) {
 			return offset, body[offset+len(SlashCommand):], true
 		}
 		offset = next
 	}
 	return 0, "", false
+}
+
+// lineAt returns the line that starts at offset, without its line ending, and
+// the offset of the line after it.
+func lineAt(body string, offset int) (line string, next int) {
+	end := strings.IndexByte(body[offset:], '\n')
+	if end < 0 {
+		return strings.TrimSuffix(body[offset:], "\r"), len(body)
+	}
+	return strings.TrimSuffix(body[offset:offset+end], "\r"), offset + end + 1
+}
+
+// fenceSpans are the byte ranges of a comment that sit inside fenced code
+// blocks, including the fence lines themselves.
+type fenceSpans [][2]int
+
+func (f fenceSpans) contain(pos int) bool {
+	for _, s := range f {
+		if pos >= s[0] && pos < s[1] {
+			return true
+		}
+	}
+	return false
+}
+
+// fencedLines finds the fenced blocks. An unclosed fence runs to the end of the
+// comment, as it does where the comment is rendered.
+func fencedLines(body string) fenceSpans {
+	var (
+		spans fenceSpans
+		fence string
+		start int
+	)
+	for offset := 0; offset < len(body); {
+		line, next := lineAt(body, offset)
+		if marker := fenceMarker(line); marker != "" {
+			switch {
+			case fence == "":
+				fence, start = marker, offset
+			case strings.HasPrefix(marker, fence[:1]) && len(marker) >= len(fence) && strings.TrimSpace(line)[len(marker):] == "":
+				spans = append(spans, [2]int{start, next})
+				fence = ""
+			}
+		}
+		offset = next
+	}
+	if fence != "" {
+		spans = append(spans, [2]int{start, len(body)})
+	}
+	return spans
 }
 
 // startsWithCommand reports whether line is the command, alone or followed by

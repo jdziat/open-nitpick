@@ -90,8 +90,11 @@ jobs:
 
 Both triggers do the same thing: `/nitpick review` is `@nitpick-review review`.
 The slash command notifies no account, and it does not depend on the App's name.
-It counts only on a line that starts with it, outside a code fence, so a quoted
-reply or a pasted log cannot start a run. `@open-nitpick` is accepted for one
+`nitpick respond` counts it only on a line that starts with it, outside a code
+fence, so a quoted reply or a pasted log cannot start a run. The workflow's `if:`
+is looser, a prefilter that starts a runner for any comment containing `/nitpick`
+(a link to this repository's URL does) and lets `respond` decide; it only avoids
+starting runners for unrelated comments. `@open-nitpick` is accepted for one
 release while `review.mention` is unchanged. Write the verb after one space, as
 in `/nitpick fix`: the workflow gates match that form.
 
