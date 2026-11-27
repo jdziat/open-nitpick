@@ -8,7 +8,7 @@ hide:
 
 # Pull request review with the model you choose and prompts that live in your repository.
 
-<p class="np-lede">open-nitpick reads a pull request, reviews it with the model provider you choose, and can post inline comments. Run it as a GitHub Action, in any CI system, from an agent, or against local changes before a pull request exists. The reviewer is self-hosted; review input is sent to the model provider you configure. Choose a local provider to keep review input on your machine.</p>
+<p class="np-lede">nitpick reads a pull request, reviews it with the model provider you choose, and can post inline comments. Run it as a GitHub Action, in any CI system, from an agent, or against local changes before a pull request exists. The reviewer is self-hosted; review input is sent to the model provider you configure. Choose a local provider to keep review input on your machine.</p>
 
 <div class="np-actions" markdown>
 [Get started](docs/getting-started.md){ .md-button .md-button--primary }

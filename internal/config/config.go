@@ -1,4 +1,4 @@
-// Package config loads, merges, and validates open-nitpick configuration.
+// Package config loads, merges, and validates nitpick configuration.
 //
 // Configuration comes from a .nitpick.yaml at the root of the repository being
 // reviewed, overlaid onto built-in defaults so that a repository with no config
@@ -24,7 +24,18 @@ import (
 // FileName is the configuration file looked up at the repository root.
 const FileName = ".nitpick.yaml"
 
-// Config is the fully resolved open-nitpick configuration.
+// DefaultMention is the handle a comment uses to address the reviewer: the name
+// of its GitHub App. Not a bare "@nitpick", which is another person's account
+// and would notify them.
+const DefaultMention = "@nitpick-review"
+
+// LegacyMention is the handle the default was before DefaultMention, accepted
+// beside it for one release so a team's habit and a pinned workflow keep
+// working. Only while the operator has not chosen a handle of their own: one
+// who did has not asked for this one.
+const LegacyMention = "@open-nitpick"
+
+// Config is the fully resolved nitpick configuration.
 type Config struct {
 	Models       Models        `yaml:"models"`
 	Review       Review        `yaml:"review"`
@@ -105,7 +116,7 @@ type Config struct {
 
 // ModelSpec describes one configured model. Provider names are matched against
 // the SDK's provider registry, so any provider the SDK supports is usable here
-// without changes to open-nitpick.
+// without changes to nitpick.
 type ModelSpec struct {
 	// Provider names the vendor or gateway the call goes to. "nitpick
 	// providers" prints the list.
@@ -190,7 +201,7 @@ type ModelSpec struct {
 	// AllowPrivateEndpoint permits base_url to use plain HTTP or resolve to a
 	// loopback or private address.
 	//
-	// It is off by default and must be opted into deliberately. open-nitpick
+	// It is off by default and must be opted into deliberately. nitpick
 	// runs in CI against pull requests, and a pull request can edit.
 	// nitpick.yaml, so an endpoint pointing at an internal address turns the
 	// reviewer into an SSRF vector. The ollama and llamacpp providers already
@@ -609,8 +620,9 @@ type Review struct {
 	Summary bool `yaml:"summary"`
 
 	// Mention is the handle a comment uses to talk to the reviewer:
-	// "@open-nitpick review" resumes, "@open-nitpick restart-review" starts fresh,
-	// "@open-nitpick resolve" closes the thread; anything else is a question.
+	// "@nitpick-review review" resumes, "@nitpick-review restart-review" starts
+	// fresh, "@nitpick-review resolve" closes the thread; anything else is a
+	// question. While it is the default, LegacyMention answers too.
 	Mention string `yaml:"mention"`
 
 	// SkipMarkers are phrases that, in a pull request's title, body or head
@@ -937,13 +949,13 @@ type Linters struct {
 	// The four keys below name an analyzer configuration that must resolve
 	// OUTSIDE the repository under review. Empty is the default and means the
 	// analyzer runs isolated from the tree: golangci-lint under a config
-	// open-nitpick ships, ruff under --isolated, and eslint and semgrep not at
+	// nitpick ships, ruff under --isolated, and eslint and semgrep not at
 	// all.
 	//
 	// "No configuration at all" is what golangci-lint used to get, and it was
 	// not neutral. Its own defaults let the tree decide, a generated-file
 	// header on line 1 of the file under review skipped that file entirely,
-	// so open-nitpick now owns those defaults; see internal/linters/golangci.yml.
+	// so nitpick now owns those defaults; see internal/linters/golangci.yml.
 	//
 	// WHY THERE IS NO "read it from the repository" OPTION. This project
 	// already refuses to execute an analyzer binary that resolves inside the
@@ -975,7 +987,7 @@ type Linters struct {
 	// settings it is reviewed under. See internal/config/policy.go.
 
 	// GolangciConfig is an absolute path to a .golangci.yml outside the
-	// repository. Empty runs golangci-lint under open-nitpick's own config,
+	// repository. Empty runs golangci-lint under nitpick's own config,
 	// materialized outside the repository.
 	GolangciConfig string `yaml:"golangci_config"`
 
@@ -1009,7 +1021,7 @@ type Linters struct {
 	// Configs names an analyzer configuration per catalog tool, keyed by the
 	// tool's name in linters.enabled, an absolute path that must resolve
 	// outside the repository, for the four keys' reasons. A tool with no
-	// entry runs under the configuration open-nitpick ships for it, under
+	// entry runs under the configuration nitpick ships for it, under
 	// its own isolation flag, or not at all; `nitpick linters` says which.
 	Configs map[string]string `yaml:"configs"`
 

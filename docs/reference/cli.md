@@ -1,6 +1,6 @@
 ---
 title: CLI reference
-description: Every open-nitpick command, its flags, and what it changes.
+description: Every nitpick command, its flags, and what it changes.
 ---
 
 # CLI reference
@@ -247,7 +247,7 @@ nitpick improve -base origin/main
 ```
 
 Runs a wider, pedantic review over the working tree by default and prints its
-result; it does not publish GitHub findings. Use `@open-nitpick improve` in a
+result; it does not publish GitHub findings. Use `@nitpick-review improve` in a
 pull-request comment for the conversational version. It shares the revision,
 configuration, instruction, linter, failure, logging, and narrowing controls
 from [`review`](#review), but rejects pull-request publishing coordinates:
@@ -318,7 +318,7 @@ only the optional model pass.
 nitpick respond -event "$GITHUB_EVENT_PATH" -event-name issue_comment
 ```
 
-Handles a GitHub Actions comment event. `@open-nitpick review` resumes a review;
+Handles a GitHub Actions comment event. `@nitpick-review review` resumes a review;
 `restart-review` starts a fresh one; `resolve` resolves the thread; any other
 mention is answered in that thread. It needs GitHub event data and credentials,
 and is intended for `issue_comment` and `pull_request_review_comment` workflows.

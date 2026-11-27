@@ -1111,7 +1111,7 @@ func TestStatusesRecordHowEachAnalyzerWasConfigured(t *testing.T) {
 		t.Errorf("golangci-lint state = %q, want it to say the repository's own .golangci.yml "+
 			"did not apply", got.State)
 	}
-	if !strings.Contains(got.State, "open-nitpick") {
+	if !strings.Contains(got.State, "nitpick") {
 		t.Errorf("golangci-lint state = %q, want it to name whose defaults decided what was "+
 			"reported; under golangci-lint's own, a generated-file header in the diff silences "+
 			"the file and the report is empty for a reason nothing here would state", got.State)

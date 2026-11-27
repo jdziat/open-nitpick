@@ -1024,7 +1024,7 @@ func reportJudgedModels(
 	}
 }
 
-// TestBenchmarkAgainstIncumbent runs Incumbent and open-nitpick over the same
+// TestBenchmarkAgainstIncumbent runs Incumbent and nitpick over the same
 // fixtures and has the same judge assess both.
 //
 // This is the comparison that matters: Incumbent is the incumbent this project
@@ -1035,7 +1035,7 @@ func reportJudgedModels(
 // reviewer's own prompt and model.
 //
 // One asymmetry is neither, and reading the GRADE column without it is a
-// mistake: judgeRequest shows the judge open-nitpick's configured persona and
+// mistake: judgeRequest shows the judge nitpick's configured persona and
 // restricts `missed` to that persona's scope, for both contenders. Incumbent
 // never received that specification, so ToneAdherence, ToneOff and Missed grade
 // it on adherence to a document only its opponent was given. Treat the tone and
@@ -1218,7 +1218,7 @@ func TestBenchmarkAgainstIncumbent(t *testing.T) {
 
 	for _, fx := range opts.Fixtures {
 		// Incumbent needs its own checkout: it reviews the working tree in
-		// place, exactly as open-nitpick does.
+		// place, exactly as nitpick does.
 		wg.Add(1)
 		go func(fx Fixture) {
 			defer wg.Done()

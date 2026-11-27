@@ -1,6 +1,6 @@
 # Trust model
 
-**open-nitpick assumes the code and the config it reviews are hostile.** It runs
+**nitpick assumes the code and the config it reviews are hostile.** It runs
 in CI against pull requests, and a pull request can edit any file in the repo,
 including `.nitpick.yaml`. Three consequences:
 
@@ -103,8 +103,8 @@ revision is not an error; policy falls back to defaults and the run says so.
 Running locally, where you wrote the file, there is no pull request and the
 checkout's config is used as written.
 
-This holds for a comment as well as for a push. `@open-nitpick` answers,
-`@open-nitpick improve` and `@open-nitpick fix` all resolve the same way, and
+This holds for a comment as well as for a push. `@nitpick-review` answers,
+`@nitpick-review improve` and `@nitpick-review fix` all resolve the same way, and
 until recently none of them did: `respond` read the checkout and built no
 substitution at all. For an inline thread comment, the event a `fix` is usually
 typed on, `actions/checkout` with no `ref` resolves the pull request's merge
@@ -367,7 +367,7 @@ language version beats anything the analyzer is configured with. Neither
 `checks: all` staticcheck demonstrably runs, since ST1000 appears, while
 `SA1019` still does not.
 
-It cannot be closed from the configuration open-nitpick owns. Raising the
+It cannot be closed from the configuration nitpick owns. Raising the
 directive is not ours to do either, since `go.mod` is the tree under review.
 So the run names it instead, under *Analyzed less than it ran over*, with the
 module's `go.mod` and the line of the directive.
@@ -505,7 +505,7 @@ untrusted data, and are never rendered as templates.
 ## Structured output
 
 Findings are constrained to a schema. By default (`structured_output: auto`)
-open-nitpick requests a JSON-Schema response format and, if the provider
+nitpick requests a JSON-Schema response format and, if the provider
 *rejects* it, falls back to JSON mode with lenient parsing and one bounded
 repair attempt, remembering that downgrade so it is paid for once per run
 rather than once per request. A provider that rejects JSON mode as well leaves

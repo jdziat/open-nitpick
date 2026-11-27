@@ -135,7 +135,7 @@ type DumpRecord struct {
 	// TestASecondarySpanSurvivesTheDump scores a round trip rather than
 	// inspecting the field, since the field matters only for what it changes.
 	//
-	// open-nitpick's own reviews leave it empty, review.Finding.AlsoAt says the
+	// nitpick's own reviews leave it empty, review.Finding.AlsoAt says the
 	// schema does not offer it, so this is omitempty on every one of our
 	// records. The incumbent is the only reviewer here whose records can carry
 	// it, and "can" is the accurate word: it is filled only where a review

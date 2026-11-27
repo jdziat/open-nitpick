@@ -166,7 +166,7 @@ Usage:
   nitpick slop [flags] [path...]   AI slop only: the tells without a model, the model's slop rules, a score, and fixes
   nitpick security [flags] [path...]
                                    Security scan: required scanners (osv, gitleaks, …), optional model, roster proves completeness
-  nitpick respond [flags]          Answer an @open-nitpick comment on a pull request (review again, resolve, or a question)
+  nitpick respond [flags]          Answer an @nitpick-review comment on a pull request (review again, resolve, or a question)
   nitpick mcp [flags]              Serve the review tools to an agent session over the Model Context Protocol (stdio)
   nitpick mcp install <client>     Register that server with an agent client (claude-code, cursor, opencode, codex, ...)
   nitpick setup [flags]            Register the MCP server with every agent client found here (claude-code, codex, opencode, ...)

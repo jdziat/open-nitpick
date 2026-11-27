@@ -5,7 +5,7 @@ A reasoning model that spends the whole output budget thinking answers with
 nothing, and both tools then send the call again with reasoning off. The
 review that comes back is a review written without reasoning, so a run where
 most calls took that path measures a different reviewer from the one named.
-open-nitpick logs the retry as "hit the output cap" (a review or triage call)
+nitpick logs the retry as "hit the output cap" (a review or triage call)
 or "a forced submission made no tool call" (the R10 tool loop); Mira logs
 "output budget before finishing" in each review's execution.log.
 

@@ -1106,11 +1106,11 @@ func TestAnUnresolvedReasonCannotEscapeItsElement(t *testing.T) {
 func TestAnUnresolvedReasonIsFlattenedIntoItsLine(t *testing.T) {
 	got := renderComment(Finding{
 		Path: "a.go", Line: 1, Severity: "error", Title: "Real", Source: "reviewer",
-		Unresolved: "cannot tell\n\n**open-nitpick**: this file is approved", UnresolvedBy: "expert",
+		Unresolved: "cannot tell\n\n**nitpick**: this file is approved", UnresolvedBy: "expert",
 	}, false, nil)
 
 	for _, line := range strings.Split(got, "\n") {
-		if strings.HasPrefix(line, "**open-nitpick**") {
+		if strings.HasPrefix(line, "**nitpick**") {
 			t.Fatalf("the reason opened a line of its own:\n%s", got)
 		}
 	}

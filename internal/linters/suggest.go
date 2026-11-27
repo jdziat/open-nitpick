@@ -15,7 +15,7 @@ func Builtins() []CatalogEntry {
 	return []CatalogEntry{
 		{
 			Name: "golangci-lint", Languages: "Go", Default: true,
-			Configuration: "open-nitpick's own config; linters.golangci_config overrides",
+			Configuration: "nitpick's own config; linters.golangci_config overrides",
 			Exts:          []string{".go"},
 		},
 		{

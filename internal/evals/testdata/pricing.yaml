@@ -39,7 +39,7 @@
 #   google/gemini-3.5-flash 6 endpoints    $0.75 to $2.70 in      3.6x
 #   qwen/*                  1 endpoint     no spread              1.0x
 #
-# open-nitpick pins no provider, so which endpoint serves a request is the
+# nitpick pins no provider, so which endpoint serves a request is the
 # router's choice and is recorded nowhere. A single number in a $/DEFECT column
 # is therefore a POINT INSIDE A BAND whose width is a property of the model, and
 # the five models with no band at all are the five qwen entries. Ranking a qwen

@@ -73,7 +73,7 @@ type mcpTools struct {
 // newMCPServer builds the server with its tools registered.
 func newMCPServer(root string, log *slog.Logger) *mcp.Server {
 	t := &mcpTools{root: root, log: log}
-	server := mcp.NewServer(&mcp.Implementation{Name: "open-nitpick", Version: version}, nil)
+	server := mcp.NewServer(&mcp.Implementation{Name: "nitpick", Version: version}, nil)
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "review",
 		Description: "Review a change in a local repository with the configured model: the uncommitted working tree by default, or base..head. " +
@@ -112,7 +112,7 @@ func newMCPServer(root string, log *slog.Logger) *mcp.Server {
 	}, t.securityScan)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "explain_config",
-		Description: "The resolved open-nitpick configuration for a repository: config source, models per role, validation, gating, budget, analyzers, persona, and the instructions that apply to a given path.",
+		Description: "The resolved nitpick configuration for a repository: config source, models per role, validation, gating, budget, analyzers, persona, and the instructions that apply to a given path.",
 	}, t.explainConfig)
 	return server
 }

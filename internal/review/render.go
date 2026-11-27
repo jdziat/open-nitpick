@@ -491,7 +491,7 @@ func renderSummary(report *Report, cfg *config.Config) string {
 	if out == "" {
 		return ""
 	}
-	return out + "\n\n<sub>Reviewed by open-nitpick.</sub>"
+	return out + "\n\n<sub>Reviewed by nitpick.</sub>"
 }
 
 // fastReviewNotice states the deliberate limits of the bounded command.
@@ -567,7 +567,7 @@ func incrementalNotice(report *Report) string {
 // When every changed file is set aside, there are no batches to send, so the
 // engine returns before a model or an analyzer is asked anything, and the
 // summary rendered as "", which the forge replaces with its default body:
-// "open-nitpick found nothing to comment on." Measured on a report whose only
+// "nitpick found nothing to comment on." Measured on a report whose only
 // changed file was `vendor/evil.go`. Vendored code is compiled into the
 // binary, and `**/vendor/**` and `**/testdata/**` are in the shipped ignore
 // list, so this is one file move away from any change that wants to go

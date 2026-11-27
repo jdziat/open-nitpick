@@ -1,4 +1,4 @@
-site_name: open-nitpick
+site_name: nitpick
 site_description: Self-hosted, model-agnostic pull request review.
 site_url: https://nitpick-oss.github.io/nitpick/
 repo_url: https://github.com/nitpick-oss/nitpick
@@ -123,6 +123,7 @@ nav:
       - Measurement rules: docs/measurement.md
       - Findings: docs/findings.md
       - Against Incumbent: docs/comparison.md
+      - The name: docs/rebrand.md
 
 extra:
   generator: false

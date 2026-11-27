@@ -97,7 +97,7 @@ import (
 //
 // None of that needs a config file, and only the first has a config-file switch
 // (`linters.exclusions.generated: disable`, with no command-line equivalent in
-// 2.8.0). So open-nitpick ships its own config, materialized outside the tree
+// 2.8.0). So nitpick ships its own config, materialized outside the tree
 // under review, and passes the rest as flags that bind an operator's config
 // too. See golangciLint.Run and golangci.yml.
 //
@@ -224,7 +224,7 @@ func resolveConfig(path, repoRoot string) (string, error) {
 	return abs, nil
 }
 
-// golangciDefaults is the golangci-lint configuration open-nitpick owns.
+// golangciDefaults is the golangci-lint configuration nitpick owns.
 //
 //go:embed golangci.yml
 var golangciDefaults []byte
@@ -281,22 +281,22 @@ func writeGolangciSecurityDefaults(repoRoot string) (string, func(), error) {
 // that is precisely why the check is here rather than assumed: the answer is a
 // refusal with a reason, not a config written into the tree.
 func writeGolangciConfig(repoRoot string, body []byte) (string, func(), error) {
-	dir, err := os.MkdirTemp("", "open-nitpick-golangci-")
+	dir, err := os.MkdirTemp("", "nitpick-golangci-")
 	if err != nil {
-		return "", nil, fmt.Errorf("create a directory for open-nitpick's analyzer config: %w", err)
+		return "", nil, fmt.Errorf("create a directory for nitpick's analyzer config: %w", err)
 	}
 	cleanup := func() { _ = os.RemoveAll(dir) }
 
 	file := filepath.Join(dir, "golangci.yml")
 	if err := os.WriteFile(file, body, 0o600); err != nil {
 		cleanup()
-		return "", nil, fmt.Errorf("write open-nitpick's analyzer config: %w", err)
+		return "", nil, fmt.Errorf("write nitpick's analyzer config: %w", err)
 	}
 
 	resolved, err := resolveConfig(file, repoRoot)
 	if err != nil {
 		cleanup()
-		return "", nil, fmt.Errorf("open-nitpick's own analyzer config is not usable here: %w", err)
+		return "", nil, fmt.Errorf("nitpick's own analyzer config is not usable here: %w", err)
 	}
 
 	return resolved, cleanup, nil
@@ -371,15 +371,15 @@ func (g *golangciLint) Detect(_ context.Context, repoRoot string, files []string
 // isolated from the tree with no config of ours runs under golangci-lint's
 // stock defaults, which is how a `// Code generated` line in the diff switches
 // the analyzer off for that file. A reader has to tell "nothing configured
-// this" from "open-nitpick configured this".
+// this" from "nitpick configured this".
 //
 // When ForceGosec is set the string always contains "gosec:enabled" so the
 // security roster can prove the overlay was requested, whether the config came
 // from the security embed or an operator path.
 func (g *golangciLint) State() string {
-	isolated := "isolated: open-nitpick's own analyzer config"
+	isolated := "isolated: nitpick's own analyzer config"
 	if g.ForceGosec && g.cfg.Ref == "" && g.cfg.Err == nil {
-		isolated = "isolated: open-nitpick's security analyzer config"
+		isolated = "isolated: nitpick's security analyzer config"
 	}
 	state := g.cfg.state(isolated)
 	if g.ForceGosec {

@@ -157,7 +157,7 @@ type resolveForge interface {
 	React(ctx context.Context, ref vcs.Ref, commentID int64, inline bool, content string) error
 }
 
-// resolveOnRequest answers "@open-nitpick resolve" on an inline thread. Only a
+// resolveOnRequest answers "@nitpick-review resolve" on an inline thread. Only a
 // thread that starts with a finding is gated: resolving a conversation between
 // people closes no finding.
 func resolveOnRequest(ctx context.Context, gh resolveForge, policy *config.Config, ref vcs.Ref,

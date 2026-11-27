@@ -75,7 +75,7 @@ exercised along with the prompt.
 
 The report separates three things that are easy to confuse:
 
-- **Invariants**: properties open-nitpick must uphold whatever the model does:
+- **Invariants**: properties nitpick must uphold whatever the model does:
   every severity is a real level, every comment is placeable, and no suggestion
   is published as one-click-applicable unless it is a single line of code. A
   breach is a bug in this repository and fails the run.

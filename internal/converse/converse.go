@@ -1,4 +1,4 @@
-// Package converse is the @open-nitpick conversation: a comment on a pull request
+// Package converse is the @nitpick-review conversation: a comment on a pull request
 // that mentions the reviewer is read as a command (review again, resolve this
 // thread) or as a question the model answers in the same thread, with the
 // change and the thread as its context.
@@ -13,6 +13,7 @@ import (
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
 
+	"github.com/nitpick-oss/nitpick/internal/config"
 	"github.com/nitpick-oss/nitpick/internal/fence"
 	"github.com/nitpick-oss/nitpick/internal/llm"
 	"github.com/nitpick-oss/nitpick/internal/prompt"
@@ -142,7 +143,7 @@ const (
 // the text after the mention. ok is false when the comment does not mention
 // the reviewer at all, or mentions it with nothing after.
 func Command(body, mention string) (Kind, string, bool) {
-	re := regexp.MustCompile(`(?i)(^|\s)` + regexp.QuoteMeta(mention) + `\b[:,]?\s*`)
+	re := regexp.MustCompile(`(?i)(^|\s)(?:` + handlePattern(mention) + `)\b[:,]?\s*`)
 	loc := re.FindStringIndex(body)
 	if loc == nil {
 		return "", "", false
@@ -170,6 +171,17 @@ func Command(body, mention string) (Kind, string, bool) {
 		return KindImprove, rest, true
 	}
 	return KindAsk, rest, true
+}
+
+// handlePattern is the alternation of handles that address the reviewer under
+// mention: the mention itself, and config.LegacyMention while the mention is
+// still the default.
+func handlePattern(mention string) string {
+	handles := []string{regexp.QuoteMeta(mention)}
+	if strings.EqualFold(strings.TrimSpace(mention), config.DefaultMention) {
+		handles = append(handles, regexp.QuoteMeta(config.LegacyMention))
+	}
+	return strings.Join(handles, "|")
 }
 
 // FixesAll reports whether a fix command asked for every finding rather than

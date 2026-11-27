@@ -45,7 +45,7 @@ const (
 var Markers = []string{PullRequestText, ClaimUnderReview, CodeUnderReview, ReferenceMaterial}
 
 // Defanged replaces text that was imitating a marker.
-const Defanged = "[open-nitpick removed a forged boundary marker here]"
+const Defanged = "[nitpick removed a forged boundary marker here]"
 
 // imitation matches text trying to pass for one of the markers.
 //

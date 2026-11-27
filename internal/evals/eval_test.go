@@ -45,7 +45,7 @@ func TestMain(m *testing.M) {
 // TestPromptsDetectPlantedDefects is the battery. It reviews every fixture with every model and
 // reports three separate things, which must not be conflated:
 //
-//  1. INVARIANTS, properties open-nitpick must uphold no matter how a model
+//  1. INVARIANTS, properties nitpick must uphold no matter how a model
 //     behaves (valid severities, placeable anchors, no corrupting suggestion).
 //     A breach is a bug in this repo and fails the test.
 //  2. RECALL, whether the prompt finds planted bugs. Reported always;

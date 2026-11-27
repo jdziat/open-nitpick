@@ -200,7 +200,7 @@ nitpick auth delete synthetic
 ```
 
 That writes to the operating system's keystore (Keychain on macOS, Credential
-Manager on Windows, Secret Service on Linux) under the service `open-nitpick`
+Manager on Windows, Secret Service on Linux) under the service `nitpick`
 and the provider's name, which is where a review looks with nothing configured.
 The credential is read from standard input rather than an argument so it
 reaches neither the shell's history nor the process table.

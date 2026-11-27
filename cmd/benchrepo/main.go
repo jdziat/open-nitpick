@@ -193,7 +193,7 @@ func scaffold() map[string]string {
 	return map[string]string{
 		"README.md": `# nitpick-bench
 
-A private benchmark repository for [open-nitpick](https://github.com/nitpick-oss/nitpick).
+A private benchmark repository for [nitpick](https://github.com/nitpick-oss/nitpick).
 
 Every directory under ` + "`services/`" + ` is one small service in its base state. Every pull request
 changes one of them. Some changes carry a defect and some are clean; which is which is recorded
@@ -203,7 +203,7 @@ To score the reviews posted here against the plants:
 
     go run ./cmd/benchrepo score <owner>/<repo>
 
-from an open-nitpick checkout.
+from an nitpick checkout.
 `,
 		".nitpick.yaml": `models:
   default:
@@ -402,11 +402,11 @@ func prNumbers(repo string) (map[string]int, error) {
 }
 
 // reviewers are the contenders a comment can belong to, told apart by what
-// posted it: open-nitpick by the marker it leaves in every comment, the
+// posted it: nitpick by the marker it leaves in every comment, the
 // hosted reviewer by its app account, whose login is not written here and
 // arrives through BENCHREPO_BOT_LOGIN. Anything else is a human and is not
 // scored.
-var reviewers = []string{"open-nitpick", "incumbent"}
+var reviewers = []string{"nitpick", "incumbent"}
 
 // botLogin is the prefix of the hosted reviewer's GitHub login, and
 // triggerComment the comment that asks it for a review; both come from the
@@ -419,7 +419,7 @@ var (
 func reviewerOf(login, body string) string {
 	switch {
 	case strings.Contains(body, "<!-- open-nitpick"):
-		return "open-nitpick"
+		return "nitpick"
 	case botLogin != "" && strings.HasPrefix(login, botLogin):
 		return "incumbent"
 	}

@@ -37,7 +37,7 @@ type Finding struct {
 	Line int `json:"line"`
 
 	// EndLine is the last line of a multi-line anchor. Zero means the finding
-	// is anchored to Line alone, which is what open-nitpick's own reviews
+	// is anchored to Line alone, which is what nitpick's own reviews
 	// always produce: the prompt's contract is to anchor AT the defect, and the
 	// hand-authored schema does not offer a model this field.
 	//
@@ -62,7 +62,7 @@ type Finding struct {
 	// as missing a defect it explicitly located, and a benchmark that reports a
 	// competitor missing something it found is worse than one that does not run.
 	//
-	// open-nitpick's own reviews leave this empty: the schema does not offer it
+	// nitpick's own reviews leave this empty: the schema does not offer it
 	// and one finding gets one anchor.
 	AlsoAt []LineSpan `json:"also_at,omitempty"`
 

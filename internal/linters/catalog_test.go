@@ -203,7 +203,7 @@ func TestShippedConfigIsWrittenOutsideTheRepository(t *testing.T) {
 	if lines[len(lines)-1] != "Dockerfile" || slices.Contains(lines, "main.go") {
 		t.Errorf("targets = %v; only the Dockerfile is hadolint's", lines)
 	}
-	if tool.State() != "isolated: open-nitpick's own analyzer config" {
+	if tool.State() != "isolated: nitpick's own analyzer config" {
 		t.Errorf("state = %q", tool.State())
 	}
 }

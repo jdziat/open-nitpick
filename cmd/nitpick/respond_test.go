@@ -13,7 +13,7 @@ import (
 func TestReviewMentionResumesAndRestartForcesFull(t *testing.T) {
 	for _, command := range []string{"review", "restart-review", "re-review", "rereview"} {
 		t.Run(command, func(t *testing.T) {
-			kind, _, ok := converse.Command("@open-nitpick "+command, "@open-nitpick")
+			kind, _, ok := converse.Command("@nitpick-review "+command, "@nitpick-review")
 			if !ok {
 				t.Fatal("command not recognized")
 			}

@@ -52,7 +52,7 @@ remove `dry-run: true` when the configuration and results are ready to publish.
 ### Talking to it
 
 A comment on the pull request that starts with
-`@open-nitpick` is answered by a second workflow on `issue_comment` and
+`@nitpick-review` is answered by a second workflow on `issue_comment` and
 `pull_request_review_comment` events, running the Action with
 `command: respond`:
 
@@ -70,7 +70,7 @@ permissions:
 jobs:
   respond:
     if: >-
-      (contains(github.event.comment.body, '@open-nitpick') ||
+      (contains(github.event.comment.body, '@nitpick-review') ||
        github.event.comment.in_reply_to_id != null) &&
       github.event.comment.user.type != 'Bot'
     runs-on: ubuntu-latest
@@ -86,11 +86,11 @@ jobs:
           api-key: ${{ secrets.OPENROUTER_API_KEY }}
 ```
 
-`@open-nitpick review` resumes the previous review, or starts one if none exists.
-`@open-nitpick restart-review` reviews the whole PR afresh. The older `re-review`
+`@nitpick-review review` resumes the previous review, or starts one if none exists.
+`@nitpick-review restart-review` reviews the whole PR afresh. The older `re-review`
 and `rereview` aliases also restart.
-`@open-nitpick resolve` on an inline thread resolves it with a reply naming who
-asked. `@open-nitpick improve` runs the wider pass, below. Anything else is a
+`@nitpick-review resolve` on an inline thread resolves it with a reply naming who
+asked. `@nitpick-review improve` runs the wider pass, below. Anything else is a
 question, answered in the same thread by the
 review model with the diff, the lines around the thread, and the thread
 so far as its context; forge-authored text is fenced as untrusted, so a
@@ -113,7 +113,7 @@ Replies pass through the same gates as a mention: `review.respond.from` and
 `max_per_pull_request`. Closing a finding takes more than that. By default only
 an owner of the finding's file in CODEOWNERS, read from the base branch so the
 change cannot name itself, or the author of the pull request, may close it
-with a reply or `@open-nitpick resolve`. Other replies are read by no one and
+with a reply or `@nitpick-review resolve`. Other replies are read by no one and
 logged. A repository without CODEOWNERS, or a file no rule covers, falls back
 to `review.respond.from`. A team named as owner is checked through the
 organisation's API, which the default `GITHUB_TOKEN` cannot read; give the
@@ -145,7 +145,7 @@ which round it is on.
   that finished but skipped an oversized file is. A fast review is not. The check stays red until
   someone raises the limit in the base branch's configuration or the
   workflow's input, which is the point: the series ends where a person decides
-  whether it continues. `@open-nitpick improve` is not counted or limited.
+  whether it continues. `@nitpick-review improve` is not counted or limited.
 - `review.stop_at` (input `stop-at`, flag `-stop-at`): when nothing at or
   above that severity remains, from this run or from a thread still open
   since an earlier round, the series is `settled` and the run exits 0. A
@@ -350,7 +350,7 @@ unreachable.
 Analyzers, triage, validation, and approval run again over the combined results.
 Earlier findings still count, and unresolved threads still prevent approval.
 The summary reports how many model requests were reused. `review.incremental:
-false` disables reuse; `nitpick review -full` and `@open-nitpick restart-review`
+false` disables reuse; `nitpick review -full` and `@nitpick-review restart-review`
 bypass it for one run.
 
 Progress is stored in the review on GitHub, so a new Actions runner can resume.

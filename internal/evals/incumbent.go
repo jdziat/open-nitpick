@@ -192,7 +192,7 @@ func crCategoryClass(category string) (config.Class, bool) {
 }
 
 // RunIncumbent reviews a prepared fixture repository with the Incumbent CLI
-// and returns its findings in open-nitpick's shape.
+// and returns its findings in nitpick's shape.
 //
 // The comparison is deliberately like-for-like: the same fixture repository,
 // the same uncommitted working-tree change, and the same judge afterwards. What

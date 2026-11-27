@@ -30,7 +30,7 @@ produce unavailable evidence. Dependencies are not fetched during execution.
 This initial pilot accepts at most eight checks and snapshots of at most 1,024
 entries, with regular files only. Larger or unsupported repositories abstain.
 
-The existing authorized `@open-nitpick fix` workflow checks the original snapshot
+The existing authorized `@nitpick-review fix` workflow checks the original snapshot
 and candidate under the same profile. Draft descriptions report both outcomes,
 the source, patch, policy and output hashes, runtime and image. Existing
 permission and stale-head publication guards still apply. With
