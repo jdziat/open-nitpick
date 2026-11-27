@@ -2,13 +2,16 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"html"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -17,18 +20,18 @@ import (
 // builtAssets is a UI that was built: a manifest and the two files it names.
 func builtAssets() fstest.MapFS {
 	return fstest.MapFS{
-		"manifest.json":        {Data: []byte(`{"app.css":"app.0123456789ab.css","app.js":"app.0123456789ab.js"}`)},
-		"app.0123456789ab.css": {Data: []byte("body{}")},
-		"app.0123456789ab.js":  {Data: []byte("//")},
+		"manifest.json":         {Data: []byte(`{"app.css":"app.0123456789ab.css","app.js":"app.0123456789ab.js","theme.js":"theme.0123456789ab.js"}`)},
+		"app.0123456789ab.css":  {Data: []byte("body{}")},
+		"app.0123456789ab.js":   {Data: []byte("//")},
+		"theme.0123456789ab.js": {Data: []byte("//")},
 	}
 }
 
 // stubComponent is a component used only in tests: one machine-authenticated
-// route, one that needs a role, and pages that print what they are given.
+// route and two that need a role.
 type stubComponent struct {
 	name     string
 	prefixes []string
-	text     string // printed by the page, to test escaping
 	healthy  error
 	extra    []Route
 }
@@ -54,24 +57,6 @@ func (c *stubComponent) Routes() []Route {
 		})},
 	}, c.extra...)
 }
-func (c *stubComponent) Pages() []Page {
-	return []Page{
-		{Path: "", Title: "Stub home", Nav: true, Body: `<p id="t">{{.Data.Text}}</p>`,
-			Data: func(*http.Request) (any, error) { return struct{ Text string }{c.text}, nil }},
-		{Path: "admin", Title: "Stub admin", Nav: true, Need: "admin", Body: `<p>admin only</p>`,
-			Data: func(*http.Request) (any, error) { return nil, nil }},
-		{Path: "item/{id}", Title: "Stub item", Body: `<p>{{.Data}}</p>`,
-			Data: func(r *http.Request) (any, error) {
-				if r.PathValue("id") == "missing" {
-					return nil, ErrNotFound
-				}
-				if r.PathValue("id") == "broken" {
-					return nil, errors.New("open /var/secret/path: boom")
-				}
-				return r.PathValue("id"), nil
-			}},
-	}
-}
 
 // fakeProvider signs in whoever the form names, with no check: the server's
 // handling of sessions is what is under test, not a credential.
@@ -90,6 +75,18 @@ func (p fakeProvider) Mount(mux *http.ServeMux, host Host) {
 		}
 		host.SignIn(w, r, Identity{Provider: p.id, Subject: r.PostFormValue("username"), Groups: strings.Fields(r.PostFormValue("groups"))}, r.PostFormValue("next"))
 	})
+}
+
+// sessionOf reads the session the shell page tells the web app about, from the
+// meta tag the server renders it into.
+func sessionOf(t *testing.T, page string) SessionInfo {
+	t.Helper()
+	raw := between(t, page, `<meta name="nitpick-session" content="`, `">`)
+	var info SessionInfo
+	if err := json.Unmarshal([]byte(html.UnescapeString(raw)), &info); err != nil {
+		t.Fatalf("the session meta tag is not JSON: %v\n%s", err, raw)
+	}
+	return info
 }
 
 func newRoles(t *testing.T, rules ...RoleRule) *RoleMap {
@@ -203,10 +200,10 @@ func (e *env) cookie(name string) *http.Cookie {
 
 // standard is a server with one component, one provider and a role rule that
 // makes the group "ops" admins.
-func standard(t *testing.T, text string) *env {
+func standard(t *testing.T) *env {
 	t.Helper()
 	return newEnv(t, Config{
-		Components: []Component{&stubComponent{name: "stub", text: text}},
+		Components: []Component{&stubComponent{name: "stub"}},
 		Providers:  []Provider{fakeProvider{id: "fake"}},
 		Roles:      newRoles(t, RoleRule{Roles: []Role{"admin"}, Provider: "fake", Group: "ops"}),
 		Assets:     builtAssets(),
@@ -214,3 +211,12 @@ func standard(t *testing.T, text string) *env {
 }
 
 var errBoom = errors.New("open /var/secret/dir: boom")
+
+// regexpFindAll returns the first group of every match of pattern in text.
+func regexpFindAll(pattern, text string) []string {
+	var out []string
+	for _, m := range regexp.MustCompile(pattern).FindAllStringSubmatch(text, -1) {
+		out = append(out, strings.Trim(m[1], `"'`))
+	}
+	return out
+}

@@ -58,7 +58,7 @@ func TestSessionsSurviveConcurrentUse(t *testing.T) {
 // The whole server, with signed-in browsers hitting it at once.
 func TestTheServerSurvivesConcurrentSignedInRequests(t *testing.T) {
 	e := newEnv(t, Config{
-		Components: []Component{&stubComponent{name: "stub", text: "x"}},
+		Components: []Component{&stubComponent{name: "stub"}},
 		Providers:  []Provider{fakeProvider{id: "fake"}},
 		Roles:      newRoles(t, RoleRule{Roles: []Role{"admin"}, Provider: "fake", Group: "ops"}),
 		Assets:     builtAssets(),
@@ -70,7 +70,7 @@ func TestTheServerSurvivesConcurrentSignedInRequests(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for _, path := range []string{"/ui/", "/ui/stub/", "/ui/stub/admin", "/v1/stub/secret", "/healthz"} {
+			for _, path := range []string{"/ui/", "/ui/stub/", "/ui/assets/app.0123456789ab.css", "/v1/stub/secret", "/healthz"} {
 				req, _ := http.NewRequest("GET", e.ts.URL+path, nil)
 				resp, err := e.c.Do(req)
 				if err != nil {

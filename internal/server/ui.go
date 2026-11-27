@@ -2,7 +2,8 @@ package server
 
 import (
 	"bytes"
-	"errors"
+	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -10,74 +11,16 @@ import (
 	"strings"
 )
 
-// layoutText is the frame every page sits in. Everything that varies is an
-// action of html/template and is escaped for the context it appears in. There is
-// no inline script and no inline style, which the Content-Security-Policy
-// would refuse anyway.
-const layoutText = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{.Title}} · nitpick</title>
-{{if .CSS}}<link rel="stylesheet" href="/ui/assets/{{.CSS}}">{{end}}
-</head>
-<body>
-<header class="bar">
-<a class="brand" href="/ui/">nitpick</a>
-<nav aria-label="Pages">{{range .Nav}}<a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Title}}</a>{{end}}</nav>
-{{if .SignedIn}}<form class="who" method="post" action="/auth/logout">
-<span>{{.Who}}</span>
-<input type="hidden" name="csrf_token" value="{{.CSRF}}">
-<button type="submit">Sign out</button>
-</form>{{end}}
-</header>
-<main>
-<h1>{{.Title}}</h1>
-{{template "body" .View}}
-</main>
-{{if .JS}}<script src="/ui/assets/{{.JS}}" defer></script>{{end}}
-</body>
-</html>`
+//go:embed templates/*.html
+var templateFS embed.FS
 
-const indexBody = `{{if .Data}}<ul class="pages">{{range .Data}}<li><a href="{{.Href}}">{{.Title}}</a> <span class="muted">{{.Component}}</span></li>{{end}}</ul>
-{{else}}<p>No pages are available to this account.</p>{{end}}`
-
-const loginBody = `{{if .Data.Message}}<p class="error" role="alert">{{.Data.Message}}</p>{{end}}
-{{range .Data.Providers}}{{if .Credentials}}
-<form class="login" method="post" action="/auth/{{.ID}}/login">
-<h2>{{.Label}}</h2>
-<label>Username <input name="username" autocomplete="username" required></label>
-<label>Password <input name="password" type="password" autocomplete="current-password" required></label>
-<input type="hidden" name="csrf_token" value="{{$.CSRF}}">
-<input type="hidden" name="next" value="{{$.Data.Next}}">
-<button type="submit">Sign in</button>
-</form>
-{{else}}
-<p><a class="button" href="/auth/{{.ID}}/login?next={{$.Data.NextQuery}}">Sign in with {{.Label}}</a></p>
-{{end}}{{end}}`
-
-const stubBody = `<p>The UI was not built into this binary.</p>
-<p>Run <code>make ui</code> before <code>go build</code>, or use a release image, which includes it.</p>`
-
-const forbiddenBody = `<p>This account does not hold the role this page needs.</p>`
-const notFoundBody = `<p>There is nothing at this address.</p>`
-
-type pageRoute struct {
-	component string
-	page      Page
-	pattern   string
-	tmpl      *template.Template
-}
-
-type navItem struct {
-	Title   string
-	Href    string
-	Current bool
-}
-
-type indexEntry struct {
-	Title, Href, Component string
+// templates are parsed once, at start-up, so a broken one is an error from New and
+// not a 500 for the first person who signs in. Everything that varies is an action
+// of html/template and is escaped for the context it appears in. The pages hold no
+// inline script and no inline style, which the Content-Security-Policy would
+// refuse anyway.
+func parseTemplates() (*template.Template, error) {
+	return template.ParseFS(templateFS, "templates/*.html")
 }
 
 type providerEntry struct {
@@ -85,33 +28,37 @@ type providerEntry struct {
 	Credentials bool
 }
 
-type loginData struct {
-	Message   string
-	Providers []providerEntry
-	Next      string
-	NextQuery string
+// pageData is what the login and shell templates are executed with.
+type pageData struct {
+	CSS, JS, Theme string // the built files, by their hashed names
+	Session        string // the shell's session JSON
+	Message        string
+	Providers      []providerEntry
+	CSRF           string
+	Next           string
+	NextQuery      string
 }
 
-// layoutData is what the layout is executed with.
-type layoutData struct {
-	Title    string
-	CSS, JS  string
-	Nav      []navItem
-	SignedIn bool
-	Who      string
-	CSRF     string
-	View     View
+// SessionInfo is what the web app is told about whoever is signed in. It is the
+// whole of what the page knows about them: the roles decide what the app offers,
+// and the API routes enforce them again on every request.
+type SessionInfo struct {
+	Name       string   `json:"name"`
+	Provider   string   `json:"provider"`
+	Roles      []Role   `json:"roles"`
+	Components []string `json:"components"`
+	CSRF       string   `json:"csrf"`
 }
 
 func (s *Server) mountUI() error {
-	layout, err := template.New("layout").Parse(layoutText)
+	t, err := parseTemplates()
 	if err != nil {
-		return fmt.Errorf("layout: %w", err)
+		return fmt.Errorf("templates: %w", err)
 	}
-	s.layout = layout
+	s.tmpl = t
 
 	s.mux.HandleFunc("GET /ui/assets/{name}", s.assets.serve)
-	s.mux.HandleFunc("GET /ui/{$}", s.index)
+	s.mux.HandleFunc("GET /ui/{path...}", s.shell)
 	s.mux.HandleFunc("GET /auth/login", s.loginPage)
 	s.mux.HandleFunc("POST /auth/logout", s.logout)
 
@@ -126,44 +73,7 @@ func (s *Server) mountUI() error {
 			s.crossSite[path] = true
 		}
 	}
-
-	for _, c := range s.components {
-		for _, pg := range c.Pages() {
-			if strings.HasPrefix(pg.Path, "/") || strings.Contains(pg.Path, "..") {
-				return fmt.Errorf("component %s: page path %q must be relative", c.Name(), pg.Path)
-			}
-			if pg.Data == nil {
-				return fmt.Errorf("component %s: page %q has no Data", c.Name(), pg.Path)
-			}
-			tmpl, err := s.pageTemplate(pg.Body)
-			if err != nil {
-				return fmt.Errorf("component %s: page %q: %w", c.Name(), pg.Path, err)
-			}
-			pattern := "GET /ui/" + c.Name() + "/"
-			if pg.Path == "" {
-				pattern += "{$}"
-			} else {
-				pattern += pg.Path
-			}
-			route := pageRoute{component: c.Name(), page: pg, pattern: pattern, tmpl: tmpl}
-			s.pages = append(s.pages, route)
-			s.mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) { s.servePage(w, r, route) })
-		}
-	}
 	return nil
-}
-
-// pageTemplate parses the layout and one body into their own set, so a body can
-// not see or redefine another page's.
-func (s *Server) pageTemplate(body string) (*template.Template, error) {
-	t, err := s.layout.Clone()
-	if err != nil {
-		return nil, err
-	}
-	if _, err := t.New("body").Parse(body); err != nil {
-		return nil, err
-	}
-	return t, nil
 }
 
 // SignIn implements Host.
@@ -201,20 +111,12 @@ func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, status int,
 		return
 	}
 	next = safeNext(next)
-	data := loginData{Message: message, Next: next, NextQuery: next}
+	data := s.page()
+	data.Message, data.Next, data.NextQuery, data.CSRF = message, next, next, s.csrf.Token(secret)
 	for _, p := range s.providers {
 		data.Providers = append(data.Providers, providerEntry{ID: p.ID(), Label: p.Label(), Credentials: p.Form() == FormCredentials})
 	}
-	tmpl, err := s.pageTemplate(loginBody)
-	if err != nil {
-		s.log.Error("login template", "error", err)
-		http.Error(w, "the login page is broken", http.StatusInternalServerError)
-		return
-	}
-	s.write(w, tmpl, status, layoutData{
-		Title: "Sign in", CSS: s.assets.css, JS: s.assets.js,
-		View: View{Data: data, CSRF: s.csrf.Token(secret)},
-	}, "")
+	s.write(w, "login.html", status, data)
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
@@ -223,7 +125,10 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
 }
 
-func (s *Server) index(w http.ResponseWriter, r *http.Request) {
+// shell answers every GET under /ui/ with the web app's page, once the person is
+// signed in. The app routes inside it. What a person may see is decided by the API
+// routes the app calls, not by this page, which holds no data.
+func (s *Server) shell(w http.ResponseWriter, r *http.Request) {
 	if !s.assets.built {
 		s.stub(w)
 		return
@@ -233,106 +138,44 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/auth/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusSeeOther)
 		return
 	}
-	var entries []indexEntry
-	for _, p := range s.pages {
-		if p.page.Need == "" || id.Has(p.page.Need) {
-			if href := pageHref(p); p.page.Nav && href != "" {
-				entries = append(entries, indexEntry{Title: p.page.Title, Href: href, Component: p.component})
-			}
-		}
-	}
-	tmpl, err := s.pageTemplate(indexBody)
-	if err != nil {
-		http.Error(w, "the page is broken", http.StatusInternalServerError)
-		return
-	}
-	s.write(w, tmpl, http.StatusOK, s.frame(r, id, "Home", View{Data: entries, Identity: id}), r.URL.Path)
-}
-
-func (s *Server) servePage(w http.ResponseWriter, r *http.Request, route pageRoute) {
-	if !s.assets.built {
-		s.stub(w)
-		return
-	}
-	id, ok := IdentityFrom(r.Context())
-	if !ok {
-		http.Redirect(w, r, "/auth/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusSeeOther)
-		return
-	}
-	if route.page.Need != "" && !id.Has(route.page.Need) {
-		s.simple(w, r, id, http.StatusForbidden, "Not allowed", forbiddenBody)
-		return
-	}
-	data, err := route.page.Data(r)
-	switch {
-	case errors.Is(err, ErrNotFound):
-		s.simple(w, r, id, http.StatusNotFound, "Not found", notFoundBody)
-		return
-	case err != nil:
-		// The text of the error is for the log. It can name a path, and a page
-		// that printed it would show it to whoever asked.
-		s.log.Error("page", "component", route.component, "path", r.URL.Path, "error", err)
-		http.Error(w, "this page could not be produced", http.StatusInternalServerError)
-		return
-	}
-	view := View{Data: data, Identity: id}
-	title := route.page.Title
-	if route.page.Heading != nil {
-		if h := route.page.Heading(data); h != "" {
-			title = h
-		}
-	}
-	s.write(w, route.tmpl, http.StatusOK, s.frame(r, id, title, view), r.URL.Path)
-}
-
-func (s *Server) simple(w http.ResponseWriter, r *http.Request, id Identity, status int, title, body string) {
-	tmpl, err := s.pageTemplate(body)
-	if err != nil {
-		http.Error(w, title, status)
-		return
-	}
-	s.write(w, tmpl, status, s.frame(r, id, title, View{Identity: id}), r.URL.Path)
-}
-
-// frame fills the layout for a signed-in page.
-func (s *Server) frame(r *http.Request, id Identity, title string, view View) layoutData {
 	var csrf string
 	if _, secret, ok := s.sessions.Lookup(r); ok {
 		csrf = s.csrf.Token(secret)
 	}
-	view.CSRF = csrf
-	var nav []navItem
-	for _, p := range s.pages {
-		if !p.page.Nav || (p.page.Need != "" && !id.Has(p.page.Need)) {
-			continue
-		}
-		href := pageHref(p)
-		if href == "" {
-			continue // a page with a wildcard has no address to link to
-		}
-		nav = append(nav, navItem{Title: p.page.Title, Href: href, Current: href == r.URL.Path})
+	info := SessionInfo{Name: id.Display(), Provider: id.Provider, Roles: id.Roles, Components: s.componentNames(), CSRF: csrf}
+	if info.Roles == nil {
+		info.Roles = []Role{}
 	}
-	return layoutData{
-		Title: title, CSS: s.assets.css, JS: s.assets.js, Nav: nav,
-		SignedIn: true, Who: id.Display(), CSRF: csrf, View: view,
+	raw, err := json.Marshal(info)
+	if err != nil {
+		s.log.Error("encode the session", "error", err)
+		http.Error(w, "this page could not be produced", http.StatusInternalServerError)
+		return
 	}
+	data := s.page()
+	data.Session = string(raw)
+	s.write(w, "shell.html", http.StatusOK, data)
 }
 
-// pageHref is a page's address. A page whose path has a wildcard is not
-// linkable, and the navigation only holds pages that are.
-func pageHref(p pageRoute) string {
-	if strings.Contains(p.page.Path, "{") {
-		return ""
+func (s *Server) componentNames() []string {
+	names := make([]string, 0, len(s.components))
+	for _, c := range s.components {
+		names = append(names, c.Name())
 	}
-	return "/ui/" + p.component + "/" + p.page.Path
+	return names
 }
 
-// write executes a page into a buffer first, so a template error is a 500 and
+// page is the data every page starts from: the built files it loads.
+func (s *Server) page() pageData {
+	return pageData{CSS: s.assets.css, JS: s.assets.js, Theme: s.assets.theme}
+}
+
+// write executes a template into a buffer first, so a template error is a 500 and
 // not half a page, then sends it.
-func (s *Server) write(w http.ResponseWriter, tmpl *template.Template, status int, data layoutData, _ string) {
+func (s *Server) write(w http.ResponseWriter, name string, status int, data pageData) {
 	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "layout", data); err != nil {
-		s.log.Error("render", "error", err)
+	if err := s.tmpl.ExecuteTemplate(&buf, name, data); err != nil {
+		s.log.Error("render", "template", name, "error", err)
 		http.Error(w, "this page could not be produced", http.StatusInternalServerError)
 		return
 	}
@@ -342,12 +185,8 @@ func (s *Server) write(w http.ResponseWriter, tmpl *template.Template, status in
 	_, _ = w.Write(buf.Bytes())
 }
 
-// stub is what the UI pages say when the UI was not built into the binary.
+// stub is what the UI pages say when the UI was not built into the binary. It
+// loads nothing, since there is nothing built to load.
 func (s *Server) stub(w http.ResponseWriter) {
-	tmpl, err := s.pageTemplate(stubBody)
-	if err != nil {
-		http.Error(w, "The UI was not built.", http.StatusOK)
-		return
-	}
-	s.write(w, tmpl, http.StatusOK, layoutData{Title: "UI not built"}, "")
+	s.write(w, "stub.html", http.StatusOK, pageData{})
 }

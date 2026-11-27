@@ -2,6 +2,7 @@ package insights
 
 import (
 	"math"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -43,8 +44,10 @@ type Hotspot struct {
 	Trend    Trend   `json:"trend"`
 	// Baseline is true when a review ran in the window before, so a Prior of 0 is
 	// a count and not the absence of data.
-	Baseline bool      `json:"baseline"`
-	Last     time.Time `json:"last"`
+	Baseline bool `json:"baseline"`
+	// Delta is Recent minus Prior: how many more findings than the window before.
+	Delta int       `json:"delta"`
+	Last  time.Time `json:"last"`
 	// Spark is findings per bucket across the window, oldest first.
 	Spark []int `json:"spark"`
 }
@@ -136,6 +139,7 @@ func (s *Store) Hotspots(q Query) []Hotspot {
 		h.Prior = prior[k]
 		h.Baseline = baseline[h.Repo]
 		h.Trend = trendOf(h.Recent, h.Prior, h.Baseline)
+		h.Delta = h.Recent - h.Prior
 		out = append(out, *h)
 	}
 	// Files that fell out of the window entirely are not hotspots, but one that
@@ -316,12 +320,14 @@ func (s *Store) Repos(q Query) []RepoRow {
 }
 
 // FindingQuery filters the findings across reviews. Path matches a file exactly,
-// or a directory when it ends in "/".
+// or a directory when it ends in "/". Q is a text search over a finding's title,
+// rationale, path and class, ignoring case.
 type FindingQuery struct {
 	Query
 	Path        string
 	Class       string
 	MinSeverity string
+	Q           string
 	Limit       int
 }
 
@@ -334,13 +340,15 @@ type FindingRow struct {
 	At       time.Time `json:"at"`
 }
 
-// Findings returns the newest matching findings, at most Limit, and how many
-// matched, so a caller that was cut short can say so.
-func (s *Store) Findings(q FindingQuery) (rows []FindingRow, total int) {
+// AllFindings returns every matching finding, newest first and, within one
+// review, most severe first. It is what a page is cut from, so the whole set is
+// sorted before any of it is shown.
+func (s *Store) AllFindings(q FindingQuery) []FindingRow {
 	from, _ := q.window()
 	floor := rank(q.MinSeverity)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	var rows []FindingRow
 	for _, r := range s.reviews {
 		if q.Repo != "" && r.Repo != q.Repo || r.At.Before(from) || r.At.After(q.Now) {
 			continue
@@ -352,7 +360,9 @@ func (s *Store) Findings(q FindingQuery) (rows []FindingRow, total int) {
 			if q.Class != "" && f.Class != q.Class || rank(f.Severity) < floor {
 				continue
 			}
-			total++
+			if !contains(q.Q, f.Title, f.Rationale, f.Path, f.Class) {
+				continue
+			}
 			rows = append(rows, FindingRow{Finding: f, Repo: r.Repo, ReviewID: r.ID, Commit: r.Commit, At: r.At})
 		}
 	}
@@ -362,10 +372,55 @@ func (s *Store) Findings(q FindingQuery) (rows []FindingRow, total int) {
 		}
 		return rank(rows[i].Severity) > rank(rows[j].Severity)
 	})
+	return rows
+}
+
+// Findings returns the newest matching findings, at most Limit, and how many
+// matched, so a caller that was cut short can say so.
+func (s *Store) Findings(q FindingQuery) (rows []FindingRow, total int) {
+	rows = s.AllFindings(q)
+	total = len(rows)
 	if q.Limit > 0 && len(rows) > q.Limit {
 		rows = rows[:q.Limit]
 	}
 	return rows, total
+}
+
+// Facets are the values a filter can offer, from what was reported in the period.
+type Facets struct {
+	Repos      []string `json:"repos"`
+	Classes    []string `json:"classes"`
+	Severities []string `json:"severities"`
+}
+
+// Facets lists the repositories and classes seen in the period, sorted. The
+// severities are the fixed scale, least severe first, whether or not each was seen.
+func (s *Store) Facets(q Query) Facets {
+	from, _ := q.window()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	repos, classes := map[string]bool{}, map[string]bool{}
+	for _, r := range s.reviews {
+		if r.At.Before(from) || r.At.After(q.Now) {
+			continue
+		}
+		repos[r.Repo] = true
+		for _, f := range r.Findings {
+			if f.Class != "" {
+				classes[f.Class] = true
+			}
+		}
+	}
+	return Facets{Repos: sortedKeys(repos), Classes: sortedKeys(classes), Severities: slices.Clone(Severities)}
+}
+
+func sortedKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // matchPath is a file exactly, or everything under a directory that ends in "/".

@@ -97,6 +97,8 @@ func (c *Component) Routes() []server.Route {
 		{Pattern: "GET /v1/reviews/{id}", Handler: h(c.one)},
 		{Pattern: "GET /v1/insights/overview", Handler: h(c.overview)},
 		{Pattern: "GET /v1/insights/hotspots", Handler: h(c.hotspots)},
+		{Pattern: "GET /v1/insights/repos", Handler: h(c.repos)},
+		{Pattern: "GET /v1/insights/facets", Handler: h(c.facets)},
 		{Pattern: "GET /v1/insights/findings", Handler: h(c.findings)},
 		{Pattern: "/mcp/", Handler: c.mcpHandler()},
 		{Pattern: "/mcp", Handler: c.mcpHandler()},
@@ -221,41 +223,93 @@ func (c *Component) parseQuery(r *http.Request) (Query, error) {
 	return q, nil
 }
 
-// maxListed is the most reviews GET /v1/reviews returns; the response says how many there are.
-const maxListed = 200
-
 // MaxDays is the longest window a query may ask for.
 const MaxDays = 365
 
-func (c *Component) list(w http.ResponseWriter, r *http.Request) {
+// ReviewRow is a review in a list: what a table shows without the findings.
+type ReviewRow struct {
+	ID       string    `json:"id"`
+	Repo     string    `json:"repo"`
+	Ref      string    `json:"ref,omitempty"`
+	Commit   string    `json:"commit,omitempty"`
+	Result   string    `json:"result"`
+	At       time.Time `json:"at"`
+	Complete bool      `json:"complete"`
+	Findings int       `json:"findings"`
+	Errors   int       `json:"errors"`
+	Worst    string    `json:"worst,omitempty"`
+	Withheld int       `json:"withheld,omitempty"`
+}
+
+func reviewRow(rv Review) ReviewRow {
+	row := ReviewRow{ID: rv.ID, Repo: rv.Repo, Ref: rv.Ref, Commit: rv.Commit, Result: rv.Result, At: rv.At, Complete: rv.Complete, Findings: len(rv.Findings), Withheld: rv.Withheld}
+	for _, f := range rv.Findings {
+		if rank(f.Severity) >= rank("error") {
+			row.Errors++
+		}
+		if rank(f.Severity) > rank(row.Worst) {
+			row.Worst = f.Severity
+		}
+	}
+	return row
+}
+
+var reviewSorts = sortSpec{allowed: []string{"at", "repo", "findings", "errors", "result"}, def: "at", defDesc: true}
+
+// Reviews lists the reviews of a window, filtered, searched, sorted and paged.
+// complete is "", "true" or "false".
+func (c *Component) reviewList(q Query, p ListParams, complete string) Paged[ReviewRow] {
+	from, _ := q.window()
+	var rows []ReviewRow
+	for _, rv := range c.store.Reviews(Filter{Repo: q.Repo, Since: from, Until: q.Now}) {
+		row := reviewRow(rv)
+		if complete != "" && strconv.FormatBool(row.Complete) != complete {
+			continue
+		}
+		if !contains(p.Q, row.Repo, row.Ref, row.Commit, row.Result) {
+			continue
+		}
+		rows = append(rows, row)
+	}
+	sortRows(rows, p, map[string]func(a, b ReviewRow) int{
+		"at":       func(a, b ReviewRow) int { return a.At.Compare(b.At) },
+		"repo":     func(a, b ReviewRow) int { return strings.Compare(a.Repo, b.Repo) },
+		"findings": func(a, b ReviewRow) int { return a.Findings - b.Findings },
+		"errors":   func(a, b ReviewRow) int { return a.Errors - b.Errors },
+		"result":   func(a, b ReviewRow) int { return strings.Compare(a.Result, b.Result) },
+	})
+	return paginate(rows, p)
+}
+
+// listRequest authenticates a read route and reads the window and the list
+// parameters, answering 401, 403 or 400 itself when it cannot. ok is false when it
+// has answered.
+func (c *Component) listRequest(w http.ResponseWriter, r *http.Request, spec sortSpec) (q Query, p ListParams, ok bool) {
 	if _, ok := c.need(w, r, false); !ok {
-		return
+		return q, p, false
 	}
 	q, err := c.parseQuery(r)
+	if err == nil {
+		p, err = parseList(r, spec)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return q, p, false
+	}
+	return q, p, true
+}
+
+func (c *Component) list(w http.ResponseWriter, r *http.Request) {
+	q, p, ok := c.listRequest(w, r, reviewSorts)
+	if !ok {
 		return
 	}
-	from, _ := q.window()
-	type row struct {
-		ID       string    `json:"id"`
-		Repo     string    `json:"repo"`
-		Ref      string    `json:"ref,omitempty"`
-		Commit   string    `json:"commit,omitempty"`
-		Result   string    `json:"result"`
-		At       time.Time `json:"at"`
-		Complete bool      `json:"complete"`
-		Findings int       `json:"findings"`
+	complete := r.URL.Query().Get("complete")
+	if complete != "" && complete != "true" && complete != "false" {
+		http.Error(w, "complete must be true or false", http.StatusBadRequest)
+		return
 	}
-	rows := []row{}
-	all := c.store.Reviews(Filter{Repo: q.Repo, Since: from, Until: q.Now})
-	for _, rv := range all {
-		if len(rows) == maxListed {
-			break
-		}
-		rows = append(rows, row{ID: rv.ID, Repo: rv.Repo, Ref: rv.Ref, Commit: rv.Commit, Result: rv.Result, At: rv.At, Complete: rv.Complete, Findings: len(rv.Findings)})
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"reviews": rows, "total": len(all), "truncated": len(all) > len(rows)})
+	writeJSON(w, http.StatusOK, c.reviewList(q, p, complete))
 }
 
 func (c *Component) one(w http.ResponseWriter, r *http.Request) {
@@ -279,64 +333,117 @@ func (c *Component) overview(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"overview": c.store.Overview(q), "series": c.store.Series(q)})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"overview": c.store.Overview(q),
+		"prior":    c.store.PriorOverview(q),
+		"series":   c.store.Series(q),
+	})
 }
+
+func (c *Component) facets(w http.ResponseWriter, r *http.Request) {
+	if _, ok := c.need(w, r, false); !ok {
+		return
+	}
+	q, err := c.parseQuery(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, http.StatusOK, c.store.Facets(q))
+}
+
+var repoSorts = sortSpec{allowed: []string{"repo", "reviews", "findings", "errors", "last"}, def: "findings", defDesc: true}
+
+func (c *Component) repos(w http.ResponseWriter, r *http.Request) {
+	q, p, ok := c.listRequest(w, r, repoSorts)
+	if !ok {
+		return
+	}
+	var rows []RepoRow
+	for _, row := range c.store.Repos(q) {
+		if contains(p.Q, row.Repo) {
+			rows = append(rows, row)
+		}
+	}
+	sortRows(rows, p, map[string]func(a, b RepoRow) int{
+		"repo":     func(a, b RepoRow) int { return strings.Compare(a.Repo, b.Repo) },
+		"reviews":  func(a, b RepoRow) int { return a.Reviews - b.Reviews },
+		"findings": func(a, b RepoRow) int { return a.Findings - b.Findings },
+		"errors":   func(a, b RepoRow) int { return a.Errors - b.Errors },
+		"last":     func(a, b RepoRow) int { return a.Last.Compare(b.Last) },
+	})
+	writeJSON(w, http.StatusOK, paginate(rows, p))
+}
+
+var hotspotSorts = sortSpec{allowed: []string{"score", "findings", "path", "repo", "delta", "worst", "last"}, def: "score", defDesc: true}
 
 func (c *Component) hotspots(w http.ResponseWriter, r *http.Request) {
-	if _, ok := c.need(w, r, false); !ok {
+	q, p, ok := c.listRequest(w, r, hotspotSorts)
+	if !ok {
 		return
 	}
-	q, err := c.parseQuery(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	trend := Trend(r.URL.Query().Get("trend"))
+	if trend != "" && trend != TrendUp && trend != TrendDown && trend != TrendFlat {
+		http.Error(w, "trend must be up, down or flat", http.StatusBadRequest)
 		return
 	}
-	hs := c.store.Hotspots(q)
-	n, err := limitParam(r, 50)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	floor := r.URL.Query().Get("min_severity")
+	if floor != "" && rank(floor) < 0 {
+		http.Error(w, "min_severity must be one of "+strings.Join(Severities, ", "), http.StatusBadRequest)
 		return
 	}
-	total := len(hs)
-	if len(hs) > n {
-		hs = hs[:n]
+	var rows []Hotspot
+	for _, h := range c.store.Hotspots(q) {
+		if trend != "" && h.Trend != trend || rank(h.Worst) < rank(floor) || !contains(p.Q, h.Path, h.Repo) {
+			continue
+		}
+		rows = append(rows, h)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"hotspots": hs, "total": total})
+	sortRows(rows, p, map[string]func(a, b Hotspot) int{
+		"score":    func(a, b Hotspot) int { return cmpFloat(a.Score, b.Score) },
+		"findings": func(a, b Hotspot) int { return a.Findings - b.Findings },
+		"path":     func(a, b Hotspot) int { return strings.Compare(a.Path, b.Path) },
+		"repo":     func(a, b Hotspot) int { return strings.Compare(a.Repo, b.Repo) },
+		"delta":    func(a, b Hotspot) int { return a.Delta - b.Delta },
+		"worst":    func(a, b Hotspot) int { return rank(a.Worst) - rank(b.Worst) },
+		"last":     func(a, b Hotspot) int { return a.Last.Compare(b.Last) },
+	})
+	writeJSON(w, http.StatusOK, paginate(rows, p))
 }
 
+var findingSorts = sortSpec{allowed: []string{"at", "severity", "path", "repo", "class", "title"}, def: "at", defDesc: true}
+
 func (c *Component) findings(w http.ResponseWriter, r *http.Request) {
-	if _, ok := c.need(w, r, false); !ok {
+	q, p, ok := c.listRequest(w, r, findingSorts)
+	if !ok {
 		return
 	}
-	q, err := c.parseQuery(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	n, err := limitParam(r, 100)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	fq := FindingQuery{Query: q, Path: r.URL.Query().Get("path"), Class: r.URL.Query().Get("class"), MinSeverity: r.URL.Query().Get("min_severity"), Limit: n}
+	v := r.URL.Query()
+	fq := FindingQuery{Query: q, Path: v.Get("path"), Class: v.Get("class"), MinSeverity: v.Get("min_severity"), Q: p.Q}
 	if fq.MinSeverity != "" && rank(fq.MinSeverity) < 0 {
 		http.Error(w, "min_severity must be one of "+strings.Join(Severities, ", "), http.StatusBadRequest)
 		return
 	}
-	rows, total := c.store.Findings(fq)
-	writeJSON(w, http.StatusOK, map[string]any{"findings": rows, "total": total})
+	rows := c.store.AllFindings(fq)
+	sortRows(rows, p, map[string]func(a, b FindingRow) int{
+		"at":       func(a, b FindingRow) int { return a.At.Compare(b.At) },
+		"severity": func(a, b FindingRow) int { return rank(a.Severity) - rank(b.Severity) },
+		"path":     func(a, b FindingRow) int { return strings.Compare(a.Path, b.Path) },
+		"repo":     func(a, b FindingRow) int { return strings.Compare(a.Repo, b.Repo) },
+		"class":    func(a, b FindingRow) int { return strings.Compare(a.Class, b.Class) },
+		"title":    func(a, b FindingRow) int { return strings.Compare(a.Title, b.Title) },
+	})
+	writeJSON(w, http.StatusOK, paginate(rows, p))
 }
 
-func limitParam(r *http.Request, def int) (int, error) {
-	v := r.URL.Query().Get("limit")
-	if v == "" {
-		return def, nil
+func cmpFloat(a, b float64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
 	}
-	n, err := strconv.Atoi(v)
-	if err != nil || n < 1 || n > 500 {
-		return 0, errors.New("limit must be a whole number from 1 to 500")
-	}
-	return n, nil
+	return 0
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

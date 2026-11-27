@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>Sign in · nitpick</title>
+{{template "head" .}}
+</head>
+<body class="bg-muted/40 text-foreground min-h-svh font-sans antialiased">
+<main class="flex min-h-svh items-center justify-center p-6">
+<div class="w-full max-w-sm">
+<div class="mb-6 flex items-center justify-center gap-2.5">
+<span class="bg-primary text-primary-foreground grid size-8 place-items-center rounded-lg" aria-hidden="true">
+<svg viewBox="0 0 24 24" class="size-4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h6"/></svg>
+</span>
+<span class="text-lg font-semibold tracking-tight">nitpick</span>
+</div>
+<div class="bg-card text-card-foreground rounded-xl border shadow-sm">
+<div class="space-y-1 p-6 pb-0">
+<h1 class="text-xl leading-none font-semibold tracking-tight">Sign in</h1>
+<p class="text-muted-foreground text-sm">to the nitpick hub</p>
+</div>
+<div class="space-y-5 p-6">
+{{if .Message}}<p class="border-destructive/30 bg-destructive/10 text-destructive rounded-md border px-3 py-2 text-sm" role="alert">{{.Message}}</p>{{end}}
+{{range .Providers}}{{if .Credentials}}
+<form class="space-y-4" method="post" action="/auth/{{.ID}}/login">
+{{if gt (len $.Providers) 1}}<h2 class="text-muted-foreground text-xs font-medium tracking-wide uppercase">{{.Label}}</h2>{{end}}
+<div class="space-y-2">
+<label class="text-sm leading-none font-medium" for="username-{{.ID}}">Username</label>
+<input id="username-{{.ID}}" name="username" autocomplete="username" required class="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px]">
+</div>
+<div class="space-y-2">
+<label class="text-sm leading-none font-medium" for="password-{{.ID}}">Password</label>
+<input id="password-{{.ID}}" name="password" type="password" autocomplete="current-password" required class="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px]">
+</div>
+<input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+<input type="hidden" name="next" value="{{$.Next}}">
+<button type="submit" class="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring/50 inline-flex h-9 w-full items-center justify-center rounded-md px-4 text-sm font-medium shadow-xs outline-none focus-visible:ring-[3px]">Sign in</button>
+</form>
+{{else}}
+<a class="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring/50 inline-flex h-9 w-full items-center justify-center rounded-md px-4 text-sm font-medium shadow-xs outline-none focus-visible:ring-[3px]" href="/auth/{{.ID}}/login?next={{$.NextQuery}}">Sign in with {{.Label}}</a>
+{{end}}{{end}}
+</div>
+</div>
+</div>
+</main>
+</body>
+</html>

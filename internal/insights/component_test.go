@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -77,7 +76,7 @@ func TestPostingAReviewNeedsAWriteToken(t *testing.T) {
 func TestReadRoutesAcceptEitherTokenAndRefuseNone(t *testing.T) {
 	ts, _ := newHub(t)
 	_, _ = do(t, "POST", ts.URL+"/v1/reviews", writeSecret, goodSubmission)
-	for _, path := range []string{"/v1/reviews", "/v1/insights/overview", "/v1/insights/hotspots", "/v1/insights/findings"} {
+	for _, path := range []string{"/v1/reviews", "/v1/insights/overview", "/v1/insights/hotspots", "/v1/insights/findings", "/v1/insights/repos", "/v1/insights/facets"} {
 		if got, _ := do(t, "GET", ts.URL+path, "", ""); got != 401 {
 			t.Errorf("%s without a token: %d", path, got)
 		}
@@ -128,7 +127,7 @@ func TestPostRefusesBadInputWithTheRightStatus(t *testing.T) {
 
 func TestQueryParametersAreValidatedNotIgnored(t *testing.T) {
 	ts, _ := newHub(t)
-	for _, q := range []string{"/v1/insights/hotspots?days=0", "/v1/insights/hotspots?days=9999", "/v1/insights/hotspots?days=x", "/v1/insights/findings?limit=0", "/v1/insights/findings?min_severity=doom"} {
+	for _, q := range []string{"/v1/insights/hotspots?days=0", "/v1/insights/hotspots?days=9999", "/v1/insights/hotspots?days=x", "/v1/insights/findings?page_size=0", "/v1/insights/findings?min_severity=doom"} {
 		if got, _ := do(t, "GET", ts.URL+q, readSecret, ""); got != 400 {
 			t.Errorf("%s: %d, want 400", q, got)
 		}
@@ -140,10 +139,10 @@ func TestHotspotsRouteRanksWhatWasPosted(t *testing.T) {
 	_, _ = do(t, "POST", ts.URL+"/v1/reviews", writeSecret, goodSubmission)
 	_, body := do(t, "GET", ts.URL+"/v1/insights/hotspots", readSecret, "")
 	var out struct {
-		Hotspots []Hotspot `json:"hotspots"`
-		Total    int       `json:"total"`
+		Items []Hotspot `json:"items"`
+		Total int       `json:"total"`
 	}
-	if err := json.Unmarshal([]byte(body), &out); err != nil || out.Total != 1 || out.Hotspots[0].Path != "pkg/a.go" {
+	if err := json.Unmarshal([]byte(body), &out); err != nil || out.Total != 1 || len(out.Items) != 1 || out.Items[0].Path != "pkg/a.go" {
 		t.Fatalf("%s", body)
 	}
 }
@@ -240,7 +239,7 @@ func TestMCPToolErrorsAreReportedToTheAgentNotSwallowed(t *testing.T) {
 func TestTheJSONRoutesUseLowercaseSnakeCaseNamesThroughout(t *testing.T) {
 	ts, _ := newHub(t)
 	_, _ = do(t, "POST", ts.URL+"/v1/reviews", writeSecret, goodSubmission)
-	for _, path := range []string{"/v1/insights/hotspots", "/v1/insights/findings", "/v1/insights/overview", "/v1/reviews"} {
+	for _, path := range []string{"/v1/insights/hotspots", "/v1/insights/findings", "/v1/insights/overview", "/v1/insights/repos", "/v1/insights/facets", "/v1/reviews"} {
 		_, body := do(t, "GET", ts.URL+path, readSecret, "")
 		var v any
 		if err := json.Unmarshal([]byte(body), &v); err != nil {
@@ -266,28 +265,6 @@ func TestTheJSONRoutesUseLowercaseSnakeCaseNamesThroughout(t *testing.T) {
 	}
 }
 
-func TestTheReviewListSaysHowManyThereAreWhenItIsCutShort(t *testing.T) {
-	ts, c := newHub(t)
-	for i := 0; i < 205; i++ {
-		_, err := c.store.Add(context.Background(), Review{Repo: "r", Commit: strconv.Itoa(i), At: t0.Add(-time.Duration(i) * time.Minute), Result: "clean", Complete: true})
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	_, body := do(t, "GET", ts.URL+"/v1/reviews?days=30", readSecret, "")
-	var out struct {
-		Reviews   []json.RawMessage `json:"reviews"`
-		Total     int               `json:"total"`
-		Truncated bool              `json:"truncated"`
-	}
-	if err := json.Unmarshal([]byte(body), &out); err != nil {
-		t.Fatal(err)
-	}
-	if len(out.Reviews) != 200 || out.Total != 205 || !out.Truncated {
-		t.Fatalf("%d reviews, total %d, truncated %v: a cut-short list must say so", len(out.Reviews), out.Total, out.Truncated)
-	}
-}
-
 func TestTheReviewListLeavesOutAReviewDatedAheadThatEveryAnalyticExcludes(t *testing.T) {
 	ts, c := newHub(t)
 	// The store accepts a little clock skew; the list must agree with the counts.
@@ -300,13 +277,13 @@ func TestTheReviewListLeavesOutAReviewDatedAheadThatEveryAnalyticExcludes(t *tes
 	}
 	_, body := do(t, "GET", ts.URL+"/v1/reviews?days=7", readSecret, "")
 	var out struct {
-		Reviews []struct{ Commit string } `json:"reviews"`
-		Total   int                       `json:"total"`
+		Items []struct{ Commit string } `json:"items"`
+		Total int                       `json:"total"`
 	}
 	if err := json.Unmarshal([]byte(body), &out); err != nil {
 		t.Fatal(err)
 	}
-	if out.Total != 1 || len(out.Reviews) != 1 || out.Reviews[0].Commit != "now" {
+	if out.Total != 1 || len(out.Items) != 1 || out.Items[0].Commit != "now" {
 		t.Fatalf("the list holds %+v: a review dated ahead is in the list but in no count", out)
 	}
 	_, over := do(t, "GET", ts.URL+"/v1/insights/overview?days=7", readSecret, "")

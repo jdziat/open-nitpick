@@ -153,6 +153,8 @@ func (c *Component) Routes() []server.Route {
 	return []server.Route{
 		{Pattern: "/v1/records/{hash}", Handler: http.HandlerFunc(c.record)},
 		{Pattern: "/v1/records", Handler: http.HandlerFunc(c.list)},
+		{Pattern: "GET /v1/records/view", Handler: http.HandlerFunc(c.viewList)},
+		{Pattern: "GET /v1/records/view/{hash}", Handler: http.HandlerFunc(c.viewRecord)},
 	}
 }
 

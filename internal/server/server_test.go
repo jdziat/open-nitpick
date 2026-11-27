@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 )
 
@@ -42,7 +44,7 @@ func TestWithNoProviderTheUIIsNotFound(t *testing.T) {
 
 // With a provider, an anonymous request is refused, each in its own way.
 func TestAnAnonymousRequestIsRefused(t *testing.T) {
-	e := standard(t, "x")
+	e := standard(t)
 	if resp, _ := e.do("GET", "/ui/", nil, nil); resp.StatusCode != 303 || !strings.HasPrefix(resp.Header.Get("Location"), "/auth/login?next=") {
 		t.Errorf("/ui/ anonymous = %d to %q, want a redirect to login", resp.StatusCode, resp.Header.Get("Location"))
 	}
@@ -60,79 +62,22 @@ func TestAnAnonymousRequestIsRefused(t *testing.T) {
 
 // Rule 9: a route that declares a role refuses a session without it.
 func TestARouteThatNeedsARoleRefusesASessionWithoutIt(t *testing.T) {
-	e := standard(t, "x")
+	e := standard(t)
 	e.signIn("alice") // no group, so no roles
 	if resp, _ := e.do("GET", "/v1/stub/secret", nil, nil); resp.StatusCode != 403 {
 		t.Errorf("a role route without the role = %d, want 403", resp.StatusCode)
 	}
-	if resp, _ := e.do("GET", "/ui/stub/admin", nil, nil); resp.StatusCode != 403 {
-		t.Errorf("a role page without the role = %d, want 403", resp.StatusCode)
-	}
 	// Rule 10: the refusal is the role's. The same routes answer for an admin.
-	admin := standard(t, "x")
+	admin := standard(t)
 	admin.signIn("bob", "ops")
 	if resp, body := admin.do("GET", "/v1/stub/secret", nil, nil); resp.StatusCode != 200 || body != "secret" {
 		t.Errorf("a role route with the role = %d %q", resp.StatusCode, body)
-	}
-	if resp, _ := admin.do("GET", "/ui/stub/admin", nil, nil); resp.StatusCode != 200 {
-		t.Errorf("a role page with the role = %d", resp.StatusCode)
-	}
-}
-
-// A sign-in alone grants nothing: roles come from the rules, and an identity no
-// rule matches holds none.
-func TestASignInWithNoMatchingRuleHoldsNoRoles(t *testing.T) {
-	e := standard(t, "x")
-	e.signIn("alice", "interns")
-	resp, body := e.do("GET", "/ui/", nil, nil)
-	if resp.StatusCode != 200 {
-		t.Fatalf("home = %d", resp.StatusCode)
-	}
-	if strings.Contains(body, "Stub admin") {
-		t.Error("a page that needs a role was listed for an account without it")
-	}
-	if !strings.Contains(body, "Stub home") {
-		t.Error("the page any signed-in account may see was not listed")
-	}
-}
-
-// A page's text is untrusted. Script in component-supplied text is shown as
-// text and not run.
-func TestScriptInComponentTextIsShownAsText(t *testing.T) {
-	const evil = `<script>alert(1)</script><img src=x onerror=alert(2)>`
-	e := standard(t, evil)
-	e.signIn("alice")
-	resp, body := e.do("GET", "/ui/stub/", nil, nil)
-	if resp.StatusCode != 200 {
-		t.Fatalf("page = %d", resp.StatusCode)
-	}
-	if strings.Contains(body, "<script>alert") || strings.Contains(body, "<img src=x") {
-		t.Errorf("component text reached the page as markup:\n%s", body)
-	}
-	if !strings.Contains(body, "&lt;script&gt;alert(1)&lt;/script&gt;") {
-		t.Errorf("the text is not shown, escaped:\n%s", body)
-	}
-}
-
-// An error's text is for the log. A page whose data failed does not print it.
-func TestAPageErrorsTextIsNotShown(t *testing.T) {
-	e := standard(t, "x")
-	e.signIn("alice")
-	resp, body := e.do("GET", "/ui/stub/item/broken", nil, nil)
-	if resp.StatusCode != 500 || strings.Contains(body, "/var/secret") || strings.Contains(body, "boom") {
-		t.Errorf("a failing page = %d %q, want a 500 that does not say why", resp.StatusCode, body)
-	}
-	if resp, _ := e.do("GET", "/ui/stub/item/missing", nil, nil); resp.StatusCode != 404 {
-		t.Errorf("a missing item = %d, want 404", resp.StatusCode)
-	}
-	if resp, body := e.do("GET", "/ui/stub/item/7", nil, nil); resp.StatusCode != 200 || !strings.Contains(body, "<p>7</p>") {
-		t.Errorf("an item = %d %q", resp.StatusCode, body)
 	}
 }
 
 // The session cookie and the security headers are asserted, not assumed.
 func TestTheSessionCookieAndSecurityHeaders(t *testing.T) {
-	e := standard(t, "x")
+	e := standard(t)
 	_, page := e.do("GET", "/auth/login", nil, nil)
 	token := between(t, page, `name="csrf_token" value="`, `"`)
 	resp, _ := e.do("POST", "/auth/fake/login", url.Values{"username": {"alice"}, "csrf_token": {token}}, nil)
@@ -188,7 +133,7 @@ func TestTheSessionCookieAndSecurityHeaders(t *testing.T) {
 // Rule 9: state-changing requests without a valid CSRF token are refused, and
 // the same request with one is not.
 func TestAStateChangingRequestWithoutACSRFTokenIsRefused(t *testing.T) {
-	e := standard(t, "x")
+	e := standard(t)
 	e.signIn("bob", "ops")
 
 	if resp, _ := e.do("POST", "/v1/stub/change", url.Values{}, nil); resp.StatusCode != 403 {
@@ -205,7 +150,7 @@ func TestAStateChangingRequestWithoutACSRFTokenIsRefused(t *testing.T) {
 	}
 
 	_, page := e.do("GET", "/ui/", nil, nil)
-	token := between(t, page, `name="csrf_token" value="`, `"`)
+	token := sessionOf(t, page).CSRF
 	if resp, body := e.do("POST", "/v1/stub/change", url.Values{"csrf_token": {token}}, nil); resp.StatusCode != 200 || body != "changed" {
 		t.Errorf("a POST with the token = %d %q", resp.StatusCode, body)
 	}
@@ -217,10 +162,10 @@ func TestAStateChangingRequestWithoutACSRFTokenIsRefused(t *testing.T) {
 // Another site cannot make the browser's POST count, even with a token it
 // somehow has: a request that says it is cross-site is refused first.
 func TestACrossSiteRequestIsRefusedEvenWithAToken(t *testing.T) {
-	e := standard(t, "x")
+	e := standard(t)
 	e.signIn("bob", "ops")
 	_, page := e.do("GET", "/ui/", nil, nil)
-	token := between(t, page, `name="csrf_token" value="`, `"`)
+	token := sessionOf(t, page).CSRF
 	for name, hdr := range map[string]map[string]string{
 		"cross-site fetch metadata": {"Sec-Fetch-Site": "cross-site"},
 		"a foreign origin":          {"Origin": "https://evil.example"},
@@ -256,14 +201,14 @@ func TestABearerRequestIsNotAskedForACSRFToken(t *testing.T) {
 
 // Sign-out ends the session, and the old cookie is no longer a session.
 func TestSigningOutEndsTheSession(t *testing.T) {
-	e := standard(t, "x")
+	e := standard(t)
 	e.signIn("alice")
 	old := e.cookie(SessionCookie)
 	if old == nil {
 		t.Fatal("no session cookie after sign-in")
 	}
 	_, page := e.do("GET", "/ui/", nil, nil)
-	token := between(t, page, `name="csrf_token" value="`, `"`)
+	token := sessionOf(t, page).CSRF
 	if resp, _ := e.do("POST", "/auth/logout", url.Values{"csrf_token": {token}}, nil); resp.StatusCode != 303 {
 		t.Fatalf("sign-out = %d", resp.StatusCode)
 	}
@@ -323,7 +268,7 @@ func TestSessionsEndWhenIdleAndWhenOld(t *testing.T) {
 // Signing in always issues a new session id: one known before sign-in is not the
 // one after, so a fixed id cannot be carried across the boundary.
 func TestSigningInIssuesANewSessionID(t *testing.T) {
-	e := standard(t, "x")
+	e := standard(t)
 	e.signIn("alice")
 	first := e.cookie(SessionCookie).Value
 	// A second browser: the login page is only shown to someone not signed in.
@@ -439,7 +384,7 @@ func TestHealthReportsEachComponentWithoutTheReason(t *testing.T) {
 // one that keeps the redirect on this site. Sign-in goes through the real form.
 func TestSignInNeverRedirectsOffThisSite(t *testing.T) {
 	for _, next := range []string{"https://evil.example/", "//evil.example/ui/", "/auth/logout", "javascript:alert(1)", "/v1/stub/open"} {
-		e := standard(t, "x")
+		e := standard(t)
 		_, page := e.do("GET", "/auth/login", nil, nil)
 		token := between(t, page, `name="csrf_token" value="`, `"`)
 		resp, _ := e.do("POST", "/auth/fake/login", url.Values{"username": {"alice"}, "csrf_token": {token}, "next": {next}}, nil)
@@ -448,7 +393,7 @@ func TestSignInNeverRedirectsOffThisSite(t *testing.T) {
 		}
 	}
 	// Rule 10: a local next is honoured, so the above is the check's doing.
-	e := standard(t, "x")
+	e := standard(t)
 	_, page := e.do("GET", "/auth/login", nil, nil)
 	token := between(t, page, `name="csrf_token" value="`, `"`)
 	resp, _ := e.do("POST", "/auth/fake/login", url.Values{"username": {"alice"}, "csrf_token": {token}, "next": {"/ui/stub/admin"}}, nil)
@@ -460,7 +405,7 @@ func TestSignInNeverRedirectsOffThisSite(t *testing.T) {
 // A login form that a page offers carries a next that is already checked, so a
 // crafted ?next= cannot be planted in the form.
 func TestTheLoginFormDoesNotEchoAnUnsafeNext(t *testing.T) {
-	e := standard(t, "x")
+	e := standard(t)
 	_, page := e.do("GET", "/auth/login?next="+url.QueryEscape(`"><script>alert(1)</script>`), nil, nil)
 	if strings.Contains(page, "<script>alert") {
 		t.Errorf("a crafted next reached the login page as markup:\n%s", page)
@@ -480,7 +425,8 @@ func TestTheRedirectLoginLinkCarriesTheRequestedPageOnceEscaped(t *testing.T) {
 		Assets:     builtAssets(),
 	})
 	_, page := e.do("GET", "/auth/login?next="+url.QueryEscape("/ui/stub/item/7?a=b&c=d"), nil, nil)
-	href := between(t, page, `class="button" href="`, `"`)
+	href := between(t, page, `href="/auth/`, `"`)
+	href = "/auth/" + href
 	u, err := url.Parse(strings.ReplaceAll(href, "&amp;", "&"))
 	if err != nil {
 		t.Fatal(err)
@@ -577,7 +523,7 @@ func TestARoleNoComponentDeclaresIsRefusedAtStartUp(t *testing.T) {
 // an empty token, would make every sign-in unreachable. This reads the rendered
 // form and holds each of its fields to a real value.
 func TestTheLoginPageRendersItsFormWithARealTokenAndTheRequestedPage(t *testing.T) {
-	e := standard(t, "x")
+	e := standard(t)
 	resp, page := e.do("GET", "/auth/login?next="+url.QueryEscape("/ui/stub/item/7"), nil, nil)
 	if resp.StatusCode != 200 {
 		t.Fatalf("the login page = %d:\n%s", resp.StatusCode, page)
@@ -606,61 +552,87 @@ func TestTheLoginPageRendersItsFormWithARealTokenAndTheRequestedPage(t *testing.
 	}
 }
 
-func TestAPageHeadingFromItsDataReplacesTheStaticTitleAndIsEscaped(t *testing.T) {
-	c := &stubComponent{name: "stub"}
-	e := newEnv(t, Config{
-		Components: []Component{&headingComponent{stubComponent: c}},
-		Providers:  []Provider{fakeProvider{id: "fake"}},
-		Roles:      newRoles(t, RoleRule{Roles: []Role{"admin"}, Provider: "fake", Group: "ops"}),
-		Assets:     builtAssets(),
-	})
-	e.signIn("ana", "ops")
-	_, body := e.do("GET", "/ui/stub/named", nil, nil)
-	if !strings.Contains(body, "<h1>acme/api &lt;b&gt; · pull/7</h1>") || !strings.Contains(body, "<title>acme/api &lt;b&gt; · pull/7 · nitpick</title>") {
-		t.Fatalf("the heading did not come from the data, escaped: %.400s", body)
-	}
-	_, plain := e.do("GET", "/ui/stub/", nil, nil)
-	if !strings.Contains(plain, "<h1>Stub home</h1>") {
-		t.Fatalf("a page with no Heading must keep its title")
-	}
-}
-
-type headingComponent struct{ *stubComponent }
-
-func (h *headingComponent) Pages() []Page {
-	return append(h.stubComponent.Pages(), Page{
-		Path: "named", Title: "Named", Body: `<p>x</p>`,
-		Data:    func(*http.Request) (any, error) { return "acme/api <b> · pull/7", nil },
-		Heading: func(data any) string { return data.(string) },
-	})
-}
-
-func TestAPageWithAWildcardPathIsNeverOfferedInTheNavigation(t *testing.T) {
-	e := newEnv(t, Config{
-		Components: []Component{&wildcardNavComponent{stubComponent: &stubComponent{name: "stub"}}},
-		Providers:  []Provider{fakeProvider{id: "fake"}},
-		Roles:      newRoles(t, RoleRule{Roles: []Role{"admin"}, Provider: "fake", Group: "ops"}),
-		Assets:     builtAssets(),
-	})
-	e.signIn("ana", "ops")
-	_, body := e.do("GET", "/ui/stub/", nil, nil)
-	if strings.Contains(body, `<a href="">`) {
-		t.Fatalf("the navigation holds a link with no address: %.500s", body)
-	}
-	if !strings.Contains(body, `>Stub home</a>`) {
-		t.Fatalf("a linkable page must stay in the navigation")
-	}
-	_, home := e.do("GET", "/ui/", nil, nil)
-	if strings.Contains(home, `<a href="">`) {
-		t.Fatalf("the home list links a page with no address: %.500s", home)
+// The page for the web app is the one thing the server renders after sign-in. It
+// tells the app who is signed in and nothing else, and it loads only files the
+// server itself serves.
+func TestTheShellTellsTheAppWhoIsSignedInAndLoadsOnlyBuiltFiles(t *testing.T) {
+	e := standard(t)
+	e.signIn("bob", "ops")
+	for _, path := range []string{"/ui/", "/ui/insights/findings", "/ui/some/deep/link"} {
+		resp, page := e.do("GET", path, nil, nil)
+		if resp.StatusCode != 200 || !strings.Contains(resp.Header.Get("Content-Type"), "text/html") {
+			t.Fatalf("%s = %d %s, want the shell", path, resp.StatusCode, resp.Header.Get("Content-Type"))
+		}
+		info := sessionOf(t, page)
+		if info.Name != "bob" || info.Provider != "fake" || len(info.Roles) != 1 || info.Roles[0] != "admin" {
+			t.Errorf("%s: session = %+v, want bob with the admin role", path, info)
+		}
+		if len(info.Components) != 1 || info.Components[0] != "stub" {
+			t.Errorf("%s: components = %v, want the enabled ones", path, info.Components)
+		}
+		if info.CSRF == "" {
+			t.Errorf("%s: no CSRF token for the app's sign-out", path)
+		}
+		for _, want := range []string{`href="/ui/assets/app.0123456789ab.css"`, `src="/ui/assets/app.0123456789ab.js"`, `src="/ui/assets/theme.0123456789ab.js"`} {
+			if !strings.Contains(page, want) {
+				t.Errorf("%s: the shell lacks %s", path, want)
+			}
+		}
 	}
 }
 
-type wildcardNavComponent struct{ *stubComponent }
+// The policy forbids inline script and style, so the shell must not need either.
+func TestTheShellHasNoInlineScriptOrStyle(t *testing.T) {
+	e := standard(t)
+	e.signIn("bob")
+	_, page := e.do("GET", "/ui/", nil, nil)
+	for _, bad := range []string{"<style", ` style="`, "javascript:", " onclick=", " onload="} {
+		if strings.Contains(page, bad) {
+			t.Errorf("the shell has %q, which the page's policy would block", bad)
+		}
+	}
+	for _, tag := range regexp.MustCompile(`<script[^>]*>`).FindAllString(page, -1) {
+		if !strings.Contains(tag, "src=") {
+			t.Errorf("an inline script: %s", tag)
+		}
+	}
+}
 
-func (w *wildcardNavComponent) Pages() []Page {
-	return append(w.stubComponent.Pages(), Page{
-		Path: "thing/{id}", Title: "A thing", Nav: true, Body: `<p>x</p>`,
-		Data: func(*http.Request) (any, error) { return nil, nil },
-	})
+// The name is the person's, set by the identity provider, so it is untrusted text
+// that ends up in an attribute. It must not be able to leave it.
+func TestAnAccountNameCannotBreakOutOfTheShellsSessionTag(t *testing.T) {
+	const evil = `x"><script>alert(1)</script><meta name="y" content="`
+	e := standard(t)
+	e.signIn(evil)
+	_, page := e.do("GET", "/ui/", nil, nil)
+	if strings.Contains(page, "<script>alert") || strings.Contains(page, `<meta name="y"`) {
+		t.Fatalf("the account name reached the page as markup:\n%s", page)
+	}
+	if got := sessionOf(t, page).Name; got != evil {
+		t.Errorf("the name was altered on the way: %q", got)
+	}
+}
+
+// With the UI unbuilt every address under /ui/ says so, and loads nothing.
+func TestTheShellIsTheStubWhenTheUIWasNotBuilt(t *testing.T) {
+	e := newEnv(t, Config{Components: []Component{&stubComponent{name: "stub"}}, Providers: []Provider{fakeProvider{id: "fake"}}, Assets: fstest.MapFS{}})
+	for _, path := range []string{"/ui/", "/ui/insights/findings"} {
+		resp, body := e.do("GET", path, nil, nil)
+		if resp.StatusCode != 200 || !strings.Contains(body, "The UI was not built") || strings.Contains(body, "<script") || strings.Contains(body, "stylesheet") {
+			t.Errorf("%s = %d %q", path, resp.StatusCode, body)
+		}
+	}
+}
+
+// A deep link survives the sign-in: the person lands where they were going.
+func TestADeepLinkSurvivesSigningIn(t *testing.T) {
+	e := standard(t)
+	resp, _ := e.do("GET", "/ui/insights/findings?path=a.go&days=30", nil, nil)
+	if resp.StatusCode != 303 {
+		t.Fatalf("anonymous deep link = %d, want the login redirect", resp.StatusCode)
+	}
+	loc, _ := url.Parse(resp.Header.Get("Location"))
+	if got := loc.Query().Get("next"); got != "/ui/insights/findings?path=a.go&days=30" {
+		t.Errorf("next = %q, want the page that was asked for", got)
+	}
 }

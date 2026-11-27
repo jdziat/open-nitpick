@@ -8,10 +8,26 @@ import (
 	"testing"
 )
 
-func sources(t *testing.T) string {
+// viteOutput is what `npm run build` leaves in ui/dist: files whose names already
+// carry a hash of their content.
+func viteOutput(t *testing.T, extra map[string]string) string {
 	t.Helper()
 	dir := t.TempDir()
-	for name, body := range map[string]string{"app.css": "body{color:red}", "app.js": "console.log(1)"} {
+	files := map[string]string{
+		"app.AbC123_x.js":       "console.log(1)",
+		"app.DeF456-y.css":      "body{color:red}",
+		"theme.GhI789.js":       "document.documentElement.className='dark'",
+		"asset.geist.Zz1.woff2": "font",
+		"index.html":            "<html></html>",
+	}
+	for k, v := range extra {
+		if v == "" {
+			delete(files, k)
+			continue
+		}
+		files[k] = v
+	}
+	for name, body := range files {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -32,147 +48,99 @@ func readManifest(t *testing.T, dst string) map[string]string {
 	return m
 }
 
-func TestABuildWritesHashedAssetsAndAManifestNamingThem(t *testing.T) {
+func TestABuildCopiesTheOutputAndNamesTheEntriesInTheManifest(t *testing.T) {
 	dst := t.TempDir()
-	if err := build(sources(t), dst); err != nil {
+	if err := build(viteOutput(t, nil), dst); err != nil {
 		t.Fatal(err)
 	}
 	m := readManifest(t, dst)
-	for _, logical := range []string{"app.css", "app.js"} {
-		hashed := m[logical]
-		if !isHashedAsset(hashed) {
-			t.Errorf("%s was written as %q, which is not a content-hashed name", logical, hashed)
-		}
-		if _, err := os.Stat(filepath.Join(dst, hashed)); err != nil {
-			t.Errorf("the manifest names %s, which was not written", hashed)
+	for logical, want := range map[string]string{"app.js": "app.AbC123_x.js", "app.css": "app.DeF456-y.css", "theme.js": "theme.GhI789.js"} {
+		if m[logical] != want {
+			t.Errorf("manifest[%s] = %q, want %q", logical, m[logical], want)
 		}
 	}
-	css, _ := os.ReadFile(filepath.Join(dst, m["app.css"]))
-	if string(css) != "body{color:red}" {
-		t.Errorf("the css was changed in the build: %q", css)
+	// Everything else the build made is served too, under its own name: a font the
+	// style sheet names, or a chunk the app loads on demand.
+	if m["asset.geist.Zz1.woff2"] != "asset.geist.Zz1.woff2" {
+		t.Errorf("a font is not listed, so the server would 404 it: %v", m)
+	}
+	for _, name := range m {
+		if _, err := os.Stat(filepath.Join(dst, name)); err != nil {
+			t.Errorf("the manifest names %s, which was not written", name)
+		}
+	}
+	if _, listed := m["index.html"]; listed {
+		t.Error("index.html is Vite's page; the server renders its own and must not serve this one")
 	}
 }
 
-// The name follows the content: change the source and the name changes, which is
-// what lets the server cache an asset for ever.
-func TestTheHashedNameFollowsTheContent(t *testing.T) {
-	src := sources(t)
-	a, b := t.TempDir(), t.TempDir()
-	if err := build(src, a); err != nil {
-		t.Fatal(err)
-	}
-	if err := build(src, b); err != nil {
-		t.Fatal(err)
-	}
-	if readManifest(t, a)["app.css"] != readManifest(t, b)["app.css"] {
-		t.Error("the same source built to different names")
-	}
-	if err := os.WriteFile(filepath.Join(src, "app.css"), []byte("body{color:blue}"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	c := t.TempDir()
-	if err := build(src, c); err != nil {
-		t.Fatal(err)
-	}
-	if readManifest(t, a)["app.css"] == readManifest(t, c)["app.css"] {
-		t.Error("changed content kept its name, so a cached copy would be served stale")
-	}
-	if readManifest(t, a)["app.js"] != readManifest(t, c)["app.js"] {
-		t.Error("an unchanged file changed its name")
+func TestABuildNeedsExactlyOneOfEachEntry(t *testing.T) {
+	for name, extra := range map[string]map[string]string{
+		"no app script":     {"app.AbC123_x.js": ""},
+		"no app stylesheet": {"app.DeF456-y.css": ""},
+		"two app scripts":   {"app.Other99.js": "x"},
+		"two stylesheets":   {"app.Other99.css": "x"},
+	} {
+		dst := t.TempDir()
+		if err := build(viteOutput(t, extra), dst); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+		if _, err := os.Stat(filepath.Join(dst, "manifest.json")); err == nil {
+			t.Errorf("%s: a failed build left a manifest, so the server would serve half a UI", name)
+		}
 	}
 }
 
-// A rebuild leaves one build and no other: old hashed files go, the placeholder
-// stays.
-func TestARebuildRemovesTheOldBuildAndKeepsThePlaceholder(t *testing.T) {
-	src, dst := sources(t), t.TempDir()
-	keep := filepath.Join(dst, "README.md")
-	if err := os.WriteFile(keep, []byte("placeholder"), 0o644); err != nil {
+func TestABuildRefusesWhatThePagePolicyWouldBlockAtRunTime(t *testing.T) {
+	for name, extra := range map[string]map[string]string{
+		"a data: URL in the stylesheet": {"app.DeF456-y.css": "a{background:url(data:image/png;base64,AAAA)}"},
+		"a remote import":               {"app.DeF456-y.css": "@import url(https://fonts.example.com/x.css);"},
+		"a remote url":                  {"app.DeF456-y.css": "a{background:url(//cdn.example.com/x.png)}"},
+	} {
+		if err := build(viteOutput(t, extra), t.TempDir()); err == nil {
+			t.Errorf("%s: accepted, and the browser would drop it", name)
+		}
+	}
+}
+
+func TestABuildRefusesANameThatCouldEscapeTheDirectoryOrHideAFile(t *testing.T) {
+	src := viteOutput(t, nil)
+	if err := os.Mkdir(filepath.Join(src, "nested"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := build(src, dst); err != nil {
+	if err := build(src, t.TempDir()); err == nil || !strings.Contains(err.Error(), "flat") {
+		t.Errorf("err = %v, want the refusal that says the build must be flat", err)
+	}
+	src = viteOutput(t, map[string]string{".hidden.js": "x"})
+	if err := build(src, t.TempDir()); err == nil {
+		t.Error("a dotfile was accepted")
+	}
+}
+
+func TestABuildLeavesNoFileOfAnEarlierBuildAndKeepsThePlaceholders(t *testing.T) {
+	dst := t.TempDir()
+	for _, keep := range []string{".gitignore", "README.md"} {
+		if err := os.WriteFile(filepath.Join(dst, keep), []byte("keep"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dst, "app.Old000.js"), []byte("old"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	old := readManifest(t, dst)["app.css"]
-	if err := os.WriteFile(filepath.Join(src, "app.css"), []byte("body{}"), 0o644); err != nil {
+	if err := build(viteOutput(t, nil), dst); err != nil {
 		t.Fatal(err)
-	}
-	if err := build(src, dst); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(filepath.Join(dst, old)); !os.IsNotExist(err) {
-		t.Errorf("the previous build's %s was left behind", old)
-	}
-	if _, err := os.Stat(keep); err != nil {
-		t.Errorf("the placeholder was removed: %v", err)
 	}
 	entries, _ := os.ReadDir(dst)
-	if len(entries) != 4 { // placeholder, manifest, one css, one js
-		var names []string
-		for _, e := range entries {
-			names = append(names, e.Name())
-		}
-		t.Errorf("the directory holds %v, want the placeholder, the manifest and one build", names)
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
 	}
-}
-
-// A build that cannot finish leaves no manifest, so the server says the UI was
-// not built and does not serve half of it.
-func TestABuildThatFailsLeavesNoManifest(t *testing.T) {
-	for name, prepare := range map[string]func(string){
-		"a missing source": func(src string) { _ = os.Remove(filepath.Join(src, "app.js")) },
-		"an empty source":  func(src string) { _ = os.WriteFile(filepath.Join(src, "app.js"), nil, 0o644) },
-	} {
-		src, dst := sources(t), t.TempDir()
-		// There was a good build before.
-		if err := build(src, dst); err != nil {
-			t.Fatal(err)
-		}
-		prepare(src)
-		if err := build(src, dst); err == nil {
-			t.Errorf("%s: the build succeeded", name)
-		}
-		if _, err := os.Stat(filepath.Join(dst, "manifest.json")); !os.IsNotExist(err) {
-			t.Errorf("%s: a failed build left a manifest, which would describe a build that is not there", name)
-		}
+	if strings.Contains(strings.Join(names, " "), "Old000") {
+		t.Errorf("a file of an earlier build is still there: %v", names)
 	}
-}
-
-func TestOnlyWhatABuildWritesIsRemovedByTheNextOne(t *testing.T) {
-	dst := t.TempDir()
-	for _, name := range []string{"app.css", "app.js", "app.notahash.css", "app.0123456789ab.txt", "other.0123456789ab.css", "app.0123456789abc.css", "app.0123456789abcd.css"} {
-		if err := os.WriteFile(filepath.Join(dst, name), []byte("x"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := build(sources(t), dst); err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{"app.css", "app.js", "app.notahash.css", "app.0123456789ab.txt", "other.0123456789ab.css", "app.0123456789abc.css", "app.0123456789abcd.css"} {
-		if _, err := os.Stat(filepath.Join(dst, name)); err != nil {
-			t.Errorf("%s is not a build output and was removed", name)
-		}
-	}
-}
-
-func TestABuildRefusesADirectoryItDidNotMake(t *testing.T) {
-	dst := t.TempDir()
-	if err := os.Mkdir(filepath.Join(dst, "sub"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := build(sources(t), dst); err == nil || !strings.Contains(err.Error(), "directory") {
-		t.Errorf("err = %v, want a directory in the output refused", err)
-	}
-}
-
-func TestHashedAssetNamesAreRecognisedExactly(t *testing.T) {
-	for name, want := range map[string]bool{
-		"app.0123456789ab.css": true, "app.0123456789ab.js": true, "app.ABCDEF012345.css": true,
-		"app.css": false, "app.0123456789a.css": false, "app.0123456789abc.css": false, "app.0123456789abcd.css": false, "app.0123456789.css": false,
-		"app.0123456789ab.txt": false, "app.zzzzzzzzzzzz.css": false, "other.0123456789ab.css": false, "manifest.json": false,
-	} {
-		if got := isHashedAsset(name); got != want {
-			t.Errorf("isHashedAsset(%q) = %v, want %v", name, got, want)
+	for _, keep := range []string{".gitignore", "README.md"} {
+		if _, err := os.Stat(filepath.Join(dst, keep)); err != nil {
+			t.Errorf("%s, which keeps the directory in the repository, was removed", keep)
 		}
 	}
 }

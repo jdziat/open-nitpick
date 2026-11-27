@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"net/http"
 )
 
@@ -24,8 +23,6 @@ type Component interface {
 
 	// Routes are the component's HTTP routes.
 	Routes() []Route
-
-	Pages() []Page
 
 	// Health reports whether the component can do its work. A nil error is
 	// healthy.
@@ -55,48 +52,3 @@ type Route struct {
 
 	Handler http.Handler
 }
-
-// Page is one page a component adds to the UI.
-type Page struct {
-	// Path is relative to /ui/<component>/. It may hold {name} wildcards. Empty
-	// is the component's index page.
-	Path string
-
-	// Title is the page heading and, with Nav set, its navigation entry.
-	Title string
-
-	// Nav puts the page in the navigation.
-	Nav bool
-
-	// Need is the role a session must hold to see the page. A page always needs
-	// a session; with no role named, any signed-in identity may see it.
-	Need Role
-
-	// Body is the page's html/template source. The shell parses it, so the
-	// escaping contexts are the shell's and a component cannot opt out of them.
-	// It is executed with a View: {{.Data}} is what Data returned, and
-	// {{.Identity}} and {{.CSRF}} are the signed-in identity and the token a
-	// form of the page puts in a csrf_token field.
-	Body string
-
-	// Heading, when set, names the page from its data, for a page that shows one
-	// thing among many, such as a review. It replaces Title in the heading and the
-	// browser title, and it is escaped like any other text. Title still names the
-	// page in the navigation and in errors.
-	Heading func(data any) string
-
-	// Data builds what Body is executed with. Return ErrNotFound for a page that
-	// does not exist, which is a 404. Any other error is a 500 whose text goes to
-	// the log and not to the page.
-	Data func(r *http.Request) (any, error)
-}
-
-// View is what a page's Body is executed with.
-type View struct {
-	Data     any
-	Identity Identity
-	CSRF     string
-}
-
-// ErrNotFound is what a page's Data returns for something that does not exist.
-var ErrNotFound = errors.New("not found")
