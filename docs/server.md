@@ -51,11 +51,19 @@ only over HTTPS (and to `localhost`).
 
 ### Building the UI
 
-The UI is built into the binary. `make ui` writes the style sheet and script, each
-under a name that carries a hash of its content, into the directory the server
-embeds, and `make server` does that and then builds the binary. The release image
-does the same. A plain `go build` skips it, and the server it produces starts and
-serves its components, but its UI pages say that the UI was not built.
+The UI is a React app under `ui/`, built with Vite, Tailwind CSS and shadcn/ui, and
+embedded in the binary. `make ui` installs its dependencies from the lockfile,
+builds it, and copies the result into the directory the server embeds, each file
+under a name that carries a hash of its content. `make server` does that and then
+builds the binary. The release image does the same.
+
+A plain `go build` skips it. The server it produces starts and serves its
+components, and the UI pages say that the UI was not built. Node 24 is needed only
+to build; the binary has no Node dependency.
+
+The server sends a strict Content-Security-Policy: scripts, styles, fonts and
+images come from the server itself, and nothing is inline. The build checks its
+own output against that and fails on a `data:` URL or a file from another origin.
 
 ## Signing in
 
