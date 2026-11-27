@@ -62,11 +62,12 @@ a { color: var(--accent); text-underline-offset: 0.15em; }
 a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .bar {
+  padding-inline: max(1rem, calc((100% - 72rem) / 2 + 1rem));
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 1.5rem;
-  padding: 0.75rem 1rem;
+  padding-block: 0.75rem;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
@@ -148,7 +149,6 @@ table.records { border-collapse: collapse; font-size: 0.92rem; }
   .records, .records tbody, .records tr, .records td { display: block; width: 100%; }
   .records tr { padding: 0.6rem 0; border-bottom: 1px solid var(--line); }
   .records td { border: 0; padding: 0.1rem 0; }
-  .facts { grid-template-columns: 1fr; }
 }
 
 /* ---- insights ---- */
@@ -303,4 +303,14 @@ span.sev-critical::before { background: var(--sev-critical); }
   .records tr { padding: 0.5rem 0; }
   .filters label, .filters select, .filters input:not([type="hidden"]) { width: 100%; }
   .filters label { flex: 1 1 100%; }
+}
+
+/* Phone, last so it wins: the label of a title cell is redundant, and a quiet cell
+   (a finished review's result) is omitted. */
+@media (max-width: 40rem) {
+  .records td[data-label].wide::before, .records td[data-label="File"]::before { display: none; }
+  .records td.quiet, .records td[data-label="Commit"] { display: none; }
+  .filters label.half { flex: 1 1 calc(50% - var(--space-2)); }
+  .filters label.half select { width: 100%; }
+  .facts { grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
 }

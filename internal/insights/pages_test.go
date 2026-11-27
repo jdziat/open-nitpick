@@ -339,3 +339,51 @@ func TestAListShowsOneStatusForAReviewThatDidNotFinish(t *testing.T) {
 		}
 	}
 }
+
+func TestAWindowWithNoEarlierReviewsDoesNotPromiseATrendOrRepeatItselfInTheCards(t *testing.T) {
+	u := newUI(t)
+	u.seed()
+	u.signIn("eng")
+	_, hot := u.get("/ui/insights/hotspots?days=90")
+	if strings.Contains(hot, "Trend compares the period") {
+		t.Errorf("the lede promises a trend the page then says it cannot show")
+	}
+	if strings.Index(hot, "No earlier data:") > strings.Index(hot, "<table") {
+		t.Errorf("the note must come before the table, where it is read")
+	}
+	_, over := u.get("/ui/insights/?days=90")
+	if n := strings.Count(over, "No reviews came before this period"); n != 1 {
+		t.Errorf("the overview says it %d times, want once", n)
+	}
+	if strings.Contains(over, "days before</div>") && strings.Contains(over, "no reviews in the") {
+		t.Errorf("a KPI card repeats the no-earlier-period note")
+	}
+	_, thirty := u.get("/ui/insights/hotspots?days=30")
+	if !strings.Contains(thirty, "Trend compares the period") {
+		t.Errorf("with a baseline the lede must explain the trend")
+	}
+}
+
+func TestTheChartStatesItsScaleInTextBecauseTheAxisScrollsAwayOnAPhone(t *testing.T) {
+	u := newUI(t)
+	u.seed()
+	u.signIn("eng")
+	_, body := u.get("/ui/insights/?days=30")
+	if !strings.Contains(body, "Scale: 0 to 4 a day") {
+		t.Fatalf("the chart has no scale outside the scrolling svg")
+	}
+}
+
+func TestClearFiltersIsOfferedOnceWhenNothingMatches(t *testing.T) {
+	u := newUI(t)
+	u.seed()
+	u.signIn("eng")
+	_, none := u.get("/ui/insights/findings?days=30&path=nothing.go")
+	if n := strings.Count(none, "Clear filters"); n != 1 {
+		t.Fatalf("Clear filters appears %d times, want once", n)
+	}
+	_, some := u.get("/ui/insights/findings?days=30&path=hot.go")
+	if n := strings.Count(some, "Clear filters"); n != 1 {
+		t.Fatalf("with results and a filter the form carries it once, got %d", n)
+	}
+}

@@ -115,6 +115,7 @@ type overviewView struct {
 	Classes    []bar
 	Hotspots   []hotspotRow
 	NoTrend    bool
+	NoPrior    bool
 	Recent     []reviewRow
 	Incomplete int
 	Empties    empty
@@ -122,7 +123,7 @@ type overviewView struct {
 
 func delta(cur, prior int, priorHeld bool, days int) (note, dir string) {
 	if !priorHeld {
-		return "no reviews in the " + strconv.Itoa(days) + " days before", ""
+		return "", ""
 	}
 	switch d := cur - prior; {
 	case d > 0:
@@ -160,6 +161,7 @@ func (c *Component) overviewPage(r *http.Request) (any, error) {
 		{Label: "Repositories", Value: strconv.Itoa(o.Repos), Note: "reviewed in the period"},
 		{Label: "Files with findings", Value: strconv.Itoa(o.Files), Note: "distinct, per repository"},
 	}
+	v.NoPrior = prior.Empty
 	v.Points = c.store.Series(q)
 	v.Chart = dailyChart(v.Points)
 	most := 0
@@ -208,10 +210,11 @@ const overviewBody = shared + `{{template "scope" .Data.Scope}}
 {{if .Data.Empty}}{{template "none" .Data.Empties}}{{else}}
 {{if .Data.Incomplete}}<p class="notice" role="note"><strong>Did not finish: {{.Data.Incomplete}}.</strong> A review that stopped early reports few or no findings, which is not a clean result. <a href="/ui/insights/reviews?days={{.Data.Scope.Days}}{{if .Data.Scope.Repo}}&amp;repo={{.Data.Scope.Repo}}{{end}}">See the reviews</a></p>{{end}}
 <section aria-label="Totals" class="cards">{{range .Data.Cards}}<div class="card{{if .Dir}} card-{{.Dir}}{{end}}"><div class="card-label">{{.Label}}</div><div class="card-value">{{.Value}}</div><div class="card-note">{{.Note}}</div></div>{{end}}</section>
+{{if .Data.NoPrior}}<p class="muted">No reviews came before this period, so there is nothing to compare these totals with.</p>{{end}}
 
 <section class="panel" aria-labelledby="daily">
 <h2 id="daily">Findings per day</h2>
-<p class="legend"><span class="key key-err"></span>Error or critical <span class="key key-other"></span>Other findings</p>
+<p class="legend"><span class="key key-err"></span>Error or critical <span class="key key-other"></span>Other findings <span class="muted">Scale: 0 to {{.Data.Chart.Max}} a day</span></p>
 <div class="chart-scroll" tabindex="0" role="group" aria-label="Findings per day, scrollable"><svg class="chart" viewBox="0 0 {{.Data.Chart.W}} {{.Data.Chart.H}}" role="img" aria-labelledby="daily" preserveAspectRatio="xMidYMid meet">
 {{range .Data.Chart.Ticks}}<line class="grid" x1="{{$.Data.Chart.Left}}" x2="{{$.Data.Chart.Right}}" y1="{{.Y}}" y2="{{.Y}}"/><text class="axis" x="{{$.Data.Chart.Left}}" dx="-6" y="{{.Y}}" dy="4" text-anchor="end">{{.Label}}</text>{{end}}
 {{range .Data.Chart.Bars}}<g>{{if .OtherH}}<rect class="bar-other" x="{{.X}}" y="{{.OtherY}}" width="{{.W}}" height="{{.OtherH}}" rx="2"/>{{end}}{{if .ErrH}}<rect class="bar-err" x="{{.X}}" y="{{.ErrY}}" width="{{.W}}" height="{{.ErrH}}" rx="2"/>{{end}}<title>{{.Label}}</title></g>{{end}}
@@ -238,7 +241,7 @@ const overviewBody = shared + `{{template "scope" .Data.Scope}}
 
 <section class="panel" aria-labelledby="rec"><h2 id="rec">Latest reviews</h2>
 <table class="records"><thead><tr><th>When</th><th>Repository</th><th>Commit</th><th>Result</th><th class="num">Findings</th></tr></thead><tbody>
-{{range .Data.Recent}}<tr><td data-label="When"><a href="{{.Href}}"><time datetime="{{.At}}">{{.At}}</time></a></td><td data-label="Repository">{{.Repo}}</td><td data-label="Commit"><code>{{.Short}}</code></td><td data-label="Result">{{if .Complete}}{{.Result}}{{else}}<span class="tag">did not finish</span>{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td></tr>{{end}}</tbody></table>
+{{range .Data.Recent}}<tr><td data-label="When"><a href="{{.Href}}"><time datetime="{{.At}}">{{.At}}</time></a></td><td data-label="Repository">{{.Repo}}</td><td data-label="Commit"><code>{{.Short}}</code></td><td data-label="Result"{{if .Complete}} class="quiet"{{end}}>{{if .Complete}}{{.Result}}{{else}}<span class="tag">did not finish</span>{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td></tr>{{end}}</tbody></table>
 <p><a href="/ui/insights/reviews?days={{.Data.Scope.Days}}{{if .Data.Scope.Repo}}&amp;repo={{.Data.Scope.Repo}}{{end}}">All reviews</a></p></section>
 {{end}}`
 
@@ -317,12 +320,12 @@ func (c *Component) hotspotsPage(r *http.Request) (any, error) {
 
 const hotspotsBody = shared + `{{template "scope" .Data.Scope}}
 {{if .Data.Empty}}{{template "none" .Data.Empties}}{{else}}
-<p class="lede">Files ranked by the findings that reviews reported in the last {{.Data.Scope.Days}} days. Each review counts, so a finding left unfixed through several pushes counts each time. Trend compares the period with the {{.Data.Scope.Days}} days before it.</p>
+<p class="lede">Files ranked by the findings that reviews reported in the last {{.Data.Scope.Days}} days. Each review counts, so a finding left unfixed through several pushes counts each time.{{if not .Data.NoTrend}} Trend compares the period with the {{.Data.Scope.Days}} days before it.{{end}}</p>
+{{if .Data.NoTrend}}<p class="muted">No earlier data: no reviews came before this period, so trends are not shown.</p>{{end}}
 <details class="data"><summary>How the score works</summary>
 <p>Each finding adds a weight by severity (nit 0.25, info 0.5, warning 1, error 3, critical 8), halved for every 21 days since it was reported. A file with many old findings ranks below one with a few recent severe ones.</p></details>
 {{if .Data.Rows}}<table class="records"><thead><tr><th class="num">#</th><th>File</th><th class="num">Score</th><th class="num">Findings</th><th>Worst</th>{{if not .Data.NoTrend}}<th>Trend</th>{{end}}<th>Over the period</th></tr></thead><tbody>
 {{range .Data.Rows}}<tr><td data-label="Rank" class="num">{{.Rank}}</td><td data-label="File"><a href="{{.FindingsHref}}"><code>{{.Path}}</code></a><div class="muted">{{.Repo}}</div></td><td data-label="Score" class="num">{{.Score}}</td><td data-label="Findings" class="num">{{.Findings}}</td><td data-label="Worst">{{template "sev" .Worst}}</td>{{if not $.Data.NoTrend}}<td data-label="Trend"><span class="trend trend-{{.Trend}}">{{.TrendText}}</span></td>{{end}}<td data-label="Over the period">{{template "spark" .Spark}}</td></tr>{{end}}</tbody></table>
-{{if .Data.NoTrend}}<p class="muted">No earlier data: no reviews came before this period, so trends are not shown.</p>{{end}}
 {{if gt .Data.Total (len .Data.Rows)}}<p class="muted">Showing the top {{len .Data.Rows}} of {{.Data.Total}} files.</p>{{end}}
 {{else}}<p>Reviews ran in this period and reported no findings.</p>{{end}}{{end}}`
 
@@ -429,10 +432,10 @@ const findingsBody = shared + `{{template "scope" .Data.Scope}}
 <form class="filters" method="get" action="/ui/insights/findings">
 <label>Repository <select name="repo"><option value="">All repositories</option>{{range .Data.Repos}}<option value="{{.}}"{{if eq . $.Data.Repo}} selected{{end}}>{{.}}</option>{{end}}</select></label>
 <label>File or directory <input name="path" value="{{.Data.Path}}" placeholder="pkg/auth/ or pkg/a.go"></label>
-<label>Class <select name="class"><option value="">any class</option>{{range .Data.Classes}}<option value="{{.}}"{{if eq . $.Data.Class}} selected{{end}}>{{.}}</option>{{end}}</select></label>
-<label>At least <select name="min_severity"><option value="">any severity</option>{{range .Data.Severities}}<option value="{{.}}"{{if eq . $.Data.MinSeverity}} selected{{end}}>{{.}}</option>{{end}}</select></label>
+<label class="half">Class <select name="class"><option value="">any class</option>{{range .Data.Classes}}<option value="{{.}}"{{if eq . $.Data.Class}} selected{{end}}>{{.}}</option>{{end}}</select></label>
+<label class="half">At least <select name="min_severity"><option value="">any severity</option>{{range .Data.Severities}}<option value="{{.}}"{{if eq . $.Data.MinSeverity}} selected{{end}}>{{.}}</option>{{end}}</select></label>
 <input type="hidden" name="days" value="{{.Data.Scope.Days}}">
-<button type="submit">Filter</button>{{if .Data.Filtered}} <a href="{{.Data.ClearHref}}">Clear filters</a>{{end}}
+<button type="submit">Filter</button>{{if and .Data.Filtered .Data.Rows}} <a href="{{.Data.ClearHref}}">Clear filters</a>{{end}}
 </form>
 {{if .Data.Rows}}<p class="muted">{{if gt .Data.Total (len .Data.Rows)}}Showing the newest {{len .Data.Rows}} of {{.Data.Total}} findings. Narrow the filters to reach the rest.{{else}}{{.Data.Total}} finding{{if ne .Data.Total 1}}s{{end}}.{{end}}</p>
 <table class="records findings"><thead><tr><th>Severity</th><th>Finding</th><th>Repository</th><th>When</th></tr></thead><tbody>
@@ -482,7 +485,7 @@ func (c *Component) reviewsPage(r *http.Request) (any, error) {
 
 const reviewsBody = shared + `{{template "scope" .Data.Scope}}
 {{if .Data.Rows}}<table class="records"><thead><tr><th>When</th><th>Repository</th><th>Ref</th><th>Commit</th><th>Result</th><th class="num">Findings</th></tr></thead><tbody>
-{{range .Data.Rows}}<tr><td data-label="When"><a href="{{.Href}}"><time datetime="{{.At}}">{{.At}}</time></a></td><td data-label="Repository">{{.Repo}}</td><td data-label="Ref">{{.Ref}}</td><td data-label="Commit"><code>{{.Short}}</code></td><td data-label="Result">{{if .Complete}}{{.Result}}{{else}}<span class="tag">did not finish</span>{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td></tr>{{end}}</tbody></table>
+{{range .Data.Rows}}<tr><td data-label="When"><a href="{{.Href}}"><time datetime="{{.At}}">{{.At}}</time></a></td><td data-label="Repository">{{.Repo}}</td><td data-label="Ref">{{.Ref}}</td><td data-label="Commit"><code>{{.Short}}</code></td><td data-label="Result"{{if .Complete}} class="quiet"{{end}}>{{if .Complete}}{{.Result}}{{else}}<span class="tag">did not finish</span>{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td></tr>{{end}}</tbody></table>
 {{if gt .Data.Total (len .Data.Rows)}}<p class="muted">Showing the newest {{len .Data.Rows}} of {{.Data.Total}} reviews.</p>{{end}}
 {{else}}{{template "none" .Data.Empties}}{{end}}`
 

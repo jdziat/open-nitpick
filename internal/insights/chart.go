@@ -46,9 +46,11 @@ type XLabel struct {
 // Chart is the daily findings chart.
 type Chart struct {
 	W, H, Top, Base, Left, Right float64
-	Bars                         []Bar
-	Ticks                        []Tick
-	XLabels                      []XLabel
+	// Max is the top of the y axis, also printed as text because on a phone the axis scrolls out of view.
+	Max     int
+	Bars    []Bar
+	Ticks   []Tick
+	XLabels []XLabel
 }
 
 // niceMax is the top of the y axis: the smallest of 4, 8, 10, 20, 40, 100, 200,
@@ -78,7 +80,7 @@ func dailyChart(pts []Point) Chart {
 		most = max(most, p.Findings)
 	}
 	top := niceMax(most)
-	c := Chart{W: chartW, H: chartH, Top: chartTop, Base: chartBot, Left: chartL, Right: chartW - chartR}
+	c := Chart{Max: top, W: chartW, H: chartH, Top: chartTop, Base: chartBot, Left: chartL, Right: chartW - chartR}
 	plot := c.Right - c.Left
 	slot := plot / float64(max(len(pts), 1))
 	gap := 2.0
