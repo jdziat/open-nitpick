@@ -22,9 +22,23 @@ const Reviews = lazy(() => import('@/pages/reviews'))
 
 function Loading() {
   return (
-    <div className="flex flex-col gap-4" role="status" aria-label="Loading the page">
-      <Skeleton className="h-8 w-48" />
-      <Skeleton className="h-64 w-full" />
+    <div className="flex flex-col gap-6" role="status" aria-label="Loading the page">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-80 max-w-full" />
+      </div>
+      <div className="bg-card overflow-hidden rounded-xl border">
+        <div className="border-b p-4">
+          <Skeleton className="h-4 w-full max-w-md" />
+        </div>
+        {Array.from({ length: 8 }, (_, i) => (
+          <div key={i} className="flex items-center gap-4 border-b p-4 last:border-b-0">
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="h-4 w-1/5" />
+            <Skeleton className="ml-auto h-4 w-16" />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
