@@ -71,6 +71,7 @@ jobs:
   respond:
     if: >-
       (contains(github.event.comment.body, '@nitpick-review') ||
+       contains(github.event.comment.body, '@open-nitpick') ||
        github.event.comment.in_reply_to_id != null) &&
       github.event.comment.user.type != 'Bot'
     runs-on: ubuntu-latest
