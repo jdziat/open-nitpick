@@ -112,8 +112,11 @@ func TestHelperProcessHoldsItsExecutable(t *testing.T) {
 	if os.Getenv("NITPICK_UPGRADE_HELPER") != "1" {
 		t.Skip("not the helper process")
 	}
-	os.Stdout.WriteString("ready\n")
-	bufio.NewReader(os.Stdin).ReadString('\n') // returns when the parent closes stdin
+	if _, err := os.Stdout.WriteString("ready\n"); err != nil {
+		t.Fatal(err)
+	}
+	// Returns when the parent closes stdin; the error is the end of input.
+	_, _ = bufio.NewReader(os.Stdin).ReadString('\n')
 }
 
 // The case Windows is strict about: the binary being replaced is running. On
@@ -152,8 +155,8 @@ func TestABinaryThatIsRunningCanBeReplaced(t *testing.T) {
 		t.Fatal(err)
 	}
 	done := make(chan struct{})
-	t.Cleanup(func() { stdin.Close(); <-done })
-	go func() { cmd.Wait(); close(done) }()
+	t.Cleanup(func() { _ = stdin.Close(); <-done })
+	go func() { _ = cmd.Wait(); close(done) }()
 	ready := make(chan string, 1)
 	go func() { line, _ := bufio.NewReader(stdout).ReadString('\n'); ready <- line }()
 	select {
@@ -174,7 +177,7 @@ func TestABinaryThatIsRunningCanBeReplaced(t *testing.T) {
 		t.Error("the new binary is not in place")
 	}
 
-	stdin.Close()
+	_ = stdin.Close()
 	<-done
 	RemoveStale(target)
 	if _, err := os.Stat(target + staleSuffix); !os.IsNotExist(err) {

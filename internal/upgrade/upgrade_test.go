@@ -248,7 +248,7 @@ func TestAnUnwritableInstallDirectoryIsRefusedNamingIt(t *testing.T) {
 	if err := os.Chmod(in.dir, 0o555); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chmod(in.dir, 0o755) })
+	t.Cleanup(func() { _ = os.Chmod(in.dir, 0o755) })
 	before := snapshot(t, in.dir)
 
 	_, err := run(t, in)

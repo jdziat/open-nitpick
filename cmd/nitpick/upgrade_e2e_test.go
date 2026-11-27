@@ -84,9 +84,9 @@ func serveRelease(t *testing.T, latest string) *upgradeRelease {
 		r.mu.Unlock()
 		switch {
 		case strings.HasSuffix(req.URL.Path, "/checksums.txt"):
-			w.Write([]byte(listing))
+			_, _ = w.Write([]byte(listing))
 		case strings.HasSuffix(req.URL.Path, asset):
-			w.Write([]byte("the real asset bytes, which do not match the listing"))
+			_, _ = w.Write([]byte("the real asset bytes, which do not match the listing"))
 		default:
 			http.NotFound(w, req)
 		}
