@@ -214,7 +214,10 @@ func TestAReviewThatDidNotFinishSaysSoInsteadOfLookingClean(t *testing.T) {
 	u := newUI(t)
 	r := review("acme/api", t0.Add(-time.Hour))
 	r.Complete, r.Result = false, "error"
-	kept, _ := u.co.store.Add(context.Background(), r)
+	kept, err := u.co.store.Add(context.Background(), r)
+	if err != nil {
+		t.Fatal(err)
+	}
 	u.signIn("eng")
 	_, body := u.get("/ui/insights/reviews/" + kept.ID)
 	if !strings.Contains(body, `<span class="tag">did not finish</span>`) {
@@ -264,7 +267,7 @@ func TestATrendIsColouredOnlyWhenItMovedAndHadSomethingToCompareWith(t *testing.
 		text  string
 	}{
 		"up":          {Hotspot{Recent: 9, Prior: 3, Baseline: true, Trend: TrendUp}, TrendUp, "▲ +6 (was 3)"},
-		"down":        {Hotspot{Recent: 1, Prior: 7, Baseline: true, Trend: TrendDown}, TrendDown, "▼ -6 (was 7)"},
+		"down":        {Hotspot{Recent: 1, Prior: 7, Baseline: true, Trend: TrendDown}, TrendDown, "▼ 6 (was 7)"},
 		"steady":      {Hotspot{Recent: 4, Prior: 3, Baseline: true, Trend: TrendFlat}, TrendFlat, "steady (was 3)"},
 		"no baseline": {Hotspot{Recent: 65, Prior: 0, Baseline: false, Trend: TrendFlat}, TrendFlat, "no earlier data"},
 	} {
@@ -481,5 +484,43 @@ func TestTheLatestReviewsPanelLeavesOutAReviewDatedAhead(t *testing.T) {
 	}
 	if strings.Contains(panel, "ahead/repo") {
 		t.Fatalf("the Latest reviews panel lists a review dated after now, which no count includes")
+	}
+}
+
+func TestTheCardsBaselineIsTheSameWindowTheHotspotTrendsUse(t *testing.T) {
+	u := newUI(t)
+	day := 24 * time.Hour
+	_, edge := (Query{Now: t0, Days: 30}).window() // start of the window before
+	// One review in the last partial day of the window before, which a clock-time
+	// shift drops from the card's baseline and the hotspot trend keeps.
+	lastDayBefore, _ := (Query{Now: t0, Days: 30}).window()
+	for _, r := range []Review{
+		review("r", edge.Add(time.Hour), finding("a.go", "nit")),
+		review("r", lastDayBefore.Add(-time.Hour), finding("a.go", "nit"), finding("a.go", "nit")),
+		review("r", t0.Add(-day), finding("a.go", "error"), finding("a.go", "error"), finding("a.go", "error"), finding("a.go", "error"), finding("a.go", "error")),
+	} {
+		if _, err := u.co.store.Add(context.Background(), r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	u.signIn("eng")
+	_, body := u.get("/ui/insights/?days=30")
+	// 5 findings now against 3 in the window before: "2 more". A baseline that
+	// misses the review in the last partial day would say "3 more".
+	if !strings.Contains(body, "▲ 2 more than the 30 days before") {
+		i := strings.Index(body, `<div class="card-label">Findings</div>`)
+		t.Fatalf("the Findings card's baseline disagrees with the hotspot trend's window: %.200s", body[i:])
+	}
+	_, hot := u.get("/ui/insights/hotspots?days=30")
+	if !strings.Contains(hot, "(was 3)") {
+		t.Fatalf("the hotspot trend's baseline is not 3")
+	}
+}
+
+func TestADownwardTrendShowsTheSizeOfTheDropNotASignedNumber(t *testing.T) {
+	c := &Component{}
+	row := c.hotspotRow(1, Hotspot{Recent: 1, Prior: 7, Baseline: true, Trend: TrendDown}, 0, 30)
+	if !strings.Contains(row.TrendText, "▼ 6 (was 7)") || strings.Contains(row.TrendText, "-") {
+		t.Fatalf("a drop of 6 reads %q: the arrow already says down, and the cards print the size", row.TrendText)
 	}
 }

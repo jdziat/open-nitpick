@@ -202,3 +202,16 @@ func TestInsightsWithASignInButNoRoleThatGrantsItIsRefusedAtStartUp(t *testing.T
 		}
 	}
 }
+
+func TestInsightsWithARoleRuleButNoWayToSignInIsRefusedAtStartUp(t *testing.T) {
+	o := &options{addr: "x", dir: t.TempDir(), oidcIssuer: notary.GitHubIssuer}
+	o.config = writeFile(t, o.dir, "server.yaml", "components: [insights]\nroles:\n  - {role: insights, user: alice}\n", 0o600)
+	_, closeStore, err := build(context.Background(), o, quiet)
+	if err == nil {
+		closeStore()
+		t.Fatal("a role rule with no provider grants to no one, and the server started anyway")
+	}
+	if !strings.Contains(err.Error(), "sign in") {
+		t.Fatalf("err = %v, want the refusal to name signing in", err)
+	}
+}

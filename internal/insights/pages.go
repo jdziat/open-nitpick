@@ -144,7 +144,7 @@ func (c *Component) overviewPage(r *http.Request) (any, error) {
 	if o.Empty {
 		return v, nil
 	}
-	prior := c.store.Overview(Query{Now: q.Now.AddDate(0, 0, -q.Days), Days: q.Days, Repo: q.Repo})
+	prior := c.store.PriorOverview(q)
 	// worse says whether more of this is bad. More reviews is activity, not a
 	// problem, so it is never coloured.
 	mk := func(label string, cur, was int, worse bool) card {
@@ -270,7 +270,7 @@ func (c *Component) hotspotRow(rank int, h Hotspot, scale, days int) hotspotRow 
 	case trend == TrendUp:
 		text = fmt.Sprintf("▲ +%d (was %d)", d, h.Prior)
 	case trend == TrendDown:
-		text = fmt.Sprintf("▼ %d (was %d)", d, h.Prior)
+		text = fmt.Sprintf("▼ %d (was %d)", -d, h.Prior)
 	default:
 		text = fmt.Sprintf("● steady (was %d)", h.Prior)
 	}

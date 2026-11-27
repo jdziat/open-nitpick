@@ -217,13 +217,26 @@ type Count struct {
 // Overview summarises the window.
 func (s *Store) Overview(q Query) Overview {
 	from, _ := q.window()
+	return s.overviewBetween(q.Repo, from, q.Now)
+}
+
+// PriorOverview summarises the window before the period, the same one the
+// hotspot trends compare with, so a card and a trend never disagree about it.
+func (s *Store) PriorOverview(q Query) Overview {
+	from, priorFrom := q.window()
+	return s.overviewBetween(q.Repo, priorFrom, from.Add(-time.Nanosecond))
+}
+
+// overviewBetween counts reviews dated from the first time to the second, both
+// inclusive.
+func (s *Store) overviewBetween(repo string, from, until time.Time) Overview {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	o := Overview{BySeverity: map[string]int{}}
 	repos, files := map[string]bool{}, map[fileKey]bool{}
 	classes := map[string]int{}
 	for _, r := range s.reviews {
-		if q.Repo != "" && r.Repo != q.Repo || r.At.Before(from) || r.At.After(q.Now) {
+		if repo != "" && r.Repo != repo || r.At.Before(from) || r.At.After(until) {
 			continue
 		}
 		o.Reviews++

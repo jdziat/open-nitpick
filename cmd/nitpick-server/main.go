@@ -263,7 +263,7 @@ func build(ctx context.Context, o *options, log *slog.Logger) (http.Handler, fun
 	for _, name := range cfg.components() {
 		// knownComponents refuses any other name before this point.
 		if name == "insights" {
-			c, closeInsights, err := buildInsights(o, cfg.grantsRole("insights"), log)
+			c, closeInsights, err := buildInsights(o, cfg.grantsRole(string(insights.RoleView)) && len(providers) > 0, log)
 			if err != nil {
 				closeStore()
 				return nil, nil, err
