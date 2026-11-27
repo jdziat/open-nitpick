@@ -35,6 +35,14 @@ describe('useListState', () => {
     expect(new URLSearchParams(result.current.search).get('q')).toBe('auth')
   })
 
+  it('reads a page that is not a positive number as the first page', () => {
+    for (const bad of ['0', '-3', 'abc', '']) {
+      const { result } = setup(`/x?page=${bad}`)
+      expect(result.current.list.page, `page=${bad}`).toBe(1)
+      expect(result.current.list.api.page, `page=${bad}`).toBe(1)
+    }
+  })
+
   it('keeps the page it was told to go to', () => {
     const { result } = setup()
     act(() => result.current.list.onPage(3))

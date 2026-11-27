@@ -20,6 +20,15 @@ describe('SearchInput', () => {
     expect(onChange).toHaveBeenCalledWith('auth')
   })
 
+  it('sends what was typed without the spaces around it', async () => {
+    const onChange = vi.fn()
+    render(<SearchInput value="" onChange={onChange} placeholder="Search" label="Search things" />)
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    await user.type(input(), '  auth  ')
+    act(() => vi.advanceTimersByTime(350))
+    expect(onChange).toHaveBeenCalledWith('auth')
+  })
+
   it('asks at once, and with nothing, when the box is cleared', async () => {
     const onChange = vi.fn()
     render(<SearchInput value="auth" onChange={onChange} placeholder="Search" label="Search things" />)
