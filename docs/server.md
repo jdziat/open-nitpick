@@ -36,7 +36,7 @@ auth:
     users_file: /etc/nitpick/users
 
 roles:
-  - {role: authoritative, user: alice}
+  - {role: authoritative, provider: password, user: alice}
 ```
 
 With no provider configured, `/ui/` and `/auth/` answer 404. The file is read
@@ -168,13 +168,14 @@ union of every rule that matches them, or none:
 ```yaml
 roles:
   - {role: authoritative, provider: oidc, group: nitpick-admins}
-  - {role: read, user: alice}
+  - {role: read, provider: password, user: alice}
 ```
 
-A rule selects by exactly one of `user` (the provider's stable name for them) and
-`group` (a group the provider reported), and may be limited to one `provider`. A
-rule that selects by neither or both, or names a provider that is not configured,
-is refused. So is a role that no enabled component declares: a typo such as
+A rule names its `provider` and selects by exactly one of `user` (the provider's
+stable name for them) and `group` (a group the provider reported). The provider is
+required: a rule without one would match the same user or group on every sign-in
+provider. A rule with no provider, with neither or both selectors, or naming a
+provider that is not configured, is refused at start-up. So is a role that no enabled component declares: a typo such as
 `authorative` would otherwise be the permission quietly not given, and the error
 lists the roles that exist. The notary's are `authoritative`, `provisional` and
 `read`. A person's roles are fixed when they sign in and last as long as the

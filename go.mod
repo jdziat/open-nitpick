@@ -18,6 +18,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/russellhaering/goxmldsig v1.6.1
 	github.com/sigstore/sigstore-go v1.3.0
+	github.com/theupdateframework/go-tuf/v2 v2.4.2
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/crypto v0.55.0
 	golang.org/x/mod v0.43.0
@@ -92,7 +93,6 @@ require (
 	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/theupdateframework/go-tuf v0.7.0 // indirect
-	github.com/theupdateframework/go-tuf/v2 v2.4.2 // indirect
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	github.com/transparency-dev/formats v0.1.1 // indirect
 	github.com/transparency-dev/merkle v0.0.2 // indirect

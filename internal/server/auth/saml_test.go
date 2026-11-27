@@ -121,7 +121,7 @@ func (s *samlSite) ok(next string) reply {
 func TestASAMLSignInSucceedsAndMapsGroupsToRoles(t *testing.T) {
 	idp := newSAMLIDP(t)
 	idp.groups = []string{"staff", "ops"}
-	s := newSAMLSite(t, idp, server.RoleRule{Roles: []server.Role{"admin"}, Group: "ops"})
+	s := newSAMLSite(t, idp, server.RoleRule{Roles: []server.Role{"admin"}, Provider: "saml", Group: "ops"})
 	resp := s.ok("/ui/somewhere")
 	if resp.Header.Get("Location") != "/ui/somewhere" {
 		t.Errorf("sign-in went to %q, want the requested page", resp.Header.Get("Location"))
@@ -533,5 +533,61 @@ func TestASAMLAssertionWithNoIDIsRefused(t *testing.T) {
 	resp, _ := s.post(idp.response(s.acs, s.spID, id), relay, nil)
 	if resp.StatusCode == http.StatusSeeOther {
 		t.Error("an assertion with no ID signed someone in")
+	}
+}
+
+func TestTheSAMLBindingCookieIsOneABrowserKeepsAndSendsOnlyToTheSAMLRoutes(t *testing.T) {
+	s := newSAMLSite(t, newSAMLIDP(t))
+	resp, err := s.c.Get(s.ts.URL + "/auth/saml/login")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	var got *http.Cookie
+	for _, c := range resp.Cookies() {
+		if c.Name == samlCookie {
+			got = c
+		}
+	}
+	if got == nil {
+		t.Fatalf("the login set no binding cookie")
+	}
+	if err := server.CheckCookie(got); err != nil {
+		t.Fatalf("a browser would drop this cookie: %v", err)
+	}
+	if got.Path != "/auth/saml/" || !got.Secure || !got.HttpOnly || got.SameSite != http.SameSiteNoneMode {
+		t.Fatalf("cookie = %+v, want Path=/auth/saml/, Secure, HttpOnly, SameSite=None", got)
+	}
+	if strings.HasPrefix(got.Name, "__Host-") {
+		t.Fatalf("a __Host- cookie must have Path=/, and this one must not")
+	}
+}
+
+func TestAFloodOfSAMLSignInStartsIsRefusedAndKeepsTheFlowInProgress(t *testing.T) {
+	s := newSAMLSite(t, newSAMLIDP(t))
+	s.s.flows.max = 40
+	s.start("/ui/")
+	s.s.flows.mu.Lock()
+	var real string
+	for k := range s.s.flows.items {
+		real = k
+	}
+	s.s.flows.mu.Unlock()
+	refused := 0
+	for i := 0; i < 200; i++ {
+		resp, err := s.c.Get(s.ts.URL + "/auth/saml/login")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode == http.StatusTooManyRequests {
+			refused++
+		}
+	}
+	s.s.flows.mu.Lock()
+	_, alive := s.s.flows.items[real]
+	s.s.flows.mu.Unlock()
+	if !alive || refused == 0 {
+		t.Fatalf("alive=%v refused=%d: a flood of SAML starts must be refused and must not evict a sign-in in progress", alive, refused)
 	}
 }

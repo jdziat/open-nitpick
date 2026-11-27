@@ -208,7 +208,7 @@ func standard(t *testing.T, text string) *env {
 	return newEnv(t, Config{
 		Components: []Component{&stubComponent{name: "stub", text: text}},
 		Providers:  []Provider{fakeProvider{id: "fake"}},
-		Roles:      newRoles(t, RoleRule{Roles: []Role{"admin"}, Group: "ops"}),
+		Roles:      newRoles(t, RoleRule{Roles: []Role{"admin"}, Provider: "fake", Group: "ops"}),
 		Assets:     builtAssets(),
 	})
 }

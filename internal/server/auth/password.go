@@ -147,11 +147,14 @@ func validToken(c *server.CSRF, r *http.Request, secret [32]byte) bool {
 	return c.Valid(r, secret)
 }
 
-func (p *Password) address(r *http.Request) string {
-	if p.TrustForwardedFor {
+func (p *Password) address(r *http.Request) string { return clientAddress(r, p.TrustForwardedFor) }
+
+// clientAddress is who a request is from, for a limiter. Behind a proxy that
+// overwrites X-Forwarded-For, the last entry is the one the nearest proxy added;
+// earlier ones are what the client claimed.
+func clientAddress(r *http.Request, trustForwardedFor bool) string {
+	if trustForwardedFor {
 		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-			// The last entry is the one the nearest proxy added; earlier ones
-			// are what the client claimed.
 			parts := strings.Split(fwd, ",")
 			if a := strings.TrimSpace(parts[len(parts)-1]); a != "" {
 				return a

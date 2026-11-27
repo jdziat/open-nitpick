@@ -60,7 +60,7 @@ func TestTheServerSurvivesConcurrentSignedInRequests(t *testing.T) {
 	e := newEnv(t, Config{
 		Components: []Component{&stubComponent{name: "stub", text: "x"}},
 		Providers:  []Provider{fakeProvider{id: "fake"}},
-		Roles:      newRoles(t, RoleRule{Roles: []Role{"admin"}, Group: "ops"}),
+		Roles:      newRoles(t, RoleRule{Roles: []Role{"admin"}, Provider: "fake", Group: "ops"}),
 		Assets:     builtAssets(),
 	})
 	e.signIn("alice", "ops")

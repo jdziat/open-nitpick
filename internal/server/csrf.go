@@ -70,10 +70,12 @@ func (c *CSRF) PreSession(w http.ResponseWriter, r *http.Request) ([32]byte, err
 	if err != nil {
 		return [32]byte{}, err
 	}
-	http.SetCookie(w, &http.Cookie{
+	if err := SetCookie(w, &http.Cookie{
 		Name: PreSessionCookie, Value: value, Path: "/",
 		HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode, MaxAge: 3600,
-	})
+	}); err != nil {
+		return [32]byte{}, err
+	}
 	return sha256.Sum256([]byte(value)), nil
 }
 

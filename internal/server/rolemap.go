@@ -12,7 +12,9 @@ import (
 type RoleRule struct {
 	Roles []Role
 
-	// Provider limits the rule to one sign-in provider. Empty matches any.
+	// Provider is the sign-in provider the rule is for: "password", "oidc", "saml".
+	// It is required, since a rule with none would match a user or group on every
+	// provider.
 	Provider string
 
 	// Exactly one of the following selects who the rule is for.
@@ -29,6 +31,9 @@ func (r RoleRule) Validate() error {
 		if strings.TrimSpace(string(role)) == "" {
 			return errors.New("a role rule names an empty role")
 		}
+	}
+	if strings.TrimSpace(r.Provider) == "" {
+		return errors.New("a role rule must name its provider: without one it would match the same user or group on every sign-in provider")
 	}
 	selectors := 0
 	for _, s := range []string{r.User, r.Group} {

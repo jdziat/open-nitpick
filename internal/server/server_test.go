@@ -384,17 +384,21 @@ func TestBadComponentsAreRefusedAtStartup(t *testing.T) {
 // Role rules that would match everyone, or no one, are refused.
 func TestRoleRulesThatCouldNeverMeanWhatTheySayAreRefused(t *testing.T) {
 	for name, rule := range map[string]RoleRule{
-		"no role":       {Group: "g"},
-		"an empty role": {Roles: []Role{" "}, Group: "g"},
-		"no selector":   {Roles: []Role{"r"}},
-		"two selectors": {Roles: []Role{"r"}, Group: "g", User: "u"},
+		"no role":       {Provider: "p", Group: "g"},
+		"an empty role": {Provider: "p", Roles: []Role{" "}, Group: "g"},
+		"no selector":   {Provider: "p", Roles: []Role{"r"}},
+		"two selectors": {Provider: "p", Roles: []Role{"r"}, Group: "g", User: "u"},
+		// A rule that omits the provider would match its subject or group on every
+		// provider, so each one must be named.
+		"no provider, by user":  {Roles: []Role{"r"}, User: "u"},
+		"no provider, by group": {Roles: []Role{"r"}, Group: "g"},
 	} {
 		if _, err := NewRoleMap([]RoleRule{rule}); err == nil {
 			t.Errorf("%s was accepted", name)
 		}
 	}
 	m, err := NewRoleMap([]RoleRule{
-		{Roles: []Role{"a"}, Group: "g"},
+		{Roles: []Role{"a"}, Group: "g", Provider: "oidc"},
 		{Roles: []Role{"a", "b"}, User: "u", Provider: "oidc"},
 	})
 	if err != nil {
@@ -552,18 +556,18 @@ func (declaring) Roles() []Role { return []Role{"admin", "viewer"} }
 func TestARoleNoComponentDeclaresIsRefusedAtStartUp(t *testing.T) {
 	comp := &declaring{stubComponent{name: "stub"}}
 	for _, role := range []Role{"admn", "Admin", "root", "admin "} {
-		_, err := New(Config{Components: []Component{comp}, Roles: newRoles(t, RoleRule{Roles: []Role{role}, User: "u"})})
+		_, err := New(Config{Components: []Component{comp}, Roles: newRoles(t, RoleRule{Roles: []Role{role}, Provider: "fake", User: "u"})})
 		if err == nil || !strings.Contains(err.Error(), "admin, viewer") {
 			t.Errorf("role %q: err = %v, want it refused with the real roles named", role, err)
 		}
 	}
 	// Rule 10: the declared roles are accepted, alone and together.
 	for _, roles := range [][]Role{{"admin"}, {"viewer"}, {"admin", "viewer"}} {
-		if _, err := New(Config{Components: []Component{comp}, Roles: newRoles(t, RoleRule{Roles: roles, User: "u"})}); err != nil {
+		if _, err := New(Config{Components: []Component{comp}, Roles: newRoles(t, RoleRule{Roles: roles, Provider: "fake", User: "u"})}); err != nil {
 			t.Errorf("roles %v were refused: %v", roles, err)
 		}
 	}
-	if _, err := New(Config{Components: []Component{&stubComponent{name: "stub"}}, Roles: newRoles(t, RoleRule{Roles: []Role{"anything"}, User: "u"})}); err != nil {
+	if _, err := New(Config{Components: []Component{&stubComponent{name: "stub"}}, Roles: newRoles(t, RoleRule{Roles: []Role{"anything"}, Provider: "fake", User: "u"})}); err != nil {
 		t.Errorf("with nothing declaring roles a rule was refused: %v", err)
 	}
 }

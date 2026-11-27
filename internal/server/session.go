@@ -82,7 +82,7 @@ func (s *Sessions) Start(w http.ResponseWriter, id Identity) error {
 	s.sweepLocked(now)
 	s.byKey[keyOf(token)] = &session{id: id, created: now, lastSeen: now, csrf: csrf}
 	s.mu.Unlock()
-	http.SetCookie(w, &http.Cookie{
+	return SetCookie(w, &http.Cookie{
 		Name:     SessionCookie,
 		Value:    token,
 		Path:     "/",
@@ -91,7 +91,6 @@ func (s *Sessions) Start(w http.ResponseWriter, id Identity) error {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(s.cfg.Absolute / time.Second),
 	})
-	return nil
 }
 
 // Lookup returns the identity of the request's session and the CSRF secret
@@ -125,7 +124,9 @@ func (s *Sessions) End(w http.ResponseWriter, r *http.Request) {
 		delete(s.byKey, keyOf(c.Value))
 		s.mu.Unlock()
 	}
-	http.SetCookie(w, &http.Cookie{
+	// The cookie is built from constants that CheckCookie accepts, so a refusal is
+	// a bug in this file and not an input; the session is already gone either way.
+	_ = SetCookie(w, &http.Cookie{
 		Name: SessionCookie, Value: "", Path: "/", MaxAge: -1,
 		HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode,
 	})

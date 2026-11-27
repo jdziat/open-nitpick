@@ -6,8 +6,11 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
+
+	"github.com/nitpick-oss/nitpick/internal/server"
 )
 
 // flowTTL is how long a sign-in may take between the redirect out and the
@@ -31,13 +34,58 @@ type flow struct {
 // would let anyone fill it by starting sign-ins and never finishing, so it is
 // capped and drops the oldest.
 type flows struct {
-	mu    sync.Mutex
-	max   int
-	now   func() time.Time
-	items map[string]*flow
+	mu     sync.Mutex
+	max    int
+	now    func() time.Time
+	items  map[string]*flow
+	starts map[string][]time.Time // by client address, the starts in the last startWindow
 }
 
-func newFlows(max int) *flows { return &flows{max: max, items: map[string]*flow{}} }
+func newFlows(max int) *flows {
+	return &flows{max: max, items: map[string]*flow{}, starts: map[string][]time.Time{}}
+}
+
+// A client address may start startMax sign-ins in startWindow. The table drops its
+// oldest flow when full, so without a limit anyone could loop on the login URL and
+// push real sign-ins out. The limit is far above what a person or an office behind
+// one address does, and far below the table's size.
+const (
+	startMax      = 20
+	startWindow   = time.Minute
+	maxStartAddrs = 100_000
+)
+
+// admit reports whether addr may start a sign-in now, and counts it if so. When
+// the table of addresses is full of recent ones, it refuses: a flood from many
+// addresses is then a refusal to start, not an eviction of sign-ins in progress.
+func (f *flows) admit(addr string) bool {
+	now := f.clock()
+	cutoff := now.Add(-startWindow)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	recent := f.starts[addr][:0]
+	for _, t := range f.starts[addr] {
+		if t.After(cutoff) {
+			recent = append(recent, t)
+		}
+	}
+	if len(recent) >= startMax {
+		f.starts[addr] = recent
+		return false
+	}
+	if _, known := f.starts[addr]; !known && len(f.starts) >= maxStartAddrs {
+		for a, ts := range f.starts {
+			if len(ts) == 0 || !ts[len(ts)-1].After(cutoff) {
+				delete(f.starts, a)
+			}
+		}
+		if len(f.starts) >= maxStartAddrs {
+			return false
+		}
+	}
+	f.starts[addr] = append(recent, now)
+	return true
+}
 
 func (f *flows) clock() time.Time {
 	if f.now != nil {
@@ -105,6 +153,12 @@ func randomToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b[:]), nil
 }
 
+// tooManyStarts answers an address that is starting sign-ins too fast.
+func tooManyStarts(w http.ResponseWriter) {
+	w.Header().Set("Retry-After", strconv.Itoa(int(startWindow/time.Second)))
+	http.Error(w, "too many sign-in attempts from this address; try again in a minute", http.StatusTooManyRequests)
+}
+
 // bindCookie ties a flow to the browser that started it. Without it, an attacker
 // could start a sign-in as themselves and get a victim's browser to finish it,
 // signing the victim in to the attacker's account.
@@ -113,10 +167,12 @@ func bindCookie(w http.ResponseWriter, name, path string, sameSite http.SameSite
 	if err != nil {
 		return [32]byte{}, err
 	}
-	http.SetCookie(w, &http.Cookie{
+	if err := server.SetCookie(w, &http.Cookie{
 		Name: name, Value: value, Path: path, MaxAge: int(flowTTL / time.Second),
 		HttpOnly: true, Secure: true, SameSite: sameSite,
-	})
+	}); err != nil {
+		return [32]byte{}, err
+	}
 	return sha256.Sum256([]byte(value)), nil
 }
 

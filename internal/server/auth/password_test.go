@@ -155,7 +155,7 @@ func newPassword(t *testing.T) *Password {
 }
 
 func TestACorrectPasswordSignsInAndGrantsTheRolesTheRulesGive(t *testing.T) {
-	s := newSite(t, newPassword(t), server.RoleRule{Roles: []server.Role{"admin"}, Group: "ops"})
+	s := newSite(t, newPassword(t), server.RoleRule{Roles: []server.Role{"admin"}, Provider: "password", Group: "ops"})
 	resp, body := s.login("Alice", "correct horse") // the account name is not case-sensitive
 	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/ui/" {
 		t.Fatalf("login = %d %q to %q", resp.StatusCode, body, resp.Header.Get("Location"))
@@ -481,14 +481,14 @@ func TestSignInReturnsToTheRequestedPage(t *testing.T) {
 
 // The groups an account is in reach the identity, and so the role rules.
 func TestAnAccountsGroupsReachTheRoleRules(t *testing.T) {
-	s := newSite(t, newPassword(t), server.RoleRule{Roles: []server.Role{"admin"}, Group: "ops"})
+	s := newSite(t, newPassword(t), server.RoleRule{Roles: []server.Role{"admin"}, Provider: "password", Group: "ops"})
 	s.login("alice", "correct horse")
 	id := lastIdentity(t, s)
 	if !id.Has("admin") {
 		t.Errorf("alice is in ops, and the roles she holds are %v", id.Roles)
 	}
 	// Rule 10: bob is in no group and holds nothing, so the above is the group's doing.
-	other := newSite(t, newPassword(t), server.RoleRule{Roles: []server.Role{"admin"}, Group: "ops"})
+	other := newSite(t, newPassword(t), server.RoleRule{Roles: []server.Role{"admin"}, Provider: "password", Group: "ops"})
 	other.login("bob", "battery staple")
 	if got := lastIdentity(t, other); len(got.Roles) != 0 {
 		t.Errorf("bob holds %v", got.Roles)
