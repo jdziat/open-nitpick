@@ -14,7 +14,7 @@ Install from the marketplace in this repository:
 
 ```
 /plugin marketplace add nitpick-oss/nitpick
-/plugin install nitpick@nitpick-review
+/plugin install nitpick@nitpick
 ```
 
 Or register the server directly, without the skills, with whichever

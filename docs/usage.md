@@ -338,7 +338,7 @@ answer:
 
 ```
 /plugin marketplace add nitpick-oss/nitpick
-/plugin install nitpick@nitpick-review
+/plugin install nitpick@nitpick
 ```
 
 Or, without the skills, register the server with the client you use:
