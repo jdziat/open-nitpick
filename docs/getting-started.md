@@ -33,6 +33,11 @@ The scripts are short files you can read before running them:
 [install.sh](https://nitpick-oss.github.io/nitpick/install.sh) and
 [install.ps1](https://nitpick-oss.github.io/nitpick/install.ps1).
 
+To move to a newer release later, run `nitpick upgrade`. It checks the download
+against `checksums.txt` and its Sigstore signature itself, with no `cosign`
+needed, and leaves the installed binary alone if either fails.
+`nitpick upgrade -check` only reports whether a newer release exists.
+
 To install by hand, download a binary for your platform from the
 [releases page](https://github.com/nitpick-oss/nitpick/releases), then put
 `nitpick` on your `PATH`.

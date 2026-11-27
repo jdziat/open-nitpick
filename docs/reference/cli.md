@@ -25,6 +25,7 @@ from "could not run" (2). Use `-dry-run` with
 | Get a quick first pass on a pull request | [`fast-review`](#fast-review) |
 | Assess a whole repository or a focused directory | [`full-review`](#full-review) or [`repo-score`](#repo-score) |
 | Enforce conventions, commits, security, or prose in CI | [`repo-standards`](#repo-standards), [`commits`](#commits), [`security`](#security), or [`slop`](#slop) |
+| Move to a newer release, or check whether there is one | [`upgrade`](#upgrade) |
 | Configure a provider, editor integration, or a new repository | [`auth`](#auth), [`mcp`](#mcp), or [`init`](#init) |
 | Inspect configuration or generated reference material | [`explain-config`](#explain-config) or [`config-reference`](#config-reference) |
 
@@ -488,6 +489,47 @@ nitpick config-reference -o docs/configuration-reference.md
 Generates configuration reference Markdown. `-o` is the output file and `-src`
 chooses the configuration source used to build it. `make docs` writes
 `docs/configuration-reference.md`; use that path for a checked-in regeneration.
+
+## `upgrade`
+
+```sh
+nitpick upgrade
+nitpick upgrade -check
+nitpick upgrade -version v2.9.0
+```
+
+Replaces the running binary with a release. It looks up the latest release,
+compares it with the version this binary reports, and does nothing when it is
+already current. Run it when you want it: nothing checks for updates in the
+background.
+
+| Flag | Meaning |
+| --- | --- |
+| `-check` | Report whether a newer release exists and install nothing. It writes nothing to disk. It cannot be combined with `-version`. |
+| `-version` | Install this release, such as `v2.10.0`, instead of the latest. It may be older, which is how to go back. |
+
+A release is installed only when three things agree: the download's SHA-256 is
+the one in the release's `checksums.txt`, its Sigstore bundle verifies against
+Sigstore's public trusted root, and the bundle was signed by this repository's
+release workflow for a version tag. Nothing is written next to the binary until
+all three pass, so a refused upgrade leaves it exactly as it was and exits
+non-zero. The trusted root is fetched over TUF when an install reaches the
+signature check, so an install needs network access to Sigstore as well as
+GitHub.
+
+The new binary is written beside the old one and renamed over it. On Windows a
+running `nitpick.exe` cannot be replaced, so it is renamed to `nitpick.exe.old`
+and removed the next time nitpick starts.
+
+When the directory is not writable, `upgrade` stops before downloading and names
+the directory. It never asks for elevated rights: use the package manager that
+installed nitpick, or `go install` again if that is how you installed it.
+
+A development build (version `dev`) has nothing to compare, so it is replaced
+only when you name a release with `-version`. Releases are read over HTTPS; a
+mirror can be set with `NITPICK_RELEASE_BASE` and `NITPICK_LATEST_BASE`, and a
+plain `http://` address is accepted only for this machine. A mirror is trusted
+with the files and nothing else, since the signature must still verify.
 
 ## `version`
 

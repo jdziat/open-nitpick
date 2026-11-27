@@ -37,6 +37,7 @@ func run() int {
 	// The version the linker set, where a message about what this build knows
 	// can reach it. internal/config cannot see a package main variable.
 	config.Version = version
+	removeStaleUpgrade()
 
 	if len(os.Args) < 2 {
 		usage()
@@ -78,6 +79,8 @@ func run() int {
 		err = runMCP(ctx, os.Args[2:])
 	case "auth":
 		err = runAuth(os.Args[2:], os.Stdin, os.Stdout)
+	case "upgrade":
+		err = runUpgrade(ctx, os.Args[2:], os.Stdout)
 	case "setup":
 		err = runSetup(os.Args[2:], os.Stdin, os.Stdout)
 	case "init":
@@ -178,6 +181,7 @@ Usage:
                                    Propose and individually accept repository references; activation requires trusted-base policy
   nitpick linters                  List the deterministic analyzers and how each is configured
   nitpick config-reference         Print every configuration key, its type and its default
+  nitpick upgrade [flags]          Replace this binary with the latest release, verified against its checksum and signature
   nitpick version                  Print the version
 
 Run "nitpick <command> -h" for a command's flags.

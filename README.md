@@ -36,7 +36,8 @@ nitpick deep-review     # agents that read the repository: 2.5 times the cost, 1
 The script puts `nitpick` in `~/.local/bin` (`INSTALL_DIR` changes that), never
 uses `sudo`, and installs a chosen release with `VERSION=v2.10.0`. It checks the
 download against `checksums.txt`, and its Sigstore signature too when `cosign` is
-installed. On Windows, `irm https://nitpick-oss.github.io/nitpick/install.ps1 | iex`
+installed. `nitpick upgrade` later replaces the binary with the latest release and
+verifies the signature itself. On Windows, `irm https://nitpick-oss.github.io/nitpick/install.ps1 | iex`
 does the same into `%LOCALAPPDATA%\Programs\nitpick`. Both are short files you can
 read first: [install.sh](https://nitpick-oss.github.io/nitpick/install.sh),
 [install.ps1](https://nitpick-oss.github.io/nitpick/install.ps1).
