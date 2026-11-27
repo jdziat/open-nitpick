@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "rules": {
+    "react/only-export-components": "off"
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/components/ui/**",
+        "src/hooks/use-mobile.ts"
+      ],
+      "rules": {
+        "react/set-state-in-effect": "off"
+      }
+    }
+  ]
+}
