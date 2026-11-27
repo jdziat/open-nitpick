@@ -48,7 +48,8 @@ jobs:
     # A comment event runs HERE, in the base repository, with this
     # repository's secrets, whoever wrote the comment. Without the
     # author_association test, every account on GitHub can spend the model
-    # credit one "@nitpick-review" at a time, and each attempt also burns a runner.
+    # credit one "@nitpick-review" at a time, and each attempt also burns a
+    # runner.
     # `nitpick respond` refuses the same set by itself (review.respond.from),
     # so this is the cheap half of the same gate: it stops the runner from
     # starting rather than stopping it after checkout.
