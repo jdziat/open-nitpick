@@ -23,8 +23,14 @@ decision that was made on purpose.
   pull request look unreviewed.
 - The keystore service name `open-nitpick`. A stored API key is found by it, and
   a rename would lose every key `nitpick auth set` saved.
-- The model prompts. They are measured, and reworded prompts would move
-  results that `docs/findings.md` reports.
+- The model prompts, and any text the review puts into a model's input, such as
+  the placeholder that replaces a forged boundary marker. Prompts are measured, so
+  rewording them would move results that `docs/findings.md` reports. The notary
+  hashes the input, so changed text would file a review under a different hash
+  than the record made from it.
+- Paths that name where data already lives, such as the bakeoff's frozen run
+  directory under `~/.local/share/open-nitpick/`. Renaming the string in a script
+  does not move the directory.
 - `LICENSE`, `NOTICE` and `CHANGELOG.md`: the copyright holder and release
   history keep the name they were written under.
 

@@ -25,7 +25,7 @@ from mira_funnel import draft_index  # noqa: E402
 
 JUDGE = "openai-gpt-6.1-sol"
 BAKEOFF = Path("/tmp/bakeoff")
-FROZEN = Path(os.path.expanduser("~/.local/share/nitpick/bakeoff-frozen/2026-11-14"))
+FROZEN = Path(os.path.expanduser("~/.local/share/open-nitpick/bakeoff-frozen/2026-11-14"))
 FLOOR = 0.7
 SURE = 0.75
 ARMS = [

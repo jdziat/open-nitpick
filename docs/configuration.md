@@ -228,7 +228,7 @@ nitpick auth delete synthetic
 ```
 
 That writes to the operating system's keystore under the service
-`nitpick` and the provider's name, which is where a review looks when no
+`open-nitpick` and the provider's name, which is where a review looks when no
 key is configured anywhere. Reading it from standard input keeps it out of the
 shell's history and out of the process table, which is where an environment
 variable puts it.
@@ -240,7 +240,7 @@ Resolution runs explicit sources before implicit ones:
 | 1 | `credential_command` | error |
 | 2 | `api_key_keyring`, as `service/account` | error |
 | 3 | `api_key_env` | error |
-| 4 | keystore under `nitpick/<provider>` | falls through |
+| 4 | keystore under `open-nitpick/<provider>` | falls through |
 | 5 | the provider's own variable | the provider reports it |
 
 The first three are what you wrote down for this model, so a failure in one is
@@ -294,7 +294,7 @@ models:
 
     # Where the credential comes from. All three are optional and all three are
     # withheld from a repository's own file; see Credentials below.
-    api_key_keyring: nitpick/synthetic
+    api_key_keyring: open-nitpick/synthetic
     api_key_env: SYNTHETIC_API_KEY
     credential_command: ["op", "read", "op://Private/synthetic/credential"]
 

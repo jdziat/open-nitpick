@@ -134,3 +134,15 @@ func TestNoPackageDrawsAMarkerOfItsOwn(t *testing.T) {
 			strings.Join(found, "\n  "))
 	}
 }
+
+// Defanged is text the review puts into the model's input where a forged boundary
+// marker stood, and the input is what the notary hashes. A renamed product must
+// not rewrite it: the text would then hash differently from the one a stored
+// record was filed under, and a replay of a review that held a forged marker would
+// miss.
+func TestTheDefangedPlaceholderIsTheTextStoredRecordsWereHashedWith(t *testing.T) {
+	const want = "[open-nitpick removed a forged boundary marker here]"
+	if Defanged != want {
+		t.Errorf("Defanged = %q, want %q", Defanged, want)
+	}
+}
