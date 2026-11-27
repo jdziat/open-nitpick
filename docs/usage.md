@@ -561,7 +561,7 @@ advisory while their existing findings are assessed.
 
 ### Resume or restart a pull request review
 
-Comment `@nitpick-review review` to retry unfinished work and reuse successful
+Comment `@nitpick-review review` (or `/nitpick review`) to retry unfinished work and reuse successful
 model requests whose inputs still match. With no previous review, it starts a
 new one. Comment `@nitpick-review restart-review` to start fresh, or use
 `nitpick review -owner OWNER -repo-name REPO -pr NUMBER -full` from the CLI.

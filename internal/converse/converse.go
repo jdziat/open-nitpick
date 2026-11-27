@@ -139,16 +139,114 @@ const (
 	KindReply Kind = "reply"
 )
 
-// Command reads the mention out of a comment: the kind, and for a question
-// the text after the mention. ok is false when the comment does not mention
-// the reviewer at all, or mentions it with nothing after.
+// SlashCommand is the second way to address the reviewer: a line that starts
+// with it. A slash command notifies no account, so it cannot ping a stranger,
+// and it does not depend on the GitHub App's name. Fixed, not configurable: the
+// mention is the setting.
+const SlashCommand = "/nitpick"
+
+// Command reads what a comment asks of the reviewer: the kind, and the text
+// after the trigger. The trigger is the mention, or a line starting with
+// SlashCommand, whichever the person wrote first. ok is false when the comment
+// has neither, or has one with nothing after it.
+//
+// This is the only authority on what a comment means. The workflow gates that
+// decide whether to start a runner are looser prefilters over the same
+// triggers, kept in step by a test.
 func Command(body, mention string) (Kind, string, bool) {
+	mentionAt, mentionRest, mentionOK := fromMention(body, mention)
+	slashAt, slashRest, slashOK := fromSlash(body)
+	switch {
+	case mentionOK && (!slashOK || mentionAt <= slashAt):
+		return classify(mentionRest)
+	case slashOK:
+		return classify(slashRest)
+	}
+	return "", "", false
+}
+
+// fromMention finds the mention and returns where it starts and what follows.
+func fromMention(body, mention string) (at int, rest string, ok bool) {
 	re := regexp.MustCompile(`(?i)(^|\s)(?:` + handlePattern(mention) + `)\b[:,]?\s*`)
 	loc := re.FindStringIndex(body)
 	if loc == nil {
-		return "", "", false
+		return 0, "", false
 	}
-	rest := strings.TrimSpace(body[loc[1]:])
+	return loc[0], body[loc[1]:], true
+}
+
+// fromSlash finds the first line that starts with SlashCommand and returns
+// where it starts and what follows it, from the original text.
+//
+// Quoted lines and fenced code cannot start a run: a person replying to a
+// maintainer's "/nitpick fix" quotes it, and a pasted log may hold any line at
+// all. A line has to begin with the command itself, so a quote (">") never
+// qualifies and needs no separate rule. A fence is the one thing that has to be
+// tracked, because it hides lines that do begin with it. An unclosed fence hides
+// the rest of the comment, as it does where the comment is rendered.
+func fromSlash(body string) (at int, rest string, ok bool) {
+	var fence string
+	for offset := 0; offset < len(body); {
+		end := strings.IndexByte(body[offset:], '\n')
+		next := len(body)
+		line := body[offset:]
+		if end >= 0 {
+			line = body[offset : offset+end]
+			next = offset + end + 1
+		}
+		line = strings.TrimSuffix(line, "\r")
+
+		if marker := fenceMarker(line); marker != "" {
+			switch {
+			case fence == "":
+				fence = marker
+			case strings.HasPrefix(marker, fence[:1]) && len(marker) >= len(fence) && strings.TrimSpace(line)[len(marker):] == "":
+				fence = ""
+			}
+		} else if fence == "" && startsWithCommand(line) {
+			return offset, body[offset+len(SlashCommand) : len(body)], true
+		}
+		offset = next
+	}
+	return 0, "", false
+}
+
+// startsWithCommand reports whether line is the command, alone or followed by
+// whitespace. "/nitpick-review" and "/nitpicker" are other words.
+func startsWithCommand(line string) bool {
+	if len(line) < len(SlashCommand) || !strings.EqualFold(line[:len(SlashCommand)], SlashCommand) {
+		return false
+	}
+	rest := line[len(SlashCommand):]
+	return rest == "" || rest[0] == ' ' || rest[0] == '\t'
+}
+
+// fenceMarker returns the run of backticks or tildes that opens or closes a
+// fenced code block on this line, or "" when the line is not a fence. Up to
+// three spaces of indent are allowed, as in CommonMark; four is code anyway.
+func fenceMarker(line string) string {
+	trimmed := strings.TrimLeft(line, " ")
+	if len(line)-len(trimmed) > 3 || len(trimmed) < 3 {
+		return ""
+	}
+	c := trimmed[0]
+	if c != '`' && c != '~' {
+		return ""
+	}
+	n := 0
+	for n < len(trimmed) && trimmed[n] == c {
+		n++
+	}
+	if n < 3 {
+		return ""
+	}
+	return trimmed[:n]
+}
+
+// classify names what the text after a trigger asks for. Empty text is no
+// command at all.
+func classify(rest string) (Kind, string, bool) {
+	rest = strings.TrimSpace(rest)
 	if rest == "" {
 		return "", "", false
 	}
