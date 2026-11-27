@@ -607,7 +607,7 @@ func TestAPageHeadingFromItsDataReplacesTheStaticTitleAndIsEscaped(t *testing.T)
 	e := newEnv(t, Config{
 		Components: []Component{&headingComponent{stubComponent: c}},
 		Providers:  []Provider{fakeProvider{id: "fake"}},
-		Roles:      newRoles(t, RoleRule{Roles: []Role{"admin"}, Group: "ops"}),
+		Roles:      newRoles(t, RoleRule{Roles: []Role{"admin"}, Provider: "fake", Group: "ops"}),
 		Assets:     builtAssets(),
 	})
 	e.signIn("ana", "ops")
@@ -635,7 +635,7 @@ func TestAPageWithAWildcardPathIsNeverOfferedInTheNavigation(t *testing.T) {
 	e := newEnv(t, Config{
 		Components: []Component{&wildcardNavComponent{stubComponent: &stubComponent{name: "stub"}}},
 		Providers:  []Provider{fakeProvider{id: "fake"}},
-		Roles:      newRoles(t, RoleRule{Roles: []Role{"admin"}, Group: "ops"}),
+		Roles:      newRoles(t, RoleRule{Roles: []Role{"admin"}, Provider: "fake", Group: "ops"}),
 		Assets:     builtAssets(),
 	})
 	e.signIn("ana", "ops")
