@@ -25,7 +25,13 @@ type Password struct {
 	TrustForwardedFor bool
 
 	Log *slog.Logger
+
+	// hashing bounds the argon2id hashes in flight.
+	hashing chan struct{}
 }
+
+// maxConcurrentHashes is how many password hashes run at once.
+const maxConcurrentHashes = 4
 
 // NewPassword builds the provider with the default limits.
 func NewPassword(users *Users, log *slog.Logger) *Password {
@@ -35,7 +41,7 @@ func NewPassword(users *Users, log *slog.Logger) *Password {
 	return &Password{Users: users, ByAccount: DefaultLimiter(), ByAddress: &Limiter{
 		// An address is allowed more misses than an account: an office shares one.
 		Max: 20, Window: DefaultLimiter().Window, Lockout: DefaultLimiter().Lockout, Keys: 100_000,
-	}, Log: log}
+	}, Log: log, hashing: make(chan struct{}, maxConcurrentHashes)}
 }
 
 // ID implements server.Provider.
@@ -82,24 +88,52 @@ func (p *Password) login(w http.ResponseWriter, r *http.Request, host server.Hos
 	acct := "account:" + strings.ToLower(name)
 	src := "address:" + addr
 
-	for _, c := range []struct {
+	// Each attempt is charged before it is hashed, atomically with the check, so
+	// parallel requests cannot all pass the check before any is counted. A charge
+	// is resolved by Fail (a wrong password) or Success (a right one). Any other
+	// way out of this function refunds it, so no path leaks a charge.
+	limits := []struct {
 		l   *Limiter
 		key string
-	}{{p.ByAddress, src}, {p.ByAccount, acct}} {
-		if allowed, _ := c.l.Allowed(c.key); !allowed {
+	}{{p.ByAddress, src}, {p.ByAccount, acct}}
+	charged := 0
+	resolved := false
+	defer func() {
+		if resolved {
+			return
+		}
+		for _, c := range limits[:charged] {
+			c.l.Refund(c.key)
+		}
+	}()
+	for _, c := range limits {
+		if allowed, _ := c.l.Take(c.key); !allowed {
 			// Refused before the hash is computed: a locked account costs the
 			// server nothing, which is the point of locking it.
 			p.Log.Warn("sign-in refused while locked", "provider", "password", "key", c.key)
 			host.LoginFailed(w, r, http.StatusTooManyRequests, refused)
 			return
 		}
+		charged++
 	}
 
+	// One argon2id hash holds 64 MiB. Hashing is bounded so many sources at once
+	// cannot exhaust memory, and a request waits its turn or gives up with its
+	// client.
+	if p.hashing != nil {
+		select {
+		case p.hashing <- struct{}{}:
+			defer func() { <-p.hashing }()
+		case <-r.Context().Done():
+			return
+		}
+	}
 	account, groups, ok := p.Users.Verify(name, password)
+	resolved = true
 	if !ok {
-		locked := p.ByAccount.Fail(acct)
+		p.ByAccount.Fail(acct)
 		p.ByAddress.Fail(src)
-		p.Log.Warn("sign-in failed", "provider", "password", "account", strings.ToLower(name), "address", addr, "locked", locked)
+		p.Log.Warn("sign-in failed", "provider", "password", "account", strings.ToLower(name), "address", addr)
 		host.LoginFailed(w, r, http.StatusUnauthorized, refused)
 		return
 	}

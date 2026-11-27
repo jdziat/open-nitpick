@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nitpick-oss/nitpick/internal/redact"
 	"github.com/nitpick-oss/nitpick/internal/server"
 	"github.com/nitpick-oss/nitpick/internal/wire"
 )
@@ -101,6 +102,7 @@ func (c *Component) listPage(r *http.Request) (any, error) {
 		return nil, err
 	}
 	for _, s := range page {
+		s.Model, s.Tool, s.Provider, s.Source = redact.Secrets(s.Model), redact.Secrets(s.Tool), redact.Secrets(s.Provider), redact.Secrets(s.Source)
 		view.Records = append(view.Records, listRow{Summary: s, Status: status(s.Complete), Short: s.Hash[:12]})
 	}
 	if next != "" {
@@ -146,8 +148,11 @@ func (c *Component) recordPage(r *http.Request) (any, error) {
 		return nil, server.ErrNotFound
 	}
 	view := recordView{
-		Hash: rec.Hash, Tool: rec.Tool, Provider: rec.Provider, Model: rec.Model, Source: rec.Source,
-		Effort: rec.Effort, Created: rec.Created, Clears: rec.Clears, ClearedBy: rec.ClearedBy,
+		Hash: rec.Hash, Tool: redact.Secrets(rec.Tool), Provider: redact.Secrets(rec.Provider), Model: redact.Secrets(rec.Model),
+		Source: redact.Secrets(rec.Source), Effort: redact.Secrets(rec.Effort), Created: rec.Created, Clears: rec.Clears,
+	}
+	for _, by := range rec.ClearedBy {
+		view.ClearedBy = append(view.ClearedBy, redact.Secrets(by))
 	}
 	if rec.Complete {
 		view.Status = "complete: a review with these inputs is replayed from it"
@@ -163,7 +168,13 @@ func (c *Component) recordPage(r *http.Request) (any, error) {
 	for _, k := range keys {
 		text, unusable := strings.CutPrefix(rec.Answers[k], unusableMark)
 		request, slot, _ := strings.Cut(k, "#")
-		view.Answers = append(view.Answers, answerView{Request: request, Slot: slot, Text: text, Unusable: unusable})
+		// What a model answered is shown through the scrubber the reviewer applies to
+		// what it prints, so a credential a model echoed from the diff is not
+		// displayed to whoever opens the page. The record itself is not changed:
+		// replay needs the answer as it was given.
+		view.Answers = append(view.Answers, answerView{
+			Request: redact.Secrets(request), Slot: redact.Secrets(slot), Text: redact.Secrets(text), Unusable: unusable,
+		})
 	}
 	return view, nil
 }

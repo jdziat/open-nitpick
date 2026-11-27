@@ -631,3 +631,53 @@ func (stubOther) Health(context.Context) error { return nil }
 func (stubOther) Routes() []server.Route {
 	return []server.Route{{Pattern: "GET /v1/other/x", Handler: http.NotFoundHandler()}}
 }
+
+// A credential a model echoed back out of the diff is not shown to whoever opens
+// the page, in any field the page prints, and the record is stored as it was
+// given, since replay needs the answer unchanged.
+func TestASecretInARecordIsRedactedOnEveryPageAndKeptInTheRecord(t *testing.T) {
+	aws := strings.ToUpper("akia") + strings.Repeat("7", 16)
+	vendor := "ghp_" + strings.Repeat("a1B2", 8)
+	labeled := "api_key=" + "hunter2hunter2hunter2"
+	fs := fileStore(t)
+	rec := putRecord(t, fs, 1, func(r *wire.Record) {
+		r.Model = "model-" + vendor
+		r.Source = "ci " + labeled
+		r.Tool = "v1 " + aws
+		r.Provider = labeled
+		r.Effort = aws
+		r.ClearedBy = []string{"by " + vendor}
+		r.Clears = 1
+		r.Answers = map[string]string{
+			"req#0":    `{"content":"the key is ` + aws + ` and ` + labeled + `"}`,
+			"req#1":    "!" + vendor,
+			aws + "#2": "keyed",
+		}
+	})
+	h := newHub(t, fs)
+	h.signIn("kay", "keepers")
+	secrets := []string{aws, vendor, "hunter2hunter2hunter2"}
+	for _, path := range []string{"/ui/notary/", "/ui/notary/records/" + rec.Hash} {
+		resp, body := h.do("GET", path, nil, "")
+		if resp.StatusCode != 200 {
+			t.Fatalf("%s = %d", path, resp.StatusCode)
+		}
+		for _, secret := range secrets {
+			if strings.Contains(body, secret) {
+				t.Errorf("%s shows %q", path, secret)
+			}
+		}
+		if !strings.Contains(body, "REDACTED") {
+			t.Errorf("%s shows no redaction at all, so the secrets may be absent for another reason", path)
+		}
+	}
+	// The listing API is for the authoritative role and returns the record's own
+	// summary fields. It is data, not a page, and is left as stored.
+	stored, ok, err := fs.Get(context.Background(), rec.Hash)
+	if err != nil || !ok {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stored.Answers["req#0"], aws) || stored.Model != rec.Model {
+		t.Error("the page's scrubbing changed the stored record, which replay needs as it was given")
+	}
+}
