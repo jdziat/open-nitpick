@@ -276,7 +276,13 @@ func (s *Server) servePage(w http.ResponseWriter, r *http.Request, route pageRou
 		return
 	}
 	view := View{Data: data, Identity: id}
-	s.write(w, route.tmpl, http.StatusOK, s.frame(r, id, route.page.Title, view), r.URL.Path)
+	title := route.page.Title
+	if route.page.Heading != nil {
+		if h := route.page.Heading(data); h != "" {
+			title = h
+		}
+	}
+	s.write(w, route.tmpl, http.StatusOK, s.frame(r, id, title, view), r.URL.Path)
 }
 
 func (s *Server) simple(w http.ResponseWriter, r *http.Request, id Identity, status int, title, body string) {

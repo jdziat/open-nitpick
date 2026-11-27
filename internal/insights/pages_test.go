@@ -387,3 +387,31 @@ func TestClearFiltersIsOfferedOnceWhenNothingMatches(t *testing.T) {
 		t.Fatalf("with results and a filter the form carries it once, got %d", n)
 	}
 }
+
+func TestAReviewPageIsNamedByItsRepositoryAndPullRequest(t *testing.T) {
+	u := newUI(t)
+	r := review("acme/api", t0.Add(-time.Hour), finding("a.go", "error"))
+	r.Ref = "pull/153"
+	kept, _ := u.co.store.Add(context.Background(), r)
+	u.signIn("eng")
+	_, body := u.get("/ui/insights/reviews/" + kept.ID)
+	if !strings.Contains(body, "<h1>acme/api · pull/153</h1>") {
+		t.Fatalf("the review's heading is not its repository and pull request: %.300s", body)
+	}
+	if got := reviewHeading(reviewView{Review: Review{Repo: "acme/api", Commit: "abcdef0123456789"}}); got != "acme/api · abcdef01" {
+		t.Fatalf("without a ref the heading uses the short commit: %q", got)
+	}
+}
+
+func TestAFinishedReviewWithFindingsShowsADashNotTheWordFindings(t *testing.T) {
+	u := newUI(t)
+	u.seed()
+	u.signIn("eng")
+	_, body := u.get("/ui/insights/reviews")
+	if strings.Contains(body, `class="quiet">findings`) {
+		t.Errorf("the Result column repeats the word findings next to the count")
+	}
+	if !strings.Contains(body, `<span class="muted" title="Finished with findings">–</span>`) {
+		t.Errorf("a finished review with findings shows no marker")
+	}
+}

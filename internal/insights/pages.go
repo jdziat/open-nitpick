@@ -21,7 +21,7 @@ func (c *Component) Pages() []server.Page {
 		{Path: "hotspots", Title: "Hotspots", Nav: true, Need: need, Body: hotspotsBody, Data: c.hotspotsPage},
 		{Path: "findings", Title: "Findings", Nav: true, Need: need, Body: findingsBody, Data: c.findingsPage},
 		{Path: "reviews", Title: "Reviews", Nav: true, Need: need, Body: reviewsBody, Data: c.reviewsPage},
-		{Path: "reviews/{id}", Title: "Review", Need: need, Body: reviewBody, Data: c.reviewPage},
+		{Path: "reviews/{id}", Title: "Review", Need: need, Body: reviewBody, Data: c.reviewPage, Heading: reviewHeading},
 	}
 }
 
@@ -214,7 +214,7 @@ const overviewBody = shared + `{{template "scope" .Data.Scope}}
 
 <section class="panel" aria-labelledby="daily">
 <h2 id="daily">Findings per day</h2>
-<p class="legend"><span class="key key-err"></span>Error or critical <span class="key key-other"></span>Other findings <span class="muted">Scale: 0 to {{.Data.Chart.Max}} a day</span></p>
+<p class="legend"><span class="key key-err"></span>Error or critical <span class="key key-other"></span>Other findings <span class="muted">Scale: 0 to {{.Data.Chart.Max}} a day</span> <span class="muted only-sm">Scrolls sideways</span></p>
 <div class="chart-scroll" tabindex="0" role="group" aria-label="Findings per day, scrollable"><svg class="chart" viewBox="0 0 {{.Data.Chart.W}} {{.Data.Chart.H}}" role="img" aria-labelledby="daily" preserveAspectRatio="xMidYMid meet">
 {{range .Data.Chart.Ticks}}<line class="grid" x1="{{$.Data.Chart.Left}}" x2="{{$.Data.Chart.Right}}" y1="{{.Y}}" y2="{{.Y}}"/><text class="axis" x="{{$.Data.Chart.Left}}" dx="-6" y="{{.Y}}" dy="4" text-anchor="end">{{.Label}}</text>{{end}}
 {{range .Data.Chart.Bars}}<g>{{if .OtherH}}<rect class="bar-other" x="{{.X}}" y="{{.OtherY}}" width="{{.W}}" height="{{.OtherH}}" rx="2"/>{{end}}{{if .ErrH}}<rect class="bar-err" x="{{.X}}" y="{{.ErrY}}" width="{{.W}}" height="{{.ErrH}}" rx="2"/>{{end}}<title>{{.Label}}</title></g>{{end}}
@@ -235,13 +235,13 @@ const overviewBody = shared + `{{template "scope" .Data.Scope}}
 <section class="panel" aria-labelledby="hot"><h2 id="hot">Where findings concentrate</h2>
 {{if .Data.Hotspots}}<table class="records"><thead><tr><th>File</th><th class="num">Findings</th><th>Worst</th>{{if not .Data.NoTrend}}<th>Trend</th>{{end}}<th>Over the period</th></tr></thead><tbody>
 {{range .Data.Hotspots}}<tr><td data-label="File"><a href="{{.FindingsHref}}"><code>{{.Path}}</code></a>{{if .Repo}}<div class="muted">{{.Repo}}</div>{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td><td data-label="Worst">{{template "sev" .Worst}}</td>{{if not $.Data.NoTrend}}<td data-label="Trend"><span class="trend trend-{{.Trend}}">{{.TrendText}}</span></td>{{end}}<td data-label="Over the period">{{template "spark" .Spark}}</td></tr>{{end}}</tbody></table>
-{{if .Data.NoTrend}}<p class="muted">No earlier data: no reviews came before this period, so trends are not shown.</p>{{end}}
+{{if .Data.NoTrend}}<p class="muted">No earlier data: no reviews came before this period, so there is no comparison with the period before it.</p>{{end}}
 <p><a href="/ui/insights/hotspots?days={{.Data.Scope.Days}}{{if .Data.Scope.Repo}}&amp;repo={{.Data.Scope.Repo}}{{end}}">All hotspots</a></p>
 {{else}}<p class="muted">No findings in this period.</p>{{end}}</section>
 
 <section class="panel" aria-labelledby="rec"><h2 id="rec">Latest reviews</h2>
 <table class="records"><thead><tr><th>When</th><th>Repository</th><th>Commit</th><th>Result</th><th class="num">Findings</th></tr></thead><tbody>
-{{range .Data.Recent}}<tr><td data-label="When"><a href="{{.Href}}"><time datetime="{{.At}}">{{.At}}</time></a></td><td data-label="Repository">{{.Repo}}</td><td data-label="Commit"><code>{{.Short}}</code></td><td data-label="Result"{{if .Complete}} class="quiet"{{end}}>{{if .Complete}}{{.Result}}{{else}}<span class="tag">did not finish</span>{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td></tr>{{end}}</tbody></table>
+{{range .Data.Recent}}<tr><td data-label="When"><a href="{{.Href}}"><time datetime="{{.At}}">{{.At}}</time></a></td><td data-label="Repository">{{.Repo}}</td><td data-label="Commit"><code>{{.Short}}</code></td><td data-label="Result"{{if .Complete}} class="quiet"{{end}}>{{if not .Complete}}<span class="tag">did not finish</span>{{else if eq .Result "findings"}}<span class="muted" title="Finished with findings">–</span>{{else}}{{.Result}}{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td></tr>{{end}}</tbody></table>
 <p><a href="/ui/insights/reviews?days={{.Data.Scope.Days}}{{if .Data.Scope.Repo}}&amp;repo={{.Data.Scope.Repo}}{{end}}">All reviews</a></p></section>
 {{end}}`
 
@@ -321,7 +321,7 @@ func (c *Component) hotspotsPage(r *http.Request) (any, error) {
 const hotspotsBody = shared + `{{template "scope" .Data.Scope}}
 {{if .Data.Empty}}{{template "none" .Data.Empties}}{{else}}
 <p class="lede">Files ranked by the findings that reviews reported in the last {{.Data.Scope.Days}} days. Each review counts, so a finding left unfixed through several pushes counts each time.{{if not .Data.NoTrend}} Trend compares the period with the {{.Data.Scope.Days}} days before it.{{end}}</p>
-{{if .Data.NoTrend}}<p class="muted">No earlier data: no reviews came before this period, so trends are not shown.</p>{{end}}
+{{if .Data.NoTrend}}<p class="muted">No earlier data: no reviews came before this period, so there is no comparison with the period before it.</p>{{end}}
 <details class="data"><summary>How the score works</summary>
 <p>Each finding adds a weight by severity (nit 0.25, info 0.5, warning 1, error 3, critical 8), halved for every 21 days since it was reported. A file with many old findings ranks below one with a few recent severe ones.</p></details>
 {{if .Data.Rows}}<table class="records"><thead><tr><th class="num">#</th><th>File</th><th class="num">Score</th><th class="num">Findings</th><th>Worst</th>{{if not .Data.NoTrend}}<th>Trend</th>{{end}}<th>Over the period</th></tr></thead><tbody>
@@ -429,7 +429,7 @@ func short(s string) string {
 
 const findingsBody = shared + `{{template "scope" .Data.Scope}}
 {{if .Data.Empty}}{{template "none" .Data.Empties}}{{else}}
-<form class="filters" method="get" action="/ui/insights/findings">
+<form class="filters grid" method="get" action="/ui/insights/findings">
 <label>Repository <select name="repo"><option value="">All repositories</option>{{range .Data.Repos}}<option value="{{.}}"{{if eq . $.Data.Repo}} selected{{end}}>{{.}}</option>{{end}}</select></label>
 <label>File or directory <input name="path" value="{{.Data.Path}}" placeholder="pkg/auth/ or pkg/a.go"></label>
 <label class="half">Class <select name="class"><option value="">any class</option>{{range .Data.Classes}}<option value="{{.}}"{{if eq . $.Data.Class}} selected{{end}}>{{.}}</option>{{end}}</select></label>
@@ -485,7 +485,7 @@ func (c *Component) reviewsPage(r *http.Request) (any, error) {
 
 const reviewsBody = shared + `{{template "scope" .Data.Scope}}
 {{if .Data.Rows}}<table class="records"><thead><tr><th>When</th><th>Repository</th><th>Ref</th><th>Commit</th><th>Result</th><th class="num">Findings</th></tr></thead><tbody>
-{{range .Data.Rows}}<tr><td data-label="When"><a href="{{.Href}}"><time datetime="{{.At}}">{{.At}}</time></a></td><td data-label="Repository">{{.Repo}}</td><td data-label="Ref">{{.Ref}}</td><td data-label="Commit"><code>{{.Short}}</code></td><td data-label="Result"{{if .Complete}} class="quiet"{{end}}>{{if .Complete}}{{.Result}}{{else}}<span class="tag">did not finish</span>{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td></tr>{{end}}</tbody></table>
+{{range .Data.Rows}}<tr><td data-label="When"><a href="{{.Href}}"><time datetime="{{.At}}">{{.At}}</time></a></td><td data-label="Repository">{{.Repo}}</td><td data-label="Ref">{{.Ref}}</td><td data-label="Commit"><code>{{.Short}}</code></td><td data-label="Result"{{if .Complete}} class="quiet"{{end}}>{{if not .Complete}}<span class="tag">did not finish</span>{{else if eq .Result "findings"}}<span class="muted" title="Finished with findings">–</span>{{else}}{{.Result}}{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td></tr>{{end}}</tbody></table>
 {{if gt .Data.Total (len .Data.Rows)}}<p class="muted">Showing the newest {{len .Data.Rows}} of {{.Data.Total}} reviews.</p>{{end}}
 {{else}}{{template "none" .Data.Empties}}{{end}}`
 
@@ -494,6 +494,23 @@ type reviewView struct {
 	At       string
 	Findings []Finding
 	Count    int
+}
+
+// reviewHeading names a review by what it reviewed: the repository and the pull
+// request, or the commit when there is none.
+func reviewHeading(data any) string {
+	v, ok := data.(reviewView)
+	if !ok {
+		return ""
+	}
+	what := v.Ref
+	if what == "" {
+		what = short(v.Commit)
+	}
+	if what == "" {
+		return v.Repo
+	}
+	return v.Repo + " · " + what
 }
 
 func (c *Component) reviewPage(r *http.Request) (any, error) {
