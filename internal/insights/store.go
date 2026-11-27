@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	stdlog "log"
 	"os"
 	"path"
 	"path/filepath"
@@ -23,6 +24,8 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/gofrs/flock"
 
 	"github.com/nitpick-oss/nitpick/internal/redact"
 )
@@ -34,6 +37,7 @@ const (
 	maxRepo     = 200
 	maxPath     = 500
 	maxText     = 4000
+	maxSkew     = 5 * time.Minute
 )
 
 // severityWeight is what a finding adds to a file's hotspot score. The spacing is
@@ -82,6 +86,8 @@ type Filter struct {
 type Store struct {
 	mu      sync.Mutex
 	f       *os.File
+	lock    *flock.Flock
+	write   func([]byte) (int, error) // f.Write; a test replaces it to fail a write
 	byID    map[string]int
 	reviews []Review
 	skipped int
@@ -94,12 +100,22 @@ func OpenStore(dir string) (*Store, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("create the insights directory: %w", err)
 	}
+	// One process appends to the file. A second would interleave its lines with
+	// the first's, and neither would see the other's reviews until a restart.
+	l := flock.New(filepath.Join(dir, ".lock"))
+	if ok, err := l.TryLock(); err != nil {
+		return nil, fmt.Errorf("lock %s: %w", dir, err)
+	} else if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrInUse, dir)
+	}
 	p := filepath.Join(dir, "reviews.jsonl")
 	f, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o600)
 	if err != nil {
+		_ = l.Unlock()
 		return nil, fmt.Errorf("open the reviews file: %w", err)
 	}
-	s := &Store{f: f, byID: map[string]int{}}
+	s := &Store{f: f, lock: l, byID: map[string]int{}}
+	s.write = f.Write
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 0, 64<<10), 16<<20)
 	var torn bool
@@ -118,17 +134,23 @@ func OpenStore(dir string) (*Store, error) {
 	}
 	if err := sc.Err(); err != nil {
 		_ = f.Close()
+		_ = l.Unlock()
 		return nil, fmt.Errorf("read the reviews file: %w", err)
 	}
 	if torn {
 		// A torn tail has no newline; end it so the next append starts a line.
 		if _, err := f.WriteString("\n"); err != nil {
 			_ = f.Close()
+			_ = l.Unlock()
 			return nil, fmt.Errorf("repair the reviews file: %w", err)
 		}
 	}
 	return s, nil
 }
+
+// log reports a fault that has no caller to return it to. It writes to stderr
+// through the standard logger, as the notary's store faults do.
+func (s *Store) log(msg string, err error) { stdlog.Printf("insights: %s: %v", msg, err) }
 
 func (s *Store) index(r Review) {
 	if _, dup := s.byID[r.ID]; dup {
@@ -138,8 +160,17 @@ func (s *Store) index(r Review) {
 	s.reviews = append(s.reviews, r)
 }
 
-// Close releases the file.
-func (s *Store) Close() error { return s.f.Close() }
+// ErrInUse is returned when another process holds the directory.
+var ErrInUse = errors.New("insights directory is in use by another process")
+
+// Close releases the file and the directory.
+func (s *Store) Close() error {
+	err := s.f.Close()
+	if uerr := s.lock.Unlock(); err == nil {
+		err = uerr
+	}
+	return err
+}
 
 // Skipped is how many lines of the file could not be read at start-up.
 func (s *Store) Skipped() int { return s.skipped }
@@ -163,7 +194,16 @@ func (s *Store) Add(ctx context.Context, r Review) (Review, error) {
 	if err != nil {
 		return Review{}, fmt.Errorf("encode the review: %w", err)
 	}
-	if _, err := s.f.Write(append(line, '\n')); err != nil {
+	info, err := s.f.Stat()
+	if err != nil {
+		return Review{}, fmt.Errorf("stat the reviews file: %w", err)
+	}
+	if _, err := s.write(append(line, '\n')); err != nil {
+		// A partial line would be joined by the next review's, and both would be
+		// skipped at the next start. Cut the file back to where this write began.
+		if terr := s.f.Truncate(info.Size()); terr != nil {
+			s.log("could not remove a partial line after a failed write", terr)
+		}
 		return Review{}, fmt.Errorf("write the review: %w", err)
 	}
 	s.index(r)
@@ -182,11 +222,11 @@ func clean(r Review) (Review, error) {
 	if r.Repo == "" || len(r.Repo) > maxRepo || hasControl(r.Repo) {
 		return Review{}, invalid("repo must be 1 to %d printable characters", maxRepo)
 	}
-	if r.At.IsZero() {
-		r.At = time.Now().UTC()
-	}
-	if r.At.After(time.Now().Add(24 * time.Hour)) {
-		return Review{}, invalid("at is in the future")
+	// A little skew between a runner's clock and this one is normal. More is
+	// refused because every query drops what is dated after now, so the review
+	// would be accepted and then invisible.
+	if r.At.After(time.Now().Add(maxSkew)) {
+		return Review{}, invalid("at is more than %s in the future", maxSkew)
 	}
 	r.At = r.At.UTC()
 	r.Ref, r.Commit, r.Result = limit(r.Ref, 100), limit(r.Commit, 64), limit(r.Result, 40)
@@ -216,7 +256,12 @@ func clean(r Review) (Review, error) {
 		out = append(out, f)
 	}
 	r.Findings = out
+	// The id is taken before a missing time is filled in, so a retry that carries
+	// no time is the same review and is kept once.
 	r.ID = digest(r)
+	if r.At.IsZero() {
+		r.At = time.Now().UTC()
+	}
 	return r, nil
 }
 

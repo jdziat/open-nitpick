@@ -50,11 +50,11 @@ func TestDailyChartHeightScalesToTheBusiestDayNotTheRoundedAxis(t *testing.T) {
 }
 
 func TestSparklinePointsRiseWithTheCountsAndStayInTheBox(t *testing.T) {
-	s := sparkline([]int{0, 2, 4, 0})
+	s := sparkline([]int{0, 2, 4, 0}, 0)
 	if s.Empty || len(s.Points) == 0 {
 		t.Fatalf("%+v", s)
 	}
-	if !sparkline([]int{0, 0, 0}).Empty {
+	if !sparkline([]int{0, 0, 0}, 9).Empty {
 		t.Fatalf("a flat zero line must say it is empty, not draw one")
 	}
 }
@@ -70,5 +70,15 @@ func TestAxisLabelsAreSparseAndAnchoredToRealDays(t *testing.T) {
 	}
 	if c.XLabels[0].Text != "Oct 1" {
 		t.Fatalf("first label %q", c.XLabels[0].Text)
+	}
+}
+
+func TestSparklinesOfOneTableShareAScaleSoASmallFileLooksSmall(t *testing.T) {
+	small, big := sparkline([]int{0, 3}, 41), sparkline([]int{0, 41}, 41)
+	if small.LastY <= big.LastY {
+		t.Fatalf("a peak of 3 drew at y=%v, no lower than a peak of 41 at y=%v: the scales are not shared", small.LastY, big.LastY)
+	}
+	if !strings.Contains(big.Title, "0, 41") {
+		t.Fatalf("the sparkline has no text equivalent: %q", big.Title)
 	}
 }

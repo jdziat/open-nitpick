@@ -260,11 +260,10 @@ span.sev-critical::before { background: var(--sev-critical); }
   .card { padding: var(--space-3); }
   .card-value { font-size: 1.6rem; }
   .card-note { overflow-wrap: anywhere; }
-  .bar nav { order: 3; flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; gap: var(--space-4); padding-bottom: var(--space-1); scrollbar-width: thin; }
-  .bar nav a { white-space: nowrap; flex: none; padding: 0.35rem 0; }
+  .bar nav { order: 3; flex: 1 1 100%; flex-wrap: wrap; gap: 0 var(--space-4); }
+  .bar nav a { white-space: nowrap; padding: 0.4rem 0; }
   .who { margin-left: auto; }
-  .records td[data-label="File"], .records td[data-label="Finding"] { display: block; text-align: left; }
-  .records td[data-label="File"]::before, .records td[data-label="Finding"]::before { display: block; margin-bottom: 0.1rem; }
+
   .records td[data-label] { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); text-align: right; }
   .records td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: 0.78rem; text-align: left; flex: none; }
   .records td[data-label] > * { min-width: 0; overflow-wrap: anywhere; }
@@ -277,3 +276,15 @@ span.sev-critical::before { background: var(--sev-critical); }
   .bars li { grid-template-columns: 5rem 1fr 2.5rem; }
 }
 .chart-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* A cell that holds a title and a path, not a short value, stacks under its label.
+   After the label/value rule above so it wins at equal specificity. */
+@media (max-width: 40rem) {
+  .records td[data-label].wide, .records td[data-label="File"] { display: block; text-align: left; }
+  .records td[data-label].wide::before, .records td[data-label="File"]::before { display: block; margin-bottom: 0.1rem; }
+  .records td.wide code, .records td[data-label="File"] code { overflow-wrap: anywhere; }
+}
+@media (max-width: 48rem) {
+  .chart-scroll .chart { min-width: 34rem; }
+}
+.filters select { min-width: 9rem; }

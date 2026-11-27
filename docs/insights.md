@@ -49,10 +49,28 @@ If it fails, `nitpick` logs a warning and the exit status stays what the review
 decided: a data point that did not arrive does not fail a build that passed.
 
 The server accepts the report that `-format json` prints, with the repository, ref
-and commit it ran against. The same review sent twice is kept once. Finding text is
+and commit it ran against. The same review sent twice is kept once, with or without a time. Finding text is
 scrubbed of credential-shaped strings before it is stored, a review keeps at most
 500 findings (the page says how many were dropped), and a path that leaves the
 repository is refused.
+
+## Size and retention
+
+There is no retention yet. Every review stays in `reviews.jsonl`, and the server
+holds all of them in memory and scans them for each page. A review with the
+maximum 500 findings is about 1 to 2 MB, and a typical one is a few kilobytes.
+Plan on memory near the size of the file, and a start-up time that grows with it
+(reading the file once). To trim, stop the server, move the file aside or cut its
+oldest lines, and start it again. One process may hold the directory: a second
+refuses to start, as with the notary.
+
+A write token may post up to 8 MiB per request and there is no rate limit. Give
+write tokens only to CI jobs you trust. A review dated more than five minutes
+ahead of the server's clock is refused with 400, since no page would show it. If
+the disk fills during a post, the partial line is removed and the post fails.
+
+Text in a finding (title and rationale) is scrubbed of credential-shaped strings.
+Repository, ref, commit, path and result are not, so do not put a secret there.
 
 ## The pages
 
@@ -68,6 +86,13 @@ A review that did not finish is marked everywhere it appears. Its zero findings 
 not a clean result, and the overview counts those reviews apart.
 
 ### How a hotspot is scored
+
+A hotspot counts findings per review, not distinct defects. A pull request that is
+pushed to five times and still has the same finding counts it five times. A file
+that is reviewed often therefore ranks above an equally buggy file that is
+reviewed rarely, and findings on a pull request that was fixed before merge still
+count. Read the rank as "where reviews keep reporting", which tracks where bugs
+are but is not a count of them.
 
 Each finding adds a weight by severity: nit 0.25, info 0.5, warning 1, error 3,
 critical 8. The weight halves for every 21 days since the review reported it. A

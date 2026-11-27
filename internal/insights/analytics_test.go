@@ -169,3 +169,47 @@ func TestHotspotSparklineBucketsFindingsAcrossTheWindowOldestFirst(t *testing.T)
 		t.Fatalf("spark sums to %d, findings %d: every finding in the window falls in a bucket", sum, hs[0].Findings)
 	}
 }
+
+func TestHotspotBaselineIsKnownOnlyWhenTheEarlierWindowHeldAReview(t *testing.T) {
+	s, _ := OpenStore(t.TempDir())
+	defer func() { _ = s.Close() }()
+	day := 24 * time.Hour
+	_, _ = s.Add(context.Background(), review("r", t0.Add(-2*day), finding("a.go", "error")))
+	if hs := s.Hotspots(Query{Now: t0, Days: 30}); len(hs) != 1 || hs[0].Baseline {
+		t.Fatalf("no review came before the window, so there is no baseline: %+v", hs)
+	}
+	_, _ = s.Add(context.Background(), review("r", t0.Add(-40*day), finding("other.go", "nit")))
+	if hs := s.Hotspots(Query{Now: t0, Days: 30}); len(hs) != 1 || !hs[0].Baseline || hs[0].Prior != 0 {
+		t.Fatalf("a review in the earlier window makes 0 a real count: %+v", hs)
+	}
+}
+
+func TestAFindingOneHalfLifeOldScoresHalfAsMuchAsAFreshOne(t *testing.T) {
+	s, _ := OpenStore(t.TempDir())
+	defer func() { _ = s.Close() }()
+	_, _ = s.Add(context.Background(), review("old", t0.Add(-21*24*time.Hour), finding("f.go", "error")))
+	_, _ = s.Add(context.Background(), review("new", t0, finding("f.go", "error")))
+	byRepo := map[string]float64{}
+	for _, h := range s.Hotspots(Query{Now: t0, Days: 60}) {
+		byRepo[h.Repo] = h.Score
+	}
+	if byRepo["new"] < 2.99 || byRepo["new"] > 3.01 {
+		t.Fatalf("a fresh error scores %v, want its weight 3", byRepo["new"])
+	}
+	if byRepo["old"] < 1.49 || byRepo["old"] > 1.51 {
+		t.Fatalf("an error 21 days old scores %v, want half its weight, 1.5", byRepo["old"])
+	}
+}
+
+func TestThePriorWindowIsExactlyOnePeriodLong(t *testing.T) {
+	s, _ := OpenStore(t.TempDir())
+	defer func() { _ = s.Close() }()
+	day := 24 * time.Hour
+	_, _ = s.Add(context.Background(), review("r", t0.Add(-59*day), finding("f.go", "error")))                                                                                   // in the prior 30 days
+	_, _ = s.Add(context.Background(), Review{Repo: "r", Commit: "z", At: t0.Add(-61 * day), Result: "findings", Complete: true, Findings: []Finding{finding("f.go", "error")}}) // before it
+	_, _ = s.Add(context.Background(), review("r", t0.Add(-day), finding("f.go", "error")))
+	hs := s.Hotspots(Query{Now: t0, Days: 30})
+	if len(hs) != 1 || hs[0].Prior != 1 {
+		t.Fatalf("prior = %+v, want only the finding 59 days back: the one 61 days back is outside the window before", hs)
+	}
+}

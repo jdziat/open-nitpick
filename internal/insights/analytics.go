@@ -23,7 +23,7 @@ type Query struct {
 // Trend compares a file's findings in the window with the window before it.
 type Trend string
 
-// The trends. Flat means the same count; New means none before the window.
+// The trends. Flat means the same count.
 const (
 	TrendUp   Trend = "up"
 	TrendDown Trend = "down"
@@ -33,14 +33,17 @@ const (
 // Hotspot is a file ranked by how much, how severely and how recently it has
 // produced findings.
 type Hotspot struct {
-	Repo     string    `json:"repo"`
-	Path     string    `json:"path"`
-	Score    float64   `json:"score"`
-	Findings int       `json:"findings"` // in the window
-	Recent   int       `json:"recent"`   // same as Findings: the current window
-	Prior    int       `json:"prior"`    // the window before
-	Worst    string    `json:"worst"`
-	Trend    Trend     `json:"trend"`
+	Repo     string  `json:"repo"`
+	Path     string  `json:"path"`
+	Score    float64 `json:"score"`
+	Findings int     `json:"findings"` // in the window
+	Recent   int     `json:"recent"`   // same as Findings: the current window
+	Prior    int     `json:"prior"`    // the window before
+	Worst    string  `json:"worst"`
+	Trend    Trend   `json:"trend"`
+	// Baseline is true when a review ran in the window before, so a Prior of 0 is
+	// a count and not the absence of data.
+	Baseline bool      `json:"baseline"`
 	Last     time.Time `json:"last"`
 	// Spark is findings per bucket across the window, oldest first.
 	Spark []int `json:"spark"`
@@ -73,9 +76,13 @@ func (s *Store) Hotspots(q Query) []Hotspot {
 	defer s.mu.Unlock()
 	byFile := map[fileKey]*Hotspot{}
 	prior := map[fileKey]int{}
+	baseline := false
 	for _, r := range s.reviews {
 		if q.Repo != "" && r.Repo != q.Repo || r.At.After(q.Now) || r.At.Before(priorFrom) {
 			continue
+		}
+		if r.At.Before(from) {
+			baseline = true
 		}
 		for _, f := range r.Findings {
 			k := fileKey{r.Repo, f.Path}
@@ -103,6 +110,7 @@ func (s *Store) Hotspots(q Query) []Hotspot {
 	out := make([]Hotspot, 0, len(byFile))
 	for k, h := range byFile {
 		h.Prior = prior[k]
+		h.Baseline = baseline
 		switch {
 		case h.Recent > h.Prior:
 			h.Trend = TrendUp

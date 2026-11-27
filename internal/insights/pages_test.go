@@ -109,6 +109,8 @@ func (u *ui) seed() {
 		review("acme/api", t0.Add(-1*day), finding("hot.go", "error"), finding("hot.go", "warning"), hostile),
 		review("acme/api", t0.Add(-3*day), finding("hot.go", "error")),
 		review("acme/web", t0.Add(-2*day), finding("ui.go", "nit")),
+		// The trend needs a review before the window to have a baseline.
+		review("acme/api", t0.Add(-40*day), finding("hot.go", "nit")),
 	} {
 		if _, err := u.co.store.Add(context.Background(), r); err != nil {
 			u.t.Fatal(err)
@@ -218,7 +220,7 @@ func TestAReviewThatDidNotFinishSaysSoInsteadOfLookingClean(t *testing.T) {
 	if !strings.Contains(body, `<span class="tag">did not finish</span>`) {
 		t.Fatalf("the result line must carry the did-not-finish tag")
 	}
-	if !strings.Contains(body, "an empty list below is not a clean result") || strings.Contains(body, "The review finished and reported no findings") {
+	if !strings.Contains(body, "This review stopped early, so its findings may be incomplete.") || strings.Contains(body, "The review finished and reported no findings") {
 		t.Fatalf("an incomplete review was shown as clean")
 	}
 	_, over := u.get("/ui/insights/")
@@ -247,7 +249,60 @@ func TestFindingsFilterNarrowsTheTableAndSaysHowManyMatched(t *testing.T) {
 		t.Fatalf("filter result wrong: %.600s", body)
 	}
 	_, none := u.get("/ui/insights/findings?days=30&path=nothing.go")
-	if !strings.Contains(none, "No finding matches this filter") {
-		t.Fatalf("a filter with no match must say so")
+	for _, want := range []string{"No finding matches these filters in the last 30 days", "Widen to 90 days", "Clear filters", "so this is a result and not a gap"} {
+		if !strings.Contains(none, want) {
+			t.Fatalf("the empty filter result lacks %q", want)
+		}
+	}
+}
+
+func TestATrendIsColouredOnlyWhenItMovedAndHadSomethingToCompareWith(t *testing.T) {
+	c := &Component{}
+	for name, tc := range map[string]struct {
+		h     Hotspot
+		trend Trend
+		text  string
+	}{
+		"up":          {Hotspot{Recent: 9, Prior: 3, Baseline: true}, TrendUp, "▲ +6 (was 3)"},
+		"down":        {Hotspot{Recent: 1, Prior: 7, Baseline: true}, TrendDown, "▼ -6 (was 7)"},
+		"steady":      {Hotspot{Recent: 4, Prior: 3, Baseline: true}, TrendFlat, "steady (was 3)"},
+		"no baseline": {Hotspot{Recent: 65, Prior: 0, Baseline: false}, TrendFlat, "no earlier data"},
+	} {
+		row := c.hotspotRow(1, tc.h, 10)
+		if row.Trend != tc.trend || !strings.Contains(row.TrendText, tc.text) {
+			t.Errorf("%s: %+v, want %s %q", name, row, tc.trend, tc.text)
+		}
+	}
+}
+
+func TestMoreReviewsIsNotColouredAsBadNewsButMoreFindingsIs(t *testing.T) {
+	u := newUI(t)
+	u.seed()
+	u.signIn("eng")
+	_, body := u.get("/ui/insights/?days=30")
+	i := strings.Index(body, `<div class="card-label">Reviews</div>`)
+	j := strings.Index(body, `<div class="card-label">Findings</div>`)
+	if i < 0 || j < 0 {
+		t.Fatal("cards missing")
+	}
+	if strings.Contains(body[max(0, i-80):i], "card-up") {
+		t.Errorf("the Reviews card is coloured as bad news")
+	}
+	if !strings.Contains(body[max(0, j-80):j], "card-up") {
+		t.Errorf("the Findings card, which rose, must be coloured")
+	}
+}
+
+func TestTheHotspotTablesBusiestBucketSetsEveryRowsSparklineScale(t *testing.T) {
+	small := Hotspot{Spark: []int{0, 3}, Findings: 3, Recent: 3}
+	big := Hotspot{Spark: []int{0, 41}, Findings: 41, Recent: 41}
+	if got := sparkScale([]Hotspot{small, big}); got != 41 {
+		t.Fatalf("scale = %d, want the busiest bucket 41", got)
+	}
+	c := &Component{}
+	alone := c.hotspotRow(1, small, 0).Spark.LastY
+	shared := c.hotspotRow(1, small, 41).Spark.LastY
+	if shared <= alone {
+		t.Fatalf("a row given the table's scale must sit lower than one scaled to itself: %v vs %v", shared, alone)
 	}
 }

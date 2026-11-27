@@ -37,7 +37,7 @@ const shared = `{{define "scope"}}<div class="scope">
 </div>{{end}}
 {{define "sev"}}<span class="sev sev-{{.}}">{{.}}</span>{{end}}
 {{define "none"}}<div class="empty"><p><strong>{{.Title}}</strong></p><p class="muted">{{.Hint}}</p>{{if .Cmd}}<pre>{{.Cmd}}</pre>{{end}}</div>{{end}}
-{{define "spark"}}{{if .Empty}}<span class="muted">none</span>{{else}}<svg class="spark" viewBox="0 0 {{.W}} {{.H}}" width="{{.W}}" height="{{.H}}" aria-hidden="true" focusable="false"><polyline points="{{.Points}}" fill="none" class="spark-line"/><circle cx="{{.LastX}}" cy="{{.LastY}}" r="2.5" class="spark-dot"/></svg>{{end}}{{end}}
+{{define "spark"}}{{if .Empty}}<span class="muted">none</span>{{else}}<svg class="spark" viewBox="0 0 {{.W}} {{.H}}" width="{{.W}}" height="{{.H}}" role="img" aria-label="{{.Title}}" focusable="false"><title>{{.Title}}</title><polyline points="{{.Points}}" fill="none" class="spark-line"/><circle cx="{{.LastX}}" cy="{{.LastY}}" r="2.5" class="spark-dot"/></svg>{{end}}{{end}}
 `
 
 const postHint = "nitpick review -format json -insights https://HOST -repo OWNER/NAME"
@@ -143,14 +143,19 @@ func (c *Component) overviewPage(r *http.Request) (any, error) {
 		return v, nil
 	}
 	prior := c.store.Overview(Query{Now: q.Now.AddDate(0, 0, -q.Days), Days: q.Days, Repo: q.Repo})
-	mk := func(label string, cur, was int) card {
+	// worse says whether more of this is bad. More reviews is activity, not a
+	// problem, so it is never coloured.
+	mk := func(label string, cur, was int, worse bool) card {
 		n, d := delta(cur, was, !prior.Empty, q.Days)
+		if !worse {
+			d = ""
+		}
 		return card{Label: label, Value: strconv.Itoa(cur), Note: n, Dir: d}
 	}
 	v.Cards = []card{
-		mk("Reviews", o.Reviews, prior.Reviews),
-		mk("Findings", o.Findings, prior.Findings),
-		mk("Error or critical", o.Errors, prior.Errors),
+		mk("Reviews", o.Reviews, prior.Reviews, false),
+		mk("Findings", o.Findings, prior.Findings, true),
+		mk("Error or critical", o.Errors, prior.Errors, true),
 		{Label: "Repositories", Value: strconv.Itoa(o.Repos), Note: "reviewed in the period"},
 		{Label: "Files with findings", Value: strconv.Itoa(o.Files), Note: "distinct, per repository"},
 	}
@@ -174,11 +179,12 @@ func (c *Component) overviewPage(r *http.Request) (any, error) {
 		}
 		v.Classes = append(v.Classes, bar{Label: k.Label, N: k.N, W: pct(k.N, top), Class: "series-1"})
 	}
-	for i, h := range c.store.Hotspots(q) {
-		if i == 5 {
-			break
-		}
-		v.Hotspots = append(v.Hotspots, c.hotspotRow(i+1, h))
+	hs := c.store.Hotspots(q)
+	if len(hs) > 5 {
+		hs = hs[:5]
+	}
+	for i, h := range hs {
+		v.Hotspots = append(v.Hotspots, c.hotspotRow(i+1, h, sparkScale(hs)))
 	}
 	for i, rv := range c.store.Reviews(Filter{Repo: q.Repo}) {
 		if i == 5 {
@@ -203,7 +209,7 @@ const overviewBody = shared + `{{template "scope" .Data.Scope}}
 
 <section class="panel" aria-labelledby="daily">
 <h2 id="daily">Findings per day</h2>
-<p class="legend"><span class="key key-other"></span>Other findings <span class="key key-err"></span>Error or critical</p>
+<p class="legend"><span class="key key-err"></span>Error or critical <span class="key key-other"></span>Other findings</p>
 <div class="chart-scroll" tabindex="0" role="group" aria-label="Findings per day, scrollable"><svg class="chart" viewBox="0 0 {{.Data.Chart.W}} {{.Data.Chart.H}}" role="img" aria-labelledby="daily" preserveAspectRatio="xMidYMid meet">
 {{range .Data.Chart.Ticks}}<line class="grid" x1="{{$.Data.Chart.Left}}" x2="{{$.Data.Chart.Right}}" y1="{{.Y}}" y2="{{.Y}}"/><text class="axis" x="{{$.Data.Chart.Left}}" dx="-6" y="{{.Y}}" dy="4" text-anchor="end">{{.Label}}</text>{{end}}
 {{range .Data.Chart.Bars}}<g>{{if .OtherH}}<rect class="bar-other" x="{{.X}}" y="{{.OtherY}}" width="{{.W}}" height="{{.OtherH}}" rx="2"/>{{end}}{{if .ErrH}}<rect class="bar-err" x="{{.X}}" y="{{.ErrY}}" width="{{.W}}" height="{{.ErrH}}" rx="2"/>{{end}}<title>{{.Label}}</title></g>{{end}}
@@ -250,15 +256,37 @@ type hotspotRow struct {
 	Last         string
 }
 
-func (c *Component) hotspotRow(rank int, h Hotspot) hotspotRow {
+// flatBand is how few findings of change still read as steady. A file that went
+// from 3 to 4 findings is not an alarm, and colouring it as one teaches the reader
+// to ignore the colour.
+const flatBand = 1
+
+func (c *Component) hotspotRow(rank int, h Hotspot, scale int) hotspotRow {
 	v := url.Values{"path": {h.Path}, "repo": {h.Repo}}
-	t := map[Trend]string{
-		TrendUp:   fmt.Sprintf("▲ %d, was %d", h.Recent, h.Prior),
-		TrendDown: fmt.Sprintf("▼ %d, was %d", h.Recent, h.Prior),
-		TrendFlat: fmt.Sprintf("● %d, same", h.Recent),
-	}[h.Trend]
+	trend, text := TrendFlat, ""
+	switch d := h.Recent - h.Prior; {
+	case !h.Baseline:
+		text = "no earlier data"
+	case d > flatBand:
+		trend, text = TrendUp, fmt.Sprintf("▲ +%d (was %d)", d, h.Prior)
+	case d < -flatBand:
+		trend, text = TrendDown, fmt.Sprintf("▼ %d (was %d)", d, h.Prior)
+	default:
+		text = fmt.Sprintf("● steady (was %d)", h.Prior)
+	}
 	return hotspotRow{Rank: rank, Repo: h.Repo, Path: h.Path, Score: strconv.FormatFloat(h.Score, 'f', 1, 64), Findings: h.Findings, Recent: h.Recent, Prior: h.Prior,
-		Worst: h.Worst, Trend: h.Trend, TrendText: t, Spark: sparkline(h.Spark), FindingsHref: "/ui/insights/findings?" + v.Encode(), Last: h.Last.Format(time.RFC3339)}
+		Worst: h.Worst, Trend: trend, TrendText: text, Spark: sparkline(h.Spark, scale), FindingsHref: "/ui/insights/findings?" + v.Encode(), Last: h.Last.Format(time.RFC3339)}
+}
+
+// sparkScale is the busiest bucket of any file in the rows.
+func sparkScale(hs []Hotspot) int {
+	most := 0
+	for _, h := range hs {
+		for _, n := range h.Spark {
+			most = max(most, n)
+		}
+	}
+	return most
 }
 
 type hotspotsView struct {
@@ -276,11 +304,9 @@ func (c *Component) hotspotsPage(r *http.Request) (any, error) {
 	}
 	hs := c.store.Hotspots(q)
 	v := hotspotsView{Scope: c.scope(r, "/ui/insights/hotspots", q), Total: len(hs), Empties: noReviews(), Empty: c.store.Overview(q).Empty}
-	for i, h := range hs {
-		if i == 100 {
-			break
-		}
-		v.Rows = append(v.Rows, c.hotspotRow(i+1, h))
+	shown := hs[:min(len(hs), 100)]
+	for i, h := range shown {
+		v.Rows = append(v.Rows, c.hotspotRow(i+1, h, sparkScale(shown)))
 	}
 	return v, nil
 }
@@ -345,6 +371,11 @@ type findingsView struct {
 	Path, Class string
 	MinSeverity string
 	Severities  []string
+	Classes     []string
+	Repos       []string
+	Repo        string
+	ClearHref   string
+	WidenHref   string
 	Filtered    bool
 	Empties     empty
 	Empty       bool
@@ -362,6 +393,15 @@ func (c *Component) findingsPage(r *http.Request) (any, error) {
 	rows, total := c.store.Findings(fq)
 	v := findingsView{Scope: c.scope(r, "/ui/insights/findings", q), Total: total, Path: fq.Path, Class: fq.Class, MinSeverity: fq.MinSeverity,
 		Severities: Severities, Filtered: fq.Path != "" || fq.Class != "" || fq.MinSeverity != "", Empties: noReviews(), Empty: c.store.Overview(q).Empty}
+	v.Repo, v.Repos, v.Scope.Repos = q.Repo, v.Scope.Repos, nil // the form below holds the repository choice
+	for _, k := range c.store.Overview(Query{Now: q.Now, Days: MaxDays, Repo: q.Repo}).ByClass {
+		v.Classes = append(v.Classes, k.Label)
+	}
+	v.ClearHref = "/ui/insights/findings?" + url.Values{"days": {strconv.Itoa(q.Days)}}.Encode()
+	if q.Days < 90 {
+		w := url.Values{"days": {"90"}, "path": {fq.Path}, "class": {fq.Class}, "min_severity": {fq.MinSeverity}, "repo": {q.Repo}}
+		v.WidenHref = "/ui/insights/findings?" + w.Encode()
+	}
 	for _, row := range rows {
 		where := row.Path
 		if row.Line > 0 {
@@ -382,16 +422,20 @@ func short(s string) string {
 const findingsBody = shared + `{{template "scope" .Data.Scope}}
 {{if .Data.Empty}}{{template "none" .Data.Empties}}{{else}}
 <form class="filters" method="get" action="/ui/insights/findings">
-<label>File or directory/ <input name="path" value="{{.Data.Path}}" placeholder="pkg/auth/ or pkg/a.go"></label>
-<label>Class <input name="class" value="{{.Data.Class}}" placeholder="bug"></label>
+<label>Repository <select name="repo"><option value="">All repositories</option>{{range .Data.Repos}}<option value="{{.}}"{{if eq . $.Data.Repo}} selected{{end}}>{{.}}</option>{{end}}</select></label>
+<label>File or directory <input name="path" value="{{.Data.Path}}" placeholder="pkg/auth/ or pkg/a.go"></label>
+<label>Class <select name="class"><option value="">any class</option>{{range .Data.Classes}}<option value="{{.}}"{{if eq . $.Data.Class}} selected{{end}}>{{.}}</option>{{end}}</select></label>
 <label>At least <select name="min_severity"><option value="">any severity</option>{{range .Data.Severities}}<option value="{{.}}"{{if eq . $.Data.MinSeverity}} selected{{end}}>{{.}}</option>{{end}}</select></label>
-<input type="hidden" name="days" value="{{.Data.Scope.Days}}"><input type="hidden" name="repo" value="{{.Data.Scope.Repo}}">
-<button type="submit">Filter</button>{{if .Data.Filtered}} <a href="/ui/insights/findings?days={{.Data.Scope.Days}}">Clear</a>{{end}}
+<input type="hidden" name="days" value="{{.Data.Scope.Days}}">
+<button type="submit">Filter</button>{{if .Data.Filtered}} <a href="{{.Data.ClearHref}}">Clear filters</a>{{end}}
 </form>
-{{if .Data.Rows}}<p class="muted">{{if gt .Data.Total (len .Data.Rows)}}Showing the newest {{len .Data.Rows}} of {{.Data.Total}} findings.{{else}}{{.Data.Total}} finding{{if ne .Data.Total 1}}s{{end}}.{{end}}</p>
-<table class="records"><thead><tr><th>Severity</th><th>Finding</th><th>Repository</th><th>When</th></tr></thead><tbody>
-{{range .Data.Rows}}<tr><td data-label="Severity">{{template "sev" .Severity}}</td><td data-label="Finding"><strong>{{.Title}}</strong><div><code>{{.Where}}</code>{{if .Class}} <span class="muted">· {{.Class}}</span>{{end}}</div>{{if .Rationale}}<details class="data"><summary>Why</summary><p>{{.Rationale}}</p></details>{{end}}</td><td data-label="Repository">{{.Repo}}<div class="muted"><a href="{{.Href}}"><code>{{.Short}}</code></a></div></td><td data-label="When"><time datetime="{{.When}}">{{.When}}</time></td></tr>{{end}}</tbody></table>
-{{else}}<p>{{if .Data.Filtered}}No finding matches this filter.{{else}}Reviews ran in this period and reported no findings.{{end}}</p>{{end}}{{end}}`
+{{if .Data.Rows}}<p class="muted">{{if gt .Data.Total (len .Data.Rows)}}Showing the newest {{len .Data.Rows}} of {{.Data.Total}} findings. Narrow the filters to reach the rest.{{else}}{{.Data.Total}} finding{{if ne .Data.Total 1}}s{{end}}.{{end}}</p>
+<table class="records findings"><thead><tr><th>Severity</th><th>Finding</th><th>Repository</th><th>When</th></tr></thead><tbody>
+{{range .Data.Rows}}<tr><td data-label="Severity">{{template "sev" .Severity}}</td><td data-label="Finding" class="wide"><strong>{{.Title}}</strong><div><code>{{.Where}}</code>{{if .Class}} <span class="muted">· {{.Class}}</span>{{end}}</div>{{if .Rationale}}<details class="data"><summary>Why</summary><p>{{.Rationale}}</p></details>{{end}}</td><td data-label="Repository">{{.Repo}}<div class="muted"><a href="{{.Href}}"><code>{{.Short}}</code></a></div></td><td data-label="When"><time datetime="{{.When}}">{{.When}}</time></td></tr>{{end}}</tbody></table>
+{{else if .Data.Filtered}}<div class="empty"><p><strong>No finding matches these filters in the last {{.Data.Scope.Days}} days.</strong></p>
+<p class="muted">The period had reviews, so this is a result and not a gap.</p>
+<p>{{if .Data.WidenHref}}<a class="button" href="{{.Data.WidenHref}}">Widen to 90 days</a> {{end}}<a href="{{.Data.ClearHref}}">Clear filters</a></p></div>
+{{else}}<p>Reviews ran in this period and reported no findings.</p>{{end}}{{end}}`
 
 // ---- reviews ----
 
@@ -458,12 +502,12 @@ const reviewBody = shared + `<p><a href="/ui/insights/reviews">All reviews</a></
 {{if .Data.Ref}}<dt>Ref</dt><dd>{{.Data.Ref}}</dd>{{end}}
 {{if .Data.Commit}}<dt>Commit</dt><dd><code>{{.Data.Commit}}</code></dd>{{end}}
 <dt>Reported</dt><dd><time datetime="{{.Data.At}}">{{.Data.At}}</time></dd>
-<dt>Result</dt><dd>{{.Data.Result}}{{if not .Data.Complete}} <span class="tag">did not finish</span>{{end}}</dd>
+<dt>Result</dt><dd>{{if .Data.Complete}}{{.Data.Result}}{{else}}<span class="tag">did not finish</span>{{end}}</dd>
 <dt>Findings</dt><dd>{{.Data.Count}}{{if .Data.Truncated}}, and {{.Data.Truncated}} more that were not kept{{end}}</dd>
 {{if .Data.Withheld}}<dt>Withheld</dt><dd>{{.Data.Withheld}} drafted and held back by a later stage</dd>{{end}}
 {{if .Data.Source}}<dt>Posted by</dt><dd>{{.Data.Source}}</dd>{{end}}
 </dl>
-{{if not .Data.Complete}}<p class="error" role="note">This review did not finish, so an empty list below is not a clean result.</p>{{end}}
+{{if not .Data.Complete}}<p class="error" role="note">This review stopped early, so its findings may be incomplete.</p>{{end}}
 <h2>Findings</h2>
 {{range .Data.Findings}}<section class="answer"><h3>{{template "sev" .Severity}} {{.Title}}</h3><p><code>{{.Path}}{{if .Line}}:{{.Line}}{{end}}</code>{{if .Class}} <span class="muted">· {{.Class}}</span>{{end}}</p>{{if .Rationale}}<p>{{.Rationale}}</p>{{end}}</section>
-{{else}}<p>{{if .Data.Complete}}The review finished and reported no findings.{{else}}No findings were reported before the review stopped.{{end}}</p>{{end}}`
+{{else}}<p>{{if .Data.Complete}}The review finished and reported no findings.{{else}}No findings were reported before the review stopped, which is not a clean result.{{end}}</p>{{end}}`

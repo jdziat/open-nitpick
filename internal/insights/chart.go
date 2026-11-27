@@ -121,6 +121,8 @@ type Spark struct {
 	Points string
 	// Empty is true when every value is zero: there is no trend to draw.
 	Empty bool
+	// Title is the sparkline read aloud: the counts, oldest first.
+	Title string
 	W, H  float64
 	// LastX, LastY place the dot on the newest point.
 	LastX, LastY float64
@@ -131,16 +133,27 @@ const (
 	sparkH = 24.0
 )
 
-func sparkline(vals []int) Spark {
+// sparkline draws vals on a vertical scale of 0 to scale. Rows of one table
+// share a scale, so a file with 3 findings does not look as busy as one with 41.
+func sparkline(vals []int, scale int) Spark {
 	s := Spark{W: sparkW, H: sparkH, Empty: true}
-	most := 0
+	most := scale
 	for _, v := range vals {
 		most = max(most, v)
 	}
-	if most == 0 || len(vals) < 2 {
+	total := 0
+	for _, v := range vals {
+		total += v
+	}
+	if total == 0 || len(vals) < 2 {
 		return s
 	}
 	s.Empty = false
+	parts := make([]string, len(vals))
+	for i, v := range vals {
+		parts[i] = strconv.Itoa(v)
+	}
+	s.Title = "Findings per part of the period, oldest first: " + strings.Join(parts, ", ")
 	var b strings.Builder
 	for i, v := range vals {
 		x := 2 + float64(i)/float64(len(vals)-1)*(sparkW-4)

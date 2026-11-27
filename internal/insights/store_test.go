@@ -2,6 +2,7 @@ package insights
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -146,4 +147,90 @@ func TestStoreCountsADuplicatedLineInTheFileOnce(t *testing.T) {
 	if n := len(again.Reviews(Filter{})); n != 1 {
 		t.Fatalf("a duplicated line made %d reviews", n)
 	}
+}
+
+func TestARepairedTornTailLetsTheNextReviewSurviveARestart(t *testing.T) {
+	dir := t.TempDir()
+	s, _ := OpenStore(dir)
+	_, _ = s.Add(context.Background(), review("acme/api", t0, finding("a.go", "error")))
+	_ = s.Close()
+	f, _ := os.OpenFile(filepath.Join(dir, "reviews.jsonl"), os.O_APPEND|os.O_WRONLY, 0o600)
+	_, _ = f.WriteString(`{"repo":"torn`) // a crash mid-write: no newline
+	_ = f.Close()
+	s, _ = OpenStore(dir)
+	if _, err := s.Add(context.Background(), review("acme/web", t0.Add(time.Hour), finding("b.go", "nit"))); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	again, _ := OpenStore(dir)
+	defer func() { _ = again.Close() }()
+	if n := len(again.Reviews(Filter{})); n != 2 {
+		t.Fatalf("%d reviews survived, want the one before the tear and the one after: the new line was glued to the torn one", n)
+	}
+}
+
+func TestAFailedWriteLeavesNoPartialLineForTheNextReviewToJoin(t *testing.T) {
+	dir := t.TempDir()
+	s, _ := OpenStore(dir)
+	real := s.write
+	s.write = func(b []byte) (int, error) {
+		n, _ := real(b[:len(b)/2])
+		return n, errors.New("no space left on device")
+	}
+	if _, err := s.Add(context.Background(), review("acme/api", t0, finding("a.go", "error"))); err == nil {
+		t.Fatal("a failed write was reported as kept")
+	}
+	if n := len(s.Reviews(Filter{})); n != 0 {
+		t.Fatalf("a review whose write failed is in the index: %d", n)
+	}
+	s.write = real
+	if _, err := s.Add(context.Background(), review("acme/web", t0, finding("b.go", "nit"))); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	again, _ := OpenStore(dir)
+	defer func() { _ = again.Close() }()
+	if n, skipped := len(again.Reviews(Filter{})), again.Skipped(); n != 1 || skipped != 0 {
+		t.Fatalf("%d reviews, %d skipped lines: the half line must have been removed", n, skipped)
+	}
+}
+
+func TestAReviewDatedMinutesAheadIsRefusedButSmallClockSkewIsNot(t *testing.T) {
+	s, _ := OpenStore(t.TempDir())
+	defer func() { _ = s.Close() }()
+	if _, err := s.Add(context.Background(), review("r", time.Now().Add(time.Minute))); err != nil {
+		t.Fatalf("one minute of skew was refused: %v", err)
+	}
+	if _, err := s.Add(context.Background(), review("r", time.Now().Add(30*time.Minute))); err == nil {
+		t.Fatal("a review dated 30 minutes ahead is invisible to every query and must be refused, not accepted")
+	}
+}
+
+func TestAReviewSentWithoutATimeIsKeptOnceWhenSentAgain(t *testing.T) {
+	s, _ := OpenStore(t.TempDir())
+	defer func() { _ = s.Close() }()
+	r := Review{Repo: "acme/api", Commit: "abc", Result: "clean", Complete: true}
+	a, _ := s.Add(context.Background(), r)
+	time.Sleep(2 * time.Millisecond)
+	b, _ := s.Add(context.Background(), r)
+	if a.ID != b.ID || len(s.Reviews(Filter{})) != 1 {
+		t.Fatalf("a retry with no at was kept twice: %d reviews", len(s.Reviews(Filter{})))
+	}
+}
+
+func TestASecondStoreOnTheSameDirectoryIsRefused(t *testing.T) {
+	dir := t.TempDir()
+	s, err := OpenStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenStore(dir); !errors.Is(err, ErrInUse) {
+		t.Fatalf("err = %v, want ErrInUse: two writers would interleave their lines", err)
+	}
+	_ = s.Close()
+	again, err := OpenStore(dir)
+	if err != nil {
+		t.Fatalf("the directory was not released on Close: %v", err)
+	}
+	_ = again.Close()
 }
