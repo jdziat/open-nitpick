@@ -86,7 +86,11 @@ func TestAPlainHTTPReleaseSourceIsRefusedExceptOnThisMachine(t *testing.T) {
 				in.cfg.LatestBase = base
 			}
 			_, err := Run(context.Background(), in.cfg)
-			if err == nil || !(strings.Contains(err.Error(), "HTTPS") || strings.Contains(err.Error(), "not a release URL")) {
+			msg := ""
+			if err != nil {
+				msg = err.Error()
+			}
+			if !strings.Contains(msg, "HTTPS") && !strings.Contains(msg, "not a release URL") {
 				t.Errorf("%s base %s: err = %v, want it refused as a source", which, base, err)
 			}
 			if rel.requests() != 0 {

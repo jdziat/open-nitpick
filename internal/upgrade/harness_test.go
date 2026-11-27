@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -203,13 +202,4 @@ func execOutput(path string) (string, error) {
 	cmd := newCommand(path)
 	b, err := cmd.Output()
 	return string(b), err
-}
-
-func readAll(t *testing.T, r io.Reader) string {
-	t.Helper()
-	b, err := io.ReadAll(r)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(b)
 }

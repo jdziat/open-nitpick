@@ -26,7 +26,7 @@ func runUpgrade(ctx context.Context, args []string, out io.Writer) error {
 	fs.StringVar(&pin, "version", "", "install this release, such as v2.10.0, instead of the latest; may be older")
 	fs.BoolVar(&check, "check", false, "report whether a newer release exists and install nothing")
 	fs.Usage = func() {
-		fmt.Fprint(fs.Output(), `Usage: nitpick upgrade [flags]
+		_, _ = fmt.Fprint(fs.Output(), `Usage: nitpick upgrade [flags]
 
 Replaces this binary with the latest release. The download is checked against
 the release's checksums.txt and its Sigstore signature, and nothing is written

@@ -159,7 +159,8 @@ func (c Config) withDefaults() Config {
 	return c
 }
 
-func (c Config) say(format string, args ...any) { fmt.Fprintf(c.Out, format, args...) }
+// say writes progress. A writer that has gone away must not fail an upgrade.
+func (c Config) say(format string, args ...any) { _, _ = fmt.Fprintf(c.Out, format, args...) }
 
 // validateBases refuses a plain-HTTP release source unless it is on this
 // machine. The version to install is read from it, and over a network that
@@ -234,7 +235,7 @@ func (c Config) install(ctx context.Context, version string) error {
 	if err != nil {
 		return fmt.Errorf("make a place to download to: %w", err)
 	}
-	defer os.RemoveAll(work)
+	defer func() { _ = os.RemoveAll(work) }()
 
 	c.say("Downloading %s.\n", asset)
 	downloaded := filepath.Join(work, asset)
@@ -276,7 +277,7 @@ func (c Config) install(ctx context.Context, version string) error {
 		return err
 	}
 	if err := swap(staged, c.Target, c.GOOS); err != nil {
-		os.Remove(staged)
+		_ = os.Remove(staged) // best effort: the swap's error is the one to report
 		return err
 	}
 	return nil
@@ -297,12 +298,12 @@ func checksumFor(sums []byte, asset string) (string, bool) {
 
 // get reads a small file from the release source.
 func (c Config) get(ctx context.Context, rawURL string, limit int64) ([]byte, error) {
-	body, closeBody, err := c.open(ctx, rawURL)
+	resp, err := c.do(ctx, rawURL)
 	if err != nil {
 		return nil, err
 	}
-	defer closeBody()
-	data, err := io.ReadAll(io.LimitReader(body, limit+1))
+	defer func() { _ = resp.Body.Close() }()
+	data, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if err != nil {
 		return nil, err
 	}
@@ -314,17 +315,17 @@ func (c Config) get(ctx context.Context, rawURL string, limit int64) ([]byte, er
 
 // download writes an asset to dst and returns its SHA-256 as it goes.
 func (c Config) download(ctx context.Context, rawURL, dst string) ([]byte, error) {
-	body, closeBody, err := c.open(ctx, rawURL)
+	resp, err := c.do(ctx, rawURL)
 	if err != nil {
 		return nil, err
 	}
-	defer closeBody()
+	defer func() { _ = resp.Body.Close() }()
 	f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0o600)
 	if err != nil {
 		return nil, err
 	}
 	h := sha256.New()
-	n, err := io.Copy(io.MultiWriter(f, h), io.LimitReader(body, maxAsset+1))
+	n, err := io.Copy(io.MultiWriter(f, h), io.LimitReader(resp.Body, maxAsset+1))
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
@@ -340,21 +341,23 @@ func (c Config) download(ctx context.Context, rawURL, dst string) ([]byte, error
 	return h.Sum(nil), nil
 }
 
-func (c Config) open(ctx context.Context, rawURL string) (io.Reader, func(), error) {
+// do makes one GET and returns the response only when it is a 200; the caller
+// closes the body.
+func (c Config) do(ctx context.Context, rawURL string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	req.Header.Set("User-Agent", "nitpick-upgrade")
 	resp, err := c.Client.Do(req)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
-		return nil, nil, fmt.Errorf("%s: %s", rawURL, resp.Status)
+		_ = resp.Body.Close()
+		return nil, fmt.Errorf("%s: %s", rawURL, resp.Status)
 	}
-	return resp.Body, func() { resp.Body.Close() }, nil
+	return resp, nil
 }
 
 // preflight proves the directory can be written before anything is downloaded,
@@ -377,8 +380,11 @@ func preflight(dir string) error {
 			dir, err, dir)
 	}
 	name := f.Name()
-	f.Close()
-	return os.Remove(name)
+	closeErr := f.Close()
+	if err := os.Remove(name); err != nil {
+		return err
+	}
+	return closeErr
 }
 
 // stage copies the verified download beside the binary it will replace, under a
@@ -394,7 +400,7 @@ func stage(downloaded, target string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 	dst, err := os.CreateTemp(filepath.Dir(target), ".nitpick-upgrade-*")
 	if err != nil {
 		return "", fmt.Errorf("cannot write to %s: %w", filepath.Dir(target), err)
@@ -408,7 +414,7 @@ func stage(downloaded, target string) (string, error) {
 		err = os.Chmod(name, mode)
 	}
 	if err != nil {
-		os.Remove(name)
+		_ = os.Remove(name)
 		return "", fmt.Errorf("stage the new binary in %s: %w", filepath.Dir(target), err)
 	}
 	return name, nil
