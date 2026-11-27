@@ -23,7 +23,7 @@ import (
 
 const (
 	testIssuer   = "https://issuer.test"
-	testAudience = "nitpick-notary"
+	testAudience = "nitpick-server"
 	testSubject  = "repo:acme/app:ref:refs/heads/main"
 )
 

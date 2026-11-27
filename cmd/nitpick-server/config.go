@@ -25,7 +25,7 @@ import (
 
 // fileConfig is the server's configuration file. It holds how people sign in and
 // what each of them may do; the notary's own flags stay flags, as they were on
-// nitpick-notary, so a deployment changes its binary name and nothing else.
+// the notary command, so a deployment changes its binary name and nothing else.
 //
 // Keys it does not know are an error. A typo in a security setting that was
 // quietly ignored is the setting off.

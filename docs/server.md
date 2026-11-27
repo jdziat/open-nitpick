@@ -11,7 +11,7 @@ the mapping from a person to roles, CSRF protection, security headers, `/healthz
 and the UI shell. A component owns its routes, its storage and its pages.
 
 Run with no configuration file, the server is the notary and nothing else: the same
-routes and flags as the `nitpick-notary` command it replaced, with no sign-in and no
+routes and flags as the notary command it replaced, with no sign-in and no
 UI.
 
 ```sh

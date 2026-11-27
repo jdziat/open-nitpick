@@ -85,7 +85,7 @@ type options struct {
 	rules                                                 oidcRules
 }
 
-// parseFlags reads the command line. The notary's flags are the ones nitpick-notary
+// parseFlags reads the command line. The notary's flags are the ones its old command
 // had, with the same names and meanings.
 func parseFlags(args []string, stderr io.Writer) (*options, *flag.FlagSet, error) {
 	o := &options{}

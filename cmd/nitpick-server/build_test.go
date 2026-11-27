@@ -41,7 +41,7 @@ func opts(t *testing.T) *options {
 const quickUser = "alice:$argon2id$v=19$m=64,t=1,p=1$c2FsdHNhbHRzYWx0c2E$c2FsdHNhbHRzYWx0c2FsdHNhbHRzYWx0c2E\n"
 
 // With no configuration file the server is the notary and nothing else: the same
-// routes, no sign-in, so no UI. This is nitpick-notary under a new name.
+// routes, no sign-in, so no UI: what the notary command was.
 func TestWithNoConfigurationTheServerIsTheNotaryAlone(t *testing.T) {
 	h, closeStore, err := build(context.Background(), opts(t), quiet)
 	if err != nil {

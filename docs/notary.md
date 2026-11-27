@@ -87,7 +87,7 @@ to the log.
 ### GitHub Actions identity instead of a stored secret
 
 ```sh
-nitpick-server -oidc-audience nitpick-notary \
+nitpick-server -oidc-audience nitpick-server \
   -oidc-allow 'authoritative:repo:acme/app:ref:refs/heads/main' \
   -oidc-allow 'provisional:repo:acme/app:*'
 ```

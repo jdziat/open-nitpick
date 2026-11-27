@@ -14,7 +14,7 @@ import (
 	"github.com/nitpick-oss/nitpick/internal/wire"
 )
 
-// testdata/v2.10.0 is a data directory that nitpick-notary v2.10.0 wrote through
+// testdata/v2.10.0 is a data directory that the v2.10.0 notary command wrote through
 // its own HTTP API, and the responses that binary gave for each record. The server
 // that replaced it has to read what it wrote and answer the same way, or an
 // existing deployment loses its records on upgrade.
