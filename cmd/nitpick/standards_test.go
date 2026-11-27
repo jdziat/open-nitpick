@@ -440,7 +440,7 @@ func TestRunStandardsWritesAndRefusesTheWrongPairs(t *testing.T) {
 // with nothing saying why.
 func TestTheCommandAndTheReviewerSkipTheSameDirectories(t *testing.T) {
 	for _, name := range []string{
-		"website", "dist", "public", ".website", "testdata",
+		"website", "dist", "ui_dist", "public", ".website", "testdata",
 		"internal", "cmd", "docs", "",
 	} {
 		if got, want := skipStandardsDir(name), review.SkipsForStandards(name); got != want {
