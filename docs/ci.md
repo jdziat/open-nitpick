@@ -95,8 +95,11 @@ fence, so a quoted reply or a pasted log cannot start a run. The workflow's `if:
 is looser, a prefilter that starts a runner for any comment containing `/nitpick`
 (a link to this repository's URL does) and lets `respond` decide; it only avoids
 starting runners for unrelated comments. `@open-nitpick` is accepted for one
-release while `review.mention` is unchanged. Write the verb after one space, as
-in `/nitpick fix`: the workflow gates match that form.
+release while `review.mention` is unchanged. `fix` and `apply` count only after
+exactly one space, as in `/nitpick fix`. The workflow that is allowed to write is
+chosen by a text match that sees one space and nothing else, so a fix written with
+two spaces, a tab or a line break is read as a question, which is answered and
+writes nothing.
 
 `@nitpick-review review` resumes the previous review, or starts one if none exists.
 `@nitpick-review restart-review` reviews the whole PR afresh. The older `re-review`

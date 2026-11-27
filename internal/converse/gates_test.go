@@ -3,6 +3,7 @@ package converse
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -180,5 +181,124 @@ func TestTheGateEvaluatorFollowsGitHubExpressionRules(t *testing.T) {
 	}
 	if _, err := gateEval("startsWith(a.s, 'H')", ctx); err == nil {
 		t.Error("an unsupported function was evaluated instead of refused")
+	}
+}
+
+// Whitespace is the one thing a workflow expression cannot match the way the
+// parser does: "contains(body, '/nitpick fix')" sees one space and nothing else.
+// The workflow allowed to write is chosen by that match, so the parser reads fix
+// and apply as a fix only after one space. After anything else they are a
+// question, which the read-only workflow answers. This holds, for every trigger and
+// every gap, that the two never disagree: a body the parser reads as a fix starts
+// the fix workflow and not the respond one.
+func TestTheParserAndTheGatesNeverDisagreeAboutAFixWhateverTheWhitespace(t *testing.T) {
+	respond := gateIf(t, "nitpick-respond.yml", "respond")
+	fix := gateIf(t, "nitpick-fix.yml", "fix")
+	fixes, questions := 0, 0
+	for _, trigger := range []string{config.DefaultMention, config.LegacyMention, SlashCommand, "please " + config.DefaultMention} {
+		for _, gap := range []string{" ", "  ", "   ", "\t", " \t ", "\n", "\r\n", " \n", "\n\n", ": ", ":  ", ",\n", ":\t"} {
+			for _, verb := range []string{"fix", "fix all", "apply this", "Fix.", "FIX"} {
+				body := trigger + gap + verb
+				kind, _, ok := Command(body, config.DefaultMention)
+				if !ok {
+					continue
+				}
+				ctx := comment(body, "User", "MEMBER", nil)
+				gotFix, gotRespond := gateRuns(t, fix, ctx), gateRuns(t, respond, ctx)
+				if kind == KindFix {
+					fixes++
+					if !gotFix || gotRespond {
+						t.Errorf("%q is a fix: fix workflow runs=%v respond workflow runs=%v, want true and false", body, gotFix, gotRespond)
+					}
+					continue
+				}
+				questions++
+				if kind != KindAsk {
+					t.Errorf("%q = %q, want a fix or a question", body, kind)
+				}
+				// A question is answered by the respond workflow. The fix gate is a
+				// looser prefilter, so it may also start for these, and then the
+				// binary it runs reads the comment again and writes nothing.
+				if !gotRespond && !gotFix {
+					t.Errorf("%q is a question and neither workflow starts for it", body)
+				}
+			}
+		}
+	}
+	if fixes < 20 || questions < 40 {
+		t.Fatalf("checked %d fixes and %d questions; the sweep is not reading enough of either", fixes, questions)
+	}
+}
+
+// Rule 9 for the gap: the parser's own rule, stated directly. After exactly one
+// space a fix is a fix; after any other gap it is a question and carries its text.
+func TestAFixCountsOnlyAfterASingleSpace(t *testing.T) {
+	for _, trigger := range []string{config.DefaultMention, SlashCommand} {
+		for gap, want := range map[string]Kind{
+			" ": KindFix, "  ": KindAsk, "\t": KindAsk, "\n": KindAsk, "\r\n": KindAsk, " \n": KindAsk, ": ": KindAsk,
+		} {
+			// The colon is punctuation after a mention. After the slash command it is
+			// part of the next word, "/nitpick:", which is not the command.
+			if trigger == SlashCommand && gap == ": " {
+				continue
+			}
+			for _, verb := range []string{"fix", "apply"} {
+				got, text, ok := Command(trigger+gap+verb+" this", config.DefaultMention)
+				if !ok || got != want {
+					t.Errorf("%q = (%q, %v), want %q", trigger+gap+verb, got, ok, want)
+				}
+				if want == KindAsk && !strings.Contains(text, verb) {
+					t.Errorf("%q: the question lost its text %q", trigger+gap+verb, text)
+				}
+			}
+		}
+	}
+	// The other verbs are unaffected by the gap: a resolve is a resolve.
+	for _, gap := range []string{" ", "  ", "\t", "\n"} {
+		if kind, _, ok := Command(SlashCommand+gap+"resolve", config.DefaultMention); !ok || kind != KindResolve {
+			t.Errorf("resolve after %q = (%q, %v)", gap, kind, ok)
+		}
+	}
+	if kind, _, ok := Command(config.DefaultMention+": resolve", config.DefaultMention); !ok || kind != KindResolve {
+		t.Errorf("resolve after a colon = (%q, %v)", kind, ok)
+	}
+}
+
+// The same bodies, as non-fixes: whatever the whitespace, a resolve or a question
+// still goes to the respond workflow and not to the fix one.
+func TestOddWhitespaceInANonFixStillGoesToTheRespondWorkflow(t *testing.T) {
+	respond := gateIf(t, "nitpick-respond.yml", "respond")
+	fix := gateIf(t, "nitpick-fix.yml", "fix")
+	checked := 0
+	for _, trigger := range []string{config.DefaultMention, SlashCommand} {
+		for _, gap := range []string{" ", "  ", "\t", "\n"} {
+			for _, verb := range []string{"review", "resolve", "fixed in the last push", "why does this fail?"} {
+				body := trigger + gap + verb
+				kind, _, ok := Command(body, config.DefaultMention)
+				if !ok || kind == KindFix {
+					continue
+				}
+				checked++
+				ctx := comment(body, "User", "MEMBER", nil)
+				if !gateRuns(t, respond, ctx) || gateRuns(t, fix, ctx) {
+					t.Errorf("%q: respond runs=%v fix runs=%v, want true and false", body, gateRuns(t, respond, ctx), gateRuns(t, fix, ctx))
+				}
+			}
+		}
+	}
+	if checked < 16 {
+		t.Fatalf("only %d non-fixes were checked", checked)
+	}
+}
+
+// The gap rule also holds when the slash command is read after a mention that sat
+// inside a code fence, which is a separate path through Command.
+func TestAFixAfterAFencedMentionObeysTheSameGapRule(t *testing.T) {
+	fenced := "```\n" + config.DefaultMention + " review\n```\n"
+	for gap, want := range map[string]Kind{" ": KindFix, "  ": KindAsk, "\t": KindAsk, "\n": KindAsk} {
+		got, _, ok := Command(fenced+SlashCommand+gap+"fix", config.DefaultMention)
+		if !ok || got != want {
+			t.Errorf("a fix after a fenced mention with gap %q = (%q, %v), want %q", gap, got, ok, want)
+		}
 	}
 }

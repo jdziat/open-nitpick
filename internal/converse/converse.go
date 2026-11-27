@@ -161,27 +161,33 @@ const SlashCommand = "/nitpick"
 // triggers, kept in step by a test.
 func Command(body, mention string) (Kind, string, bool) {
 	spans := fencedLines(body)
-	mentionAt, mentionRest, mentionOK := fromMention(body, mention)
+	mentionAt, mentionRest, mentionGap, mentionOK := fromMention(body, mention)
 	slashAt, slashRest, slashOK := fromSlash(body, spans)
 	switch {
 	case mentionOK && slashOK && spans.contain(mentionAt):
-		return classify(slashRest)
+		return classify(slashRest, gapOf(slashRest))
 	case mentionOK && (!slashOK || mentionAt <= slashAt):
-		return classify(mentionRest)
+		return classify(mentionRest, mentionGap)
 	case slashOK:
-		return classify(slashRest)
+		return classify(slashRest, gapOf(slashRest))
 	}
 	return "", "", false
 }
 
-// fromMention finds the mention and returns where it starts and what follows.
-func fromMention(body, mention string) (at int, rest string, ok bool) {
-	re := regexp.MustCompile(`(?i)(^|\s)(?:` + handlePattern(mention) + `)\b[:,]?\s*`)
-	loc := re.FindStringIndex(body)
-	if loc == nil {
-		return 0, "", false
+// gapOf is the whitespace between a trigger and the word after it.
+func gapOf(rest string) string {
+	return rest[:len(rest)-len(strings.TrimLeft(rest, " \t\r\n"))]
+}
+
+// fromMention finds the mention and returns where it starts, what follows it, and
+// the punctuation and whitespace between the two.
+func fromMention(body, mention string) (at int, rest, gap string, ok bool) {
+	re := regexp.MustCompile(`(?i)(^|\s)(?:` + handlePattern(mention) + `)\b([:,]?\s*)`)
+	m := re.FindStringSubmatchIndex(body)
+	if m == nil {
+		return 0, "", "", false
 	}
-	return loc[0], body[loc[1]:], true
+	return m[0], body[m[1]:], body[m[4]:m[5]], true
 }
 
 // fromSlash finds the first line outside a fenced block that starts with
@@ -288,7 +294,13 @@ func fenceMarker(line string) string {
 
 // classify names what the text after a trigger asks for. Empty text is no
 // command at all.
-func classify(rest string) (Kind, string, bool) {
+//
+// gap is what separates the trigger from the text. The write-capable verbs, fix
+// and apply, count only after a single space. The workflow that is allowed to write
+// is chosen by a text match that sees one space and nothing else, so a fix with a
+// different gap would be read here as a fix and sent to the workflow that may not
+// write. Read as a question instead, it is answered and writes nothing.
+func classify(rest, gap string) (Kind, string, bool) {
 	rest = strings.TrimSpace(rest)
 	if rest == "" {
 		return "", "", false
@@ -307,6 +319,9 @@ func classify(rest string) (Kind, string, bool) {
 		// the work is done.
 		return KindResolve, rest, true
 	case "fix", "apply":
+		if gap != " " {
+			return KindAsk, rest, true
+		}
 		return KindFix, rest, true
 	case "improve", "polish":
 		return KindImprove, rest, true
