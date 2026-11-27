@@ -113,6 +113,7 @@ nav:
       - Providers and models: docs/providers.md
       - The notary: docs/notary.md
       - The nitpick server: docs/server.md
+      - Insights: docs/insights.md
       - How a review runs: docs/how-a-review-runs.md
       - Trust model: docs/trust-model.md
       - Security policy: docs/security.md

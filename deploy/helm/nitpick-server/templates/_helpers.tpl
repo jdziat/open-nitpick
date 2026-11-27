@@ -22,3 +22,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "notary.secretName" -}}
 {{- if .Values.existingSecret -}}{{ .Values.existingSecret }}{{- else -}}{{ include "notary.fullname" . }}{{- end -}}
 {{- end -}}
+
+{{/* The Secret the pod reads insights tokens from: the operator's, or the one this chart makes. */}}
+{{- define "notary.insightsSecretName" -}}
+{{- if .Values.insightsExistingSecret -}}{{ .Values.insightsExistingSecret }}{{- else -}}{{ include "notary.fullname" . }}-insights{{- end -}}
+{{- end -}}

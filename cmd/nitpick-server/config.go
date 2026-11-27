@@ -99,7 +99,7 @@ func loadConfig(path string) (*fileConfig, error) {
 }
 
 // knownComponents are the components this binary can run.
-var knownComponents = map[string]bool{"notary": true}
+var knownComponents = map[string]bool{"notary": true, "insights": true}
 
 func (c *fileConfig) check() error {
 	seen := map[string]bool{}

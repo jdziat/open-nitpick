@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"flag"
@@ -43,6 +44,7 @@ type reviewFlags struct {
 	noLinters           bool
 	full                bool
 	notary              notaryFlags
+	insights            insightsFlags
 
 	// Pull request selection. When unset, these are read from the GitHub
 	// Actions environment.
@@ -177,6 +179,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	// notary to certify and these flags would name something it cannot do.
 	if name != "improve" {
 		f.notary.register(fs)
+		f.insights.register(fs)
 	}
 	fs.StringVar(&f.format, "format", "text", "output: text prints the review, json prints the result and published findings as one JSON object")
 
@@ -324,6 +327,9 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		}
 	}
 
+	if err := f.insights.check(); err != nil {
+		return err
+	}
 	provider, ref, err := selectProvider(&f, repo)
 	if err != nil {
 		return err
@@ -350,6 +356,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		configure(engine)
 	}
 
+	startedAt := time.Now()
 	report, err := engine.Review(ctx, ref)
 	if engine.ModelCalls != nil {
 		if report == nil {
@@ -406,6 +413,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		printRoundLimit(report)
 		actions.setOutputs(resultLimit, report)
 		actions.writeSummary(resultLimit, report, nil, ref, roundLimitNote(report.Rounds))
+		reportInsights(ctx, &f.insights, log, resultLimit, report, ref, startedAt)
 		if f.format == "json" {
 			if werr := writeJSONReport(os.Stdout, resultLimit, report); werr != nil {
 				return errors.Join(errRoundLimit, werr)
@@ -414,6 +422,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		return errRoundLimit
 	default:
 		actions.setOutputs(resultError, report)
+		reportInsights(ctx, &f.insights, log, resultError, report, ref, startedAt)
 		if f.format == "json" {
 			if werr := writeJSONReport(os.Stdout, resultError, report); werr != nil {
 				return errors.Join(err, werr)
@@ -438,6 +447,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	rendered := review.Render(report, report.Files, cfg)
 	actions.setOutputs(result, report)
 	actions.writeSummary(result, report, &rendered, ref, note)
+	reportInsights(ctx, &f.insights, log, result, report, ref, startedAt)
 	if f.format == "json" {
 		if err := writeJSONReport(os.Stdout, result, report); err != nil {
 			return err
@@ -445,6 +455,27 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 	}
 
 	return exitFor(result)
+}
+
+// reportInsights sends a finished review to the insights server, when one was
+// named. The review has been published and printed by now, so a failure here is a
+// warning: a data point that did not arrive must not fail a build that passed.
+// A review with no report, which is one that failed before it began, has nothing
+// to send.
+func reportInsights(ctx context.Context, f *insightsFlags, log *slog.Logger, result actionResult, report *review.Report, ref vcs.Ref, at time.Time) {
+	if f.url == "" || report == nil {
+		return
+	}
+	var buf bytes.Buffer
+	if err := writeJSONReport(&buf, result, report); err != nil {
+		log.Warn("could not encode the report for the insights server", "error", err)
+		return
+	}
+	if err := f.post(ctx, buf.Bytes(), ref, at); err != nil {
+		log.Warn("could not report to the insights server", "error", err)
+		return
+	}
+	log.Info("reported to the insights server", "url", f.url)
 }
 
 // exitFor turns a classification into the error the process exits on.

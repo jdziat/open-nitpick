@@ -232,6 +232,12 @@ or the stage that asked, so the page does not show a stage; keeping them would
 change the record format, which is a decision of its own. The pages only read: a
 page request never writes or deletes a record.
 
+## The insights pages
+
+With `insights` in `components`, the hub also shows the findings that reviews report:
+a dashboard, the files that keep producing findings, and an MCP endpoint for
+agents. See [Insights](insights.md).
+
 ## Deploying
 
 The image and chart are published to `ghcr.io` as `nitpick-server` when a release tag
