@@ -136,7 +136,7 @@ def review(case, repos, out, model, timeout, config, binary, command="review"):
         "result": {"comments": comments, "withheld": withheld},
         "usage": report.get("usage") if report else None,
         "duration_seconds": seconds,
-        "manifest": {"reviewer": "open-nitpick", "model": model, "version": nitpick_version(binary),
+        "manifest": {"reviewer": "nitpick", "model": model, "version": nitpick_version(binary),
                      "config": str(config) if config else None, "command": command},
     }
     result["manifest"]["artifacts_sha256"] = {
@@ -175,7 +175,7 @@ def main():
     selection = json.loads((args.inputs / "selection.json").read_text())
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / "run.json").write_text(json.dumps({
-        "selection": selection, "repeats": 1, "model": args.model, "reviewer": "open-nitpick",
+        "selection": selection, "repeats": 1, "model": args.model, "reviewer": "nitpick",
         "version": nitpick_version(args.binary), "config": str(args.config) if args.config else None,
         "command": args.command,
     }))

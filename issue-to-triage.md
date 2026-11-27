@@ -1,9 +1,9 @@
-# Triage notes — open-nitpick findings on llm-go-sdk PR #96
+# Triage notes — nitpick findings on llm-go-sdk PR #96
 
 Source: `nocturnium/llm-go-sdk#96` — "Zero hardcoded per-model token limits and
 share the stream watchdog".
 Branch `task/pickup-the-medium-and-minor-the-2baa71`, base `main`.
-Reviewer: open-nitpick GitHub Action (`github-actions[bot]`).
+Reviewer: nitpick GitHub Action (`github-actions[bot]`).
 Head triaged here: `6b8696c467ae1d11ba8aec39e4de213b75d61386` (last of four review
 rounds: `d89e086`, `cea11f2`, `6b8696c`).
 
@@ -179,7 +179,7 @@ reviewer's own rationale concludes "No defect here". Filed as info; nothing to d
 
 ---
 
-## Suggestion for open-nitpick
+## Suggestion for nitpick
 
 One class of false positive caused almost every error in this PR: **a finding
 rests on the behaviour of code outside the diff.** Both the zero-token error and

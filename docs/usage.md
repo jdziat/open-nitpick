@@ -338,7 +338,7 @@ answer:
 
 ```
 /plugin marketplace add nitpick-oss/nitpick
-/plugin install nitpick@open-nitpick
+/plugin install nitpick@nitpick
 ```
 
 Or, without the skills, register the server with the client you use:
@@ -542,7 +542,7 @@ classify authorship.
 
 ### This repository's engineering policy
 
-Open-nitpick requires its convention, analyzer, commit, and deterministic slop
+Nitpick requires its convention, analyzer, commit, and deterministic slop
 checks to complete. Its six established Go conventions remain required even
 if later violations would lower them below the inference threshold. Direct
 imports of `os/exec` and `net/http` are forbidden in the commit validator and
@@ -561,8 +561,8 @@ advisory while their existing findings are assessed.
 
 ### Resume or restart a pull request review
 
-Comment `@open-nitpick review` to retry unfinished work and reuse successful
+Comment `@nitpick-review review` to retry unfinished work and reuse successful
 model requests whose inputs still match. With no previous review, it starts a
-new one. Comment `@open-nitpick restart-review` to start fresh, or use
+new one. Comment `@nitpick-review restart-review` to start fresh, or use
 `nitpick review -owner OWNER -repo-name REPO -pr NUMBER -full` from the CLI.
 See [incremental review](ci.md#incremental-review) for reuse and approval rules.

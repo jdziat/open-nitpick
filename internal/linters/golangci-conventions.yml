@@ -10,7 +10,7 @@
 # not a defect and a reviewer reporting every departure from house style is the
 # dilution the generation scope exists to prevent.
 #
-# Measured over open-nitpick with `default: standard` alone: zero observations
+# Measured over nitpick with `default: standard` alone: zero observations
 # across 290 files, which is correct and says nothing. Adding these: four rules
 # and enough spread that revive lands at 94% and reads as contested.
 version: "2"

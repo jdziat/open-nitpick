@@ -28,7 +28,7 @@ scorecard for comparing the same repository over time. It prints locally.
 
 ### Ask for improvement feedback on a pull request
 
-`@open-nitpick improve` reviews naming, documentation, structure, idiom, and
+`@nitpick-review improve` reviews naming, documentation, structure, idiom, and
 slop after the normal review. It replies on GitHub and does not block a merge.
 
 ## Normal review
@@ -73,7 +73,7 @@ On a pull request, mention the reviewer in a conversation comment or inline
 thread:
 
 ```text
-@open-nitpick improve
+@nitpick-review improve
 ```
 
 It reviews naming, documentation, structure, idiom, and slop. An inline request
@@ -85,6 +85,6 @@ single comment and does not create findings that block a merge.
 A GitHub review can reuse completed model work when its code, context, model,
 and policy still match. New commits rerun affected work; unresolved commented
 files are rechecked so their threads can be confirmed or closed. Use
-`nitpick review -full` or `@open-nitpick restart-review` to inspect the whole
+`nitpick review -full` or `@nitpick-review restart-review` to inspect the whole
 change again. [CI incremental review](../ci.md#incremental-review) explains the
 stored progress and fallbacks.

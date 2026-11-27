@@ -72,7 +72,7 @@ func TestImproveRefusesToPostToAPullRequest(t *testing.T) {
 	for _, args := range [][]string{
 		{"-pr", "7"},
 		{"-owner", "jdziat"},
-		{"-repo-name", "open-nitpick"},
+		{"-repo-name", "nitpick"},
 	} {
 		err := runImproveCLI(t.Context(), args)
 		if err == nil {
@@ -103,7 +103,7 @@ func TestTheRefusalCoversAPullRequestNoFlagNamed(t *testing.T) {
 	}{
 		"-pr":                  {f: reviewFlags{pr: 7}},
 		"-owner":               {f: reviewFlags{owner: "jdziat"}},
-		"-repo-name":           {f: reviewFlags{repoName: "open-nitpick"}},
+		"-repo-name":           {f: reviewFlags{repoName: "nitpick"}},
 		"from the environment": {ref: vcs.Ref{Number: 7}},
 	}
 	for name, tc := range cases {

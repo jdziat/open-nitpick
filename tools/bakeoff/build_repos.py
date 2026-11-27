@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build a two-commit git repository for each benchmark snapshot.
 
-open-nitpick reviews a checkout, so the comparison gives it one: the snapshot's
+nitpick reviews a checkout, so the comparison gives it one: the snapshot's
 head tree as the working tree, with the pull request as the last commit.
 
     base commit  = head tree with the diff reverse-applied

@@ -1,4 +1,4 @@
-# open-nitpick applying a finding on @open-nitpick fix.
+# nitpick applying a finding on @nitpick-review fix.
 #
 # A separate file from nitpick-respond.yml rather than another job in
 # it, and the separation is the point: this is the only workflow here
@@ -39,7 +39,10 @@ jobs:
     # COLLABORATOR covers anyone invited at all, read access included,
     # so the binary asks the forge for the asker's real permission.
     if: >-
-      contains(github.event.comment.body, '@open-nitpick fix') &&
+      (
+        contains(github.event.comment.body, '@nitpick-review fix') ||
+        contains(github.event.comment.body, '@open-nitpick fix')
+      ) &&
       (github.event_name == 'pull_request_review_comment' || github.event.issue.pull_request != null) &&
       contains(
         fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'),

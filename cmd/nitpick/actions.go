@@ -172,7 +172,7 @@ func (a actionsEnv) writeSummary(result actionResult, report *review.Report, ren
 		return
 	}
 	var b strings.Builder
-	b.WriteString("## open-nitpick\n\n")
+	b.WriteString("## nitpick\n\n")
 	if note != "" {
 		fmt.Fprintf(&b, "> %s\n\n", note)
 	}

@@ -5,25 +5,26 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nitpick-oss/nitpick/internal/config"
 	"github.com/nitpick-oss/nitpick/internal/fence"
 )
 
 func TestParseEventReadsBothCommentShapes(t *testing.T) {
-	issue := `{"issue":{"number":7,"pull_request":{"url":"x"}},"comment":{"id":11,"body":"@open-nitpick review","user":{"login":"alice"}}}`
+	issue := `{"issue":{"number":7,"pull_request":{"url":"x"}},"comment":{"id":11,"body":"@nitpick-review review","user":{"login":"alice"}}}`
 	e, err := ParseEvent("issue_comment", []byte(issue))
 	if err != nil || e.Number != 7 || e.CommentID != 11 || e.RootID != 11 || e.Author != "alice" || e.Inline {
 		t.Errorf("issue_comment = %+v, %v", e, err)
 	}
-	notPR := `{"issue":{"number":8},"comment":{"id":12,"body":"@open-nitpick hi","user":{"login":"bob"}}}`
+	notPR := `{"issue":{"number":8},"comment":{"id":12,"body":"@nitpick-review hi","user":{"login":"bob"}}}`
 	if _, err := ParseEvent("issue_comment", []byte(notPR)); err == nil {
 		t.Error("a comment on an issue that is not a pull request was accepted")
 	}
-	review := `{"pull_request":{"number":7},"comment":{"id":21,"in_reply_to_id":20,"path":"a.go","line":9,"body":"@open-nitpick why?","user":{"login":"carol"}}}`
+	review := `{"pull_request":{"number":7},"comment":{"id":21,"in_reply_to_id":20,"path":"a.go","line":9,"body":"@nitpick-review why?","user":{"login":"carol"}}}`
 	e, err = ParseEvent("pull_request_review_comment", []byte(review))
 	if err != nil || !e.Inline || e.RootID != 20 || e.Path != "a.go" || e.Line != 9 {
 		t.Errorf("review comment = %+v, %v", e, err)
 	}
-	root := `{"pull_request":{"number":7},"comment":{"id":30,"path":"a.go","line":9,"body":"@open-nitpick resolve","user":{"login":"carol"}}}`
+	root := `{"pull_request":{"number":7},"comment":{"id":30,"path":"a.go","line":9,"body":"@nitpick-review resolve","user":{"login":"carol"}}}`
 	e, _ = ParseEvent("pull_request_review_comment", []byte(root))
 	if e.RootID != 30 {
 		t.Errorf("a thread root's RootID = %d, want its own id", e.RootID)
@@ -40,26 +41,26 @@ func TestCommandReadsTheMention(t *testing.T) {
 		text string
 		ok   bool
 	}{
-		{"@open-nitpick review", KindReview, "review", true},
-		{"@open-nitpick restart-review", KindRestartReview, "restart-review", true},
-		{"@open-nitpick rereview", KindRestartReview, "rereview", true},
-		{"@open-nitpick restart-reviewing", KindAsk, "restart-reviewing", true},
-		{"please @Open-NitPick re-review this", KindRestartReview, "re-review this", true},
-		{"@open-nitpick resolve", KindResolve, "resolve", true},
-		{"@open-nitpick: fixed in the last push", KindResolve, "fixed in the last push", true},
-		{"@open-nitpick improve", KindImprove, "improve", true},
-		{"@open-nitpick polish this file please", KindImprove, "polish this file please", true},
+		{"@nitpick-review review", KindReview, "review", true},
+		{"@nitpick-review restart-review", KindRestartReview, "restart-review", true},
+		{"@nitpick-review rereview", KindRestartReview, "rereview", true},
+		{"@nitpick-review restart-reviewing", KindAsk, "restart-reviewing", true},
+		{"please @nitpick-review re-review this", KindRestartReview, "re-review this", true},
+		{"@nitpick-review resolve", KindResolve, "resolve", true},
+		{"@nitpick-review: fixed in the last push", KindResolve, "fixed in the last push", true},
+		{"@nitpick-review improve", KindImprove, "improve", true},
+		{"@nitpick-review polish this file please", KindImprove, "polish this file please", true},
 		// "improvement" is a noun in a sentence, not the command. The switch
 		// matches whole words for the same reason "fix" and "fixed" are
 		// different commands.
-		{"@open-nitpick improvements welcome", KindAsk, "improvements welcome", true},
-		{"@open-nitpick why does this matter?", KindAsk, "why does this matter?", true},
-		{"@open-nitpick", "", "", false},
+		{"@nitpick-review improvements welcome", KindAsk, "improvements welcome", true},
+		{"@nitpick-review why does this matter?", KindAsk, "why does this matter?", true},
+		{"@nitpick-review", "", "", false},
 		{"no mention here", "", "", false},
-		{"email me at bob@open-nitpick.example", "", "", false},
+		{"email me at bob@nitpick-review.example", "", "", false},
 	}
 	for _, tc := range cases {
-		kind, text, ok := Command(tc.body, "@open-nitpick")
+		kind, text, ok := Command(tc.body, config.DefaultMention)
 		if kind != tc.kind || text != tc.text || ok != tc.ok {
 			t.Errorf("%q = %q, %q, %v; want %q, %q, %v", tc.body, kind, text, ok, tc.kind, tc.text, tc.ok)
 		}
@@ -83,7 +84,7 @@ func TestExcerptNumbersAndMarksTheLine(t *testing.T) {
 // The association has to survive parsing, or the gate that reads it is
 // checking a field that is always empty and refusing everyone.
 func TestTheAuthorAssociationIsCarriedFromBothEvents(t *testing.T) {
-	issue := `{"issue":{"number":7,"pull_request":{}},"comment":{"id":11,"body":"@open-nitpick review","author_association":"COLLABORATOR","user":{"login":"kim"}}}`
+	issue := `{"issue":{"number":7,"pull_request":{}},"comment":{"id":11,"body":"@nitpick-review review","author_association":"COLLABORATOR","user":{"login":"kim"}}}`
 	ev, err := ParseEvent("issue_comment", []byte(issue))
 	if err != nil {
 		t.Fatalf("issue_comment: %v", err)
@@ -92,7 +93,7 @@ func TestTheAuthorAssociationIsCarriedFromBothEvents(t *testing.T) {
 		t.Errorf("Association = %q, want COLLABORATOR", ev.Association)
 	}
 
-	inline := `{"pull_request":{"number":7},"comment":{"id":12,"body":"@open-nitpick why","path":"a.go","line":3,"author_association":"NONE","user":{"login":"stranger"}}}`
+	inline := `{"pull_request":{"number":7},"comment":{"id":12,"body":"@nitpick-review why","path":"a.go","line":3,"author_association":"NONE","user":{"login":"stranger"}}}`
 	ev, err = ParseEvent("pull_request_review_comment", []byte(inline))
 	if err != nil {
 		t.Fatalf("pull_request_review_comment: %v", err)
@@ -107,16 +108,16 @@ func TestTheAuthorAssociationIsCarriedFromBothEvents(t *testing.T) {
 // before the first existed.
 func TestFixIsNotResolve(t *testing.T) {
 	for body, want := range map[string]Kind{
-		"@open-nitpick fix":                    KindFix,
-		"@open-nitpick fix all":                KindFix,
-		"@open-nitpick apply this":             KindFix,
-		"@open-nitpick Fix.":                   KindFix,
-		"@open-nitpick fixed":                  KindResolve,
-		"@open-nitpick fixed in the last push": KindResolve,
-		"@open-nitpick done":                   KindResolve,
-		"@open-nitpick why is this wrong?":     KindAsk,
+		"@nitpick-review fix":                    KindFix,
+		"@nitpick-review fix all":                KindFix,
+		"@nitpick-review apply this":             KindFix,
+		"@nitpick-review Fix.":                   KindFix,
+		"@nitpick-review fixed":                  KindResolve,
+		"@nitpick-review fixed in the last push": KindResolve,
+		"@nitpick-review done":                   KindResolve,
+		"@nitpick-review why is this wrong?":     KindAsk,
 	} {
-		got, _, ok := Command(body, "@open-nitpick")
+		got, _, ok := Command(body, config.DefaultMention)
 		if !ok {
 			t.Errorf("%q was not read as a mention", body)
 			continue
@@ -148,7 +149,7 @@ func TestFixesAllReadsTheAdverbAndNotThePrefix(t *testing.T) {
 // The text a fix command returns still carries the verb, like every other
 // kind, so a caller reading fields[1] sees the adverb rather than the verb.
 func TestAFixCommandKeepsItsVerbInTheText(t *testing.T) {
-	_, text, ok := Command("@open-nitpick fix all", "@open-nitpick")
+	_, text, ok := Command("@nitpick-review fix all", config.DefaultMention)
 	if !ok {
 		t.Fatal("not read as a mention")
 	}

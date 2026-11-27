@@ -1,6 +1,6 @@
 # Working in this repository
 
-open-nitpick is a self-hosted, model-agnostic pull request reviewer. Everything
+nitpick is a self-hosted, model-agnostic pull request reviewer. Everything
 above the generated block is written by hand and no command rewrites it.
 
 ## Gates

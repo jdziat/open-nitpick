@@ -7,7 +7,7 @@ import (
 
 // Environment variables that supply a model when the config file does not.
 // These mirror the SDK's own NewFromEnv convention so a user who already has
-// them exported can run open-nitpick with no config file at all.
+// them exported can run nitpick with no config file at all.
 const (
 	EnvProvider = "LLM_PROVIDER"
 	EnvModel    = "LLM_MODEL"

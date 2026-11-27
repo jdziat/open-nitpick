@@ -4,7 +4,7 @@
 Mira drops a draft comment after a critic grades how well the shown diff
 supports it: proven, plausible or unsupported, with a keep rule held in code
 (proven keeps; plausible keeps only at warning severity or worse; unsupported
-drops). open-nitpick has no such pass, so this applies the same idea to a
+drops). nitpick has no such pass, so this applies the same idea to a
 finished run, offline, and writes a new run directory the scorer can read.
 
 The critic prompt is a paraphrase of Mira's, not a copy. The grade is requested

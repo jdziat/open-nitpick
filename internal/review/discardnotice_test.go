@@ -538,7 +538,7 @@ func TestTheUncoveredListIsBoundedPerReason(t *testing.T) {
 // When every changed file is set aside there are no batches to send, so the
 // engine returns before any model or analyzer is asked anything and the
 // summary renders empty, at which point the forge publishes its own default
-// body, "open-nitpick found nothing to comment on", for a change nothing read.
+// body, "nitpick found nothing to comment on", for a change nothing read.
 // One file under vendor/ reaches it, and vendored code is compiled into the
 // binary.
 func TestAChangeNothingReviewedSaysSoRatherThanReadingClean(t *testing.T) {

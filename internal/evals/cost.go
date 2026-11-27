@@ -260,7 +260,7 @@ func MeterClient(c *llm.Client) *Meter {
 // MeterJudge installs metering on the judge's client.
 //
 // The judge is metered separately and never folded into a contender's cost. It
-// is a MEASUREMENT expense: nobody running open-nitpick pays for a judge, so
+// is a MEASUREMENT expense: nobody running nitpick pays for a judge, so
 // adding its tokens to a review's would overstate what the tool costs by
 // whatever the judge happens to charge, currently more than the input rate of
 // more than half the battery.
@@ -335,7 +335,7 @@ type Tier struct {
 // the previous table was a correct copy of it, and that block is one endpoint's
 // price. OpenRouter serves 15 of the 20 battery models from between
 // 5 and 34 endpoints, spanning 22x on openai/gpt-5.6-luna and 3.9x on
-// z-ai/glm-5.2, and open-nitpick pins no provider, so which one served a request
+// z-ai/glm-5.2, and nitpick pins no provider, so which one served a request
 // is the router's choice and is recorded nowhere. A $/DEFECT figure was
 // therefore a point inside a band whose width is a property of the model, and
 // the five models with no band at all are the five qwen entries, so the error
@@ -414,7 +414,7 @@ type Price struct {
 	// five-minute rate is the cheaper of the two, which is the direction that
 	// flatters a model into being the default.
 	//
-	// Nothing in open-nitpick enables prompt caching today, so this refusal
+	// Nothing in nitpick enables prompt caching today, so this refusal
 	// should never fire, which is why it is encoded rather than left as a
 	// comment: "no path sends these tokens" is a property of this month's call
 	// sites, and the accounting has to be right the month somebody adds one.
@@ -731,7 +731,7 @@ func parsePrice(raw rawPrice) (Price, error) {
 func parseRouting(raw *rawRouting, base Rates, endpoint string) (Routing, error) {
 	if raw == nil {
 		return Routing{}, fmt.Errorf("has no routing block: OpenRouter serves most of this battery from " +
-			"several endpoints at different rates and open-nitpick pins none of them, so an entry that " +
+			"several endpoints at different rates and nitpick pins none of them, so an entry that " +
 			"records one rate and says nothing about the others reports a point as though it were the price")
 	}
 
@@ -1680,7 +1680,7 @@ func (r CostRow) banded(c Cost) Cost {
 	scale := c.USD / total
 	c.Low, c.High, c.Banded = low*scale, high*scale, true
 	c.BandReason = fmt.Sprintf("%s costs $%.6f to $%.6f here depending on which of its %d endpoints served the "+
-		"request (cheapest %s, dearest %s); the printed amount is the %s rate. open-nitpick pins no provider, "+
+		"request (cheapest %s, dearest %s); the printed amount is the %s rate. nitpick pins no provider, "+
 		"so nothing records which one it was — pin one to collapse this to a single number",
 		r.Model, c.Low, c.High, r.Price.Routing.Endpoints,
 		r.Price.Routing.Cheapest, r.Price.Routing.Dearest, r.Price.Endpoint)
@@ -2040,7 +2040,7 @@ const CostReadingLegend = "$/DEFECT IS NOT A RANKING ON ITS OWN. It is minimised
 	"be ranked. An amount marked ! was priced from a rate old enough to recapture. " +
 	"AN AMOUNT MARKED ~ IS ONE POINT INSIDE A ROUTING BAND. OpenRouter serves most of this battery from " +
 	"several endpoints at different rates — SPREAD is how many times dearer the dearest is — and " +
-	"open-nitpick pins no provider, so which one served a request is unrecorded. Two such amounts may be " +
+	"nitpick pins no provider, so which one served a request is unrecorded. Two such amounts may be " +
 	"ordered only if their bands are disjoint; the pairs that fail that test are listed above as NOT " +
 	"ORDERABLE. The five qwen rows have a spread of 1.0x and are exact, which is why the marker matters: " +
 	"the column mixes exact figures with figures that could be several times either way. Pin a provider " +

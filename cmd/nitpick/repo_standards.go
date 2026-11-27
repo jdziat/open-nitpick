@@ -294,7 +294,7 @@ func repoStandardsAnalyzers(paths []string) []linters.CatalogEntry {
 		if selected[entries[i].Name] {
 			entries[i].Default = true
 			entries[i].NeedsConfig = false
-			entries[i].Configuration = "open-nitpick's isolated convention rules"
+			entries[i].Configuration = "nitpick's isolated convention rules"
 		}
 	}
 	return entries

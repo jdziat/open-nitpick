@@ -32,7 +32,7 @@ const EnvIgnoreUnknownKeys = "NITPICK_IGNORE_UNKNOWN_KEYS"
 // allow_private_endpoint, are the ones that decide *where* a request goes and
 // *which* credential rides along with it.
 //
-// open-nitpick reviews pull requests, and a pull request can edit the config
+// nitpick reviews pull requests, and a pull request can edit the config
 // file it is reviewed under. If these keys were honored from that file, a
 // contributor could point the reviewer at an endpoint they control and name the
 // environment variable whose value gets sent as the bearer token, turning a CI

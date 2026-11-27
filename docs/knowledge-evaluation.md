@@ -49,7 +49,7 @@ refactor commit is not evidence the old code was defective, and authorship is
 never the label. Style and slop get a separate manually labelled slice from the
 same repositories, with counterexamples.
 
-open-nitpick's own three historical bugs stay a diagnostic corpus, with the
+nitpick's own three historical bugs stay a diagnostic corpus, with the
 selection bias stated: we already know those targets.
 
 ### The selection, frozen 2026-09-08

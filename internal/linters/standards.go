@@ -243,7 +243,7 @@ func countLines(path string) (int, error) {
 // languageConventionConfigs preserves explicit operator settings and supplies
 // portable convention rules without loading project plugins or configuration.
 func languageConventionConfigs(root string, cfg *config.Config) (func(), error) {
-	dir, err := os.MkdirTemp("", "open-nitpick-conventions-")
+	dir, err := os.MkdirTemp("", "nitpick-conventions-")
 	if err != nil {
 		return nil, err
 	}

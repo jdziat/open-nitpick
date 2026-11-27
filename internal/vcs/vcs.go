@@ -416,7 +416,7 @@ type IncrementalDiffer interface {
 // ReviewEvent selects the review disposition.
 type ReviewEvent string
 
-// Review dispositions. open-nitpick defaults to Comment: a bot that can block
+// Review dispositions. nitpick defaults to Comment: a bot that can block
 // merges is a bot people disable.
 const (
 	EventComment        ReviewEvent = "COMMENT"

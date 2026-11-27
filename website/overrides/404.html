@@ -4,7 +4,7 @@
   main.html special-cases the homepage and falls through to the theme for
   everything else, and the theme builds its title and its cards from page,
   which mkdocs does not give a theme template. Without these the tab, the
-  history entry and the bookmark all read "open-nitpick", and a dead link
+  history entry and the bookmark all read "nitpick", and a dead link
   pasted into a chat client unfurled as the project's front page with no
   address on it. Both names are read by main.html, which is where the cards
   are written.
@@ -41,7 +41,7 @@
     the repository, so a link written against the old layout can miss.
   </p>
   <ul>
-    <li><a href="{{ 'guide/' | url }}">Guide</a>: what open-nitpick is and how to run it.</li>
+    <li><a href="{{ 'guide/' | url }}">Guide</a>: what nitpick is and how to run it.</li>
     <li><a href="{{ 'docs/configuration-reference/' | url }}">Configuration reference</a>: every key <code>.nitpick.yaml</code> accepts.</li>
     <li><a href="{{ config.repo_url }}">The repository</a>: the source, the releases, and the issue tracker.</li>
   </ul>

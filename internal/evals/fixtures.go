@@ -1,4 +1,4 @@
-// Package evals runs open-nitpick against real models and scores the result.
+// Package evals runs nitpick against real models and scores the result.
 //
 // Unit tests prove the tooling behaves correctly given a scripted model. They
 // cannot tell you whether the PROMPTS work, whether a real model, handed a

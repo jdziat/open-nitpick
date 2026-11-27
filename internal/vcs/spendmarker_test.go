@@ -1,6 +1,9 @@
 package vcs
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // The marker is the only durable record of what a run spent, so its two ends
 // are tested together: a value written by one run and read by the next.
@@ -57,5 +60,20 @@ func TestOnlyTheFormThisToolWritesIsReadAsSpend(t *testing.T) {
 
 	if v, ok := parseSpend(spendMarker(1)); !ok || v != 1 {
 		t.Errorf("the marker this tool writes did not read back: %v, %v", v, ok)
+	}
+}
+
+// DefaultBotMarker is how the reviewer finds its own comments on a pull request,
+// and every comment it has ever posted on one carries it. Renaming it makes every
+// open pull request look as though nobody had reviewed it. It stays under the name
+// the product had when those comments were written, whatever the product is called
+// now.
+func TestTheBotMarkerIsTheOneEveryPostedCommentAlreadyCarries(t *testing.T) {
+	if DefaultBotMarker != "<!-- open-nitpick -->" {
+		t.Errorf("DefaultBotMarker = %q; comments already on pull requests carry %q", DefaultBotMarker, "<!-- open-nitpick -->")
+	}
+	// The marker is what the reviewer looks for in a comment's body.
+	if !strings.Contains("a finding\n\n<!-- open-nitpick -->", DefaultBotMarker) {
+		t.Error("a comment already posted does not contain the marker")
 	}
 }

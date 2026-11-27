@@ -1,4 +1,4 @@
-# open-nitpick against Incumbent
+# nitpick against Incumbent
 
 !!! note "What Incumbent names in these tables"
 
@@ -18,7 +18,7 @@ because it could not be run here.
 
 ## Capabilities
 
-| capability | Incumbent | open-nitpick |
+| capability | Incumbent | nitpick |
 |---|---|---|
 | Runs where | hosted; self-hosted on an enterprise plan | anywhere: GitHub Action, any CI, a laptop, offline against a checkout |
 | Model | theirs, undisclosed | any of 18 providers, any OpenRouter model, any OpenAI-compatible endpoint, local models; different models per role |
@@ -30,7 +30,7 @@ because it could not be run here.
 | Static analyzers | ~50 tools, auto-selected | 33 tools, auto-detected when installed, every one isolated from the tree; see [Analyzers](analyzers.md) |
 | Repository context | indexes the repository | attaches the definitions a changed line uses: Go (types and methods), TypeScript (aliases, barrels), Python (package re-exports), Ruby (Rails autoload), Rust, Java, Kotlin, C/C++; and the untouched callers of what a change redefines, with the constants they pass: Go, Python, TypeScript |
 | Disclosure | summary and walkthrough | every file not reviewed, every analyzer that did not run, every finding an analyzer produced and the review discarded, every part of the change an analyzer did not cover, every finding a domain expert overruled |
-| Chat, `@mention` commands | yes | yes; `@open-nitpick review` resumes, `@open-nitpick restart-review` starts fresh, `@open-nitpick resolve` closes a thread, anything else is a question answered in it. Bounded by `review.respond.from`, which defaults to owner, member and collaborator, and by `max_per_pull_request` |
+| Chat, `@mention` commands | yes | yes; `@nitpick-review review` resumes, `@nitpick-review restart-review` starts fresh, `@nitpick-review resolve` closes a thread, anything else is a question answered in it. Bounded by `review.respond.from`, which defaults to owner, member and collaborator, and by `max_per_pull_request` |
 | Learnings from human feedback | yes | no |
 | Multi-line committable suggestions | yes | yes, up to 40 lines within one hunk, and only when the lines it would replace match the diff; a range that fails either check is published as a described change rather than a wrong one-click apply |
 | Sequence diagrams, docstring generation, issue creation | yes | no |
@@ -161,7 +161,7 @@ diffs at identical times. `cmd/benchrepo score` scores each reviewer's
 inline comments with the runner's scorer; a review with no inline comment
 counts as located nothing, which is what it is.
 
-| language | open-nitpick | Incumbent (hosted) |
+| language | nitpick | Incumbent (hosted) |
 |---|---|---|
 | Go | R 16/18, N 0/19 | R 14/18, N 4/19 |
 | Python | R 6/8, N 1/9 | R 7/8, N 0/9 |
@@ -193,19 +193,19 @@ between the two columns was checked against the actual comments:
 - `go-empty-filter-deletes-all`: its extra finding is golangci-lint's
   `errcheck` on an ignored `fmt.Fprintf`, which it ran and this run did
   not: the benchmark runner has no golangci-lint installed, so
-  open-nitpick's analyzer auto-detection had nothing to run. That is a real
+  nitpick's analyzer auto-detection had nothing to run. That is a real
   difference in the hosted product's favour: it brings its analyzers.
 - `go-hardcoded-secret`, `php-forbidden-vs-404`, `defensive-copy-nit`:
   Incumbent posted a walkthrough and no inline comment on all three. The
   committed `sk-live-` key is the one miss that matters.
 - `python-secret-to-audit-log`, `retry-no-backoff`: Incumbent found what
-  open-nitpick's single noise finding sat next to; on Python it is one
+  nitpick's single noise finding sat next to; on Python it is one
   plant ahead.
 
 **What the hosted product does that this does not.** Every Incumbent
 comment carries a category, an effort label, a proposed fix as a diff, a
 committable suggestion, and a prompt for an agent; several carry the shell
-script it ran to verify the finding against the repository. open-nitpick's
+script it ran to verify the finding against the repository. nitpick's
 comment carries the severity, the class, the title, the consequence, and
 which model found and triaged it. On a defect both found, both comments were
 right; theirs is longer and more actionable, ours is shorter and says who
@@ -240,7 +240,7 @@ pass. Two things it does not control for, both of which cut the same way for
 both reviewers: the first layout told the model it was reading fixtures, and
 the incumbent's run predates the four fixtures it never reviewed at all.
 
-| | open-nitpick, after remediation | Incumbent (hosted), first full run |
+| | nitpick, after remediation | Incumbent (hosted), first full run |
 |---|---|---|
 | plants located | **36 of 41** | 30 of 41 |
 | noise, at the shipped `min_severity: info` | 8 over 44 | 5 over 44 |
@@ -259,8 +259,8 @@ above.
 | reviewer | $ per review on these corpora | ratio |
 |---|---|---|
 | Incumbent, on demand | $0.25 to $0.36 | 1× |
-| open-nitpick, sonnet-4.6 with related context | $0.019 to $0.022 | 12 to 19× cheaper |
-| open-nitpick, glm-5.3-flash with related context | $0.0011 to $0.0018 | 140 to 330× cheaper |
+| nitpick, sonnet-4.6 with related context | $0.019 to $0.022 | 12 to 19× cheaper |
+| nitpick, glm-5.3-flash with related context | $0.0011 to $0.0018 | 140 to 330× cheaper |
 
 The seat-priced plan is a different arithmetic and depends on how many pull
 requests a seat reviews a month; at $24 a seat and one review a day it is

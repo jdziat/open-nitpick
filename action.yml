@@ -1,6 +1,6 @@
-name: open-nitpick
+name: nitpick
 description: Self-hosted, model-agnostic pull request review.
-author: open-nitpick contributors
+author: nitpick contributors
 
 branding:
   icon: check-square
@@ -108,7 +108,7 @@ inputs:
 
   version:
     description: >-
-      Version of open-nitpick to install: a release tag such as v1.0.0, or
+      Version of nitpick to install: a release tag such as v1.0.0, or
       latest. The release binary for the runner is downloaded and its checksum
       verified; when no release matches — or the repository is private and
       its releases cannot be fetched — the binary is built from the Action's
@@ -215,7 +215,7 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Install open-nitpick
+    - name: Install nitpick
       id: install
       shell: bash
       env:
@@ -255,7 +255,7 @@ runs:
               echo "source=release $version" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            echo "::warning::open-nitpick: checksum mismatch for $asset; building from source instead"
+            echo "::warning::nitpick: checksum mismatch for $asset; building from source instead"
           fi
         fi
         echo "source=build" >> "$GITHUB_OUTPUT"
@@ -268,7 +268,7 @@ runs:
         cache: false
 
     # Private forks may have no reachable release, so build from this checkout.
-    - name: Build open-nitpick from the Action's checkout
+    - name: Build nitpick from the Action's checkout
       if: steps.install.outputs.source == 'build'
       shell: bash
       env:
@@ -280,7 +280,7 @@ runs:
         version="$(git -C "$ACTION_PATH" describe --tags --always 2>/dev/null || echo source)"
         (cd "$ACTION_PATH" && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$version" -o "$bin/nitpick" ./cmd/nitpick)
         echo "$bin" >> "$GITHUB_PATH"
-        echo "built open-nitpick $version from $ACTION_PATH"
+        echo "built nitpick $version from $ACTION_PATH"
 
     # The hosted reviewers bring their analyzers; this one runs whatever is
     # on the runner, which on a stock image is nothing. `analyzers` closes
@@ -395,13 +395,13 @@ runs:
             htmlhint)      npm_tool htmlhint htmlhint ;;
             markdownlint)  npm_tool markdownlint markdownlint-cli ;;
             "")            ;;
-            *) echo "::warning::open-nitpick: no installer for analyzer '$tool'; install it on the runner yourself" ;;
+            *) echo "::warning::nitpick: no installer for analyzer '$tool'; install it on the runner yourself" ;;
           esac
         done
         for tool in "${tools[@]}"; do
           [ -z "$tool" ] && continue
           bin_name="$tool"; [ "$tool" = psscriptanalyzer ] && bin_name=pwsh
-          if have "$bin_name"; then echo "$tool: $(command -v "$bin_name")"; else echo "::warning::open-nitpick: $tool did not install"; fi
+          if have "$bin_name"; then echo "$tool: $(command -v "$bin_name")"; else echo "::warning::nitpick: $tool did not install"; fi
         done
         exit 0
 
@@ -479,7 +479,7 @@ runs:
           status=$?
           set -e
           if [ "$status" -ne 0 ]; then
-            echo "::error::open-nitpick: respond failed (exit $status)"
+            echo "::error::nitpick: respond failed (exit $status)"
             echo "result=error" >> "$GITHUB_OUTPUT"
             exit 2
           fi
@@ -489,7 +489,7 @@ runs:
         case "$NITPICK_COMMAND" in
           review|fast-review|deep-review) ;;
           *) message="command must be review, fast-review, deep-review, or respond"
-             echo "::error::open-nitpick: $message"
+             echo "::error::nitpick: $message"
              echo "result=error" >> "$GITHUB_OUTPUT"
              exit 2 ;;
         esac
@@ -503,7 +503,7 @@ runs:
             ;;
           merge_group)
             if [ -z "$MERGE_BASE" ] || [ -z "$MERGE_HEAD" ]; then
-              echo "::error::open-nitpick: merge_group requires base and head SHAs"
+              echo "::error::nitpick: merge_group requires base and head SHAs"
               echo "result=error" >> "$GITHUB_OUTPUT"
               exit 2
             fi
@@ -515,7 +515,7 @@ runs:
               base="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD~1 2>/dev/null || true)"
             fi
             if [ -z "$base" ]; then
-              echo "::error::open-nitpick: a push with no reachable parent commit cannot be reviewed"
+              echo "::error::nitpick: a push with no reachable parent commit cannot be reviewed"
               echo "result=error" >> "$GITHUB_OUTPUT"
               exit 2
             fi
@@ -524,7 +524,7 @@ runs:
             ;;
           *)
             if [ -z "$PR_NUMBER" ]; then
-              echo "::error::open-nitpick: $EVENT_NAME names no pull request; set the pr-number input"
+              echo "::error::nitpick: $EVENT_NAME names no pull request; set the pr-number input"
               echo "result=error" >> "$GITHUB_OUTPUT"
               exit 2
             fi
@@ -534,7 +534,7 @@ runs:
           flags+=(-pr "$PR_NUMBER")
         fi
         if [ "$IS_FORK" = "true" ]; then
-          echo "::notice::open-nitpick: pull request from a fork; if the token cannot post, the review goes to the job summary"
+          echo "::notice::nitpick: pull request from a fork; if the token cannot post, the review goes to the job summary"
         fi
 
         # Extra args are split on whitespace deliberately; they are an escape
@@ -552,7 +552,7 @@ runs:
         # other nonzero exits mean review failed.
         case "$status" in
           0|1|3) ;;
-          *) echo "::error::open-nitpick failed to run (exit $status)"
+          *) echo "::error::nitpick failed to run (exit $status)"
              grep -q '^result=' "$GITHUB_OUTPUT" 2>/dev/null || echo "result=error" >> "$GITHUB_OUTPUT" ;;
         esac
         exit "$status"

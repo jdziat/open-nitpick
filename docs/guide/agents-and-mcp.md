@@ -1,4 +1,4 @@
-# Use open-nitpick from an agent
+# Use nitpick from an agent
 
 `nitpick mcp` serves local review tools over MCP standard input and output. It
 uses the configuration and provider environment of the repository where it

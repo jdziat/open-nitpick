@@ -1,6 +1,6 @@
 # Guide
 
-open-nitpick reviews code with the model and evidence-gathering tools you
+nitpick reviews code with the model and evidence-gathering tools you
 configure. Each review reports findings and whether its planned work completed,
 so a quiet result can be distinguished from a review that did not finish.
 Choose the job below; use the [CLI reference](reference/cli.md) for exact flags.

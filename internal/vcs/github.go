@@ -802,9 +802,9 @@ func (g *GitHub) ChangedSince(ctx context.Context, ref Ref, since string) ([]str
 // a body for COMMENT and REQUEST_CHANGES reviews.
 func defaultReviewBody(comments int, marker string) string {
 	if comments == 0 {
-		return "open-nitpick found nothing to comment on.\n" + marker
+		return "nitpick found nothing to comment on.\n" + marker
 	}
-	return fmt.Sprintf("open-nitpick left %d inline comment(s).\n%s", comments, marker)
+	return fmt.Sprintf("nitpick left %d inline comment(s).\n%s", comments, marker)
 }
 
 // maxSummaryBytes keeps the fallback body inside GitHub's limit.
@@ -858,7 +858,7 @@ func summaryFallbackFor(body string, cause error) string {
 // degradation does not look like a clean review.
 func summaryFallback(body string, cause error) string {
 	if strings.TrimSpace(body) == "" {
-		body = "open-nitpick could not attach inline comments to this pull request."
+		body = "nitpick could not attach inline comments to this pull request."
 	}
 
 	note := fmt.Sprintf("\n\n_Inline comments could not be posted (%v)._", truncateBytes(cause.Error(), 500))

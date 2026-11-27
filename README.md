@@ -1,6 +1,6 @@
-<p align="center"><img src="website/assets/logo.svg" width="112" alt="open-nitpick"></p>
+<p align="center"><img src="website/assets/logo.svg" width="112" alt="nitpick"></p>
 
-# open-nitpick
+# nitpick
 
 [![CI](https://github.com/nitpick-oss/nitpick/actions/workflows/ci.yml/badge.svg)](https://github.com/nitpick-oss/nitpick/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/nitpick-oss/nitpick)](https://github.com/nitpick-oss/nitpick/releases)
@@ -10,7 +10,7 @@ Self-hosted, model-agnostic pull request review.
 
 Documentation: <https://nitpick-oss.github.io/nitpick/>
 
-open-nitpick reads a pull request, reviews it with a model you choose, and posts
+nitpick reads a pull request, reviews it with a model you choose, and posts
 inline comments. Run it as a GitHub Action, as a CLI in any CI system, as MCP
 tools inside an agent session, or against your uncommitted working tree.
 

@@ -155,7 +155,7 @@ func goSource(firstLine string, bodies ...string) string {
 // It is assembled rather than written literally so that this FILE does not
 // contain one at column 1. positionsRewritten scans the package under analysis,
 // and a test that plants a working directive in its own source would make
-// open-nitpick refuse to analyze internal/linters the next time anybody edits
+// nitpick refuse to analyze internal/linters the next time anybody edits
 // it, a detector that breaks the review of its own package gets deleted.
 func lineDirective(target string, line int) string {
 	return "//" + "line " + target + ":" + strconv.Itoa(line)
@@ -175,7 +175,7 @@ func lineDirective(target string, line int) string {
 // Report.Error and the status "ran(isolated)": byte-identical to a clean review,
 // in strict mode as well as auto.
 //
-// The fix is an open-nitpick-owned config living outside the tree, which is a
+// The fix is an nitpick-owned config living outside the tree, which is a
 // different thing from the tree supplying policy. Delete `generated: disable`
 // from golangci.yml and this test fails.
 func TestAGeneratedFileHeaderDoesNotSilenceTheFileUnderReview(t *testing.T) {
@@ -230,7 +230,7 @@ func TestOpenNitpickAnalyzerConfigIsNeverWrittenIntoTheRepository(t *testing.T) 
 	defer cleanup()
 
 	if rel, err := filepath.Rel(repo, file); err == nil && !strings.HasPrefix(rel, "..") {
-		t.Fatalf("open-nitpick wrote its analyzer config to %s, inside the repository under "+
+		t.Fatalf("nitpick wrote its analyzer config to %s, inside the repository under "+
 			"review; that is this tool putting policy into the tree and then reading it back", file)
 	}
 
@@ -257,7 +257,7 @@ func TestOpenNitpickAnalyzerConfigIsNeverWrittenIntoTheRepository(t *testing.T) 
 	writeFile(t, repo, "app.go", goSource("", uncheckedError("F")))
 
 	if _, err := (&golangciLint{}).Run(context.Background(), repo, []string{"app.go"}); err == nil {
-		t.Fatal("golangci-lint ran without the configuration open-nitpick owns; a review that " +
+		t.Fatal("golangci-lint ran without the configuration nitpick owns; a review that " +
 			"cannot be contained has to be a visible failure, not a quieter review")
 	}
 }
@@ -495,7 +495,7 @@ func TestSourceThatMerelyMentionsALineDirectiveIsAnalyzed(t *testing.T) {
 //
 // positionsRewritten reads the source of the package under analysis, and the
 // files describing the attack are in this repository. If any of them contains a
-// working directive, open-nitpick refuses to review changes to its own analyzer
+// working directive, nitpick refuses to review changes to its own analyzer
 // package, which is both a bug and the kind that only shows up in production.
 func TestThisPackageIsAnalyzable(t *testing.T) {
 	entries, err := os.ReadDir(".")
@@ -513,7 +513,7 @@ func TestThisPackageIsAnalyzable(t *testing.T) {
 			t.Fatal(err)
 		}
 		if line := goDirectiveLine(e.Name(), src); line != 0 {
-			t.Errorf("%s:%d is a working Go line directive; open-nitpick would refuse to "+
+			t.Errorf("%s:%d is a working Go line directive; nitpick would refuse to "+
 				"analyze its own linters package", e.Name(), line)
 		}
 	}
@@ -1737,7 +1737,7 @@ func TestTheSuppressionDetectorMatchesGolangciLintsOwnRule(t *testing.T) {
 // file.
 //
 // It goes through the runner rather than shelling out directly so that the
-// measurement is taken under the configuration open-nitpick ships,
+// measurement is taken under the configuration nitpick ships,
 // a comment that suppresses nothing under stock defaults but everything under
 // ours would be a fact about a run nobody has.
 func suppressedByGolangciLint(t *testing.T, comment string) bool {

@@ -5,7 +5,7 @@
 
 ## Problem
 
-open-nitpick reviews pull requests on the contributor's host with a model of
+nitpick reviews pull requests on the contributor's host with a model of
 its choice. Its measured obstacle is precision at unchanged recall, and its
 fix proposals are generated but unverified. Its cost accounting exists in
 pieces; the gaps are completeness and retained evidence, not a missing meter.

@@ -41,7 +41,7 @@ func TestActionsOutputsAndSummaryAreWrittenByTheCLI(t *testing.T) {
 
 	summary, _ := os.ReadFile(a.summary)
 	s := string(summary)
-	for _, want := range []string{"## open-nitpick", "Result: **findings**", "3 file(s) reviewed", "Adds a retry path.",
+	for _, want := range []string{"## nitpick", "Result: **findings**", "3 file(s) reviewed", "Adds a retry path.",
 		"| error | [`a.go:4`](https://github.com/o/r/pull/7/files) | Ignored error \\| from Get |", "golangci-lint — ran", "already posted"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("summary lacks %q:\n%s", want, s)

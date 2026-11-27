@@ -155,7 +155,7 @@ ESLintConfig is an absolute path to an eslint flat config outside the repository
 ### `linters.golangci_config`
 
 string, default `none`.
-GolangciConfig is an absolute path to a .golangci.yml outside the repository. Empty runs golangci-lint under open-nitpick's own config, materialized outside the repository.
+GolangciConfig is an absolute path to a .golangci.yml outside the repository. Empty runs golangci-lint under nitpick's own config, materialized outside the repository.
 
 ### `linters.max_severity`
 
@@ -1582,8 +1582,8 @@ MaxRounds ends a series of reviews of one pull request.
 
 ### `review.mention`
 
-string, default `@open-nitpick`.
-Mention is the handle a comment uses to talk to the reviewer: "@open-nitpick review" resumes, "@open-nitpick restart-review" starts fresh, "@open-nitpick resolve" closes the thread; anything else is a question.
+string, default `@nitpick-review`.
+Mention is the handle a comment uses to talk to the reviewer: "@nitpick-review review" resumes, "@nitpick-review restart-review" starts fresh, "@nitpick-review resolve" closes the thread; anything else is a question.
 
 ### `review.min_severity`
 

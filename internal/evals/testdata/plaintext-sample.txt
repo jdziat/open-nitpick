@@ -11,7 +11,7 @@ Directory : cr-probe
 
 ────────────────────────────────────────────────────────────────────────
   critical [Security & Privacy]
-  → ]8;;vscode://file//tmp/claude-1000/-home-jdziat-Code-jdziat-open-nitpick/3205858d-bfa5-4452-9d1a-4a7840d5f4fb/scratchpad/cr-probe/store.go:10store.go:10-12]8;;
+  → ]8;;vscode://file//tmp/claude-1000/-home-jdziat-Code-jdziat-nitpick/3205858d-bfa5-4452-9d1a-4a7840d5f4fb/scratchpad/cr-probe/store.go:10store.go:10-12]8;;
 
   Use a bound parameter for name.
 

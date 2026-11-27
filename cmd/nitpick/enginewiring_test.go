@@ -16,7 +16,7 @@ import (
 // TestTheReviewEngineIsWiredAgainstTheChangesOwnPolicy guards one constructor
 // and says in its own header that dropping the wiring elsewhere is a clean
 // build and a green suite. It was right: a second constructor had neither
-// field, so `@open-nitpick improve` ran a whole review under configuration the
+// field, so `@nitpick-review improve` ran a whole review under configuration the
 // change supplied, and internal/review's nil branch said nothing about it.
 //
 // A scan rather than a list, for the reason internal/config's modelRoleKeys is

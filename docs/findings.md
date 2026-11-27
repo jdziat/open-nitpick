@@ -16,7 +16,7 @@ the whole of what is supportable, and the two halves have to be read together.
 Counted, no judge, on real pull requests (2026-09-03, 44 pull requests on
 `nitpick-oss/nitpick-bench`):
 
-| | open-nitpick | Incumbent |
+| | nitpick | Incumbent |
 |---|---|---|
 | plants located | 33 of 41 | 30 of 41 |
 | noise findings over 44 pull requests | 1 | 5 |
@@ -41,7 +41,7 @@ plants and findings, not from a model scoring a review.
 Superseded by the two above, kept because the corrections under it are the
 reason this document has a measurement section at all.
 
-On 8 single-file fixtures judged by `openai/gpt-5.6-terra`, open-nitpick was
+On 8 single-file fixtures judged by `openai/gpt-5.6-terra`, nitpick was
 competitive with Incumbent on detection and behind it on precision:
 `anthropic/claude-sonnet-4.6` at 3 runs per fixture, detection 71%, precision
 0.82, grade 3.69 against 3.90. The grade gap is inside the judge's own noise and
@@ -66,7 +66,7 @@ from the tree. Our own side is a live measurement and does not.
 Twenty measurement bugs have been found, listed below. Six of them scored
 against Incumbent and seven flattered whichever behaviour this project would
 rather see (silence, selective reporting, or the author's own argument).
-None were bugs in open-nitpick.
+None were bugs in nitpick.
 
 The count is the number of rows in the table, so it moves when the table does.
 It said "nine" against fourteen rows for two rounds, which is the same failure
