@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -262,5 +263,27 @@ func TestTheJSONRoutesUseLowercaseSnakeCaseNamesThroughout(t *testing.T) {
 			}
 		}
 		walk(v)
+	}
+}
+
+func TestTheReviewListSaysHowManyThereAreWhenItIsCutShort(t *testing.T) {
+	ts, c := newHub(t)
+	for i := 0; i < 205; i++ {
+		_, err := c.store.Add(context.Background(), Review{Repo: "r", Commit: strconv.Itoa(i), At: t0.Add(-time.Duration(i) * time.Minute), Result: "clean", Complete: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, body := do(t, "GET", ts.URL+"/v1/reviews?days=30", readSecret, "")
+	var out struct {
+		Reviews   []json.RawMessage `json:"reviews"`
+		Total     int               `json:"total"`
+		Truncated bool              `json:"truncated"`
+	}
+	if err := json.Unmarshal([]byte(body), &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Reviews) != 200 || out.Total != 205 || !out.Truncated {
+		t.Fatalf("%d reviews, total %d, truncated %v: a cut-short list must say so", len(out.Reviews), out.Total, out.Truncated)
 	}
 }

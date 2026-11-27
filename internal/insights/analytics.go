@@ -128,6 +128,9 @@ func (s *Store) Hotspots(q Query) []Hotspot {
 		if out[i].Score != out[j].Score {
 			return out[i].Score > out[j].Score
 		}
+		if out[i].Repo != out[j].Repo {
+			return out[i].Repo < out[j].Repo
+		}
 		return out[i].Path < out[j].Path
 	})
 	return out
@@ -250,7 +253,7 @@ func (s *Store) Repos(q Query) []RepoRow {
 	defer s.mu.Unlock()
 	by := map[string]*RepoRow{}
 	for _, r := range s.reviews {
-		if r.At.Before(from) || r.At.After(q.Now) {
+		if q.Repo != "" && r.Repo != q.Repo || r.At.Before(from) || r.At.After(q.Now) {
 			continue
 		}
 		row := by[r.Repo]

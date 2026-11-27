@@ -187,7 +187,7 @@ func (c *Component) overviewPage(r *http.Request) (any, error) {
 		hs = hs[:5]
 	}
 	for i, h := range hs {
-		v.Hotspots = append(v.Hotspots, c.hotspotRow(i+1, h, sparkScale(hs)))
+		v.Hotspots = append(v.Hotspots, c.hotspotRow(i+1, h, sparkScale(hs), q.Days))
 	}
 	v.NoTrend = len(hs) > 0 && !hs[0].Baseline
 	for i, rv := range c.store.Reviews(Filter{Repo: q.Repo}) {
@@ -266,8 +266,8 @@ type hotspotRow struct {
 // to ignore the colour.
 const flatBand = 1
 
-func (c *Component) hotspotRow(rank int, h Hotspot, scale int) hotspotRow {
-	v := url.Values{"path": {h.Path}, "repo": {h.Repo}}
+func (c *Component) hotspotRow(rank int, h Hotspot, scale, days int) hotspotRow {
+	v := url.Values{"path": {h.Path}, "repo": {h.Repo}, "days": {strconv.Itoa(days)}}
 	trend, text := TrendFlat, ""
 	switch d := h.Recent - h.Prior; {
 	case !h.Baseline:
@@ -312,7 +312,7 @@ func (c *Component) hotspotsPage(r *http.Request) (any, error) {
 	v := hotspotsView{NoTrend: len(hs) > 0 && !hs[0].Baseline, Scope: c.scope(r, "/ui/insights/hotspots", q), Total: len(hs), Empties: noReviews(), Empty: c.store.Overview(q).Empty}
 	shown := hs[:min(len(hs), 100)]
 	for i, h := range shown {
-		v.Rows = append(v.Rows, c.hotspotRow(i+1, h, sparkScale(shown)))
+		v.Rows = append(v.Rows, c.hotspotRow(i+1, h, sparkScale(shown), q.Days))
 	}
 	return v, nil
 }
@@ -349,7 +349,9 @@ func (c *Component) reposPage(r *http.Request) (any, error) {
 	}
 	v := reposView{Scope: c.scope(r, "/ui/insights/repos", q), Empties: noReviews()}
 	v.Scope.Repos = nil // this page lists every repository; a filter would hide the rest
-	for _, row := range c.store.Repos(q) {
+	listAll := q
+	listAll.Repo = "" // this page lists every repository, so a stray ?repo= must not hide the rest
+	for _, row := range c.store.Repos(listAll) {
 		v.Rows = append(v.Rows, repoRow{RepoRow: row, Href: "/ui/insights/?days=" + strconv.Itoa(q.Days) + "&repo=" + url.QueryEscape(row.Repo), Last: row.Last.Format(time.RFC3339)})
 	}
 	return v, nil

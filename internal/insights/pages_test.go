@@ -268,7 +268,7 @@ func TestATrendIsColouredOnlyWhenItMovedAndHadSomethingToCompareWith(t *testing.
 		"steady":      {Hotspot{Recent: 4, Prior: 3, Baseline: true}, TrendFlat, "steady (was 3)"},
 		"no baseline": {Hotspot{Recent: 65, Prior: 0, Baseline: false}, TrendFlat, "no earlier data"},
 	} {
-		row := c.hotspotRow(1, tc.h, 10)
+		row := c.hotspotRow(1, tc.h, 10, 30)
 		if row.Trend != tc.trend || !strings.Contains(row.TrendText, tc.text) {
 			t.Errorf("%s: %+v, want %s %q", name, row, tc.trend, tc.text)
 		}
@@ -300,8 +300,8 @@ func TestTheHotspotTablesBusiestBucketSetsEveryRowsSparklineScale(t *testing.T) 
 		t.Fatalf("scale = %d, want the busiest bucket 41", got)
 	}
 	c := &Component{}
-	alone := c.hotspotRow(1, small, 0).Spark.LastY
-	shared := c.hotspotRow(1, small, 41).Spark.LastY
+	alone := c.hotspotRow(1, small, 0, 30).Spark.LastY
+	shared := c.hotspotRow(1, small, 41, 30).Spark.LastY
 	if shared <= alone {
 		t.Fatalf("a row given the table's scale must sit lower than one scaled to itself: %v vs %v", shared, alone)
 	}
@@ -422,5 +422,23 @@ func TestAFinishedReviewWithFindingsShowsADashNotTheWordFindings(t *testing.T) {
 	}
 	if !strings.Contains(body, `<span class="muted" title="Finished with findings">–</span>`) {
 		t.Errorf("a finished review with findings shows no marker")
+	}
+}
+
+func TestAHotspotsFindingsLinkKeepsThePeriodTheReaderWasLookingAt(t *testing.T) {
+	c := &Component{}
+	row := c.hotspotRow(1, Hotspot{Repo: "r", Path: "a.go"}, 0, 90)
+	if !strings.Contains(row.FindingsHref, "days=90") {
+		t.Fatalf("the link to the findings drops the period: %s", row.FindingsHref)
+	}
+}
+
+func TestTheRepositoriesPageListsEveryRepositoryEvenWithAStrayRepoParameter(t *testing.T) {
+	u := newUI(t)
+	u.seed()
+	u.signIn("eng")
+	_, body := u.get("/ui/insights/repos?days=30&repo=acme/web")
+	if !strings.Contains(body, "acme/api") || !strings.Contains(body, "acme/web") {
+		t.Fatalf("a repo parameter hid the other repositories on the page that lists them all")
 	}
 }

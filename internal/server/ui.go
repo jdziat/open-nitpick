@@ -307,6 +307,9 @@ func (s *Server) frame(r *http.Request, id Identity, title string, view View) la
 			continue
 		}
 		href := pageHref(p)
+		if href == "" {
+			continue // a page with a wildcard has no address to link to
+		}
 		nav = append(nav, navItem{Title: p.page.Title, Href: href, Current: href == r.URL.Path})
 	}
 	return layoutData{

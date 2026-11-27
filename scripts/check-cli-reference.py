@@ -19,8 +19,9 @@ for prefix, path in (('mcp', 'cmd/nitpick/mcp.go'), ('auth', 'cmd/nitpick/auth.g
     commands.update(f'{prefix} {subcommand}' for subcommand in subcommands)
 inherits = {'fast-review': 'review', 'deep-review': 'review', 'improve': 'review', 'repo-score': 'full-review'}
 # Flags a command inherits in the docs but deliberately does not take. improve
-# never publishes, so a notary has no posted review to certify.
-not_taken = {'improve': {'-notary', '-notary-oidc-audience', '-fresh', '-clear-by', '-require-notary'}}
+# never publishes, so a notary has no posted review to certify and the insights
+# server has no review to track.
+not_taken = {'improve': {'-notary', '-notary-oidc-audience', '-fresh', '-clear-by', '-require-notary', '-insights', '-insights-repo'}}
 errors = []
 for command in sorted(commands):
     if command not in sections:

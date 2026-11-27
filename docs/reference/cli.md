@@ -115,6 +115,8 @@ deep-review](../usage.md#choosing-between-review-and-deep-review).
 | `-fresh` | Clear the notary's record for these inputs and review again. The cleared record is kept as history. Needs `-notary`. |
 | `-clear-by` | Name kept in the record's history when `-fresh` clears it. Defaults to the token's name. |
 | `-require-notary` | Label a review UNOFFICIAL and do not post it unless a notary kept its record. The findings still print, and the gate still applies. |
+| `-insights` | URL of a `nitpick-server` with the [insights](../insights.md) component. After the review is published and printed, the report is posted so the server can show findings and hotspots over time. The credential is read from `NITPICK_INSIGHTS_TOKEN`. A failed post is a warning and does not change the exit status. |
+| `-insights-repo` | Repository name to report under. Defaults to the pull request's, then `GITHUB_REPOSITORY`. Needs `-insights`. |
 | `-log-format` | Log format: `text` (default) or `json`. |
 | `-v` | Print verbose logs. |
 
@@ -255,8 +257,8 @@ from [`review`](#review), but rejects pull-request publishing coordinates:
 passing `-pr`, `-owner`, or `-repo-name`, or running in an Actions pull-request
 job, exits with an error instead of posting. So `-dry-run` and `-skip-draft`
 have nothing to act on here; every `improve` run prints locally, and it takes
-none of the `-notary` flags, since there is no posted review for a notary to
-certify. It also accepts
+none of the `-notary` or `-insights` flags, since there is no posted review for a
+notary to certify or a server to track. It also accepts
 the following local-only controls.
 
 | Extra flag | Meaning |

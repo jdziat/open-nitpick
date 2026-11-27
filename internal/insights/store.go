@@ -40,12 +40,30 @@ const (
 	maxSkew     = 5 * time.Minute
 )
 
-// severityWeight is what a finding adds to a file's hotspot score. The spacing is
-// deliberate: one critical outranks several nits, but not a pile of errors.
-var severityWeight = map[string]float64{"nit": 0.25, "info": 0.5, "warning": 1, "error": 3, "critical": 8}
+// severityScale is the one list of severities, least severe first, with what a
+// finding of each adds to a file's hotspot score. The spacing is deliberate: one
+// critical outranks several nits, but not a pile of errors.
+var severityScale = []struct {
+	name   string
+	weight float64
+}{{"nit", 0.25}, {"info", 0.5}, {"warning", 1}, {"error", 3}, {"critical", 8}}
 
 // Severities lists the accepted values, least severe first.
-var Severities = []string{"nit", "info", "warning", "error", "critical"}
+var Severities = func() []string {
+	names := make([]string, len(severityScale))
+	for i, s := range severityScale {
+		names[i] = s.name
+	}
+	return names
+}()
+
+var severityWeight = func() map[string]float64 {
+	w := make(map[string]float64, len(severityScale))
+	for _, s := range severityScale {
+		w[s.name] = s.weight
+	}
+	return w
+}()
 
 // Finding is one published finding, in the shape `review -format json` prints.
 type Finding struct {

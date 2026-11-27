@@ -9,6 +9,9 @@
 {{- if and .Values.oidc.allow (not .Values.oidc.audience) }}
 {{- fail "oidc.allow needs oidc.audience" }}
 {{- end }}
+{{- if and .Values.insightsTokens .Values.insightsExistingSecret }}
+{{- fail "set insightsTokens or insightsExistingSecret, not both: the Secret you name wins and the listed tokens would be silently ignored" }}
+{{- end }}
 {{- if not (or .Values.tokens .Values.existingSecret .Values.oidc.audience .Values.config.existingSecret .Values.insightsTokens .Values.insightsExistingSecret) }}
 {{- fail "give the server a way to authenticate: set tokens, existingSecret, insightsTokens, insightsExistingSecret, config.existingSecret or oidc.audience. With none, every request is refused" }}
 {{- end }}
@@ -31,6 +34,9 @@ spec:
       annotations:
         {{- if and (not .Values.existingSecret) .Values.tokens }}
         checksum/tokens: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if and (not .Values.insightsExistingSecret) .Values.insightsTokens }}
+        checksum/insights-tokens: {{ include (print $.Template.BasePath "/insights-secret.yaml") . | sha256sum }}
         {{- end }}
         {{- with .Values.podAnnotations }}{{ toYaml . | nindent 8 }}{{- end }}
     spec:

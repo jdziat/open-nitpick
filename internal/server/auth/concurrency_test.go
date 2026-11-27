@@ -155,17 +155,26 @@ func TestAParallelBurstOfGuessesIsHeldToTheLimit(t *testing.T) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	counts := map[int]int{}
+	var transportErrs []error
 	for n := 0; n < burst; n++ {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()
-			r, _ := s.post(url.Values{"username": {"alice"}, "password": {fmt.Sprintf("guess-%d", n)}, "csrf_token": {token}, "next": {"/ui/"}})
+			r, _, err := s.postE(url.Values{"username": {"alice"}, "password": {fmt.Sprintf("guess-%d", n)}, "csrf_token": {token}, "next": {"/ui/"}})
 			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				// Reported by the test goroutine below: FailNow is not allowed here.
+				transportErrs = append(transportErrs, err)
+				return
+			}
 			counts[r.StatusCode]++
-			mu.Unlock()
 		}(n)
 	}
 	wg.Wait()
+	if len(transportErrs) > 0 {
+		t.Fatalf("%d of %d guesses did not complete: %v", len(transportErrs), burst, transportErrs[0])
+	}
 	if counts[http.StatusUnauthorized] > pw.ByAccount.Max {
 		t.Errorf("%d of %d parallel guesses were answered as wrong passwords, want at most %d: %v", counts[http.StatusUnauthorized], burst, pw.ByAccount.Max, counts)
 	}

@@ -130,13 +130,23 @@ func (s *site) login(user, password string) (reply, string) {
 
 func (s *site) post(form url.Values) (reply, string) {
 	s.t.Helper()
-	resp, err := s.c.PostForm(s.ts.URL+"/auth/password/login", form)
+	r, body, err := s.postE(form)
 	if err != nil {
 		s.t.Fatal(err)
 	}
+	return r, body
+}
+
+// postE is post for a goroutine other than the test's, where FailNow is not
+// allowed: it returns the error for the test goroutine to report.
+func (s *site) postE(form url.Values) (reply, string, error) {
+	resp, err := s.c.PostForm(s.ts.URL+"/auth/password/login", form)
+	if err != nil {
+		return reply{}, "", err
+	}
 	defer func() { _ = resp.Body.Close() }()
 	b, _ := io.ReadAll(resp.Body)
-	return replyOf(resp), string(b)
+	return replyOf(resp), string(b), nil
 }
 
 func (s *site) signedIn() bool {

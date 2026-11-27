@@ -221,6 +221,9 @@ func (c *Component) parseQuery(r *http.Request) (Query, error) {
 	return q, nil
 }
 
+// maxListed is the most reviews GET /v1/reviews returns; the response says how many there are.
+const maxListed = 200
+
 // MaxDays is the longest window a query may ask for.
 const MaxDays = 365
 
@@ -245,13 +248,14 @@ func (c *Component) list(w http.ResponseWriter, r *http.Request) {
 		Findings int       `json:"findings"`
 	}
 	rows := []row{}
-	for _, rv := range c.store.Reviews(Filter{Repo: q.Repo, Since: from}) {
-		rows = append(rows, row{ID: rv.ID, Repo: rv.Repo, Ref: rv.Ref, Commit: rv.Commit, Result: rv.Result, At: rv.At, Complete: rv.Complete, Findings: len(rv.Findings)})
-		if len(rows) == 200 {
+	all := c.store.Reviews(Filter{Repo: q.Repo, Since: from})
+	for _, rv := range all {
+		if len(rows) == maxListed {
 			break
 		}
+		rows = append(rows, row{ID: rv.ID, Repo: rv.Repo, Ref: rv.Ref, Commit: rv.Commit, Result: rv.Result, At: rv.At, Complete: rv.Complete, Findings: len(rv.Findings)})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"reviews": rows})
+	writeJSON(w, http.StatusOK, map[string]any{"reviews": rows, "total": len(all), "truncated": len(all) > len(rows)})
 }
 
 func (c *Component) one(w http.ResponseWriter, r *http.Request) {

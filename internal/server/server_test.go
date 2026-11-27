@@ -630,3 +630,29 @@ func (h *headingComponent) Pages() []Page {
 		Heading: func(data any) string { return data.(string) },
 	})
 }
+
+func TestAPageWithAWildcardPathIsNeverOfferedInTheNavigation(t *testing.T) {
+	e := newEnv(t, Config{
+		Components: []Component{&wildcardNavComponent{stubComponent: &stubComponent{name: "stub"}}},
+		Providers:  []Provider{fakeProvider{id: "fake"}},
+		Roles:      newRoles(t, RoleRule{Roles: []Role{"admin"}, Group: "ops"}),
+		Assets:     builtAssets(),
+	})
+	e.signIn("ana", "ops")
+	_, body := e.do("GET", "/ui/stub/", nil, nil)
+	if strings.Contains(body, `<a href="">`) {
+		t.Fatalf("the navigation holds a link with no address: %.500s", body)
+	}
+	if !strings.Contains(body, `>Stub home</a>`) {
+		t.Fatalf("a linkable page must stay in the navigation")
+	}
+}
+
+type wildcardNavComponent struct{ *stubComponent }
+
+func (w *wildcardNavComponent) Pages() []Page {
+	return append(w.stubComponent.Pages(), Page{
+		Path: "thing/{id}", Title: "A thing", Nav: true, Body: `<p>x</p>`,
+		Data: func(*http.Request) (any, error) { return nil, nil },
+	})
+}

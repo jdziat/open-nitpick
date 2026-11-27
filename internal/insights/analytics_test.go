@@ -247,3 +247,42 @@ func TestTheEdgeOfThePriorWindowIsDrawnToTheMinute(t *testing.T) {
 		t.Fatalf("prior = %v: a finding ten minutes inside the edge counts and one ten minutes outside does not", prior)
 	}
 }
+
+func TestReposHonoursTheRepositoryFilterLikeEveryOtherQuery(t *testing.T) {
+	s := seeded(t)
+	_, _ = s.Add(context.Background(), review("acme/web", t0.Add(-time.Hour), finding("ui.go", "nit")))
+	if rows := s.Repos(Query{Now: t0, Days: 90, Repo: "acme/web"}); len(rows) != 1 || rows[0].Repo != "acme/web" {
+		t.Fatalf("a repo filter returned %+v", rows)
+	}
+	if rows := s.Repos(Query{Now: t0, Days: 90}); len(rows) != 2 {
+		t.Fatalf("no filter must list every repo: %+v", rows)
+	}
+}
+
+func TestHotspotsOfEqualScoreAreOrderedByRepoThenPathSoARefreshDoesNotShuffleThem(t *testing.T) {
+	s, _ := OpenStore(t.TempDir())
+	defer func() { _ = s.Close() }()
+	for _, repo := range []string{"b", "a", "c"} {
+		_, _ = s.Add(context.Background(), review(repo, t0, finding("same.go", "error")))
+	}
+	for i := 0; i < 20; i++ {
+		hs := s.Hotspots(Query{Now: t0, Days: 30})
+		if len(hs) != 3 || hs[0].Repo != "a" || hs[1].Repo != "b" || hs[2].Repo != "c" {
+			t.Fatalf("equal scores came back as %v %v %v", hs[0].Repo, hs[1].Repo, hs[2].Repo)
+		}
+	}
+}
+
+func TestEverySeverityTheStoreAcceptsHasAWeightAndAnOrder(t *testing.T) {
+	for i, sev := range Severities {
+		if w, ok := severityWeight[sev]; !ok || w <= 0 {
+			t.Errorf("%s has no weight", sev)
+		}
+		if i > 0 && severityWeight[sev] <= severityWeight[Severities[i-1]] {
+			t.Errorf("%s must weigh more than %s", sev, Severities[i-1])
+		}
+	}
+	if len(severityWeight) != len(Severities) {
+		t.Errorf("%d weights for %d severities: the two lists have drifted", len(severityWeight), len(Severities))
+	}
+}
