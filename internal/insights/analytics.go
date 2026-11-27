@@ -49,14 +49,38 @@ type Hotspot struct {
 	Spark []int `json:"spark"`
 }
 
+// flatBand is how few findings of change still read as steady. A file that went
+// from 3 to 4 findings is not an alarm, and colouring it as one teaches the reader
+// to ignore the colour.
+const flatBand = 1
+
+// trendOf is the one rule for a file's direction: with nothing earlier to compare
+// with, or a change within flatBand, it is flat.
+func trendOf(recent, prior int, baseline bool) Trend {
+	switch d := recent - prior; {
+	case !baseline:
+		return TrendFlat
+	case d > flatBand:
+		return TrendUp
+	case d < -flatBand:
+		return TrendDown
+	}
+	return TrendFlat
+}
+
 // SparkBuckets is how many points a hotspot's trend line has.
 const SparkBuckets = 12
 
 type fileKey struct{ repo, path string }
 
+// window is the whole UTC days the period covers: Days calendar days ending with
+// today, so the cards and the chart, which draws one bar per day, count the same
+// reviews. The window before it is the Days days before that.
 func (q Query) window() (from, priorFrom time.Time) {
-	d := time.Duration(max(q.Days, 1)) * 24 * time.Hour
-	return q.Now.Add(-d), q.Now.Add(-2 * d)
+	days := max(q.Days, 1)
+	today := q.Now.UTC().Truncate(24 * time.Hour)
+	from = today.AddDate(0, 0, -(days - 1))
+	return from, from.AddDate(0, 0, -days)
 }
 
 func rank(sev string) int {
@@ -111,14 +135,7 @@ func (s *Store) Hotspots(q Query) []Hotspot {
 	for k, h := range byFile {
 		h.Prior = prior[k]
 		h.Baseline = baseline[h.Repo]
-		switch {
-		case h.Recent > h.Prior:
-			h.Trend = TrendUp
-		case h.Recent < h.Prior:
-			h.Trend = TrendDown
-		default:
-			h.Trend = TrendFlat
-		}
+		h.Trend = trendOf(h.Recent, h.Prior, h.Baseline)
 		out = append(out, *h)
 	}
 	// Files that fell out of the window entirely are not hotspots, but one that

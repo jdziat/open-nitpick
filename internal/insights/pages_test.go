@@ -263,10 +263,10 @@ func TestATrendIsColouredOnlyWhenItMovedAndHadSomethingToCompareWith(t *testing.
 		trend Trend
 		text  string
 	}{
-		"up":          {Hotspot{Recent: 9, Prior: 3, Baseline: true}, TrendUp, "▲ +6 (was 3)"},
-		"down":        {Hotspot{Recent: 1, Prior: 7, Baseline: true}, TrendDown, "▼ -6 (was 7)"},
-		"steady":      {Hotspot{Recent: 4, Prior: 3, Baseline: true}, TrendFlat, "steady (was 3)"},
-		"no baseline": {Hotspot{Recent: 65, Prior: 0, Baseline: false}, TrendFlat, "no earlier data"},
+		"up":          {Hotspot{Recent: 9, Prior: 3, Baseline: true, Trend: TrendUp}, TrendUp, "▲ +6 (was 3)"},
+		"down":        {Hotspot{Recent: 1, Prior: 7, Baseline: true, Trend: TrendDown}, TrendDown, "▼ -6 (was 7)"},
+		"steady":      {Hotspot{Recent: 4, Prior: 3, Baseline: true, Trend: TrendFlat}, TrendFlat, "steady (was 3)"},
+		"no baseline": {Hotspot{Recent: 65, Prior: 0, Baseline: false, Trend: TrendFlat}, TrendFlat, "no earlier data"},
 	} {
 		row := c.hotspotRow(1, tc.h, 10, 30)
 		if row.Trend != tc.trend || !strings.Contains(row.TrendText, tc.text) {
@@ -440,5 +440,25 @@ func TestTheRepositoriesPageListsEveryRepositoryEvenWithAStrayRepoParameter(t *t
 	_, body := u.get("/ui/insights/repos?days=30&repo=acme/web")
 	if !strings.Contains(body, "acme/api") || !strings.Contains(body, "acme/web") {
 		t.Fatalf("a repo parameter hid the other repositories on the page that lists them all")
+	}
+}
+
+func TestTheNoTrendNoteShowsOnlyWhenNoRowHasSomethingToCompareWith(t *testing.T) {
+	u := newUI(t)
+	day := 24 * time.Hour
+	// Repo a has an earlier review, repo b has none. The top row is repo b's.
+	for _, r := range []Review{
+		review("a", t0.Add(-40*day), finding("old.go", "nit")),
+		review("b", t0.Add(-1*day), finding("top.go", "critical"), finding("top.go", "critical")),
+		review("a", t0.Add(-1*day), finding("low.go", "nit")),
+	} {
+		if _, err := u.co.store.Add(context.Background(), r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	u.signIn("eng")
+	_, body := u.get("/ui/insights/hotspots?days=30")
+	if strings.Contains(body, "No earlier data:") || !strings.Contains(body, `data-label="Trend"`) {
+		t.Fatalf("repo a's rows have a baseline, so the Trend column must stay: the top row's repo decided for everyone")
 	}
 }

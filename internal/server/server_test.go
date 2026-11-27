@@ -646,6 +646,10 @@ func TestAPageWithAWildcardPathIsNeverOfferedInTheNavigation(t *testing.T) {
 	if !strings.Contains(body, `>Stub home</a>`) {
 		t.Fatalf("a linkable page must stay in the navigation")
 	}
+	_, home := e.do("GET", "/ui/", nil, nil)
+	if strings.Contains(home, `<a href="">`) {
+		t.Fatalf("the home list links a page with no address: %.500s", home)
+	}
 }
 
 type wildcardNavComponent struct{ *stubComponent }

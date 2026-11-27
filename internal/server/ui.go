@@ -236,8 +236,8 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	var entries []indexEntry
 	for _, p := range s.pages {
 		if p.page.Need == "" || id.Has(p.page.Need) {
-			if p.page.Nav {
-				entries = append(entries, indexEntry{Title: p.page.Title, Href: pageHref(p), Component: p.component})
+			if href := pageHref(p); p.page.Nav && href != "" {
+				entries = append(entries, indexEntry{Title: p.page.Title, Href: href, Component: p.component})
 			}
 		}
 	}

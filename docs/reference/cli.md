@@ -116,7 +116,7 @@ deep-review](../usage.md#choosing-between-review-and-deep-review).
 | `-clear-by` | Name kept in the record's history when `-fresh` clears it. Defaults to the token's name. |
 | `-require-notary` | Label a review UNOFFICIAL and do not post it unless a notary kept its record. The findings still print, and the gate still applies. |
 | `-insights` | URL of a `nitpick-server` with the [insights](../insights.md) component. After the review is published and printed, the report is posted so the server can show findings and hotspots over time. The credential is read from `NITPICK_INSIGHTS_TOKEN`. A failed post is a warning and does not change the exit status. |
-| `-insights-repo` | Repository name to report under. Defaults to the pull request's, then `GITHUB_REPOSITORY`. Needs `-insights`. |
+| `-insights-repo` | Repository name to report under, such as `acme/api`. Defaults to the pull request's, then `GITHUB_REPOSITORY`. A local review has neither, so give it there; without a name the post is skipped with a warning. Needs `-insights`. |
 | `-log-format` | Log format: `text` (default) or `json`. |
 | `-v` | Print verbose logs. |
 

@@ -2,6 +2,7 @@ package insights
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -49,6 +50,8 @@ func TestHotspotsRankRecentSevereFilesAboveOldOnes(t *testing.T) {
 
 func TestHotspotTrendComparesThisPeriodWithThePrior(t *testing.T) {
 	s := seeded(t)
+	// A review in the window before gives the trend something to compare with.
+	_, _ = s.Add(context.Background(), review("acme/api", t0.Add(-40*24*time.Hour), finding("elsewhere.go", "nit")))
 	for _, h := range s.Hotspots(Query{Now: t0, Days: 30}) {
 		if h.Path == "hot.go" && (h.Trend != TrendUp || h.Recent != 3 || h.Prior != 0) {
 			t.Fatalf("hot.go = %+v, want up, 3 recent, 0 prior", h)
@@ -231,13 +234,17 @@ func TestAFileIsComparedWithItsOwnRepositorysEarlierReviewsNotAnothers(t *testin
 func TestTheEdgeOfThePriorWindowIsDrawnToTheMinute(t *testing.T) {
 	s, _ := OpenStore(t.TempDir())
 	defer func() { _ = s.Close() }()
-	day, near := 24*time.Hour, 10*time.Minute
-	// The window before a 30 day period starts 60 days back.
-	_, _ = s.Add(context.Background(), review("r", t0.Add(-60*day+near), finding("in.go", "error")))
-	_, _ = s.Add(context.Background(), review("r", t0.Add(-60*day-near), finding("out.go", "error")))
-	_, _ = s.Add(context.Background(), review("r", t0.Add(-day), finding("in.go", "error"), finding("out.go", "error")))
+	q := Query{Now: t0, Days: 30}
+	_, edge := q.window() // the start of the window before the 30 day period
+	if want := time.Date(2026, 9, 3, 0, 0, 0, 0, time.UTC); !edge.Equal(want) {
+		t.Fatalf("the window before starts %v, want %v: 30 whole days ending Nov 1, and 30 before them", edge, want)
+	}
+	near := 10 * time.Minute
+	_, _ = s.Add(context.Background(), review("r", edge.Add(near), finding("in.go", "error")))
+	_, _ = s.Add(context.Background(), review("r", edge.Add(-near), finding("out.go", "error")))
+	_, _ = s.Add(context.Background(), review("r", t0.Add(-24*time.Hour), finding("in.go", "error"), finding("out.go", "error")))
 	prior := map[string]int{}
-	for _, h := range s.Hotspots(Query{Now: t0, Days: 30}) {
+	for _, h := range s.Hotspots(q) {
 		prior[h.Path] = h.Prior
 	}
 	if len(prior) != 2 {
@@ -284,5 +291,47 @@ func TestEverySeverityTheStoreAcceptsHasAWeightAndAnOrder(t *testing.T) {
 	}
 	if len(severityWeight) != len(Severities) {
 		t.Errorf("%d weights for %d severities: the two lists have drifted", len(severityWeight), len(Severities))
+	}
+}
+
+func TestTheChartAndTheCardsCountTheSameDays(t *testing.T) {
+	s, _ := OpenStore(t.TempDir())
+	defer func() { _ = s.Close() }()
+	// t0 is noon. A 7 day window is the 7 calendar days ending today, so it starts
+	// at midnight six days back. Reviews 15 hours either side of that edge.
+	edge := time.Date(2026, 10, 26, 0, 0, 0, 0, time.UTC)
+	for i, at := range []time.Time{edge.Add(-9 * time.Hour), edge.Add(15 * time.Hour), t0.Add(-time.Hour)} {
+		_, err := s.Add(context.Background(), Review{Repo: "r", Commit: strconv.Itoa(i), At: at, Result: "findings", Complete: true, Findings: []Finding{finding("a.go", "error")}})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	q := Query{Now: t0, Days: 7}
+	sum := 0
+	for _, p := range s.Series(q) {
+		sum += p.Findings
+	}
+	if o := s.Overview(q); o.Findings != sum || sum != 2 {
+		t.Fatalf("cards say %d findings, chart sums to %d, want both 2: the review before the first day is in neither", o.Findings, sum)
+	}
+}
+
+func TestOneRuleDecidesATrendEverywhere(t *testing.T) {
+	for name, tc := range map[string]struct {
+		recent, prior int
+		baseline      bool
+		want          Trend
+	}{
+		"up":                     {9, 3, true, TrendUp},
+		"down":                   {1, 7, true, TrendDown},
+		"within the band, up":    {4, 3, true, TrendFlat},
+		"within the band, down":  {3, 4, true, TrendFlat},
+		"just past the band":     {5, 3, true, TrendUp},
+		"no baseline is flat":    {65, 0, false, TrendFlat},
+		"from nothing with data": {3, 0, true, TrendUp},
+	} {
+		if got := trendOf(tc.recent, tc.prior, tc.baseline); got != tc.want {
+			t.Errorf("%s: trendOf(%d, %d, %v) = %s, want %s", name, tc.recent, tc.prior, tc.baseline, got, tc.want)
+		}
 	}
 }

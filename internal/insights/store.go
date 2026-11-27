@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	stdlog "log"
 	"os"
 	"path"
@@ -109,6 +110,8 @@ type Store struct {
 	byID    map[string]int
 	reviews []Review
 	skipped int
+	// peakLine is the most bytes load held for one line, for a test of the limit.
+	peakLine int
 }
 
 // OpenStore opens the reviews file in dir, creating it. A line that does not
@@ -134,21 +137,7 @@ func OpenStore(dir string) (*Store, error) {
 	}
 	s := &Store{f: f, lock: l, byID: map[string]int{}}
 	s.write = f.Write
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64<<10), 16<<20)
-	for sc.Scan() {
-		line := bytes.TrimSpace(sc.Bytes())
-		if len(line) == 0 {
-			continue
-		}
-		var r Review
-		if err := json.Unmarshal(line, &r); err != nil || r.ID == "" {
-			s.skipped++
-			continue
-		}
-		s.index(r)
-	}
-	if err := sc.Err(); err != nil {
+	if err := s.load(f); err != nil {
 		_ = f.Close()
 		_ = l.Unlock()
 		return nil, fmt.Errorf("read the reviews file: %w", err)
@@ -181,6 +170,56 @@ func endsMidLine(f *os.File) bool {
 		return false
 	}
 	return last[0] != '\n'
+}
+
+// maxLine is the longest line load keeps. A review is at most MaxFindings
+// findings of bounded text, well under this, so a longer line is damage.
+const maxLine = 16 << 20
+
+// load reads every line, skipping and counting what does not parse and what is
+// too long to be a review, so no single bad line keeps the server from starting.
+func (s *Store) load(f *os.File) error {
+	return s.loadFrom(f, maxLine)
+}
+
+// loadFrom is load with the line limit given, so a test can use a small one.
+func (s *Store) loadFrom(f io.Reader, limit int) error {
+	r := bufio.NewReaderSize(f, 64<<10)
+	var line []byte
+	defer func() { s.peakLine = max(s.peakLine, cap(line)) }()
+	tooLong := false
+	for {
+		chunk, isPrefix, err := r.ReadLine()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		}
+		// Decide before appending, so a line over the limit never holds more than
+		// the limit plus nothing: its remaining chunks are read and dropped.
+		if !tooLong && len(line)+len(chunk) > limit {
+			tooLong = true
+		}
+		if !tooLong {
+			line = append(line, chunk...)
+		}
+		if isPrefix {
+			continue
+		}
+		switch {
+		case tooLong:
+			s.skipped++
+		case len(bytes.TrimSpace(line)) > 0:
+			var rv Review
+			if json.Unmarshal(bytes.TrimSpace(line), &rv) != nil || rv.ID == "" {
+				s.skipped++
+			} else {
+				s.index(rv)
+			}
+		}
+		line, tooLong = line[:0], false
+	}
 }
 
 func (s *Store) index(r Review) {

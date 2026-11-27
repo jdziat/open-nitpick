@@ -3,6 +3,7 @@ package insights
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -255,5 +256,42 @@ func TestATailThatParsesButHasNoNewlineIsEndedBeforeTheNextReview(t *testing.T) 
 	defer func() { _ = again.Close() }()
 	if n := len(again.Reviews(Filter{})); n != 2 || again.Skipped() != 0 {
 		t.Fatalf("%d reviews and %d skipped lines: the new line was glued to %s", n, again.Skipped(), first.ID[:8])
+	}
+}
+
+func TestALineTooLongToReadIsSkippedAndCountedNotFatal(t *testing.T) {
+	dir := t.TempDir()
+	s, _ := OpenStore(dir)
+	_, _ = s.Add(context.Background(), review("acme/api", t0, finding("a.go", "error")))
+	_ = s.Close()
+	f, _ := os.OpenFile(filepath.Join(dir, "reviews.jsonl"), os.O_APPEND|os.O_WRONLY, 0o600)
+	_, _ = f.Write(bytes.Repeat([]byte("x"), 20<<20)) // longer than any review can be
+	_, _ = f.WriteString("\n")
+	_ = f.Close()
+	s, _ = OpenStore(dir)
+	_, _ = s.Add(context.Background(), review("acme/web", t0.Add(time.Hour), finding("b.go", "nit")))
+	_ = s.Close()
+	again, err := OpenStore(dir)
+	if err != nil {
+		t.Fatalf("one over-long line stopped the server starting: %v", err)
+	}
+	defer func() { _ = again.Close() }()
+	if n, skipped := len(again.Reviews(Filter{})), again.Skipped(); n != 2 || skipped != 1 {
+		t.Fatalf("%d reviews and %d skipped: the two whole reviews must load and the long line be counted", n, skipped)
+	}
+}
+
+func TestALineOverTheLimitIsDroppedWithoutBeingKept(t *testing.T) {
+	good, _ := json.Marshal(Review{ID: "abc", Repo: "r", At: t0})
+	input := string(good) + "\n" + strings.Repeat("y", 5000) + "\n" + string(good[:len(good)-1]) + "7}\n"
+	s := &Store{byID: map[string]int{}}
+	if err := s.loadFrom(strings.NewReader(input), 1000); err != nil {
+		t.Fatal(err)
+	}
+	if s.peakLine > 4*1000 {
+		t.Fatalf("held %d bytes for one line with a limit of 1000: an over-long line must be dropped as it is read, not kept", s.peakLine)
+	}
+	if s.skipped != 2 || len(s.reviews) != 1 {
+		t.Fatalf("skipped %d, kept %d: the 5000 byte line is over the 1000 limit and is counted, the bad JSON too, the first review is kept", s.skipped, len(s.reviews))
 	}
 }

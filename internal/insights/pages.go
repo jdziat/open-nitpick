@@ -189,7 +189,7 @@ func (c *Component) overviewPage(r *http.Request) (any, error) {
 	for i, h := range hs {
 		v.Hotspots = append(v.Hotspots, c.hotspotRow(i+1, h, sparkScale(hs), q.Days))
 	}
-	v.NoTrend = len(hs) > 0 && !hs[0].Baseline
+	v.NoTrend = noBaseline(hs)
 	for i, rv := range c.store.Reviews(Filter{Repo: q.Repo}) {
 		if i == 5 {
 			break
@@ -261,26 +261,32 @@ type hotspotRow struct {
 	Last         string
 }
 
-// flatBand is how few findings of change still read as steady. A file that went
-// from 3 to 4 findings is not an alarm, and colouring it as one teaches the reader
-// to ignore the colour.
-const flatBand = 1
-
 func (c *Component) hotspotRow(rank int, h Hotspot, scale, days int) hotspotRow {
 	v := url.Values{"path": {h.Path}, "repo": {h.Repo}, "days": {strconv.Itoa(days)}}
-	trend, text := TrendFlat, ""
-	switch d := h.Recent - h.Prior; {
+	trend, d, text := h.Trend, h.Recent-h.Prior, ""
+	switch {
 	case !h.Baseline:
 		text = "no earlier data"
-	case d > flatBand:
-		trend, text = TrendUp, fmt.Sprintf("▲ +%d (was %d)", d, h.Prior)
-	case d < -flatBand:
-		trend, text = TrendDown, fmt.Sprintf("▼ %d (was %d)", d, h.Prior)
+	case trend == TrendUp:
+		text = fmt.Sprintf("▲ +%d (was %d)", d, h.Prior)
+	case trend == TrendDown:
+		text = fmt.Sprintf("▼ %d (was %d)", d, h.Prior)
 	default:
 		text = fmt.Sprintf("● steady (was %d)", h.Prior)
 	}
 	return hotspotRow{Rank: rank, Repo: h.Repo, Path: h.Path, Score: strconv.FormatFloat(h.Score, 'f', 1, 64), Findings: h.Findings, Recent: h.Recent, Prior: h.Prior,
 		Worst: h.Worst, Trend: trend, TrendText: text, Spark: sparkline(h.Spark, scale), FindingsHref: "/ui/insights/findings?" + v.Encode(), Last: h.Last.Format(time.RFC3339)}
+}
+
+// noBaseline is true when there are rows and none has an earlier period to be
+// compared with. One row with a baseline keeps the Trend column.
+func noBaseline(hs []Hotspot) bool {
+	for _, h := range hs {
+		if h.Baseline {
+			return false
+		}
+	}
+	return len(hs) > 0
 }
 
 // sparkScale is the busiest bucket of any file in the rows.
@@ -309,7 +315,7 @@ func (c *Component) hotspotsPage(r *http.Request) (any, error) {
 		return nil, err
 	}
 	hs := c.store.Hotspots(q)
-	v := hotspotsView{NoTrend: len(hs) > 0 && !hs[0].Baseline, Scope: c.scope(r, "/ui/insights/hotspots", q), Total: len(hs), Empties: noReviews(), Empty: c.store.Overview(q).Empty}
+	v := hotspotsView{NoTrend: noBaseline(hs), Scope: c.scope(r, "/ui/insights/hotspots", q), Total: len(hs), Empties: noReviews(), Empty: c.store.Overview(q).Empty}
 	shown := hs[:min(len(hs), 100)]
 	for i, h := range shown {
 		v.Rows = append(v.Rows, c.hotspotRow(i+1, h, sparkScale(shown), q.Days))
