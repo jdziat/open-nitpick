@@ -51,7 +51,7 @@ func newUI(t *testing.T) *ui {
 	t.Cleanup(func() { _ = store.Close() })
 	co := NewComponent(store, []Token{NewToken("ci", RoleWrite, writeSecret)}, nil)
 	co.now = func() time.Time { return t0 }
-	roles, err := server.NewRoleMap([]server.RoleRule{{Roles: []server.Role{server.Role(RoleView)}, Group: "eng"}})
+	roles, err := server.NewRoleMap([]server.RoleRule{{Roles: []server.Role{server.Role(RoleView)}, Provider: "fake", Group: "eng"}})
 	if err != nil {
 		t.Fatal(err)
 	}

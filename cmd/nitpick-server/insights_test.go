@@ -120,9 +120,12 @@ func TestAnInsightsServerDoesNotLeaveItsDataDirectoryLockedAfterAFailedStartUp(t
 	if err := o.tokens.Set("ci:authoritative:nsecret"); err != nil {
 		t.Fatal(err)
 	}
-	o.config = writeFile(t, o.dir, "both.yaml", "components: [notary, insights]\nroles:\n  - {role: nonsense, user: bob}\n", 0o600)
-	if _, _, err := build(context.Background(), o, quiet); err == nil {
-		t.Fatal("a role no component declares was accepted")
+	users := writeFile(t, o.dir, "users", quickUser, 0o600)
+	// A configured provider, so config loading passes and both stores are opened and
+	// locked before the unknown role is refused.
+	o.config = writeFile(t, o.dir, "both.yaml", "components: [notary, insights]\nauth:\n  password: {users_file: "+users+"}\nroles:\n  - {role: nonsense, provider: password, user: bob}\n", 0o600)
+	if _, _, err := build(context.Background(), o, quiet); err == nil || !strings.Contains(err.Error(), "no component knows the role") {
+		t.Fatalf("err = %v, want the refusal that comes after the stores were locked", err)
 	}
 	o.config = writeFile(t, o.dir, "ok.yaml", "components: [notary, insights]\n", 0o600)
 	_, closeStore, err := build(context.Background(), o, quiet)
@@ -180,9 +183,9 @@ func TestInsightsWithASignInButNoRoleThatGrantsItIsRefusedAtStartUp(t *testing.T
 		"a sign-in and no rule": {"", true},
 		// The notary runs beside insights, so authoritative is a role the server
 		// knows and the rule is valid. It grants nothing on insights.
-		"a rule for the notary's role": {"roles:\n  - {role: authoritative, user: alice}\n", true},
-		"a rule that grants insights":  {"roles:\n  - {role: insights, user: alice}\n", false},
-		"a rule for a group":           {"roles:\n  - {role: insights, group: eng}\n", false},
+		"a rule for the notary's role": {"roles:\n  - {role: authoritative, provider: password, user: alice}\n", true},
+		"a rule that grants insights":  {"roles:\n  - {role: insights, provider: password, user: alice}\n", false},
+		"a rule for a group":           {"roles:\n  - {role: insights, provider: password, group: eng}\n", false},
 	} {
 		o := &options{addr: "x", dir: t.TempDir(), oidcIssuer: notary.GitHubIssuer}
 		if err := o.tokens.Set("ci:authoritative:nsecret"); err != nil {

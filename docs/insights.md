@@ -14,7 +14,7 @@ reviews.
 # nitpick-server.yaml
 components: [notary, insights]
 roles:
-  - {role: insights, group: engineering}
+  - {role: insights, provider: oidc, group: engineering}
 ```
 
 ```sh
