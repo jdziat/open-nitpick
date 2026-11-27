@@ -2,6 +2,7 @@ package upgrade
 
 import (
 	"context"
+	"crypto/sha256"
 	"os"
 	"os/user"
 	"runtime"
@@ -392,4 +393,47 @@ func TestAFailedSwapLeavesNoStagedFileBehind(t *testing.T) {
 		}
 		t.Errorf("the directory holds %v after a failed swap, want only the original", names)
 	}
+}
+
+// The file is checked in the temporary directory and installed from there, so a
+// change to it in between must not reach the install directory. This is the
+// copy's own check, run directly, since the window is too short to hit from outside.
+func TestAFileChangedAfterItWasVerifiedIsNotStaged(t *testing.T) {
+	dir := t.TempDir()
+	target := dir + "/nitpick"
+	if err := os.WriteFile(target, script("v1.0.0"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	download := t.TempDir() + "/asset"
+	good := script("v2.0.0")
+	if err := os.WriteFile(download, good, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256Of(good)
+
+	// The same bytes that were verified are staged.
+	staged, err := stage(download, target, digest)
+	if err != nil {
+		t.Fatalf("a file that matches its verified digest was refused: %v", err)
+	}
+	if err := os.Remove(staged); err != nil {
+		t.Fatal(err)
+	}
+
+	// The file is swapped after verification.
+	if err := os.WriteFile(download, script("v6.6.6"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	before := snapshot(t, dir)
+	if _, err := stage(download, target, digest); err == nil || !strings.Contains(err.Error(), "changed after it was verified") {
+		t.Fatalf("err = %v, want the swapped file refused", err)
+	}
+	if after := snapshot(t, dir); after != before {
+		t.Errorf("a refused stage left something in the install directory:\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+}
+
+func sha256Of(b []byte) []byte {
+	d := sha256.Sum256(b)
+	return d[:]
 }

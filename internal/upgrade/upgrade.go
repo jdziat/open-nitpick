@@ -1,6 +1,7 @@
 package upgrade
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -272,7 +273,7 @@ func (c Config) install(ctx context.Context, version string) error {
 	}
 	c.say("Verified the checksum and the Sigstore signature.\n")
 
-	staged, err := stage(downloaded, c.Target)
+	staged, err := stage(downloaded, c.Target, digest)
 	if err != nil {
 		return err
 	}
@@ -390,8 +391,8 @@ func preflight(dir string) error {
 // stage copies the verified download beside the binary it will replace, under a
 // name no one runs, with the old binary's permissions. A rename is only atomic
 // within one filesystem, which is why it is here and not in the temporary
-// directory.
-func stage(downloaded, target string) (string, error) {
+// directory. The copy is hashed and compared with the digest that was verified.
+func stage(downloaded, target string, verified []byte) (string, error) {
 	mode := os.FileMode(0o755)
 	if info, err := os.Stat(target); err == nil {
 		mode = info.Mode().Perm() | 0o111
@@ -406,9 +407,16 @@ func stage(downloaded, target string) (string, error) {
 		return "", fmt.Errorf("cannot write to %s: %w", filepath.Dir(target), err)
 	}
 	name := dst.Name()
-	_, err = io.Copy(dst, src)
+	// The file is read again here, after it was checked, so what is copied is
+	// hashed as it goes and must be the bytes that were verified. A file changed
+	// in between is refused, and is never put where the binary is.
+	h := sha256.New()
+	_, err = io.Copy(io.MultiWriter(dst, h), src)
 	if cerr := dst.Close(); err == nil {
 		err = cerr
+	}
+	if err == nil && !bytes.Equal(h.Sum(nil), verified) {
+		err = errors.New("the downloaded file changed after it was verified")
 	}
 	if err == nil {
 		err = os.Chmod(name, mode)
