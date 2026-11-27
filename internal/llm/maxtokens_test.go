@@ -206,7 +206,7 @@ func (m *mandatoryLLM) GenerateContent(_ context.Context, _ []llms.Message, opts
 	co := llms.ApplyOptions(opts...)
 	if r, _ := co.ExtraBody["reasoning"].(map[string]any); r["enabled"] == false {
 		m.refused++
-		return nil, errors.New("API error (status 400, code 400): Reasoning is mandatory for this endpoint and cannot be disabled.") //nolint:revive // Match the provider response that triggers the retry.
+		return nil, errors.New("API error (status 400, code 400): Reasoning is mandatory for this endpoint and cannot be disabled")
 	}
 	limit := 0
 	if co.MaxTokens != nil {
