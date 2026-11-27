@@ -27,7 +27,7 @@ export default function ReviewDetail() {
   const { data, error, loading, reload } = useApi<Review>(`/v1/reviews/${encodeURIComponent(id)}`)
   usePageTitle(data ? reviewTitle(data) : undefined)
   const back = (
-    <Button variant="ghost" size="sm" render={<Link to={{ pathname: '/insights/reviews', search: carry(search) }} />}>
+    <Button variant="ghost" size="sm" className="-ml-2 w-fit" render={<Link to={{ pathname: '/insights/reviews', search: carry(search) }} />}>
       <ArrowLeftIcon /> All reviews
     </Button>
   )

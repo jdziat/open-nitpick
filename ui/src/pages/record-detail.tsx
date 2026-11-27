@@ -15,7 +15,7 @@ export default function RecordDetail() {
   const { hash = '' } = useParams()
   const { data, error, reload } = useApi<RecordView>(`/v1/records/view/${encodeURIComponent(hash)}`)
   const back = (
-    <Button variant="ghost" size="sm" render={<Link to="/notary" />}>
+    <Button variant="ghost" size="sm" className="-ml-2 w-fit" render={<Link to="/notary" />}>
       <ArrowLeftIcon /> All records
     </Button>
   )
