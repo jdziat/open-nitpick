@@ -151,6 +151,13 @@ type ModelSpec struct {
 	// than dropping it.
 	MaxTokens int `yaml:"max_tokens"`
 
+	// RetryMaxTokens is the most a retry may raise max_tokens to when a model
+	// cannot turn reasoning off and spent its whole cap thinking. The retry
+	// doubles the cap it ran under, up to this. Zero selects 65536; a model
+	// that runs away at that size is better sent to its fallback than given
+	// more, so lower it for a role that should give up sooner.
+	RetryMaxTokens int `yaml:"retry_max_tokens"`
+
 	// Timeout bounds one call, retries excluded.
 	Timeout time.Duration `yaml:"timeout"`
 
@@ -1446,6 +1453,9 @@ func (s ModelSpec) overlay(over ModelSpec) ModelSpec {
 	}
 	if over.MaxTokens != 0 {
 		out.MaxTokens = over.MaxTokens
+	}
+	if over.RetryMaxTokens != 0 {
+		out.RetryMaxTokens = over.RetryMaxTokens
 	}
 	if over.Timeout != 0 {
 		out.Timeout = over.Timeout

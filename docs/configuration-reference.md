@@ -259,6 +259,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
+### `models.default.retry_max_tokens`
+
+integer, default `0`.
+RetryMaxTokens is the most a retry may raise max_tokens to when a model cannot turn reasoning off and spent its whole cap thinking.
+
 ### `models.default.service_tier`
 
 string, default `none`.
@@ -343,6 +348,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
+### `models.embed.retry_max_tokens`
+
+integer, default `0`.
+RetryMaxTokens is the most a retry may raise max_tokens to when a model cannot turn reasoning off and spent its whole cap thinking.
 
 ### `models.embed.service_tier`
 
@@ -429,6 +439,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
+### `models.ensemble[].retry_max_tokens`
+
+integer, default `0`.
+RetryMaxTokens is the most a retry may raise max_tokens to when a model cannot turn reasoning off and spent its whole cap thinking.
+
 ### `models.ensemble[].service_tier`
 
 string, default `none`.
@@ -513,6 +528,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
+### `models.fix.retry_max_tokens`
+
+integer, default `0`.
+RetryMaxTokens is the most a retry may raise max_tokens to when a model cannot turn reasoning off and spent its whole cap thinking.
 
 ### `models.fix.service_tier`
 
@@ -599,6 +619,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
+### `models.review.retry_max_tokens`
+
+integer, default `0`.
+RetryMaxTokens is the most a retry may raise max_tokens to when a model cannot turn reasoning off and spent its whole cap thinking.
+
 ### `models.review.service_tier`
 
 string, default `none`.
@@ -684,6 +709,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
+### `models.router.retry_max_tokens`
+
+integer, default `0`.
+RetryMaxTokens is the most a retry may raise max_tokens to when a model cannot turn reasoning off and spent its whole cap thinking.
+
 ### `models.router.service_tier`
 
 string, default `none`.
@@ -768,6 +798,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
+### `models.routes[].ensemble[].retry_max_tokens`
+
+integer, default `0`.
+RetryMaxTokens is the most a retry may raise max_tokens to when a model cannot turn reasoning off and spent its whole cap thinking.
 
 ### `models.routes[].ensemble[].service_tier`
 
@@ -879,6 +914,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
+### `models.routes[].review.retry_max_tokens`
+
+integer, default `0`.
+RetryMaxTokens is the most a retry may raise max_tokens to when a model cannot turn reasoning off and spent its whole cap thinking.
+
 ### `models.routes[].review.service_tier`
 
 string, default `none`.
@@ -963,6 +1003,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
+### `models.security.retry_max_tokens`
+
+integer, default `0`.
+RetryMaxTokens is the most a retry may raise max_tokens to when a model cannot turn reasoning off and spent its whole cap thinking.
 
 ### `models.security.service_tier`
 
@@ -1049,6 +1094,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
 
+### `models.triage.retry_max_tokens`
+
+integer, default `0`.
+RetryMaxTokens is the most a retry may raise max_tokens to when a model cannot turn reasoning off and spent its whole cap thinking.
+
 ### `models.triage.service_tier`
 
 string, default `none`.
@@ -1133,6 +1183,11 @@ Providers pins a router to these upstream providers, tried in order, with no fal
 
 string, default `none`.
 Reasoning bounds how much a reasoning model thinks before it answers: "minimal", "low", "medium", "high", "xhigh", "max", or "off" to ask for none. Unset leaves the model's own default, which is the shipped behaviour and the only setting any measurement here was taken under.
+
+### `models.validate.retry_max_tokens`
+
+integer, default `0`.
+RetryMaxTokens is the most a retry may raise max_tokens to when a model cannot turn reasoning off and spent its whole cap thinking.
 
 ### `models.validate.service_tier`
 
