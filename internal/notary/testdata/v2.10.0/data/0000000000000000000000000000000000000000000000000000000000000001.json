@@ -1,0 +1,16 @@
+{
+  "schema": 4,
+  "hash": "0000000000000000000000000000000000000000000000000000000000000001",
+  "tool": "v2.10.0",
+  "provider": "openrouter",
+  "model": "z-ai/glm-5.3-flash",
+  "created": "2026-11-20T10:01:00Z",
+  "answers": {
+    "aaaaaaaaaaaaaaaa#0": "{\"content\":\"first\"}",
+    "bbbbbbbbbbbbbbbb#0": "{\"content\":\"second\"}"
+  },
+  "batches": 2,
+  "complete": true,
+  "source": "ci",
+  "clears": 0
+}

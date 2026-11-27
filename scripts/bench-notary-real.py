@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Benchmark notary against non-notary reviews with a real model.
 
-Runs the real `nitpick review` against a real `nitpick-notary` on real changes
+Runs the real `nitpick review` against a real `nitpick-server` on real changes
 from this repository's history. Each change gets its arms interleaved: reviews
 with no notary, a first review with one, replays of it, and a -fresh review.
 Usage and cost are read from what the provider reported, never estimated, and a
@@ -11,7 +11,7 @@ hard budget aborts the run before it can overspend.
     scripts/bench-notary-real.py --budget 2.00    # the benchmark
 
 Needs an OpenRouter key in the keystore (nitpick auth set openrouter), a
-nitpick and a nitpick-notary binary, and spends real money.
+nitpick and a nitpick-server binary, and spends real money.
 """
 import argparse
 import hashlib
@@ -74,7 +74,7 @@ def jaccard(a, b):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--nitpick", default="/tmp/nb/nitpick")
-    ap.add_argument("--notary", default="/tmp/nb/nitpick-notary")
+    ap.add_argument("--notary", default="/tmp/nb/nitpick-server")
     ap.add_argument("--repo", default=os.getcwd())
     ap.add_argument("--budget", type=float, default=2.0, help="abort once reported spend passes this many USD")
     ap.add_argument("--probe", action="store_true")

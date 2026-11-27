@@ -1,9 +1,10 @@
 ---
 apiVersion: v2
-name: nitpick-notary
+name: nitpick-server
 description: >-
-  The nitpick notary, a server that keeps the model answers of code reviews so
-  the same inputs replay them and an interrupted review resumes.
+  The nitpick server: the notary, which keeps the model answers of code reviews
+  so the same inputs replay them and an interrupted review resumes, and the hub
+  that shows what it holds.
 type: application
 # Development values. The publish workflow packages the chart with the release
 # tag's version for both fields, so a published chart names its own image. A

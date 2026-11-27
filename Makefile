@@ -15,6 +15,18 @@ build:
 install:
 	go install -ldflags '$(LDFLAGS)' $(PKG)
 
+# The hub UI, written to the directory the server embeds. A go build without it
+# produces a server whose UI pages say the UI was not built; the release image
+# runs this first.
+.PHONY: ui
+ui:
+	go run ./internal/server/uibuild
+
+# nitpick-server with the UI in it.
+.PHONY: server
+server: ui
+	go build -ldflags '$(LDFLAGS)' -o bin/nitpick-server ./cmd/nitpick-server
+
 # Cross-compiled release binaries, named the way action.yml downloads them:
 #   dist/nitpick_<version>_<os>_<arch>[.exe]  plus dist/checksums.txt
 # The release workflow and CI both run this target, so a binary built for a

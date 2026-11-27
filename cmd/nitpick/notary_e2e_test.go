@@ -413,7 +413,7 @@ func TestNotaryEndToEndAWorkflowIdentityTokenReplacesAStoredSecret(t *testing.T)
 		t.Fatal(err)
 	}
 	srv := httptest.NewServer(notary.New(store, nil, false).WithOIDC(&notary.OIDC{
-		Issuer: "https://issuer.test", Audience: "nitpick-notary", JWKSURL: jwks,
+		Issuer: "https://issuer.test", Audience: "nitpick-server", JWKSURL: jwks,
 		Allow: []notary.OIDCRule{mustRule(t, "authoritative:repo:acme/app:*")},
 	}))
 	t.Cleanup(srv.Close)
@@ -422,7 +422,7 @@ func TestNotaryEndToEndAWorkflowIdentityTokenReplacesAStoredSecret(t *testing.T)
 	t.Setenv("ACTIONS_ID_TOKEN_REQUEST_URL", mint+"?api-version=2")
 	t.Setenv("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "request-token")
 
-	first, err := reviewJSON(t, repo, "-notary", srv.URL, "-notary-oidc-audience", "nitpick-notary")
+	first, err := reviewJSON(t, repo, "-notary", srv.URL, "-notary-oidc-audience", "nitpick-server")
 	if err != nil {
 		t.Fatalf("first review: %v", err)
 	}
@@ -430,7 +430,7 @@ func TestNotaryEndToEndAWorkflowIdentityTokenReplacesAStoredSecret(t *testing.T)
 		t.Fatalf("first notary = %v", first["notary"])
 	}
 	calls := model.calls.Load()
-	second, err := reviewJSON(t, repo, "-notary", srv.URL, "-notary-oidc-audience", "nitpick-notary")
+	second, err := reviewJSON(t, repo, "-notary", srv.URL, "-notary-oidc-audience", "nitpick-server")
 	if err != nil {
 		t.Fatalf("replay: %v", err)
 	}

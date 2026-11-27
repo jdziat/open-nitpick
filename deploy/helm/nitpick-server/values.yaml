@@ -4,7 +4,7 @@
 # than rolling it. There is deliberately no replicaCount.
 
 image:
-  repository: ghcr.io/nitpick-oss/nitpick-notary
+  repository: ghcr.io/nitpick-oss/nitpick-server
   # Empty means the chart's appVersion.
   tag: ""
   pullPolicy: IfNotPresent
@@ -12,7 +12,7 @@ imagePullSecrets: []
 
 # Who may read and write records. Give hashes, never secrets: the server only
 # ever compares hashes, and a Secret holding hashes is not a credential.
-#   printf %s "$SECRET" | nitpick-notary -hash
+#   printf %s "$SECRET" | nitpick-server -hash
 tokens: []
 #  - name: ci
 #    role: authoritative        # authoritative | provisional | read
@@ -33,6 +33,16 @@ oidc:
 
 # Let provisional tokens clear a record (nitpick review -fresh).
 authorClear: false
+
+# Sign-in for the hub UI. Left empty, there is no UI and only the machine tokens
+# above work, as with the notary alone. The name of a Secret holding server.yaml
+# (see docs/server.md), and, for the password provider, a users file.
+config:
+  existingSecret: ""
+  # Keys of that Secret: the configuration, and any files it points at, such as
+  # users, client-secret, idp-metadata.xml, sp.key and sp.crt. They are mounted
+  # under /etc/nitpick/.
+  file: server.yaml
 
 persistence:
   enabled: true

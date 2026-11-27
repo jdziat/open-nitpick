@@ -23,7 +23,7 @@ import (
 
 const (
 	testIssuer   = "https://issuer.test"
-	testAudience = "nitpick-notary"
+	testAudience = "nitpick-server"
 	testSubject  = "repo:acme/app:ref:refs/heads/main"
 )
 
@@ -352,7 +352,9 @@ func TestTheHealthEndpointNeedsNoTokenAndServesNoRecord(t *testing.T) {
 	}
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusOK || strings.TrimSpace(string(body)) != "ok" {
+	// The first line is the verdict a probe reads; the lines after it say which
+	// components were asked, and carry no record and no path.
+	if resp.StatusCode != http.StatusOK || !strings.HasPrefix(string(body), "ok\n") || strings.TrimSpace(string(body)) != "ok\nnotary: ok" {
 		t.Fatalf("health = %d %q", resp.StatusCode, body)
 	}
 	// Anything else still needs a token.

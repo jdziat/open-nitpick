@@ -4,8 +4,11 @@ go 1.26.11
 
 require (
 	github.com/alecthomas/chroma/v2 v2.27.0
+	github.com/beevik/etree v1.8.1
 	github.com/bmatcuk/doublestar/v4 v4.10.7
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
+	github.com/coreos/go-oidc/v3 v3.17.0
+	github.com/crewjam/saml v0.6.3
 	github.com/gofrs/flock v0.13.2
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/google/go-github/v74 v74.0.0
@@ -13,9 +16,12 @@ require (
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/nocturnium/llm-go-sdk/v6 v6.16.1
 	github.com/pelletier/go-toml/v2 v2.4.3
+	github.com/russellhaering/goxmldsig v1.6.1
 	github.com/sigstore/sigstore-go v1.3.0
 	github.com/zalando/go-keyring v0.2.8
+	golang.org/x/crypto v0.55.0
 	golang.org/x/mod v0.43.0
+	golang.org/x/oauth2 v0.38.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -67,6 +73,7 @@ require (
 	github.com/in-toto/in-toto-golang v0.11.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jedisct1/go-minisign v0.0.0-20211028175153-1c139d1cc84b // indirect
+	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/letsencrypt/boulder v0.20260309.0 // indirect
 	github.com/oklog/ulid/v2 v2.1.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
@@ -97,13 +104,11 @@ require (
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
-	golang.org/x/oauth2 v0.38.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260523011958-0a33c5d7ca68 // indirect

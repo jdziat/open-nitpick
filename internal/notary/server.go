@@ -1,7 +1,11 @@
-// Package notary serves review records over HTTP with token roles.
+// Package notary serves review records over HTTP with token roles. It is a
+// component of the nitpick server: the same routes and the same machine
+// authentication it always had, plus a listing and the pages of the hub that
+// show what it holds.
 package notary
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
@@ -14,6 +18,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/nitpick-oss/nitpick/internal/server"
 	"github.com/nitpick-oss/nitpick/internal/wire"
 )
 
@@ -69,8 +74,8 @@ func HashSecret(secret string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// Server is the notary HTTP handler.
-type Server struct {
+// Component is the notary as a component of the nitpick server.
+type Component struct {
 	store wire.Store
 	// writes serializes PUTs. The provisional rule reads a record and then writes
 	// one, and an authoritative write landing between the two would be replaced.
@@ -82,19 +87,76 @@ type Server struct {
 	oidc                  *OIDC
 }
 
+// NewComponent builds the notary component. With no tokens every machine request
+// is refused; people reach the listing and the pages through a session.
+func NewComponent(store wire.Store, tokens []Token, allowProvisionalClear bool) *Component {
+	return &Component{store: store, tokens: tokens, allowProvisionalClear: allowProvisionalClear}
+}
+
 // WithOIDC also accepts identity tokens that o verifies, beside the static
-// ones. It returns s for chaining.
+// ones. It returns c for chaining.
+func (c *Component) WithOIDC(o *OIDC) *Component {
+	c.oidc = o
+	return c
+}
+
+// Server is the notary mounted alone in a nitpick server, for a test or an
+// embedding that wants the notary's routes and nothing else. The nitpick server
+// itself mounts the Component beside the others.
+type Server struct {
+	*Component
+	handler http.Handler
+}
+
+// New mounts a notary component alone. It panics only if the notary's own routes
+// are invalid, which is a bug in this package and not an input.
+func New(store wire.Store, tokens []Token, allowProvisionalClear bool) *Server {
+	c := NewComponent(store, tokens, allowProvisionalClear)
+	h, err := server.New(server.Config{Components: []server.Component{c}})
+	if err != nil {
+		panic("notary: " + err.Error())
+	}
+	return &Server{Component: c, handler: h}
+}
+
+// WithOIDC is Component.WithOIDC returning the Server, so it chains from New.
 func (s *Server) WithOIDC(o *OIDC) *Server {
-	s.oidc = o
+	s.Component.WithOIDC(o)
 	return s
 }
 
-// New builds a server. With no tokens every request is refused.
-func New(store wire.Store, tokens []Token, allowProvisionalClear bool) *Server {
-	return &Server{store: store, tokens: tokens, allowProvisionalClear: allowProvisionalClear}
+// ServeHTTP implements http.Handler.
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.handler.ServeHTTP(w, r) }
+
+// Name implements server.Component.
+func (c *Component) Name() string { return "notary" }
+
+// Roles implements server.RoleDeclarer: the roles a token holds, which a person
+// can hold too. Only authoritative opens the pages and the listing.
+func (c *Component) Roles() []server.Role {
+	return []server.Role{server.Role(RoleAuthoritative), server.Role(RoleProvisional), server.Role(RoleRead)}
 }
 
-func (s *Server) auth(r *http.Request) (Token, bool) {
+// Prefixes implements server.Component.
+func (c *Component) Prefixes() []string { return []string{"/v1/records/"} }
+
+// Health implements server.Component. A store that can answer a read is healthy;
+// one that cannot is not, which is what a probe has to know.
+func (c *Component) Health(ctx context.Context) error {
+	_, _, err := c.store.Get(ctx, strings.Repeat("0", 64))
+	return err
+}
+
+// Routes implements server.Component. The record routes take their own machine
+// authentication, as they always did; the listing takes a token or a session.
+func (c *Component) Routes() []server.Route {
+	return []server.Route{
+		{Pattern: "/v1/records/{hash}", Handler: http.HandlerFunc(c.record)},
+		{Pattern: "/v1/records", Handler: http.HandlerFunc(c.list)},
+	}
+}
+
+func (c *Component) auth(r *http.Request) (Token, bool) {
 	h := r.Header.Get("Authorization")
 	secret, ok := strings.CutPrefix(h, "Bearer ")
 	if !ok || secret == "" {
@@ -103,44 +165,32 @@ func (s *Server) auth(r *http.Request) (Token, bool) {
 	sum := sha256.Sum256([]byte(secret))
 	var found Token
 	ok = false
-	for _, t := range s.tokens {
+	for _, t := range c.tokens {
 		if subtle.ConstantTimeCompare(t.hash[:], sum[:]) == 1 {
 			found, ok = t, true
 		}
 	}
-	if !ok && s.oidc != nil {
-		return s.oidc.Authenticate(r.Context(), secret)
+	if !ok && c.oidc != nil {
+		return c.oidc.Authenticate(r.Context(), secret)
 	}
 	return found, ok
 }
 
-// ServeHTTP implements http.Handler. Routes: GET, PUT and DELETE on
-// /v1/records/{hash}.
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Before the token check, because a probe has no token and must not be able
-	// to read a record: it reports that the process is serving and nothing else.
-	if r.URL.Path == "/healthz" && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = io.WriteString(w, "ok\n")
-		return
-	}
-	hash, ok := strings.CutPrefix(r.URL.Path, "/v1/records/")
-	if !ok || hash == "" || strings.Contains(hash, "/") {
-		http.NotFound(w, r)
-		return
-	}
+// record serves GET, PUT and DELETE on /v1/records/{hash}.
+func (c *Component) record(w http.ResponseWriter, r *http.Request) {
+	hash := r.PathValue("hash")
 	if !hashRE.MatchString(hash) {
 		http.Error(w, "record hash must be 64 hex characters", http.StatusBadRequest)
 		return
 	}
-	tok, ok := s.auth(r)
+	tok, ok := c.auth(r)
 	if !ok {
 		http.Error(w, "missing or unknown token", http.StatusUnauthorized)
 		return
 	}
 	switch r.Method {
 	case http.MethodGet:
-		rec, found, err := s.store.Get(r.Context(), hash)
+		rec, found, err := c.store.Get(r.Context(), hash)
 		if err != nil {
 			storeFault(w, r, err)
 			return
@@ -152,9 +202,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(rec)
 	case http.MethodPut:
-		s.put(w, r, tok, hash)
+		c.put(w, r, tok, hash)
 	case http.MethodDelete:
-		if tok.Role != RoleAuthoritative && (tok.Role != RoleProvisional || !s.allowProvisionalClear) {
+		if tok.Role != RoleAuthoritative && (tok.Role != RoleProvisional || !c.allowProvisionalClear) {
 			http.Error(w, "this token may not clear records", http.StatusForbidden)
 			return
 		}
@@ -162,7 +212,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if by == "" {
 			by = tok.Name
 		}
-		if err := s.store.Clear(r.Context(), hash, by); err != nil {
+		if err := c.store.Clear(r.Context(), hash, by); err != nil {
 			storeFault(w, r, err)
 			return
 		}
@@ -172,7 +222,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) put(w http.ResponseWriter, r *http.Request, tok Token, hash string) {
+func (c *Component) put(w http.ResponseWriter, r *http.Request, tok Token, hash string) {
 	if tok.Role == RoleRead {
 		http.Error(w, "read-only token", http.StatusForbidden)
 		return
@@ -191,17 +241,17 @@ func (s *Server) put(w http.ResponseWriter, r *http.Request, tok Token, hash str
 		http.Error(w, "record hash does not match the URL", http.StatusBadRequest)
 		return
 	}
-	s.writes.Lock()
-	defer s.writes.Unlock()
+	c.writes.Lock()
+	defer c.writes.Unlock()
 	rec.Source = tok.Name
 	if tok.Role == RoleProvisional {
 		rec.Source = "provisional:" + tok.Name
-		if old, found, err := s.store.Get(r.Context(), hash); err == nil && found && old.Complete {
+		if old, found, err := c.store.Get(r.Context(), hash); err == nil && found && old.Complete {
 			http.Error(w, "a complete record exists; provisional tokens do not replace it", http.StatusConflict)
 			return
 		}
 	}
-	if err := s.store.Put(r.Context(), rec); err != nil {
+	if err := c.store.Put(r.Context(), rec); err != nil {
 		storeFault(w, r, err)
 		return
 	}

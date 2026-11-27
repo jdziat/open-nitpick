@@ -9,8 +9,8 @@
 {{- if and .Values.oidc.allow (not .Values.oidc.audience) }}
 {{- fail "oidc.allow needs oidc.audience" }}
 {{- end }}
-{{- if not (or .Values.tokens .Values.existingSecret .Values.oidc.audience) }}
-{{- fail "give the notary a way to authenticate: set tokens, existingSecret or oidc.audience. With none, every request is refused" }}
+{{- if not (or .Values.tokens .Values.existingSecret .Values.oidc.audience .Values.config.existingSecret) }}
+{{- fail "give the server a way to authenticate: set tokens, existingSecret, config.existingSecret or oidc.audience. With none, every request is refused" }}
 {{- end }}
 apiVersion: apps/v1
 kind: Deployment
@@ -60,13 +60,19 @@ spec:
             - -oidc-allow={{ . }}
             {{- end }}
             {{- end }}
-          {{- if or .Values.tokens .Values.existingSecret }}
+          {{- if or .Values.tokens .Values.existingSecret .Values.config.existingSecret }}
           env:
+            {{- if or .Values.tokens .Values.existingSecret }}
             - name: NITPICK_NOTARY_TOKENS
               valueFrom:
                 secretKeyRef:
                   name: {{ include "notary.secretName" . }}
                   key: tokens
+            {{- end }}
+            {{- if .Values.config.existingSecret }}
+            - name: NITPICK_SERVER_CONFIG
+              value: /etc/nitpick/{{ .Values.config.file }}
+            {{- end }}
           {{- end }}
           ports:
             - {name: http, containerPort: 8484}
@@ -84,7 +90,17 @@ spec:
             capabilities: {drop: [ALL]}
           volumeMounts:
             - {name: data, mountPath: /data}
+            {{- if .Values.config.existingSecret }}
+            - {name: config, mountPath: /etc/nitpick, readOnly: true}
+            {{- end }}
       volumes:
+        {{- if .Values.config.existingSecret }}
+        - name: config
+          secret:
+            secretName: {{ .Values.config.existingSecret }}
+            # Readable by the pod's group only: it holds a client secret and keys.
+            defaultMode: 0440
+        {{- end }}
         - name: data
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
