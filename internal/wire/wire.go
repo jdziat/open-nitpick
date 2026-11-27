@@ -98,5 +98,9 @@ type Store interface {
 // as "no notary" and carries on.
 var ErrUnreachable = errors.New("notary unreachable")
 
+// ErrBadQuery marks a listing request the store cannot make sense of, which is
+// the caller's mistake and not the store's fault.
+var ErrBadQuery = errors.New("bad listing query")
+
 // ErrForbidden marks a store that refused the caller's token.
 var ErrForbidden = errors.New("notary refused the token")

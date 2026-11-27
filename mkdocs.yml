@@ -110,6 +110,8 @@ nav:
       - Agents and MCP: docs/guide/agents-and-mcp.md
       - Configuration: docs/configuration.md
       - Providers and models: docs/providers.md
+      - The notary: docs/notary.md
+      - The nitpick server: docs/server.md
       - How a review runs: docs/how-a-review-runs.md
       - Trust model: docs/trust-model.md
       - Security policy: docs/security.md

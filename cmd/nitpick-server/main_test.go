@@ -131,7 +131,7 @@ func TestASecondServerOnTheSameDirectoryRefusesToStart(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds and starts the server binary")
 	}
-	bin := filepath.Join(t.TempDir(), "nitpick-notary")
+	bin := filepath.Join(t.TempDir(), "nitpick-server")
 	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}

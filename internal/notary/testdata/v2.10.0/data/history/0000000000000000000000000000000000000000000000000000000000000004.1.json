@@ -1,0 +1,18 @@
+{
+  "schema": 4,
+  "hash": "0000000000000000000000000000000000000000000000000000000000000004",
+  "tool": "v2.10.0",
+  "provider": "openrouter",
+  "model": "z-ai/glm-5.3-flash",
+  "created": "2026-11-20T10:04:00Z",
+  "answers": {
+    "eeeeeeeeeeeeeeee#0": "{\"content\":\"later cleared\"}"
+  },
+  "batches": 1,
+  "complete": true,
+  "source": "ci",
+  "clears": 1,
+  "cleared_by": [
+    "fixture-maintainer"
+  ]
+}

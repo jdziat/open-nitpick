@@ -2,8 +2,30 @@
 
 A notary keeps the model answers of a review, so the same inputs replay them
 with no model call, and a review that was interrupted asks only for what is
-missing. It is a server, `nitpick-notary`, and a client built into
-`nitpick review`, `fast-review` and `deep-review`.
+missing. It is a component of the [nitpick server](server.md), `nitpick-server`,
+and a client built into `nitpick review`, `fast-review` and `deep-review`.
+
+## Moving from nitpick-notary
+
+`nitpick-server` replaces the `nitpick-notary` command, and the notary is now a
+component of it. Nothing about records changes: the routes, the roles, the machine
+authentication, the record format and its hashing, and the data directory are the
+same, and a data directory written by `nitpick-notary` is read by `nitpick-server`
+unchanged (a test holds a fixture from the last release of the old command to
+that). A deployment changes its binary name and nothing else.
+
+| Before | Now |
+| --- | --- |
+| `nitpick-notary -addr … -data … -token …` | `nitpick-server -addr … -data … -token …` |
+| `NITPICK_NOTARY_TOKENS` | the same variable |
+| image `ghcr.io/nitpick-oss/nitpick-notary` | `ghcr.io/nitpick-oss/nitpick-server` |
+| chart `oci://ghcr.io/nitpick-oss/charts/nitpick-notary` | `oci://ghcr.io/nitpick-oss/charts/nitpick-server` |
+| helm values | the same values, plus `config.*` for sign-in |
+
+The old image and chart stay on the registry and get no new versions; there is no
+pointer release under the old name. What is new is `GET /v1/records`, a paginated
+listing for the `authoritative` role, and the notary pages of the hub, described in
+[the server](server.md#the-notary-pages).
 
 ## What a record is
 
@@ -45,7 +67,7 @@ forever.
 ## Running one
 
 ```sh
-nitpick-notary -addr 127.0.0.1:8484 -data /var/lib/notary \
+nitpick-server -addr 127.0.0.1:8484 -data /var/lib/notary \
   -token ci:authoritative:$CI_SECRET \
   -token dev:provisional:$DEV_SECRET \
   -token viewer:read:$VIEW_SECRET
@@ -65,7 +87,7 @@ to the log.
 ### GitHub Actions identity instead of a stored secret
 
 ```sh
-nitpick-notary -oidc-audience nitpick-notary \
+nitpick-server -oidc-audience nitpick-notary \
   -oidc-allow 'authoritative:repo:acme/app:ref:refs/heads/main' \
   -oidc-allow 'provisional:repo:acme/app:*'
 ```
@@ -84,7 +106,7 @@ Kubernetes Secret never holds a usable credential. Hash a secret with the server
 itself:
 
 ```sh
-printf %s "$SECRET" | nitpick-notary -hash      # sha256:<64 hex>
+printf %s "$SECRET" | nitpick-server -hash      # sha256:<64 hex>
 ```
 
 `-token name:role:sha256:<hex>` and the `NITPICK_NOTARY_TOKENS` environment
@@ -92,7 +114,7 @@ variable (whitespace-separated entries, for a container) take that form. The
 hash is not a bearer token: presenting it is refused. A plain secret must not
 start with `sha256:`, since that prefix means the rest is a hash; one that does
 is refused at startup unless the rest is 64 hex characters. `GET /healthz` answers
-`ok` with no token and serves no record, and `nitpick-notary -healthcheck` probes
+`ok` with no token, followed by a line for each component, and serves no record, and `nitpick-server -healthcheck` probes
 it, for an image with no shell.
 
 ### Docker
@@ -104,14 +126,14 @@ docker compose up -d --build
 curl -s localhost:8484/healthz
 ```
 
-The image is about 9 MB, runs as an unprivileged user on a read-only root filesystem,
+The image holds the server and the hub UI, runs as an unprivileged user on a read-only root filesystem,
 and keeps records on the `notary-data` volume. The compose file binds loopback
 only.
 
 ### Kubernetes
 
 ```sh
-helm install notary oci://ghcr.io/nitpick-oss/charts/nitpick-notary \
+helm install nitpick oci://ghcr.io/nitpick-oss/charts/nitpick-server \
   --set 'tokens[0].name=ci' --set 'tokens[0].role=authoritative' --set 'tokens[0].hash=<64 hex>'
 ```
 
@@ -123,7 +145,7 @@ volume claim is kept when the release is deleted, and installing again under the
 same release name picks it up with its records. Set `existingSecret` to supply
 the `tokens` entry from a Secret you manage, and `oidc.*` for GitHub Actions
 identity tokens. The image and chart are published to `ghcr.io` when a release
-tag is pushed by the `Notary image` workflow.
+tag is pushed by the `Server image` workflow.
 
 ## Limits
 

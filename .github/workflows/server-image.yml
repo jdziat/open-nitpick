@@ -1,8 +1,9 @@
 ---
-name: Notary image
+name: Server image
 
-# Publishes the notary container image and its helm chart to ghcr.io when a
-# release tag is pushed, beside the binaries the Release workflow builds.
+# Publishes the nitpick server container image and its helm chart to ghcr.io
+# when a release tag is pushed, beside the binaries the Release workflow builds.
+# The image holds the notary and the hub UI.
 # GitHub reads the key `on` as the trigger, and yamllint reads it as a boolean.
 # yamllint disable-line rule:truthy
 on:
@@ -60,7 +61,7 @@ jobs:
         id: image
         env:
           OWNER: ${{ github.repository_owner }}
-        run: echo "name=ghcr.io/${OWNER,,}/nitpick-notary" >> "$GITHUB_OUTPUT"
+        run: echo "name=ghcr.io/${OWNER,,}/nitpick-server" >> "$GITHUB_OUTPUT"
 
       # yamllint disable-line rule:line-length
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
@@ -86,13 +87,13 @@ jobs:
           ACTOR: ${{ github.actor }}
         run: |
           hash=$(printf 'a%.0s' $(seq 64))
-          helm lint deploy/helm/nitpick-notary \
+          helm lint deploy/helm/nitpick-server \
             --set 'tokens[0].name=ci' --set 'tokens[0].role=read' \
             --set "tokens[0].hash=$hash"
-          helm package deploy/helm/nitpick-notary \
+          helm package deploy/helm/nitpick-server \
             --version "$VERSION" --app-version "$VERSION" \
             --destination dist-chart
           printf %s "$TOKEN" | helm registry login ghcr.io \
             --username "$ACTOR" --password-stdin
-          helm push "dist-chart/nitpick-notary-$VERSION.tgz" \
+          helm push "dist-chart/nitpick-server-$VERSION.tgz" \
             "oci://ghcr.io/${OWNER,,}/charts"
