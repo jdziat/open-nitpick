@@ -193,22 +193,36 @@ func TestTheCapWarningSaysWhatTheCappedCallSpent(t *testing.T) {
 	}
 }
 
-// mandatoryLLM is a model that always reasons: an empty answer at the cap, and
-// a 400 for any request that asks it to stop.
-type mandatoryLLM struct{ calls, refused int }
+// mandatoryLLM is a model that always reasons: it refuses any request that asks
+// it to stop, and it answers only when it was given low effort and room.
+type mandatoryLLM struct {
+	answersAt int // the smallest cap at which it finishes; 0 means never
+	refused   int
+	caps      []int
+	efforts   []llms.ReasoningEffort
+}
 
 func (m *mandatoryLLM) GenerateContent(_ context.Context, _ []llms.Message, opts ...llms.CallOption) (*llms.Response, error) {
-	m.calls++
-	var co llms.CallOptions
-	for _, o := range opts {
-		o(&co)
-	}
+	co := llms.ApplyOptions(opts...)
 	if r, _ := co.ExtraBody["reasoning"].(map[string]any); r["enabled"] == false {
 		m.refused++
 		return nil, errors.New("API error (status 400, code 400): Reasoning is mandatory for this endpoint and cannot be disabled.")
 	}
+	limit := 0
+	if co.MaxTokens != nil {
+		limit = *co.MaxTokens
+	}
+	var effort llms.ReasoningEffort
+	if co.Reasoning != nil {
+		effort = co.Reasoning.Effort
+	}
+	m.caps = append(m.caps, limit)
+	m.efforts = append(m.efforts, effort)
+	if m.answersAt > 0 && limit >= m.answersAt && effort == llms.ReasoningEffortLow {
+		return &llms.Response{Content: `{"summary":"ok"}`, FinishReason: llms.FinishReasonStop}, nil
+	}
 	return &llms.Response{Content: "", FinishReason: llms.FinishReasonLength,
-		Usage: llms.Usage{CompletionTokens: 16384, ReasoningTokens: 16384}}, nil
+		Usage: llms.Usage{CompletionTokens: limit, ReasoningTokens: limit}}, nil
 }
 func (m *mandatoryLLM) Stream(context.Context, []llms.Message, ...llms.CallOption) (<-chan llms.StreamChunk, error) {
 	return nil, errors.New("not supported")
@@ -216,35 +230,87 @@ func (m *mandatoryLLM) Stream(context.Context, []llms.Message, ...llms.CallOptio
 func (m *mandatoryLLM) Provider() llms.Provider { return "mandatory" }
 func (m *mandatoryLLM) Model() string           { return "mandatory" }
 
-// A model that refuses to stop reasoning is asked once, on its first batch.
-// Every later batch that ends empty at the cap goes straight to escalation
-// without a request that is refused.
-func TestAModelThatCannotStopReasoningIsNotAskedToAgain(t *testing.T) {
-	inner := &mandatoryLLM{}
-	c := NewClientForTest(inner, config.ModelSpec{Provider: "openrouter", Model: "z-ai/glm-5.3-flash"})
-	type out struct {
-		Summary string `json:"summary"`
-	}
-	msgs := []llms.Message{{Role: llms.RoleUser, Content: "hi"}}
+type summaryOut struct {
+	Summary string `json:"summary"`
+}
 
-	_, first := Extract[out](context.Background(), c, msgs)
-	if !ShouldEscalate(first) {
-		t.Fatalf("first batch error %v does not escalate", first)
+func extractOnce(c *Client) (summaryOut, error) {
+	return Extract[summaryOut](context.Background(), c, []llms.Message{{Role: llms.RoleUser, Content: "hi"}})
+}
+
+// A model that refuses to stop reasoning is refused once, on its first batch.
+// The refused request is answered with its lowest effort and twice the cap, and
+// every later batch sends that retry directly.
+func TestAModelThatCannotStopReasoningIsRetriedAtLowEffortWithMoreRoom(t *testing.T) {
+	inner := &mandatoryLLM{answersAt: 32768}
+	c := NewClientForTest(inner, config.ModelSpec{Provider: "openrouter", Model: "z-ai/glm-5.3-flash"})
+
+	v, err := extractOnce(c)
+	if err != nil || v.Summary != "ok" {
+		t.Fatalf("first batch: %+v, %v", v, err)
 	}
 	if inner.refused != 1 || !c.ReasoningIsMandatory() {
 		t.Fatalf("first batch: refused=%d mandatory=%v, want one refusal learned", inner.refused, c.ReasoningIsMandatory())
 	}
 
-	before := inner.calls
-	_, second := Extract[out](context.Background(), c, msgs)
-	if !ShouldEscalate(second) {
-		t.Errorf("second batch error %v does not escalate", second)
+	before := len(inner.caps)
+	if v, err = extractOnce(c); err != nil || v.Summary != "ok" {
+		t.Fatalf("second batch: %+v, %v", v, err)
 	}
 	if inner.refused != 1 {
 		t.Errorf("a refused request was sent again: refused=%d", inner.refused)
 	}
-	if got := inner.calls - before; got != 1 {
-		t.Errorf("second batch made %d requests, want the one capped call and no JSON-fallback repeat", got)
+	if got := inner.caps[before:]; len(got) != 2 || got[0] != 16384 || got[1] != 32768 {
+		t.Errorf("second batch caps = %v, want the capped call then the doubled retry", got)
+	}
+	if last := inner.efforts[len(inner.efforts)-1]; last != llms.ReasoningEffortLow {
+		t.Errorf("retry effort = %q, want low", last)
+	}
+}
+
+// retry_max_tokens bounds how far the retry may raise the cap, per model.
+func TestRetryMaxTokensBoundsTheRaisedCapPerModel(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		maxTokens    int
+		retryMax     int
+		want         int
+		wantEscalate bool
+	}{
+		{"the default ceiling is 64k", 40000, 0, 65536, true},
+		{"a configured ceiling is kept", 40000, 50000, 50000, true},
+		{"a ceiling under the cap never shrinks it", 40000, 1000, 40000, true},
+		{"unset max_tokens doubles the first-attempt cap", 0, 0, 32768, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inner := &mandatoryLLM{} // never answers: shows the cap of every call
+			c := NewClientForTest(inner, config.ModelSpec{Provider: "openrouter", Model: "m", MaxTokens: tc.maxTokens, RetryMaxTokens: tc.retryMax})
+			_, err := extractOnce(c)
+			if tc.wantEscalate && !ShouldEscalate(err) {
+				t.Errorf("error %v does not escalate", err)
+			}
+			if len(inner.caps) == 0 || inner.caps[len(inner.caps)-1] != tc.want {
+				t.Errorf("caps = %v, want the retry at %d", inner.caps, tc.want)
+			}
+		})
+	}
+}
+
+// Rule 10: a model that still ends empty after the larger retry is not asked a
+// third time, and the batch escalates for a stated reason.
+func TestAMandatoryReasoningModelThatStaysEmptyEscalatesAfterOneRetry(t *testing.T) {
+	inner := &mandatoryLLM{}
+	c := NewClientForTest(inner, config.ModelSpec{Provider: "openrouter", Model: "m"})
+	if _, err := extractOnce(c); !ShouldEscalate(err) {
+		t.Fatalf("first batch error %v does not escalate", err)
+	}
+	before := len(inner.caps)
+	_, err := extractOnce(c)
+	if !ShouldEscalate(err) {
+		t.Fatalf("second batch error %v does not escalate", err)
+	}
+	if got := len(inner.caps) - before; got != 2 {
+		t.Errorf("second batch made %d requests, want the capped call and one retry", got)
 	}
 }
 

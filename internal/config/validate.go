@@ -163,6 +163,9 @@ func (s ModelSpec) validate(required bool) []error {
 	if s.Temperature != nil && !(*s.Temperature >= 0 && *s.Temperature <= 2) {
 		errs = append(errs, fmt.Errorf("temperature %.2f out of range [0, 2]", *s.Temperature))
 	}
+	if s.RetryMaxTokens < 0 {
+		errs = append(errs, fmt.Errorf("retry_max_tokens must not be negative, got %d", s.RetryMaxTokens))
+	}
 	if s.MaxTokens < 0 {
 		errs = append(errs, fmt.Errorf("max_tokens must not be negative, got %d", s.MaxTokens))
 	}

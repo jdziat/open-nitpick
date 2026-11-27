@@ -205,11 +205,14 @@ func (c *Client) retryAfter(ctx context.Context, attempt int, started time.Time,
 		return nil, false
 	}
 	// A refusal to turn reasoning off is final for this model, so it is
-	// learned here and never asked for again. The caller escalates on it; see
-	// ShouldEscalate.
-	if RefusesReasoningOff(err) {
+	// learned here and never asked for again. The request that was refused is
+	// the one reasoning-off retry, so the answer to it is the least effort the
+	// model allows with room to finish; a refusal of anything else is not this.
+	if RefusesReasoningOff(err) && askedReasoningOff(call) {
 		c.reasoningMandatory.Store(true)
-		return nil, false
+		c.logger().Warn("the model cannot turn reasoning off; sending again at its lowest effort with a larger cap",
+			"model", c.String())
+		return c.mandatoryRetryOptions(call), true
 	}
 	// Not a retry of the transport and not counted against its budget: it fires
 	// at most once per call, since the options sent again carry no temperature.
@@ -259,15 +262,15 @@ func (c *Client) retryAfter(ctx context.Context, attempt int, started time.Time,
 			return nil, false
 		}
 		// Asking a model that cannot stop reasoning to stop is a request that
-		// is refused (glm-5.3-flash, issue #214). The empty answer is then
-		// final, and is surfaced for escalation like a second one.
+		// is refused (glm-5.3-flash, issue #214), so it is asked for less
+		// reasoning and more room instead.
 		if c.reasoningMandatory.Load() {
-			c.logger().Warn("model hit the output cap with empty content and cannot turn reasoning off; not sending again",
+			c.logger().Warn("model hit the output cap with empty content and cannot turn reasoning off; sending again at its lowest effort with a larger cap",
 				"model", c.String(),
 				"elapsed", c.now().Sub(started).Round(time.Second),
 				"completion_tokens", resp.Usage.CompletionTokens,
 				"reasoning_tokens", resp.Usage.ReasoningTokens)
-			return nil, false
+			return c.mandatoryRetryOptions(call), true
 		}
 		next := emptyAnswerRetryOptions(call)
 		if strings.EqualFold(strings.TrimSpace(c.Spec.Provider), "openrouter") {
@@ -345,6 +348,45 @@ func emptyAnswerRetryOptions(call []llms.CallOption) []llms.CallOption {
 		next = append(next, llms.WithMaxTokens(creditCappedMaxTokens))
 	}
 	return next
+}
+
+// defaultRetryMaxTokens bounds the cap a retry on a model that must reason
+// raises to when the spec sets retry_max_tokens to nothing. A runaway at 32768
+// used all of it (issue #214), so more room is bounded, and per model.
+const defaultRetryMaxTokens = 65536
+
+// askedReasoningOff reports whether call asks for reasoning to be off, in the
+// neutral switch or in OpenRouter's own field.
+func askedReasoningOff(call []llms.CallOption) bool {
+	applied := llms.ApplyOptions(call...)
+	if r := applied.Reasoning; r != nil && r.Enabled != nil && !*r.Enabled {
+		return true
+	}
+	r, _ := applied.ExtraBody["reasoning"].(map[string]any)
+	return r["enabled"] == false
+}
+
+// mandatoryRetryOptions is the retry for a model that cannot stop reasoning:
+// its lowest effort, which Z.ai lists as low for GLM, and twice the cap the
+// capped call had, up to the spec's retry_max_tokens. Appended, so it replaces a
+// reasoning-off switch an earlier retry set.
+func (c *Client) mandatoryRetryOptions(call []llms.CallOption) []llms.CallOption {
+	next := append(append([]llms.CallOption(nil), call...),
+		llms.WithReasoningEffort(llms.ReasoningEffortLow))
+	if strings.EqualFold(strings.TrimSpace(c.Spec.Provider), "openrouter") {
+		next = append(next, llms.WithExtraBodyParam("reasoning", map[string]any{"effort": "low"}))
+	}
+	capNow := creditCappedMaxTokens
+	if applied := llms.ApplyOptions(call...); applied.MaxTokens != nil {
+		capNow = *applied.MaxTokens
+	}
+	ceiling := defaultRetryMaxTokens
+	if c.Spec.RetryMaxTokens > 0 {
+		ceiling = c.Spec.RetryMaxTokens
+	}
+	// Never below the cap the call already ran under: a ceiling under it would
+	// shrink the room, which is the opposite of the retry.
+	return append(next, llms.WithMaxTokens(max(capNow, min(2*capNow, ceiling))))
 }
 
 // runawayRetryTemperature is what a request is re-sampled at after a
