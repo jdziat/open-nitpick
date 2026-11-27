@@ -313,8 +313,14 @@ func TestAWindowWithNoEarlierReviewsSaysSoOnceInsteadOfOnEveryRow(t *testing.T) 
 	u.signIn("eng")
 	for _, p := range []string{"/ui/insights/hotspots?days=90", "/ui/insights/?days=90"} {
 		_, body := u.get(p)
-		if n := strings.Count(body, "No earlier data: no reviews came before this period"); n != 1 {
-			t.Errorf("%s: the note appears %d times, want once", p, n)
+		// Hotspots says it beside its table. Overview says it once, under the
+		// cards, in different words, so the two pages never repeat it.
+		want := 1
+		if strings.HasPrefix(p, "/ui/insights/?") {
+			want = 0
+		}
+		if n := strings.Count(body, "No earlier data: no reviews came before this period"); n != want {
+			t.Errorf("%s: the note appears %d times, want %d", p, n, want)
 		}
 		if strings.Contains(body, `data-label="Trend"`) || strings.Contains(body, "no earlier data</span>") {
 			t.Errorf("%s: a Trend column was drawn with nothing to compare", p)
@@ -352,6 +358,9 @@ func TestAWindowWithNoEarlierReviewsDoesNotPromiseATrendOrRepeatItselfInTheCards
 		t.Errorf("the note must come before the table, where it is read")
 	}
 	_, over := u.get("/ui/insights/?days=90")
+	if strings.Contains(over, "No earlier data:") {
+		t.Errorf("the overview says the same fact a second time, in the hotspots panel")
+	}
 	if n := strings.Count(over, "No reviews came before this period"); n != 1 {
 		t.Errorf("the overview says it %d times, want once", n)
 	}

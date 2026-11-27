@@ -235,7 +235,6 @@ const overviewBody = shared + `{{template "scope" .Data.Scope}}
 <section class="panel" aria-labelledby="hot"><h2 id="hot">Where findings concentrate</h2>
 {{if .Data.Hotspots}}<table class="records"><thead><tr><th>File</th><th class="num">Findings</th><th>Worst</th>{{if not .Data.NoTrend}}<th>Trend</th>{{end}}<th>Over the period</th></tr></thead><tbody>
 {{range .Data.Hotspots}}<tr><td data-label="File"><a href="{{.FindingsHref}}"><code>{{.Path}}</code></a>{{if .Repo}}<div class="muted">{{.Repo}}</div>{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td><td data-label="Worst">{{template "sev" .Worst}}</td>{{if not $.Data.NoTrend}}<td data-label="Trend"><span class="trend trend-{{.Trend}}">{{.TrendText}}</span></td>{{end}}<td data-label="Over the period">{{template "spark" .Spark}}</td></tr>{{end}}</tbody></table>
-{{if .Data.NoTrend}}<p class="muted">No earlier data: no reviews came before this period, so there is no comparison with the period before it.</p>{{end}}
 <p><a href="/ui/insights/hotspots?days={{.Data.Scope.Days}}{{if .Data.Scope.Repo}}&amp;repo={{.Data.Scope.Repo}}{{end}}">All hotspots</a></p>
 {{else}}<p class="muted">No findings in this period.</p>{{end}}</section>
 

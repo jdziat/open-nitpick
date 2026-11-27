@@ -327,14 +327,17 @@ span.sev-critical::before { background: var(--sev-critical); }
   .facts { grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; }
 }
 
-@media (max-width: 48rem) {
+/* Only where the 45rem chart overflows its card: the page gutters take 2rem. */
+@media (max-width: 46.9rem) {
   .only-sm { display: inline; }
 }
+.empty .button { margin-right: 1rem; }
 @media (max-width: 40rem) {
   .records td[data-label="Rank"] { display: block; text-align: left; color: var(--muted); font-size: 0.8rem; padding-bottom: 0; }
   .records td[data-label="Rank"]::before { content: "#"; margin-right: 0.1rem; }
   .cards .card:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .facts { grid-template-columns: 6rem 1fr; gap: 0.25rem 1rem; }
+  .data summary { padding: 0.75rem 0; }
   .filters.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filters.grid label:nth-child(-n+2) { grid-column: 1 / -1; }
 }
