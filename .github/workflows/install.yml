@@ -173,6 +173,7 @@ jobs:
           exe=nitpick; [ "$RUNNER_OS" = Windows ] && exe=nitpick.exe
           go build -ldflags '-X main.version=v0.0.1' \
             -o "$RUNNER_TEMP/up/$exe" ./cmd/nitpick
+          cp "$RUNNER_TEMP/up/$exe" "$RUNNER_TEMP/original-$exe"
           "$RUNNER_TEMP/up/$exe" version
 
       - name: Check reports a newer release and changes nothing
@@ -204,12 +205,26 @@ jobs:
             *) echo "unexpected version output: $out" >&2; exit 1 ;;
           esac
 
-      # Windows renamed the running executable aside. The next start removes it.
-      - name: The old binary is gone after the next start
+      # Windows renamed the running executable aside, so the old binary is
+      # still there under another name.
+      - name: Windows keeps the old binary aside
         if: runner.os == 'Windows'
         shell: bash
         run: |
           cd "$RUNNER_TEMP/up"
+          if [ ! -e nitpick.exe.old ]; then
+            echo "the old binary was not moved aside" >&2
+            exit 1
+          fi
+
+      # The release just installed predates this code, so it cannot remove
+      # the file. A build that has this code does, the next time it starts.
+      - name: The next start of this build removes the old binary
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/up"
+          cp "$RUNNER_TEMP/original-nitpick.exe" nitpick.exe
           ./nitpick.exe version
           if [ -e nitpick.exe.old ]; then
             echo "nitpick.exe.old was not removed" >&2
