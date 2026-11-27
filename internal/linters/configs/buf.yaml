@@ -1,4 +1,4 @@
-# open-nitpick's buf config: the standard lint rules.
+# nitpick's buf config: the standard lint rules.
 version: v2
 lint:
   use:

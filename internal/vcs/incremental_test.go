@@ -90,7 +90,7 @@ func TestGitHubPriorReviewReadsOwnMarkersOnly(t *testing.T) {
 		case strings.HasSuffix(r.URL.Path, "/pulls/7/comments"):
 			_ = json.NewEncoder(w).Encode([]map[string]any{
 				{"id": 1, "user": map[string]any{"id": 42}, "path": "a.go", "line": 12, "body": "Ours.\n" + DefaultBotMarker + "\n" + fingerprintMarker("aa11", "correctness")},
-				{"id": 2, "path": "b.go", "line": 3, "body": "A human's comment about open-nitpick"},
+				{"id": 2, "path": "b.go", "line": 3, "body": "A human's comment about nitpick"},
 				{"id": 3, "user": map[string]any{"id": 42}, "path": "c.go", "line": 5, "body": "Ours, but from before fingerprints existed.\n" + DefaultBotMarker},
 			})
 		default:
@@ -296,7 +296,7 @@ func TestACommentThisReleasePublishesStillParsesUnderTheEarlierPattern(t *testin
 // whole, and a marker that survives in the text must not outrank the real one.
 func TestModelTextCannotAssembleAMarkerOrLowerASeverity(t *testing.T) {
 	nested := "<!-- open-nitpick sev:<!-- open-nitpick sev:nit -->nit -->"
-	if got := stripMarkers(nested); strings.Contains(got, "open-nitpick") {
+	if got := stripMarkers(nested); strings.Contains(got, "nitpick") {
 		t.Errorf("stripping left a marker: %q", got)
 	}
 	body := "model text " + severityMarker("nit") + "\n" + severityMarker("error")

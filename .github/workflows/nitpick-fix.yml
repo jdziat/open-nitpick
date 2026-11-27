@@ -1,4 +1,4 @@
-# open-nitpick applying a finding on @open-nitpick fix.
+# nitpick applying a finding on @nitpick-review fix.
 #
 # A separate file from nitpick-respond.yml rather than another job in
 # it, and the separation is the point: this is the only workflow here
@@ -25,8 +25,14 @@ concurrency:
 jobs:
   fix:
     runs-on: ubuntu-latest
-    # Three conditions: the comment asks for a fix, the event is on a
-    # pull request, and the author is one the forge calls a writer.
+    # Four conditions: the comment asks for a fix, a person wrote it, the
+    # event is on a pull request, and the author is one the forge calls a
+    # writer.
+    #
+    # "Asks for a fix" is a trigger followed by fix, and not by fixed: that is
+    # a person saying they fixed it, which the respond workflow resolves. A
+    # gate cannot see word boundaries, so "fixes" and "fixture" still pass it;
+    # `nitpick respond` reads the comment again and does nothing with them.
     #
     # There is no fork test here, and that is a limit rather than a
     # choice. An issue_comment payload carries no head repository, so
@@ -39,8 +45,28 @@ jobs:
     # COLLABORATOR covers anyone invited at all, read access included,
     # so the binary asks the forge for the asker's real permission.
     if: >-
-      contains(github.event.comment.body, '@open-nitpick fix') &&
-      (github.event_name == 'pull_request_review_comment' || github.event.issue.pull_request != null) &&
+      (
+        (
+          contains(github.event.comment.body, '@nitpick-review fix') &&
+          !contains(github.event.comment.body, '@nitpick-review fixed')
+        ) ||
+        contains(github.event.comment.body, '@nitpick-review apply') ||
+        (
+          contains(github.event.comment.body, '@open-nitpick fix') &&
+          !contains(github.event.comment.body, '@open-nitpick fixed')
+        ) ||
+        contains(github.event.comment.body, '@open-nitpick apply') ||
+        (
+          contains(github.event.comment.body, '/nitpick fix') &&
+          !contains(github.event.comment.body, '/nitpick fixed')
+        ) ||
+        contains(github.event.comment.body, '/nitpick apply')
+      ) &&
+      github.event.comment.user.type != 'Bot' &&
+      (
+        github.event_name == 'pull_request_review_comment' ||
+        github.event.issue.pull_request != null
+      ) &&
       contains(
         fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'),
         github.event.comment.author_association

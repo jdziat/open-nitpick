@@ -13,7 +13,7 @@ import (
 
 // A change may not supply the policy it is reviewed under.
 //
-// open-nitpick reviews a pull request under a .nitpick.yaml that the same pull
+// nitpick reviews a pull request under a .nitpick.yaml that the same pull
 // request can edit, and nearly every key in that file decides whether a finding
 // is ever produced or ever published: review.ignore skips files outright,
 // min_severity and fail_on delete findings and un-gate the build,

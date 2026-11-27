@@ -375,7 +375,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		note = "UNOFFICIAL: no notary kept this review's record, so it was not posted; the review is below instead."
 		fmt.Fprintln(os.Stderr, note)
 		if actions.active() {
-			fmt.Printf("::warning::open-nitpick: %s\n", note)
+			fmt.Printf("::warning::nitpick: %s\n", note)
 		}
 		if perr := (&dryRunProvider{source: provider, out: textOut(&f)}).PublishReview(ctx, ref,
 			review.Render(report, report.Files, cfg)); perr != nil {
@@ -394,7 +394,7 @@ func reviewWithScope(ctx context.Context, name string, args []string, scope func
 		note = reason + "; the review is below instead."
 		log.Warn("could not publish the review; printing it instead", "error", err)
 		if actions.active() {
-			fmt.Printf("::warning::open-nitpick: %s\n", reason)
+			fmt.Printf("::warning::nitpick: %s\n", reason)
 		}
 		if perr := (&dryRunProvider{source: provider, out: textOut(&f)}).PublishReview(ctx, ref,
 			review.Render(report, report.Files, cfg)); perr != nil {
@@ -1028,7 +1028,7 @@ func explainConfig(w io.Writer, repo, configPath, forPath string) error {
 	if spec, ok := cfg.Models.ResolveFix(); ok {
 		pf("  %-8s %s/%s\n", "fix", spec.Provider, spec.Model)
 	} else {
-		pl("  fix      (none; \"@open-nitpick fix\" refuses without models.fix)")
+		pl("  fix      (none; \"@nitpick-review fix\" refuses without models.fix)")
 	}
 
 	// Printed whether or not validation is on, because "which model would
@@ -1155,7 +1155,7 @@ func refusePublishing(f *reviewFlags, ref vcs.Ref) error {
 		return nil
 	}
 	return errors.New("improve does not post to a pull request: it prints locally, " +
-		`and "@open-nitpick improve" is how the same pass reaches one`)
+		`and "@nitpick-review improve" is how the same pass reaches one`)
 }
 
 // printRoundLimit lists what still stands when the limit stopped the series.

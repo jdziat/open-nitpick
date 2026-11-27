@@ -14,7 +14,7 @@ import (
 	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
-// The wider pass, on `@open-nitpick improve`.
+// The wider pass, on `@nitpick-review improve`.
 //
 // config.GenerationLevel is normal because four eval runs found that asking
 // one pass for defects and style together produced more findings, lower

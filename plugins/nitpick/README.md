@@ -1,6 +1,6 @@
 # nitpick, from an agent session
 
-This plugin puts open-nitpick's review engine inside an agent session as
+This plugin puts nitpick's review engine inside an agent session as
 MCP tools, with skills that say when to reach for each and what to do with
 what comes back.
 
@@ -14,7 +14,7 @@ Install from the marketplace in this repository:
 
 ```
 /plugin marketplace add nitpick-oss/nitpick
-/plugin install nitpick@open-nitpick
+/plugin install nitpick@nitpick
 ```
 
 Or register the server directly, without the skills, with whichever

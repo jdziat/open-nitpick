@@ -72,7 +72,7 @@ can apply: the suggestion says what to type, not where else the finding reaches.
 
 ## The wider pass
 
-`@open-nitpick improve` reviews the change again for naming, documentation,
+`@nitpick-review improve` reviews the change again for naming, documentation,
 structure, idiom and slop: the classes an ordinary review does not ask for.
 On an inline thread it covers that file; on the conversation, the whole change.
 
@@ -111,7 +111,7 @@ instead, which is a different command under the same name.
 
 ## Applying a finding
 
-`@open-nitpick fix` on a review thread applies that finding; `@open-nitpick fix
+`@nitpick-review fix` or `/nitpick fix` on a review thread applies that finding; `/nitpick fix
 all` applies every published finding it can. The result is a draft pull request
 against the branch under review, never a write to that branch.
 
@@ -333,7 +333,7 @@ linters:
 
   # Analyzer configuration. Every one of these must resolve OUTSIDE the
   # repository under review; a path inside it is refused. Empty is the default.
-  golangci_config: ""              # empty: golangci-lint runs under open-nitpick's own config
+  golangci_config: ""              # empty: golangci-lint runs under nitpick's own config
   ruff_config: ""                  # empty: ruff runs with --isolated
   eslint_config: ""                # empty: eslint does not run
   semgrep_config: ""               # empty: semgrep does not run
@@ -653,7 +653,7 @@ removes it. The measurements are in
 
 A comment event runs in the **base** repository, holding the base repository's
 secrets, whoever wrote the comment. On a public repository that means every
-account on the forge is one `@open-nitpick` away from your model credit, and a cap
+account on the forge is one `@nitpick-review` away from your model credit, and a cap
 on the size of each answer does not bound a total whose multiplier is the
 number of strangers.
 
@@ -1077,14 +1077,15 @@ Because a prompt asks and cannot enforce, model-authored prose is scrubbed
 before it is published: em dashes and en-dash separators become commas,
 arrows become words, filler words and chat openers and offers of further
 help are removed, and code spans and fenced blocks are left exactly as the
-model wrote them. The same rules and the same scrub apply to an `@open-nitpick`
+model wrote them. The same rules and the same scrub apply to an `@nitpick-review`
 answer, which is capped at 120 words.
 
 ## The review.mention handle
 
-`review.mention` (default `@open-nitpick`) is the handle a pull request comment
+`review.mention` (default `@nitpick-review`) is the handle a pull request comment
 uses to talk to the reviewer; see the CI page for the workflow that
-answers it.
+answers it. `/nitpick` is a second trigger, with the same commands. It is not a
+setting: the name is fixed, and it works whatever `review.mention` is.
 
 ## Approving a clean review
 

@@ -154,7 +154,7 @@ func New(repoRoot string, cfg *config.Config, log *slog.Logger) *Set {
 	return &Set{repoRoot: repoRoot, cfg: cfg, log: log, runners: selected}
 }
 
-// builtins lists the analyzers shipped with open-nitpick, each holding its
+// builtins lists the analyzers shipped with nitpick, each holding its
 // operator-supplied configuration already resolved against repoRoot.
 //
 // Resolution happens once, here, rather than per Run: whether a configuration is

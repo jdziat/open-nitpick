@@ -1641,7 +1641,7 @@ func (e *Engine) superseded(ctx context.Context, ref vcs.Ref, prior *vcs.PriorRe
 	if len(ids) == 0 {
 		return nil
 	}
-	reply := fmt.Sprintf("Resolved by open-nitpick: the change was reviewed again after %s, and the finding did not recur on the current head.", short(inc.Since))
+	reply := fmt.Sprintf("Resolved by nitpick: the change was reviewed again after %s, and the finding did not recur on the current head.", short(inc.Since))
 	resolved, err := resolver.ResolveThreads(ctx, ref, ids, reply)
 	if err != nil {
 		e.log().Warn("could not resolve superseded comments", "error", err, "resolved", len(resolved), "of", len(ids))
@@ -1716,9 +1716,9 @@ func (e *Engine) resolveClearedForApprove(ctx context.Context, ref vcs.Ref, prio
 	if len(ids) == 0 {
 		return nil
 	}
-	reply := "Resolved by open-nitpick: the change was reviewed again and no findings remain."
+	reply := "Resolved by nitpick: the change was reviewed again and no findings remain."
 	if residual {
-		reply = "Resolved by open-nitpick: the change was reviewed again; remaining findings are within the residual approve floor."
+		reply = "Resolved by nitpick: the change was reviewed again; remaining findings are within the residual approve floor."
 	}
 	resolved, err := resolver.ResolveThreads(ctx, ref, ids, reply)
 	if err != nil {

@@ -1113,7 +1113,7 @@ func TestAgeIsWholeCalendarDays(t *testing.T) {
 
 // TestJudgeSpendIsNotAContenderCost keeps the two ledgers apart.
 //
-// Nobody running open-nitpick pays for a judge. Folding its tokens into a
+// Nobody running nitpick pays for a judge. Folding its tokens into a
 // contender's cost would overstate what the tool costs by whatever the judge
 // happens to charge, currently more than the input rate of more than half the
 // battery.
@@ -1283,7 +1283,7 @@ func TestAPublishedFreeCacheRateIsNotTheInputFallback(t *testing.T) {
 // and nothing here can say which. It was billed silently at the 5-minute rate,
 // the cheaper of the two, which is the flattering direction.
 //
-// Nothing in open-nitpick enables prompt caching today, which is why this is
+// Nothing in nitpick enables prompt caching today, which is why this is
 // encoded rather than left as a comment: "no path sends these tokens" is a
 // property of this month's call sites.
 func TestTwoPublishedCacheWriteRatesMakeTheCallUnpriceable(t *testing.T) {

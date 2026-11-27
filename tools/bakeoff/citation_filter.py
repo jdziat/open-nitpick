@@ -2,7 +2,7 @@
 """Does requiring a verbatim citation separate real findings from noise?
 
 Mira discards a comment whose quoted code is not in the diff. This applies the same
-rule to open-nitpick's own `citation` field on stored runs: keep a comment only
+rule to nitpick's own `citation` field on stored runs: keep a comment only
 when its citation is present and appears, whitespace-normalised, in the pull
 request's diff. Scored from the judge's existing verdicts, so no model call is made.
 

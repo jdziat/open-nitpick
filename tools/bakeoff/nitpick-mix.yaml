@@ -1,4 +1,4 @@
-# open-nitpick's mixed-model configuration for the bakeoff against Mira (arm B).
+# nitpick's mixed-model configuration for the bakeoff against Mira (arm B).
 #
 # The shape is the documented cheap composite (docs/comparison.md): two reviewers
 # on every batch, a second model triaging. DeepSeek V4 Flash reviews, as in arm A;

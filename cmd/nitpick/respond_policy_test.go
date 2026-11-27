@@ -19,7 +19,7 @@ import (
 // respond had no BasePolicy at all, so the config on disk decided who may spend
 // the repository's credit, which model answered, who may write, and what the
 // improve pass reviewed under. For an inline thread comment, the event
-// `@open-nitpick fix` is typed on, actions/checkout resolves the pull request's
+// `@nitpick-review fix` is typed on, actions/checkout resolves the pull request's
 // merge ref, so the file on disk is the change's own.
 func TestRespondAnswersUnderThePolicyTheChangeDidNotWrite(t *testing.T) {
 	// The operator's environment, which is what a withheld configuration falls

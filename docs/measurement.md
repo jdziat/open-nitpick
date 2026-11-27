@@ -65,7 +65,7 @@ were judged, not how many samples exist. `COV` is the denominator that makes a
 comparison legitimate; `N` is what the rates divide by.
 
 **Rule 6: there is no cross-tool severity score. WITHDRAWN, twice.** Incumbent
-publishes ~3 severity levels; open-nitpick publishes 5. Comparing them at full
+publishes ~3 severity levels; nitpick publishes 5. Comparing them at full
 resolution is a category error in whichever direction the mapping happens to
 round: that was the first attempt, correcting for it in the parser, and it was
 retracted. The second attempt corrected for it at comparison time, coarsening

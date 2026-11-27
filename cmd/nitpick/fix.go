@@ -16,7 +16,7 @@ import (
 	"github.com/nitpick-oss/nitpick/internal/vcs"
 )
 
-// Applying a finding, on `@open-nitpick fix`.
+// Applying a finding, on `@nitpick-review fix`.
 //
 // This is the one command that writes to the repository, so it refuses more
 // than the others and says why rather than going quiet. A question answered to

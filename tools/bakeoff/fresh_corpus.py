@@ -280,7 +280,7 @@ def classify(candidate, cache):
 
 
 def request(url, accept=None, limit=None):
-    headers = {"User-Agent": "open-nitpick-fresh-corpus"}
+    headers = {"User-Agent": "nitpick-fresh-corpus"}
     if accept:
         headers["Accept"] = accept
     token = subprocess.run(["gh", "auth", "token"], capture_output=True, text=True).stdout.strip()

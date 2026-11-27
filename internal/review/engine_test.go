@@ -603,7 +603,7 @@ Binary files a/huge.bin and b/huge.bin differ
 }
 
 func TestDegradedFilesAreNotReportedAsUnreviewed(t *testing.T) {
-	// Found by running open-nitpick on its own history. A file whose content
+	// Found by running nitpick on its own history. A file whose content
 	// fetch fails is reviewed from the diff alone, but was recorded in
 	// Plan.Skipped, which the summary prints under "Files not reviewed". Claiming
 	// a reviewed file was not reviewed is the same class of error as hiding a

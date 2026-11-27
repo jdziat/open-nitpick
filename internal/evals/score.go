@@ -35,7 +35,7 @@ type Score struct {
 	Unmatched []review.Finding
 
 	// Violations are breaches of invariants the tooling must uphold regardless
-	// of which model is used. Any of these is a bug in open-nitpick, not a
+	// of which model is used. Any of these is a bug in nitpick, not a
 	// weakness of the model.
 	Violations []string
 
@@ -1000,7 +1000,7 @@ func mentionsAny(f review.Finding, keywords []string) bool {
 // checkInvariants verifies properties the tooling must guarantee for any model.
 //
 // These are the fixes from the security and correctness pass, restated as
-// assertions against real output. A violation here is an open-nitpick bug: no
+// assertions against real output. A violation here is an nitpick bug: no
 // model behavior should be able to produce it.
 func checkInvariants(r RunResult) []string {
 	var out []string

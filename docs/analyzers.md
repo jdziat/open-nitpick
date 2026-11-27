@@ -9,7 +9,7 @@ the binary.
 
 | analyzer | covers | runs | configuration |
 |---|---|---|---|
-| golangci-lint | Go | enabled | open-nitpick's own config; `golangci_config` overrides |
+| golangci-lint | Go | enabled | nitpick's own config; `golangci_config` overrides |
 | ruff | Python | enabled | `--isolated`; `ruff_config` overrides |
 | pylint | Python (errors and warnings only) | auto | shipped rcfile |
 | brakeman | Ruby on Rails (security) | auto | shipped config and an empty ignore file |
@@ -66,7 +66,7 @@ oasdiff.
 
 ## Analyzers do not read configuration from the branch under review
 
-golangci-lint runs isolated under a config open-nitpick ships and ruff runs
+golangci-lint runs isolated under a config nitpick ships and ruff runs
 `--isolated`; eslint and semgrep do not run at all until you point them at a
 configuration you control, which is also why they are not in the default
 `enabled` list. Adding them there without setting their config is a mistake
@@ -98,7 +98,7 @@ tree. Measured against golangci-lint 2.8.0:
 - `uniq-by-line` defaults to true, so one issue survives per line. A
   two-statement function reported four issues with it off and two with it on.
 
-So open-nitpick ships its own golangci-lint config, embedded in the binary and
+So nitpick ships its own golangci-lint config, embedded in the binary and
 written to a temporary directory **outside** the repository under review. It sets
 `exclusions.generated: disable`, and if it cannot be written outside the
 repository the analyzer does not run and says so; it never falls back to the
@@ -146,7 +146,7 @@ about why.
 
 ## Every review says what every analyzer did
 
-`ran` under `isolated: open-nitpick's own analyzer config` or `operator config
+`ran` under `isolated: nitpick's own analyzer config` or `operator config
 <path>`, `did not run: <reason>`, or `skipped` because the change contained no
 files it reads. It is published **on the pull request**, in the summary comment
 beside the notice about a substituted `.nitpick.yaml`, and repeated on stderr;

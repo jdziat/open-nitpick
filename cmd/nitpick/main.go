@@ -37,6 +37,7 @@ func run() int {
 	// The version the linker set, where a message about what this build knows
 	// can reach it. internal/config cannot see a package main variable.
 	config.Version = version
+	removeStaleUpgrade()
 
 	if len(os.Args) < 2 {
 		usage()
@@ -78,6 +79,8 @@ func run() int {
 		err = runMCP(ctx, os.Args[2:])
 	case "auth":
 		err = runAuth(os.Args[2:], os.Stdin, os.Stdout)
+	case "upgrade":
+		err = runUpgrade(ctx, os.Args[2:], os.Stdout)
 	case "setup":
 		err = runSetup(os.Args[2:], os.Stdin, os.Stdout)
 	case "init":
@@ -166,7 +169,7 @@ Usage:
   nitpick slop [flags] [path...]   AI slop only: the tells without a model, the model's slop rules, a score, and fixes
   nitpick security [flags] [path...]
                                    Security scan: required scanners (osv, gitleaks, …), optional model, roster proves completeness
-  nitpick respond [flags]          Answer an @open-nitpick comment on a pull request (review again, resolve, or a question)
+  nitpick respond [flags]          Answer an @nitpick-review comment on a pull request (review again, resolve, or a question)
   nitpick mcp [flags]              Serve the review tools to an agent session over the Model Context Protocol (stdio)
   nitpick mcp install <client>     Register that server with an agent client (claude-code, cursor, opencode, codex, ...)
   nitpick setup [flags]            Register the MCP server with every agent client found here (claude-code, codex, opencode, ...)
@@ -178,6 +181,7 @@ Usage:
                                    Propose and individually accept repository references; activation requires trusted-base policy
   nitpick linters                  List the deterministic analyzers and how each is configured
   nitpick config-reference         Print every configuration key, its type and its default
+  nitpick upgrade [flags]          Replace this binary with the latest release, verified against its checksum and signature
   nitpick version                  Print the version
 
 Run "nitpick <command> -h" for a command's flags.

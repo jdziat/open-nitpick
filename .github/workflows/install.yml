@@ -16,6 +16,8 @@ on:
       - website/install.sh
       - website/install.ps1
       - scripts/test-install-ps1.ps1
+      - internal/upgrade/**
+      - cmd/nitpick/upgrade.go
       - .github/workflows/install.yml
   push:
     branches: [main]
@@ -23,6 +25,8 @@ on:
       - website/install.sh
       - website/install.ps1
       - scripts/test-install-ps1.ps1
+      - internal/upgrade/**
+      - cmd/nitpick/upgrade.go
       - .github/workflows/install.yml
   schedule:
     - cron: "17 6 * * 1"
@@ -135,3 +139,94 @@ jobs:
       - name: Test install.ps1 under Windows PowerShell 5.1
         shell: powershell
         run: ./scripts/test-install-ps1.ps1
+
+  # `nitpick upgrade` for real, on each platform: a binary that says it is an
+  # old release replaces itself with the latest published one, through the
+  # network, the checksum and the Sigstore signature. The Go tests cover every
+  # refusal against a fake release server; this is the one place the swap runs
+  # on Windows, where a running .exe can be renamed but not replaced.
+  upgrade:
+    name: upgrade ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # yamllint disable-line rule:line-length
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v7.1.0
+        with:
+          go-version-file: go.mod
+
+      - name: The upgrade package's tests, including a running binary
+        run: go test ./internal/upgrade
+
+      - name: Build a binary that says it is an old release
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/up"
+          exe=nitpick; [ "$RUNNER_OS" = Windows ] && exe=nitpick.exe
+          go build -ldflags '-X main.version=v0.0.1' \
+            -o "$RUNNER_TEMP/up/$exe" ./cmd/nitpick
+          cp "$RUNNER_TEMP/up/$exe" "$RUNNER_TEMP/original-$exe"
+          "$RUNNER_TEMP/up/$exe" version
+
+      - name: Check reports a newer release and changes nothing
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/up"
+          exe=nitpick; [ "$RUNNER_OS" = Windows ] && exe=nitpick.exe
+          before=$(find . -type f -exec sha256sum {} + | sort)
+          out=$(./"$exe" upgrade -check)
+          echo "$out"
+          case "$out" in
+            *"is available"*) ;;
+            *) echo "no newer release was reported" >&2; exit 1 ;;
+          esac
+          after=$(find . -type f -exec sha256sum {} + | sort)
+          test "$after" = "$before"
+
+      - name: Upgrade to the latest release
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/up"
+          exe=nitpick; [ "$RUNNER_OS" = Windows ] && exe=nitpick.exe
+          ./"$exe" upgrade
+          out=$(./"$exe" version)
+          echo "$out"
+          case "$out" in
+            "nitpick v0.0.1") echo "not replaced" >&2; exit 1 ;;
+            "nitpick v"*) ;;
+            *) echo "unexpected version output: $out" >&2; exit 1 ;;
+          esac
+
+      # Windows renamed the running executable aside, so the old binary is
+      # still there under another name.
+      - name: Windows keeps the old binary aside
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/up"
+          if [ ! -e nitpick.exe.old ]; then
+            echo "the old binary was not moved aside" >&2
+            exit 1
+          fi
+
+      # The release just installed predates this code, so it cannot remove
+      # the file. A build that has this code does, the next time it starts.
+      - name: The next start of this build removes the old binary
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/up"
+          cp "$RUNNER_TEMP/original-nitpick.exe" nitpick.exe
+          ./nitpick.exe version
+          if [ -e nitpick.exe.old ]; then
+            echo "nitpick.exe.old was not removed" >&2
+            exit 1
+          fi

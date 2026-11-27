@@ -1,4 +1,4 @@
-# open-nitpick reviewing its own pull requests.
+# nitpick reviewing its own pull requests.
 name: Review
 
 on:

@@ -265,7 +265,7 @@ func (t *catalogTool) State() string {
 	var isolated string
 	switch t.spec.isolation {
 	case isolatedByShipped:
-		isolated = "isolated: open-nitpick's own analyzer config"
+		isolated = "isolated: nitpick's own analyzer config"
 	case isolatedByFlag:
 		isolated = "isolated"
 	case noConfig:
@@ -290,7 +290,7 @@ func (t *catalogTool) Run(ctx context.Context, repoRoot string, files []string) 
 		return nil, nil
 	}
 
-	tmp, err := os.MkdirTemp("", "open-nitpick-"+t.spec.name+"-")
+	tmp, err := os.MkdirTemp("", "nitpick-"+t.spec.name+"-")
 	if err != nil {
 		return nil, fmt.Errorf("%s: scratch directory: %w", t.spec.name, err)
 	}
@@ -356,11 +356,11 @@ func (t *catalogTool) Run(ctx context.Context, repoRoot string, files []string) 
 func writeShipped(dir, name string) (string, error) {
 	content, err := shippedConfigs.ReadFile("configs/" + name)
 	if err != nil {
-		return "", fmt.Errorf("open-nitpick ships no analyzer config named %s: %w", name, err)
+		return "", fmt.Errorf("nitpick ships no analyzer config named %s: %w", name, err)
 	}
 	file := filepath.Join(dir, name)
 	if err := os.WriteFile(file, content, 0o600); err != nil {
-		return "", fmt.Errorf("write open-nitpick's analyzer config: %w", err)
+		return "", fmt.Errorf("write nitpick's analyzer config: %w", err)
 	}
 	return file, nil
 }
@@ -710,7 +710,7 @@ func Catalog() []CatalogEntry {
 		case isolatedByFlag:
 			conf = "isolated by flag; linters.configs." + s.name + " overrides"
 		case isolatedByShipped:
-			conf = "open-nitpick's own config; linters.configs." + s.name + " overrides"
+			conf = "nitpick's own config; linters.configs." + s.name + " overrides"
 		case noConfig:
 			conf = "none"
 		default:

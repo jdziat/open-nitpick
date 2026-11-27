@@ -1,4 +1,4 @@
-# golangci-lint configuration owned by open-nitpick.
+# golangci-lint configuration owned by nitpick.
 #
 # It is embedded in the binary and written to a temporary directory outside the
 # repository under review, because the alternative is not "no configuration" but
@@ -22,7 +22,7 @@ version: "2"
 linters:
   # Pinned rather than inherited. It is already golangci-lint 2.8.0's default,
   # and stating it means a future release changing that default cannot quietly
-  # change what open-nitpick reports.
+  # change what nitpick reports.
   default: standard
 
   exclusions:

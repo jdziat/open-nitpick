@@ -1,5 +1,5 @@
 # R12: R9 (each pull request in one batch) with room for the reviewer to finish
-# thinking. Unset, open-nitpick caps a reasoning model on OpenRouter at 16,384
+# thinking. Unset, nitpick caps a reasoning model on OpenRouter at 16,384
 # output tokens, and 39 of R1's 48 review batches and about 19 of R9's 23 spent
 # all of it thinking and were sent again with reasoning off.
 models:

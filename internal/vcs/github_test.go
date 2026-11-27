@@ -446,7 +446,7 @@ func TestGitHubConversationMethods(t *testing.T) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/pulls/7/comments") && r.Method == http.MethodGet:
 			_ = json.NewEncoder(w).Encode([]map[string]any{
-				{"id": 20, "body": "finding", "user": map[string]any{"login": "open-nitpick[bot]"}},
+				{"id": 20, "body": "finding", "user": map[string]any{"login": "nitpick[bot]"}},
 				{"id": 21, "in_reply_to_id": 20, "body": "why?", "user": map[string]any{"login": "carol"}},
 				{"id": 22, "body": "other thread", "user": map[string]any{"login": "dave"}},
 			})

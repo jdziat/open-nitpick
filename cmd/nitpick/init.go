@@ -234,7 +234,7 @@ func renderConfig(c chosenModel, matched []linters.CatalogEntry) string {
 	var b strings.Builder
 	p := func(format string, a ...any) { _, _ = fmt.Fprintf(&b, format, a...) }
 
-	p(`# open-nitpick configuration. Written by "nitpick init".
+	p(`# nitpick configuration. Written by "nitpick init".
 #
 # Every value here is already the shipped default, except the model and
 # linters.enabled, so deleting a key changes nothing and this file can be

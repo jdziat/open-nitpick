@@ -14,7 +14,7 @@ import (
 
 // PolicyResolver decides which configuration a review runs under.
 //
-// A change may not supply the policy it is reviewed under. open-nitpick
+// A change may not supply the policy it is reviewed under. nitpick
 // reviews pull requests, and a pull request can edit the .nitpick.yaml it is
 // reviewed under, so when the change modifies that file, the file in the
 // change is not authoritative for this review and policy comes from a revision

@@ -1,6 +1,6 @@
 # Security policy
 
-open-nitpick runs in CI, holds a model credential and a forge token, and
+nitpick runs in CI, holds a model credential and a forge token, and
 executes third-party analyzers against code it did not write. Its trust
 model is written down in [Trust model](docs/trust-model.md); a report
 that shows that document and the code disagree is the most useful kind.

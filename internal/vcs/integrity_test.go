@@ -276,7 +276,7 @@ func TestResolveThreadsTrustsOnlyConfirmedResolutions(t *testing.T) {
 				_, _ = w.Write([]byte(`{}`))
 			}
 		})
-		resolved, err := gh.ResolveThreads(context.Background(), testRef(), []int64{1}, "Resolved by open-nitpick: test")
+		resolved, err := gh.ResolveThreads(context.Background(), testRef(), []int64{1}, "Resolved by nitpick: test")
 		if confirmed {
 			if err != nil || len(resolved) != 1 {
 				t.Fatalf("confirmed resolve reported err=%v resolved=%v", err, resolved)
