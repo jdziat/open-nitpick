@@ -462,3 +462,24 @@ func TestTheNoTrendNoteShowsOnlyWhenNoRowHasSomethingToCompareWith(t *testing.T)
 		t.Fatalf("repo a's rows have a baseline, so the Trend column must stay: the top row's repo decided for everyone")
 	}
 }
+
+func TestTheLatestReviewsPanelLeavesOutAReviewDatedAhead(t *testing.T) {
+	u := newUI(t)
+	u.seed()
+	// c.now is the fixed t0; this review is a few minutes after it.
+	if _, err := u.co.store.Add(context.Background(), Review{Repo: "ahead/repo", Commit: "future", At: time.Now().Add(2 * time.Minute), Result: "clean", Complete: true}); err != nil {
+		t.Fatal(err)
+	}
+	u.co.now = time.Now
+	u.signIn("eng")
+	_, body := u.get("/ui/insights/?days=30")
+	// The repository picker lists every repository that ever reported, on purpose.
+	// The panel is what must not show the review.
+	_, panel, ok := strings.Cut(body, `id="rec">Latest reviews</h2>`)
+	if !ok {
+		t.Fatal("no Latest reviews panel")
+	}
+	if strings.Contains(panel, "ahead/repo") {
+		t.Fatalf("the Latest reviews panel lists a review dated after now, which no count includes")
+	}
+}

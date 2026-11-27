@@ -190,7 +190,7 @@ func (c *Component) overviewPage(r *http.Request) (any, error) {
 		v.Hotspots = append(v.Hotspots, c.hotspotRow(i+1, h, sparkScale(hs), q.Days))
 	}
 	v.NoTrend = noBaseline(hs)
-	for i, rv := range c.store.Reviews(Filter{Repo: q.Repo}) {
+	for i, rv := range c.store.Reviews(Filter{Repo: q.Repo, Until: q.Now}) {
 		if i == 5 {
 			break
 		}
@@ -479,7 +479,7 @@ func (c *Component) reviewsPage(r *http.Request) (any, error) {
 		return nil, err
 	}
 	from, _ := q.window()
-	all := c.store.Reviews(Filter{Repo: q.Repo, Since: from})
+	all := c.store.Reviews(Filter{Repo: q.Repo, Since: from, Until: q.Now})
 	v := reviewsView{Scope: c.scope(r, "/ui/insights/reviews", q), Total: len(all), Empties: noReviews()}
 	for i, rv := range all {
 		if i == 100 {

@@ -287,3 +287,34 @@ func TestTheReviewListSaysHowManyThereAreWhenItIsCutShort(t *testing.T) {
 		t.Fatalf("%d reviews, total %d, truncated %v: a cut-short list must say so", len(out.Reviews), out.Total, out.Truncated)
 	}
 }
+
+func TestTheReviewListLeavesOutAReviewDatedAheadThatEveryAnalyticExcludes(t *testing.T) {
+	ts, c := newHub(t)
+	// The store accepts a little clock skew; the list must agree with the counts.
+	c.now = time.Now
+	if _, err := c.store.Add(context.Background(), Review{Repo: "r", Commit: "now", At: time.Now().Add(-time.Minute), Result: "clean", Complete: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.store.Add(context.Background(), Review{Repo: "r", Commit: "ahead", At: time.Now().Add(3 * time.Minute), Result: "clean", Complete: true}); err != nil {
+		t.Fatalf("a review 3 minutes ahead is within the skew and must be accepted: %v", err)
+	}
+	_, body := do(t, "GET", ts.URL+"/v1/reviews?days=7", readSecret, "")
+	var out struct {
+		Reviews []struct{ Commit string } `json:"reviews"`
+		Total   int                       `json:"total"`
+	}
+	if err := json.Unmarshal([]byte(body), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Total != 1 || len(out.Reviews) != 1 || out.Reviews[0].Commit != "now" {
+		t.Fatalf("the list holds %+v: a review dated ahead is in the list but in no count", out)
+	}
+	_, over := do(t, "GET", ts.URL+"/v1/insights/overview?days=7", readSecret, "")
+	var ov struct {
+		Overview struct{ Reviews int } `json:"overview"`
+	}
+	_ = json.Unmarshal([]byte(over), &ov)
+	if ov.Overview.Reviews != out.Total {
+		t.Fatalf("overview counts %d reviews, the list %d", ov.Overview.Reviews, out.Total)
+	}
+}

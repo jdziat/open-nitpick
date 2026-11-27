@@ -98,6 +98,9 @@ type Review struct {
 type Filter struct {
 	Repo  string
 	Since time.Time
+	// Until, when set, leaves out what is dated after it. The analytics ignore a
+	// review dated after now, so a list built for the same period must too.
+	Until time.Time
 }
 
 // Store holds reviews. Add appends to the file and the index under one lock, so
@@ -369,7 +372,7 @@ func (s *Store) Reviews(f Filter) []Review {
 	defer s.mu.Unlock()
 	var out []Review
 	for _, r := range s.reviews {
-		if f.Repo != "" && r.Repo != f.Repo || r.At.Before(f.Since) {
+		if f.Repo != "" && r.Repo != f.Repo || r.At.Before(f.Since) || !f.Until.IsZero() && r.At.After(f.Until) {
 			continue
 		}
 		out = append(out, r)

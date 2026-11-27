@@ -263,7 +263,7 @@ func build(ctx context.Context, o *options, log *slog.Logger) (http.Handler, fun
 	for _, name := range cfg.components() {
 		// knownComponents refuses any other name before this point.
 		if name == "insights" {
-			c, closeInsights, err := buildInsights(o, len(providers) > 0, log)
+			c, closeInsights, err := buildInsights(o, cfg.grantsRole("insights"), log)
 			if err != nil {
 				closeStore()
 				return nil, nil, err
@@ -321,11 +321,12 @@ func build(ctx context.Context, o *options, log *slog.Logger) (http.Handler, fun
 // buildInsights opens the insights store under the data directory. One server per
 // directory holds for it as for the notary: the reviews file is appended to by
 // one process.
-func buildInsights(o *options, hasSignIn bool, log *slog.Logger) (*insights.Component, func(), error) {
+func buildInsights(o *options, roleGrantsView bool, log *slog.Logger) (*insights.Component, func(), error) {
 	// A component no machine can write to and no person can open is not one that
-	// was meant to be started.
-	if len(o.insightsTokens) == 0 && !hasSignIn {
-		return nil, nil, errors.New("insights: give at least one -insights-token, or configure a sign-in")
+	// was meant to be started. A sign-in alone grants nothing, so a person can open
+	// it only when a role rule gives them the insights role.
+	if len(o.insightsTokens) == 0 && !roleGrantsView {
+		return nil, nil, errors.New("insights: give at least one -insights-token, or a role rule that grants the insights role to someone who can sign in")
 	}
 	store, err := insights.OpenStore(filepath.Join(o.dir, "insights"))
 	if err != nil {

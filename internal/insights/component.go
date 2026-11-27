@@ -248,7 +248,7 @@ func (c *Component) list(w http.ResponseWriter, r *http.Request) {
 		Findings int       `json:"findings"`
 	}
 	rows := []row{}
-	all := c.store.Reviews(Filter{Repo: q.Repo, Since: from})
+	all := c.store.Reviews(Filter{Repo: q.Repo, Since: from, Until: q.Now})
 	for _, rv := range all {
 		if len(rows) == maxListed {
 			break

@@ -33,7 +33,9 @@ starts.
 | `write` | post reviews and read |
 | `read` | read |
 
-A signed-in person needs the `insights` role. It reads and never writes. Secrets
+A signed-in person needs the `insights` role, and a sign-in alone grants nothing: the
+server refuses to start the component unless a token is configured or a role rule
+grants `insights`. The role reads and never writes. Secrets
 can also be given as `name:role:sha256:<hex>`, or in `NITPICK_INSIGHTS_TOKENS`.
 
 ## Send a review

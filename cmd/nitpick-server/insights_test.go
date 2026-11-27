@@ -171,3 +171,34 @@ func TestABuildThatFailsAfterInsightsOpenedReleasesItsDirectory(t *testing.T) {
 		closeStore()
 	})
 }
+
+func TestInsightsWithASignInButNoRoleThatGrantsItIsRefusedAtStartUp(t *testing.T) {
+	for name, tc := range map[string]struct {
+		roles   string
+		wantErr bool
+	}{
+		"a sign-in and no rule": {"", true},
+		// The notary runs beside insights, so authoritative is a role the server
+		// knows and the rule is valid. It grants nothing on insights.
+		"a rule for the notary's role": {"roles:\n  - {role: authoritative, user: alice}\n", true},
+		"a rule that grants insights":  {"roles:\n  - {role: insights, user: alice}\n", false},
+		"a rule for a group":           {"roles:\n  - {role: insights, group: eng}\n", false},
+	} {
+		o := &options{addr: "x", dir: t.TempDir(), oidcIssuer: notary.GitHubIssuer}
+		if err := o.tokens.Set("ci:authoritative:nsecret"); err != nil {
+			t.Fatal(err)
+		}
+		users := writeFile(t, o.dir, "users", quickUser, 0o600)
+		o.config = writeFile(t, o.dir, "server.yaml", "components: [notary, insights]\nauth:\n  password:\n    users_file: "+users+"\n"+tc.roles, 0o600)
+		_, closeStore, err := build(context.Background(), o, quiet)
+		switch {
+		case tc.wantErr && (err == nil || !strings.Contains(err.Error(), "grants the insights role")):
+			t.Errorf("%s: err = %v, want the refusal that names the insights role", name, err)
+		case !tc.wantErr && err != nil:
+			t.Errorf("%s: refused: %v", name, err)
+		}
+		if err == nil {
+			closeStore()
+		}
+	}
+}

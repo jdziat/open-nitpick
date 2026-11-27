@@ -143,6 +143,16 @@ func (c *fileConfig) components() []string {
 	return c.Components
 }
 
+// grantsRole reports whether any role rule gives the role to someone.
+func (c *fileConfig) grantsRole(role string) bool {
+	for _, r := range c.Roles {
+		if r.Role == role {
+			return true
+		}
+	}
+	return false
+}
+
 // roleRules turns the file's role section into the server's rules.
 func (c *fileConfig) roleRules() []server.RoleRule {
 	var rules []server.RoleRule
