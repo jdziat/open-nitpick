@@ -85,6 +85,11 @@ jobs:
       - name: Install
         run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: ui
+      # What ships to the browser. .npmrc turns the audit off for a plain install,
+      # which would otherwise add a network call to every build.
+      - name: Audit what the browser runs
+        run: npm audit --omit=dev --audit-level=high
+        working-directory: ui
       - name: Lint
         run: npm run lint
         working-directory: ui

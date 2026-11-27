@@ -36,3 +36,10 @@ updates:
     directory: /ui
     schedule:
       interval: weekly
+
+  # The release image's base images. The Dockerfile names them by tag, so this is
+  # what moves them: a bump arrives as a pull request that builds the image.
+  - package-ecosystem: docker
+    directory: /deploy/docker
+    schedule:
+      interval: weekly
