@@ -30,7 +30,8 @@ concurrency:
       github.event.issue.number || github.event.pull_request.number
     }}-${{
       (contains(github.event.comment.body, '@nitpick-review')
-      || contains(github.event.comment.body, '@open-nitpick'))
+      || contains(github.event.comment.body, '@open-nitpick')
+      || contains(github.event.comment.body, '/nitpick'))
       && 'mention' || 'reply'
     }}
 
@@ -54,6 +55,11 @@ jobs:
     # so this is the cheap half of the same gate: it stops the runner from
     # starting rather than stopping it after checkout.
     #
+    # The gate is a prefilter and `nitpick respond` is the parser: a comment
+    # that has "/nitpick" in a URL starts a runner that finds no command and
+    # stops. internal/converse/gates_test.go keeps this list and the parser in
+    # step, and fails when one gains a trigger the other lacks.
+    #
     # A fix is answered by nitpick-fix.yml, which carries contents: write and
     # a fork test this workflow does not need. Excluded here so one ask does
     # not start two runs that both try to create the same branch.
@@ -61,12 +67,31 @@ jobs:
       (
         contains(github.event.comment.body, '@nitpick-review') ||
         contains(github.event.comment.body, '@open-nitpick') ||
+        contains(github.event.comment.body, '/nitpick') ||
         github.event.comment.in_reply_to_id != null
       ) &&
       github.event.comment.user.type != 'Bot' &&
-      !contains(github.event.comment.body, '@nitpick-review fix') &&
-      !contains(github.event.comment.body, '@open-nitpick fix') &&
-      (github.event_name == 'pull_request_review_comment' || github.event.issue.pull_request != null) &&
+      !(
+        (
+          contains(github.event.comment.body, '@nitpick-review fix') &&
+          !contains(github.event.comment.body, '@nitpick-review fixed')
+        ) ||
+        contains(github.event.comment.body, '@nitpick-review apply') ||
+        (
+          contains(github.event.comment.body, '@open-nitpick fix') &&
+          !contains(github.event.comment.body, '@open-nitpick fixed')
+        ) ||
+        contains(github.event.comment.body, '@open-nitpick apply') ||
+        (
+          contains(github.event.comment.body, '/nitpick fix') &&
+          !contains(github.event.comment.body, '/nitpick fixed')
+        ) ||
+        contains(github.event.comment.body, '/nitpick apply')
+      ) &&
+      (
+        github.event_name == 'pull_request_review_comment' ||
+        github.event.issue.pull_request != null
+      ) &&
       contains(
         fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'),
         github.event.comment.author_association

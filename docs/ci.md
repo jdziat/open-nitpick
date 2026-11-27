@@ -51,8 +51,8 @@ remove `dry-run: true` when the configuration and results are ready to publish.
 
 ### Talking to it
 
-A comment on the pull request that starts with
-`@nitpick-review` is answered by a second workflow on `issue_comment` and
+A comment on the pull request that mentions `@nitpick-review`, or has a line
+that starts with `/nitpick`, is answered by a second workflow on `issue_comment` and
 `pull_request_review_comment` events, running the Action with
 `command: respond`:
 
@@ -72,6 +72,7 @@ jobs:
     if: >-
       (contains(github.event.comment.body, '@nitpick-review') ||
        contains(github.event.comment.body, '@open-nitpick') ||
+       contains(github.event.comment.body, '/nitpick') ||
        github.event.comment.in_reply_to_id != null) &&
       github.event.comment.user.type != 'Bot'
     runs-on: ubuntu-latest
@@ -86,6 +87,19 @@ jobs:
           model: z-ai/glm-5.3-flash
           api-key: ${{ secrets.OPENROUTER_API_KEY }}
 ```
+
+Both triggers do the same thing: `/nitpick review` is `@nitpick-review review`.
+The slash command notifies no account, and it does not depend on the App's name.
+`nitpick respond` counts it only on a line that starts with it, outside a code
+fence, so a quoted reply or a pasted log cannot start a run. The workflow's `if:`
+is looser, a prefilter that starts a runner for any comment containing `/nitpick`
+(a link to this repository's URL does) and lets `respond` decide; it only avoids
+starting runners for unrelated comments. `@open-nitpick` is accepted for one
+release while `review.mention` is unchanged. `fix` and `apply` count only after
+exactly one space, as in `/nitpick fix`. The workflow that is allowed to write is
+chosen by a text match that sees one space and nothing else, so a fix written with
+two spaces, a tab or a line break is read as a question, which is answered and
+writes nothing.
 
 `@nitpick-review review` resumes the previous review, or starts one if none exists.
 `@nitpick-review restart-review` reviews the whole PR afresh. The older `re-review`

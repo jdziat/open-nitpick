@@ -111,7 +111,7 @@ instead, which is a different command under the same name.
 
 ## Applying a finding
 
-`@nitpick-review fix` on a review thread applies that finding; `@nitpick-review fix
+`@nitpick-review fix` or `/nitpick fix` on a review thread applies that finding; `/nitpick fix
 all` applies every published finding it can. The result is a draft pull request
 against the branch under review, never a write to that branch.
 
@@ -1084,7 +1084,8 @@ answer, which is capped at 120 words.
 
 `review.mention` (default `@nitpick-review`) is the handle a pull request comment
 uses to talk to the reviewer; see the CI page for the workflow that
-answers it.
+answers it. `/nitpick` is a second trigger, with the same commands. It is not a
+setting: the name is fixed, and it works whatever `review.mention` is.
 
 ## Approving a clean review
 

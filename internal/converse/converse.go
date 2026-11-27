@@ -139,16 +139,169 @@ const (
 	KindReply Kind = "reply"
 )
 
-// Command reads the mention out of a comment: the kind, and for a question
-// the text after the mention. ok is false when the comment does not mention
-// the reviewer at all, or mentions it with nothing after.
+// SlashCommand is the second way to address the reviewer: a line that starts
+// with it. A slash command notifies no account, so it cannot ping a stranger,
+// and it does not depend on the GitHub App's name. Fixed, not configurable: the
+// mention is the setting.
+const SlashCommand = "/nitpick"
+
+// Command reads what a comment asks of the reviewer: the kind, and the text
+// after the trigger. The trigger is the mention, or a line starting with
+// SlashCommand. ok is false when the comment has neither, or has one with
+// nothing after it.
+//
+// Where both are present the one written first decides, with one exception: a
+// mention inside a fenced block gives way to a slash command outside it. A
+// pasted log that mentions the reviewer is not a request, and it must not
+// shadow the request that follows it. A mention that is alone in a fence still
+// counts, as it always did.
+//
+// This is the only authority on what a comment means. The workflow gates that
+// decide whether to start a runner are looser prefilters over the same
+// triggers, kept in step by a test.
 func Command(body, mention string) (Kind, string, bool) {
-	re := regexp.MustCompile(`(?i)(^|\s)(?:` + handlePattern(mention) + `)\b[:,]?\s*`)
-	loc := re.FindStringIndex(body)
-	if loc == nil {
-		return "", "", false
+	spans := fencedLines(body)
+	mentionAt, mentionRest, mentionGap, mentionOK := fromMention(body, mention)
+	slashAt, slashRest, slashOK := fromSlash(body, spans)
+	switch {
+	case mentionOK && slashOK && spans.contain(mentionAt):
+		return classify(slashRest, gapOf(slashRest))
+	case mentionOK && (!slashOK || mentionAt <= slashAt):
+		return classify(mentionRest, mentionGap)
+	case slashOK:
+		return classify(slashRest, gapOf(slashRest))
 	}
-	rest := strings.TrimSpace(body[loc[1]:])
+	return "", "", false
+}
+
+// gapOf is the whitespace between a trigger and the word after it.
+func gapOf(rest string) string {
+	return rest[:len(rest)-len(strings.TrimLeft(rest, " \t\r\n"))]
+}
+
+// fromMention finds the mention and returns where it starts, what follows it, and
+// the punctuation and whitespace between the two.
+func fromMention(body, mention string) (at int, rest, gap string, ok bool) {
+	re := regexp.MustCompile(`(?i)(^|\s)(?:` + handlePattern(mention) + `)\b([:,]?\s*)`)
+	m := re.FindStringSubmatchIndex(body)
+	if m == nil {
+		return 0, "", "", false
+	}
+	return m[0], body[m[1]:], body[m[4]:m[5]], true
+}
+
+// fromSlash finds the first line outside a fenced block that starts with
+// SlashCommand and returns where it starts and what follows it, from the
+// original text.
+//
+// Quoted lines and fenced code cannot start a run: a person replying to a
+// maintainer's "/nitpick fix" quotes it, and a pasted log may hold any line at
+// all. A line has to begin with the command itself, so a quote (">") never
+// qualifies and needs no separate rule. A fence is the one thing that has to be
+// tracked, because it hides lines that do begin with it.
+func fromSlash(body string, fenced fenceSpans) (at int, rest string, ok bool) {
+	for offset := 0; offset < len(body); {
+		line, next := lineAt(body, offset)
+		if !fenced.contain(offset) && startsWithCommand(line) {
+			return offset, body[offset+len(SlashCommand):], true
+		}
+		offset = next
+	}
+	return 0, "", false
+}
+
+// lineAt returns the line that starts at offset, without its line ending, and
+// the offset of the line after it.
+func lineAt(body string, offset int) (line string, next int) {
+	end := strings.IndexByte(body[offset:], '\n')
+	if end < 0 {
+		return strings.TrimSuffix(body[offset:], "\r"), len(body)
+	}
+	return strings.TrimSuffix(body[offset:offset+end], "\r"), offset + end + 1
+}
+
+// fenceSpans are the byte ranges of a comment that sit inside fenced code
+// blocks, including the fence lines themselves.
+type fenceSpans [][2]int
+
+func (f fenceSpans) contain(pos int) bool {
+	for _, s := range f {
+		if pos >= s[0] && pos < s[1] {
+			return true
+		}
+	}
+	return false
+}
+
+// fencedLines finds the fenced blocks. An unclosed fence runs to the end of the
+// comment, as it does where the comment is rendered.
+func fencedLines(body string) fenceSpans {
+	var (
+		spans fenceSpans
+		fence string
+		start int
+	)
+	for offset := 0; offset < len(body); {
+		line, next := lineAt(body, offset)
+		if marker := fenceMarker(line); marker != "" {
+			switch {
+			case fence == "":
+				fence, start = marker, offset
+			case strings.HasPrefix(marker, fence[:1]) && len(marker) >= len(fence) && strings.TrimSpace(line)[len(marker):] == "":
+				spans = append(spans, [2]int{start, next})
+				fence = ""
+			}
+		}
+		offset = next
+	}
+	if fence != "" {
+		spans = append(spans, [2]int{start, len(body)})
+	}
+	return spans
+}
+
+// startsWithCommand reports whether line is the command, alone or followed by
+// whitespace. "/nitpick-review" and "/nitpicker" are other words.
+func startsWithCommand(line string) bool {
+	if len(line) < len(SlashCommand) || !strings.EqualFold(line[:len(SlashCommand)], SlashCommand) {
+		return false
+	}
+	rest := line[len(SlashCommand):]
+	return rest == "" || rest[0] == ' ' || rest[0] == '\t'
+}
+
+// fenceMarker returns the run of backticks or tildes that opens or closes a
+// fenced code block on this line, or "" when the line is not a fence. Up to
+// three spaces of indent are allowed, as in CommonMark; four is code anyway.
+func fenceMarker(line string) string {
+	trimmed := strings.TrimLeft(line, " ")
+	if len(line)-len(trimmed) > 3 || len(trimmed) < 3 {
+		return ""
+	}
+	c := trimmed[0]
+	if c != '`' && c != '~' {
+		return ""
+	}
+	n := 0
+	for n < len(trimmed) && trimmed[n] == c {
+		n++
+	}
+	if n < 3 {
+		return ""
+	}
+	return trimmed[:n]
+}
+
+// classify names what the text after a trigger asks for. Empty text is no
+// command at all.
+//
+// gap is what separates the trigger from the text. The write-capable verbs, fix
+// and apply, count only after a single space. The workflow that is allowed to write
+// is chosen by a text match that sees one space and nothing else, so a fix with a
+// different gap would be read here as a fix and sent to the workflow that may not
+// write. Read as a question instead, it is answered and writes nothing.
+func classify(rest, gap string) (Kind, string, bool) {
+	rest = strings.TrimSpace(rest)
 	if rest == "" {
 		return "", "", false
 	}
@@ -166,6 +319,9 @@ func Command(body, mention string) (Kind, string, bool) {
 		// the work is done.
 		return KindResolve, rest, true
 	case "fix", "apply":
+		if gap != " " {
+			return KindAsk, rest, true
+		}
 		return KindFix, rest, true
 	case "improve", "polish":
 		return KindImprove, rest, true
