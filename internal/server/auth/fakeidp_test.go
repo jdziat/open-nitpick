@@ -16,10 +16,10 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-// fakeIdP is an OpenID Connect provider with real discovery, a real JWKS and a
+// fakeIDP is an OpenID Connect provider with real discovery, a real JWKS and a
 // token endpoint that returns correctly signed ID tokens. Each field below is a
 // way to make it misbehave, so a test is one assignment away from an attack.
-type fakeIdP struct {
+type fakeIDP struct {
 	t    *testing.T
 	srv  *httptest.Server
 	key  *rsa.PrivateKey
@@ -47,13 +47,13 @@ type codeGrant struct {
 	nonce, challenge string
 }
 
-func newFakeIdP(t *testing.T) *fakeIdP {
+func newFakeIDP(t *testing.T) *fakeIDP {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := &fakeIdP{t: t, key: key, kid: "k1", code: map[string]codeGrant{}, subject: "user-1", name: "Una Person", expires: time.Hour, alg: jwt.SigningMethodRS256}
+	p := &fakeIDP{t: t, key: key, kid: "k1", code: map[string]codeGrant{}, subject: "user-1", name: "Una Person", expires: time.Hour, alg: jwt.SigningMethodRS256}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -116,7 +116,7 @@ func newFakeIdP(t *testing.T) *fakeIdP {
 	return p
 }
 
-func (p *fakeIdP) idToken(clientID, nonce string) string {
+func (p *fakeIDP) idToken(clientID, nonce string) string {
 	iss := p.issuer
 	if iss == "" {
 		iss = p.srv.URL

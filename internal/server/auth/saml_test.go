@@ -20,14 +20,14 @@ import (
 
 type samlSite struct {
 	*site
-	idp  *samlIdP
+	idp  *samlIDP
 	s    *SAML
 	acs  string
 	spID string
 	log  *strings.Builder
 }
 
-func newSAMLSite(t *testing.T, idp *samlIdP, rules ...server.RoleRule) *samlSite {
+func newSAMLSite(t *testing.T, idp *samlIDP, rules ...server.RoleRule) *samlSite {
 	t.Helper()
 	var handler http.Handler
 	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.ServeHTTP(w, r) }))
@@ -119,7 +119,7 @@ func (s *samlSite) ok(next string) reply {
 }
 
 func TestASAMLSignInSucceedsAndMapsGroupsToRoles(t *testing.T) {
-	idp := newSAMLIdP(t)
+	idp := newSAMLIDP(t)
 	idp.groups = []string{"staff", "ops"}
 	s := newSAMLSite(t, idp, server.RoleRule{Roles: []server.Role{"admin"}, Group: "ops"})
 	resp := s.ok("/ui/somewhere")
@@ -138,9 +138,9 @@ func TestASAMLSignInSucceedsAndMapsGroupsToRoles(t *testing.T) {
 // refused runs a sign-in whose response is made wrong by mutate, and checks that
 // no session came out of it and what the person was told does not carry the
 // reason. The reason is in the log.
-func samlRefused(t *testing.T, name string, mutate func(*samlIdP)) *samlSite {
+func samlRefused(t *testing.T, name string, mutate func(*samlIDP)) *samlSite {
 	t.Helper()
-	idp := newSAMLIdP(t)
+	idp := newSAMLIDP(t)
 	mutate(idp)
 	s := newSAMLSite(t, idp)
 	id, relay := s.start("/ui/")
@@ -165,7 +165,7 @@ func samlRefused(t *testing.T, name string, mutate func(*samlIdP)) *samlSite {
 // Rule 9: an assertion nobody signed is refused. Rule 10: the same flow with the
 // signature is not (TestASAMLSignInSucceeds above).
 func TestAnUnsignedSAMLAssertionIsRefused(t *testing.T) {
-	s := samlRefused(t, "unsigned", func(p *samlIdP) { p.signAssertion = false; p.signResponse = false })
+	s := samlRefused(t, "unsigned", func(p *samlIDP) { p.signAssertion = false; p.signResponse = false })
 	if !strings.Contains(s.log.String(), "did not validate") {
 		t.Errorf("the refusal was not for validation:\n%s", s.log.String())
 	}
@@ -173,54 +173,54 @@ func TestAnUnsignedSAMLAssertionIsRefused(t *testing.T) {
 
 // A signature that was valid and has been broken by changing what it covers.
 func TestASAMLAssertionChangedAfterSigningIsRefused(t *testing.T) {
-	samlRefused(t, "tampered", func(p *samlIdP) { p.tamperName = "admin@example.com" })
+	samlRefused(t, "tampered", func(p *samlIDP) { p.tamperName = "admin@example.com" })
 }
 
 // A valid signature by a certificate the operator did not give us is a
 // signature by a stranger.
 func TestASAMLAssertionSignedByAnUnknownCertificateIsRefused(t *testing.T) {
-	samlRefused(t, "a stranger's key", func(p *samlIdP) {
+	samlRefused(t, "a stranger's key", func(p *samlIDP) {
 		key, cert := selfSigned(t, "evil.example")
 		p.signWith, p.signedBy = key, cert
 	})
 	// The same stranger cannot borrow the real certificate: its public half is
 	// public, and the signature has to be made with the private half.
-	samlRefused(t, "the real certificate, the wrong key", func(p *samlIdP) {
+	samlRefused(t, "the real certificate, the wrong key", func(p *samlIDP) {
 		key, _ := selfSigned(t, "evil.example")
 		p.signWith = key
 	})
 }
 
 func TestASAMLAssertionForAnotherAudienceIsRefused(t *testing.T) {
-	samlRefused(t, "another audience", func(p *samlIdP) { p.audience = "https://someone-else.example/metadata" })
+	samlRefused(t, "another audience", func(p *samlIDP) { p.audience = "https://someone-else.example/metadata" })
 }
 
 func TestASAMLAssertionForAnotherRecipientIsRefused(t *testing.T) {
-	samlRefused(t, "another recipient", func(p *samlIdP) { p.recipient = "https://evil.example/acs" })
+	samlRefused(t, "another recipient", func(p *samlIDP) { p.recipient = "https://evil.example/acs" })
 }
 
 func TestASAMLResponseForAnotherDestinationIsRefused(t *testing.T) {
-	samlRefused(t, "another destination", func(p *samlIdP) { p.dest = "https://evil.example/acs"; p.signResponse = true })
+	samlRefused(t, "another destination", func(p *samlIDP) { p.dest = "https://evil.example/acs"; p.signResponse = true })
 }
 
 func TestAnExpiredSAMLAssertionIsRefused(t *testing.T) {
-	samlRefused(t, "expired", func(p *samlIdP) { p.notBefore, p.notAfter = -time.Hour, -30*time.Minute })
+	samlRefused(t, "expired", func(p *samlIDP) { p.notBefore, p.notAfter = -time.Hour, -30*time.Minute })
 }
 
 func TestASAMLAssertionNotYetValidIsRefused(t *testing.T) {
-	samlRefused(t, "not yet valid", func(p *samlIdP) { p.notBefore, p.notAfter = time.Hour, 2*time.Hour })
+	samlRefused(t, "not yet valid", func(p *samlIDP) { p.notBefore, p.notAfter = time.Hour, 2*time.Hour })
 }
 
 func TestASAMLAssertionFromAnotherIssuerIsRefused(t *testing.T) {
-	samlRefused(t, "another issuer", func(p *samlIdP) { p.issuer = "https://evil.example/metadata" })
+	samlRefused(t, "another issuer", func(p *samlIDP) { p.issuer = "https://evil.example/metadata" })
 }
 
 func TestAFailureStatusIsNotASignIn(t *testing.T) {
-	samlRefused(t, "a failure status", func(p *samlIdP) { p.status = saml.StatusRequester })
+	samlRefused(t, "a failure status", func(p *samlIDP) { p.status = saml.StatusRequester })
 }
 
 func TestASAMLAssertionWithNoSubjectIsRefused(t *testing.T) {
-	samlRefused(t, "no subject", func(p *samlIdP) { p.nameID = "" })
+	samlRefused(t, "no subject", func(p *samlIDP) { p.nameID = "" })
 }
 
 // Signature wrapping. A forged assertion for an administrator is placed where a
@@ -230,38 +230,38 @@ func TestASAMLAssertionWithNoSubjectIsRefused(t *testing.T) {
 // refused for: a refusal for malformed XML would prove nothing about the defence.
 func TestASignatureWrappedAroundAForgedAssertionDoesNotSignInTheForgery(t *testing.T) {
 	type attack struct {
-		build func(p *samlIdP, acs, sp, id string) string
+		build func(p *samlIDP, acs, sp, id string) string
 		why   string // part of the library's reason, from the log
 	}
-	forged := func(p *samlIdP, acs, sp, id string) *etree.Element {
+	forged := func(p *samlIDP, acs, sp, id string) *etree.Element {
 		f := *p
 		f.nameID = "admin@example.com"
 		return parseEl(t, f.assertionXML(acs, sp, id))
 	}
-	genuine := func(p *samlIdP, acs, sp, id string) *etree.Element {
+	genuine := func(p *samlIDP, acs, sp, id string) *etree.Element {
 		return p.sign(parseEl(t, p.assertionXML(acs, sp, id)))
 	}
 	for name, a := range map[string]attack{
-		"the genuine assertion inside the forged one's Advice": {func(p *samlIdP, acs, sp, id string) string {
+		"the genuine assertion inside the forged one's Advice": {func(p *samlIDP, acs, sp, id string) string {
 			f := forged(p, acs, sp, id)
 			adv := etree.NewElement("saml:Advice")
 			adv.AddChild(genuine(p, acs, sp, id))
 			f.AddChild(adv)
 			return p.wrap(acs, id, f)
 		}, "signature element not present"},
-		"the forged assertion first, the genuine one second": {func(p *samlIdP, acs, sp, id string) string {
+		"the forged assertion first, the genuine one second": {func(p *samlIDP, acs, sp, id string) string {
 			return p.wrap(acs, id, forged(p, acs, sp, id), genuine(p, acs, sp, id))
 		}, "must contain exactly one Assertion"},
-		"the genuine assertion first, the forged one second": {func(p *samlIdP, acs, sp, id string) string {
+		"the genuine assertion first, the forged one second": {func(p *samlIDP, acs, sp, id string) string {
 			return p.wrap(acs, id, genuine(p, acs, sp, id), forged(p, acs, sp, id))
 		}, "must contain exactly one Assertion"},
-		"the signature copied onto the forged assertion": {func(p *samlIdP, acs, sp, id string) string {
+		"the signature copied onto the forged assertion": {func(p *samlIDP, acs, sp, id string) string {
 			f := forged(p, acs, sp, id)
 			f.AddChild(genuine(p, acs, sp, id).FindElement("./Signature").Copy())
 			return p.wrap(acs, id, f)
 		}, "Missing signature referencing the top-level element"},
 	} {
-		idp := newSAMLIdP(t)
+		idp := newSAMLIDP(t)
 		s := newSAMLSite(t, idp)
 		id, relay := s.start("/ui/")
 		resp, _ := s.post(a.build(idp, s.acs, s.spID, id), relay, nil)
@@ -278,7 +278,7 @@ func TestASignatureWrappedAroundAForgedAssertionDoesNotSignInTheForgery(t *testi
 	}
 	// Rule 10: the genuine assertion on its own signs in, so each refusal above is
 	// the wrapping's, not a document the library cannot read.
-	idp := newSAMLIdP(t)
+	idp := newSAMLIDP(t)
 	newSAMLSite(t, idp).ok("/ui/")
 }
 
@@ -287,7 +287,7 @@ func TestASignatureWrappedAroundAForgedAssertionDoesNotSignInTheForgery(t *testi
 // issues the same assertion ID for both (a bug, or an assertion captured and
 // re-issued) is stopped by the table of IDs, which is the only thing that can.
 func TestAReplayedSAMLAssertionIDIsRefused(t *testing.T) {
-	idp := newSAMLIdP(t)
+	idp := newSAMLIDP(t)
 	idp.assertID = "_the-same-assertion"
 	s := newSAMLSite(t, idp)
 	s.ok("/ui/") // the first use, which is fine
@@ -312,7 +312,7 @@ func TestAReplayedSAMLAssertionIDIsRefused(t *testing.T) {
 
 // The same answer, posted twice to the same flow, signs in once.
 func TestASAMLAnswerPostedTwiceSignsInOnce(t *testing.T) {
-	idp := newSAMLIdP(t)
+	idp := newSAMLIDP(t)
 	s := newSAMLSite(t, idp)
 	id, relay := s.start("/ui/")
 	answer := idp.response(s.acs, s.spID, id)
@@ -329,7 +329,7 @@ func TestASAMLAnswerPostedTwiceSignsInOnce(t *testing.T) {
 // Unsolicited (identity-provider-initiated) responses are not accepted: every
 // answer must be for a request this server made.
 func TestASAMLResponseForARequestWeDidNotMakeIsRefused(t *testing.T) {
-	idp := newSAMLIdP(t)
+	idp := newSAMLIDP(t)
 	s := newSAMLSite(t, idp)
 	s.start("/ui/") // so the browser has a binding cookie
 	for name, relay := range map[string]string{"no relay state": "", "a made-up relay state": "made-up"} {
@@ -351,7 +351,7 @@ func TestASAMLResponseForARequestWeDidNotMakeIsRefused(t *testing.T) {
 // themselves and hands the victim the answer; the victim's browser has no cookie
 // for that flow, or has one for a different flow, and in neither case is signed in.
 func TestASAMLAnswerInAnotherBrowserIsRefused(t *testing.T) {
-	idp := newSAMLIdP(t)
+	idp := newSAMLIDP(t)
 	s := newSAMLSite(t, idp)
 	id, relay := s.start("/ui/") // the attacker's browser starts a flow
 	answer := idp.response(s.acs, s.spID, id)
@@ -389,7 +389,7 @@ func TestASAMLAnswerInAnotherBrowserIsRefused(t *testing.T) {
 // starts, so it is exempt from the CSRF check even for a signed-in person, and
 // nothing else is.
 func TestOnlyTheAssertionConsumerAcceptsACrossSitePost(t *testing.T) {
-	idp := newSAMLIdP(t)
+	idp := newSAMLIDP(t)
 	s := newSAMLSite(t, idp)
 	s.ok("/ui/") // signed in, with a real session cookie
 
@@ -412,7 +412,7 @@ func TestOnlyTheAssertionConsumerAcceptsACrossSitePost(t *testing.T) {
 }
 
 func TestTheSAMLBindingCookieIsHttpOnlySecureAndScopedToTheProvider(t *testing.T) {
-	idp := newSAMLIdP(t)
+	idp := newSAMLIDP(t)
 	s := newSAMLSite(t, idp)
 	resp, err := s.c.Get(s.ts.URL + "/auth/saml/login")
 	if err != nil {
@@ -432,7 +432,7 @@ func TestTheSAMLBindingCookieIsHttpOnlySecureAndScopedToTheProvider(t *testing.T
 
 // The request carries what the provider needs and no more.
 func TestTheSAMLRequestIsSentByRedirectWithARelayState(t *testing.T) {
-	idp := newSAMLIdP(t)
+	idp := newSAMLIDP(t)
 	s := newSAMLSite(t, idp)
 	id, relay := s.start("/ui/x")
 	if !strings.HasPrefix(id, "id-") && !strings.HasPrefix(id, "_") {
@@ -445,7 +445,7 @@ func TestTheSAMLRequestIsSentByRedirectWithARelayState(t *testing.T) {
 
 // The SP metadata the operator hands the provider names this server's ACS.
 func TestTheServiceProviderMetadataNamesTheConsumer(t *testing.T) {
-	idp := newSAMLIdP(t)
+	idp := newSAMLIDP(t)
 	s := newSAMLSite(t, idp)
 	resp, err := s.c.Get(s.ts.URL + "/auth/saml/metadata")
 	if err != nil {
@@ -462,7 +462,7 @@ func TestTheServiceProviderMetadataNamesTheConsumer(t *testing.T) {
 }
 
 func TestSAMLConfigThatCouldNotWorkIsRefused(t *testing.T) {
-	idp := newSAMLIdP(t)
+	idp := newSAMLIDP(t)
 	key, cert := selfSigned(t, "sp")
 	acs, _ := url.Parse("https://sp.example/auth/saml/acs")
 	http1, _ := url.Parse("http://sp.example/auth/saml/acs")
@@ -511,7 +511,7 @@ func TestTheAssertionIDTableForgetsExpiredIDsAndRemembersLiveOnes(t *testing.T) 
 // the only thing wrong with the response is that it answers no request. That is
 // the check that AllowIDPInitiated=false is, and nothing else here would catch it.
 func TestASAMLResponseThatAnswersNoRequestIsRefusedEvenInAGenuineFlow(t *testing.T) {
-	idp := newSAMLIdP(t)
+	idp := newSAMLIDP(t)
 	s := newSAMLSite(t, idp)
 	_, relay := s.start("/ui/")
 	resp, _ := s.post(idp.response(s.acs, s.spID, ""), relay, nil)
@@ -526,7 +526,7 @@ func TestASAMLResponseThatAnswersNoRequestIsRefusedEvenInAGenuineFlow(t *testing
 // An assertion with no ID cannot be told apart from another, so it cannot be
 // checked for replay and is not accepted.
 func TestASAMLAssertionWithNoIDIsRefused(t *testing.T) {
-	idp := newSAMLIdP(t)
+	idp := newSAMLIDP(t)
 	idp.emptyAssertID = true
 	s := newSAMLSite(t, idp)
 	id, relay := s.start("/ui/")

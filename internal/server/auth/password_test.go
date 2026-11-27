@@ -22,25 +22,42 @@ import (
 	"github.com/nitpick-oss/nitpick/internal/server"
 )
 
+// tokenIn reads the CSRF token out of a login page. A page without one fails the
+// test at once, instead of slicing at a missing index and handing a wrong token on.
+func tokenIn(tb testing.TB, page string) string {
+	tb.Helper()
+	const marker = `name="csrf_token" value="`
+	start := strings.Index(page, marker)
+	if start < 0 {
+		tb.Fatalf("no csrf token on the page:\n%s", page)
+	}
+	rest := page[start+len(marker):]
+	end := strings.Index(rest, `"`)
+	if end < 0 {
+		tb.Fatalf("an unterminated csrf token on the page:\n%s", page)
+	}
+	return rest[:end]
+}
+
 // quickHash is a valid argon2id hash with small parameters, so a test does not
 // pay 64 MiB a time. The parser accepts any parameters inside its bounds, which
 // is also how an operator's older file keeps working.
-func quickHash(t testing.TB, password string) string {
-	t.Helper()
+func quickHash(tb testing.TB, password string) string {
+	tb.Helper()
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	key := argon2.IDKey([]byte(password), salt, 1, 64, 1, 32)
 	return fmt.Sprintf("$argon2id$v=19$m=64,t=1,p=1$%s$%s",
 		base64.RawStdEncoding.EncodeToString(salt), base64.RawStdEncoding.EncodeToString(key))
 }
 
-func usersFile(t testing.TB, lines ...string) *Users {
-	t.Helper()
+func usersFile(tb testing.TB, lines ...string) *Users {
+	tb.Helper()
 	u, err := ParseUsers(strings.NewReader(strings.Join(lines, "\n")))
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	return u
 }
@@ -107,12 +124,7 @@ func (s *site) login(user, password string) (reply, string) {
 	}
 	page, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	i := strings.Index(string(page), `name="csrf_token" value="`)
-	if i < 0 {
-		s.t.Fatalf("no token on the login page: %s", page)
-	}
-	token := string(page)[i+len(`name="csrf_token" value="`):]
-	token = token[:strings.Index(token, `"`)]
+	token := tokenIn(s.t, string(page))
 	return s.post(url.Values{"username": {user}, "password": {password}, "csrf_token": {token}, "next": {"/ui/"}})
 }
 
@@ -138,6 +150,7 @@ func (s *site) signedIn() bool {
 }
 
 func newPassword(t *testing.T) *Password {
+	t.Helper()
 	return NewPassword(usersFile(t, "alice:"+quickHash(t, "correct horse")+":ops,staff", "bob:"+quickHash(t, "battery staple")), slog.New(slog.NewTextHandler(io.Discard, nil)))
 }
 
@@ -163,9 +176,8 @@ func TestEveryRefusalSaysTheSameThing(t *testing.T) {
 	// What differs between the pages is the CSRF token and nothing about the
 	// account. Strip the token and the two bodies are the same.
 	norm := func(s string) string {
-		i := strings.Index(s, `name="csrf_token" value="`)
-		j := i + len(`name="csrf_token" value="`)
-		return s[:j] + s[j+strings.Index(s[j:], `"`):]
+		token := tokenIn(t, s)
+		return strings.Replace(s, token, "TOKEN", 1)
 	}
 	if norm(wrongPassword) != norm(unknownAccount) {
 		t.Error("an unknown account and a wrong password are answered differently, which says which names exist")
@@ -293,8 +305,7 @@ func TestALoginPostWithoutTheFormsTokenIsRefusedBeforeCountingAFailure(t *testin
 	r1, _ := s.c.Get(s.ts.URL + "/auth/login")
 	page, _ := io.ReadAll(r1.Body)
 	_ = r1.Body.Close()
-	tok := string(page)[strings.Index(string(page), `name="csrf_token" value="`)+len(`name="csrf_token" value="`):]
-	tok = tok[:strings.Index(tok, `"`)]
+	tok := tokenIn(t, string(page))
 	r2, _ := other.c.Get(other.ts.URL + "/auth/login") // the other site's cookie
 	_ = r2.Body.Close()
 	if r, _ := other.post(url.Values{"username": {"alice"}, "password": {"correct horse"}, "csrf_token": {tok}}); r.StatusCode != http.StatusForbidden {
@@ -341,8 +352,7 @@ func TestTheForwardedHeaderIsIgnoredUnlessTrusted(t *testing.T) {
 			resp, _ := s.c.Get(s.ts.URL + "/auth/login")
 			page, _ := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
-			tok := string(page)[strings.Index(string(page), `name="csrf_token" value="`)+len(`name="csrf_token" value="`):]
-			tok = tok[:strings.Index(tok, `"`)]
+			tok := tokenIn(t, string(page))
 			form := url.Values{"username": {"nobody"}, "password": {"x"}, "csrf_token": {tok}}
 			r, _ := http.NewRequest("POST", s.ts.URL+"/auth/password/login", strings.NewReader(form.Encode()))
 			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -395,7 +405,7 @@ func TestParsingAUsersFile(t *testing.T) {
 	}
 }
 
-func TestVerifyingPasswords(t *testing.T) {
+func TestVerifyingPasswordsAcceptsOnlyTheRightOne(t *testing.T) {
 	u := usersFile(t, "alice:"+quickHash(t, "right")+":g1,g2")
 	if name, groups, ok := u.Verify("ALICE", "right"); !ok || name != "alice" || len(groups) != 2 {
 		t.Errorf("a right password = %q %v %v", name, groups, ok)
@@ -459,8 +469,7 @@ func TestSignInReturnsToTheRequestedPage(t *testing.T) {
 	}
 	page, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	tok := string(page)[strings.Index(string(page), `name="csrf_token" value="`)+len(`name="csrf_token" value="`):]
-	tok = tok[:strings.Index(tok, `"`)]
+	tok := tokenIn(t, string(page))
 	if !strings.Contains(string(page), `name="next" value="/ui/somewhere"`) {
 		t.Fatalf("the login page did not carry the requested page:\n%s", page)
 	}
@@ -572,4 +581,40 @@ func TestAnUnknownNameCostsWhatAWrongPasswordCosts(t *testing.T) {
 	if unknown < known/2 {
 		t.Errorf("an unknown name took %v against %v for a wrong password: the difference says which names exist", unknown, known)
 	}
+}
+
+// tokenIn must fail the test when the page has no token, and must return exactly
+// the token when it has one. A helper that slices at a missing index would hand a
+// wrong token to a test that then passes or fails for a reason it did not intend.
+func TestTokenInReadsTheTokenAndFailsLoudlyWithout(t *testing.T) {
+	if got := tokenIn(t, `<input name="csrf_token" value="abc-123_x"><input name="next" value="/ui/">`); got != "abc-123_x" {
+		t.Errorf("tokenIn = %q, want abc-123_x", got)
+	}
+	for name, page := range map[string]string{
+		"no marker":    `<form><input name="user"></form>`,
+		"unterminated": `<input name="csrf_token" value="abc`,
+		"empty page":   ``,
+	} {
+		rec := &recordingTB{}
+		func() {
+			defer func() { _ = recover() }()
+			tokenIn(rec, page)
+		}()
+		if !rec.failed {
+			t.Errorf("%s: tokenIn did not fail the test", name)
+		}
+	}
+}
+
+// recordingTB is a testing.TB that notes whether it was told to stop, and stops by
+// panicking, as Fatalf does by leaving the goroutine.
+type recordingTB struct {
+	testing.TB
+	failed bool
+}
+
+func (r *recordingTB) Helper() {}
+func (r *recordingTB) Fatalf(string, ...any) {
+	r.failed = true
+	panic("stop")
 }

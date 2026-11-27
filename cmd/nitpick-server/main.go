@@ -223,28 +223,30 @@ func build(ctx context.Context, o *options, log *slog.Logger) (http.Handler, fun
 	var components []server.Component
 	closeStore := func() {}
 	for _, name := range cfg.components() {
-		switch name {
-		case "notary":
-			// A notary no machine can write to and no person can open is not a
-			// notary that was meant to be started.
-			if len(o.tokens) == 0 && o.oidcAudience == "" && len(providers) == 0 {
-				return nil, nil, errors.New("give at least one -token or an -oidc-audience with -oidc-allow, or configure a sign-in")
-			}
-			store, err := wire.NewFileStore(o.dir)
-			if err != nil {
-				return nil, nil, err
-			}
-			// One server per directory: see FileStore.Lock.
-			if err := store.Lock(); err != nil {
-				return nil, nil, fmt.Errorf("%w (run one server per data directory)", err)
-			}
-			closeStore = func() { _ = store.Unlock() }
-			c := notary.NewComponent(store, o.tokens, o.allowClear)
-			if o.oidcAudience != "" {
-				c.WithOIDC(&notary.OIDC{Issuer: o.oidcIssuer, Audience: o.oidcAudience, Allow: o.rules, JWKSURL: o.oidcJWKS})
-			}
-			components = append(components, c)
+		// notary is the only component this binary has; knownComponents refuses
+		// any other name before this point.
+		if name != "notary" {
+			continue
 		}
+		// A notary no machine can write to and no person can open is not a
+		// notary that was meant to be started.
+		if len(o.tokens) == 0 && o.oidcAudience == "" && len(providers) == 0 {
+			return nil, nil, errors.New("give at least one -token or an -oidc-audience with -oidc-allow, or configure a sign-in")
+		}
+		store, err := wire.NewFileStore(o.dir)
+		if err != nil {
+			return nil, nil, err
+		}
+		// One server per directory: see FileStore.Lock.
+		if err := store.Lock(); err != nil {
+			return nil, nil, fmt.Errorf("%w (run one server per data directory)", err)
+		}
+		closeStore = func() { _ = store.Unlock() }
+		c := notary.NewComponent(store, o.tokens, o.allowClear)
+		if o.oidcAudience != "" {
+			c.WithOIDC(&notary.OIDC{Issuer: o.oidcIssuer, Audience: o.oidcAudience, Allow: o.rules, JWKSURL: o.oidcJWKS})
+		}
+		components = append(components, c)
 	}
 
 	roles, err := server.NewRoleMap(cfg.roleRules())

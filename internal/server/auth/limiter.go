@@ -136,13 +136,14 @@ func (l *Limiter) failLocked(key string, now time.Time) bool {
 		l.entries[key] = e
 	}
 	cutoff := now.Add(-l.Window)
-	kept := e.failures[:0]
+	kept := make([]time.Time, 0, len(e.failures)+1)
 	for _, t := range e.failures {
 		if t.After(cutoff) {
 			kept = append(kept, t)
 		}
 	}
-	e.failures = append(kept, now)
+	kept = append(kept, now)
+	e.failures = kept
 	if len(e.failures) >= l.Max {
 		e.lockedUntil = now.Add(l.Lockout)
 		e.failures = nil

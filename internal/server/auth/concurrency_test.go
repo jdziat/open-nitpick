@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -150,8 +149,7 @@ func TestAParallelBurstOfGuessesIsHeldToTheLimit(t *testing.T) {
 	}
 	page, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	i := strings.Index(string(page), `name="csrf_token" value="`) + len(`name="csrf_token" value="`)
-	token := string(page)[i : i+strings.Index(string(page)[i:], `"`)]
+	token := tokenIn(t, string(page))
 
 	const burst = 100
 	var wg sync.WaitGroup
@@ -244,8 +242,7 @@ func TestConcurrentHashesAreBounded(t *testing.T) {
 	}
 	page, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	i := strings.Index(string(page), `name="csrf_token" value="`) + len(`name="csrf_token" value="`)
-	token := string(page)[i : i+strings.Index(string(page)[i:], `"`)]
+	token := tokenIn(t, string(page))
 	slow, err := s.c.PostForm(s.ts.URL+"/auth/password/login", url.Values{"username": {"alice"}, "password": {"correct horse"}, "csrf_token": {token}})
 	if slow != nil {
 		_ = slow.Body.Close()
@@ -299,8 +296,7 @@ func TestARefusedOrAbandonedSignInLeavesNoChargeBehind(t *testing.T) {
 	}
 	page, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	i := strings.Index(string(page), `name="csrf_token" value="`) + len(`name="csrf_token" value="`)
-	token := string(page)[i : i+strings.Index(string(page)[i:], `"`)]
+	token := tokenIn(t, string(page))
 	for n := 0; n < 3; n++ {
 		if r, err := s2.c.PostForm(s2.ts.URL+"/auth/password/login", url.Values{"username": {"bob"}, "password": {"x"}, "csrf_token": {token}}); err == nil {
 			_ = r.Body.Close()
@@ -347,8 +343,7 @@ func TestNoMoreThanFourHashesRunAtOnceUnderABurst(t *testing.T) {
 	}
 	page, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	i := strings.Index(string(page), `name="csrf_token" value="`) + len(`name="csrf_token" value="`)
-	token := string(page)[i : i+strings.Index(string(page)[i:], `"`)]
+	token := tokenIn(t, string(page))
 
 	var wg sync.WaitGroup
 	for n := 0; n < 40; n++ {
@@ -369,5 +364,36 @@ func TestNoMoreThanFourHashesRunAtOnceUnderABurst(t *testing.T) {
 	wg.Wait()
 	if p := peak.Load(); p != 4 {
 		t.Errorf("peak concurrent hashes = %d, want 4", p)
+	}
+}
+
+// Failures older than the window do not count toward a lock, in Take as well as in
+// Fail. Without this, an account that mistyped four times last week would be one
+// charge from a lock today.
+func TestTakeIgnoresFailuresOlderThanTheWindow(t *testing.T) {
+	now := time.Now()
+	l := &Limiter{Max: 5, Window: 10 * time.Minute, Lockout: time.Hour, Keys: 10, now: func() time.Time { return now }}
+	for i := 0; i < 4; i++ {
+		l.Fail("k")
+	}
+	// Inside the window, four failures leave room for one attempt and no more.
+	if ok, _ := l.Take("k"); !ok {
+		t.Fatal("the fifth attempt was refused with four failures in the window")
+	}
+	if ok, _ := l.Take("k"); ok {
+		t.Fatal("a sixth attempt was allowed while the fifth was still unresolved")
+	}
+	l.Refund("k")
+
+	// After the window the four failures no longer count: five attempts are owed again.
+	now = now.Add(11 * time.Minute)
+	allowed := 0
+	for i := 0; i < 8; i++ {
+		if ok, _ := l.Take("k"); ok {
+			allowed++
+		}
+	}
+	if allowed != 5 {
+		t.Errorf("after the window, %d of 8 attempts were allowed, want 5", allowed)
 	}
 }

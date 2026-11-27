@@ -132,11 +132,11 @@ func newEnv(t *testing.T, cfg Config) *env {
 type reply struct {
 	StatusCode int
 	Header     http.Header
-	Cookies_   []*http.Cookie
+	SetCookies []*http.Cookie
 }
 
 // Cookies are the cookies the response set.
-func (r reply) Cookies() []*http.Cookie { return r.Cookies_ }
+func (r reply) Cookies() []*http.Cookie { return r.SetCookies }
 
 func (e *env) do(method, path string, body url.Values, hdr map[string]string) (reply, string) {
 	e.t.Helper()
@@ -160,7 +160,7 @@ func (e *env) do(method, path string, body url.Values, hdr map[string]string) (r
 	}
 	defer func() { _ = resp.Body.Close() }()
 	b, _ := io.ReadAll(resp.Body)
-	return reply{StatusCode: resp.StatusCode, Header: resp.Header, Cookies_: resp.Cookies()}, string(b)
+	return reply{StatusCode: resp.StatusCode, Header: resp.Header, SetCookies: resp.Cookies()}, string(b)
 }
 
 // signIn goes through the real login form as the stub provider: it reads the
@@ -204,6 +204,7 @@ func (e *env) cookie(name string) *http.Cookie {
 // standard is a server with one component, one provider and a role rule that
 // makes the group "ops" admins.
 func standard(t *testing.T, text string) *env {
+	t.Helper()
 	return newEnv(t, Config{
 		Components: []Component{&stubComponent{name: "stub", text: text}},
 		Providers:  []Provider{fakeProvider{id: "fake"}},

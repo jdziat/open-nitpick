@@ -19,11 +19,11 @@ import (
 
 type oidcSite struct {
 	*site
-	idp *fakeIdP
+	idp *fakeIDP
 	o   *OIDC
 }
 
-func newOIDCSite(t *testing.T, idp *fakeIdP, rules ...server.RoleRule) *oidcSite {
+func newOIDCSite(t *testing.T, idp *fakeIDP, rules ...server.RoleRule) *oidcSite {
 	t.Helper()
 	// The provider must be told the server's address before the server has one, so
 	// serve through a placeholder and fill it in.
@@ -106,7 +106,7 @@ func (s *oidcSite) whoami() (int, string) {
 }
 
 func TestAnOIDCSignInSucceedsAndMapsGroupsToRoles(t *testing.T) {
-	idp := newFakeIdP(t)
+	idp := newFakeIDP(t)
 	idp.groups = []any{"staff", "ops"}
 	s := newOIDCSite(t, idp, server.RoleRule{Roles: []server.Role{"admin"}, Group: "ops"})
 
@@ -126,21 +126,21 @@ func TestAnOIDCSignInSucceedsAndMapsGroupsToRoles(t *testing.T) {
 // A callback that is wrong in any way ends with no session. Each case changes
 // one thing about a good sign-in.
 func TestAnOIDCCallbackThatIsWrongInAnyWayDoesNotSignIn(t *testing.T) {
-	for name, tamper := range map[string]func(*fakeIdP){
-		"an expired token":   func(p *fakeIdP) { p.expires = -time.Hour },
-		"the wrong audience": func(p *fakeIdP) { p.audience = "someone-elses-client" },
-		"the wrong issuer":   func(p *fakeIdP) { p.issuer = "https://evil.example" },
-		"a different nonce":  func(p *fakeIdP) { p.tamperNonce = true },
-		"no nonce at all":    func(p *fakeIdP) { p.nonce = "-" },
-		"a token signed by another key": func(p *fakeIdP) {
-			k := newFakeIdP(t)
+	for name, tamper := range map[string]func(*fakeIDP){
+		"an expired token":   func(p *fakeIDP) { p.expires = -time.Hour },
+		"the wrong audience": func(p *fakeIDP) { p.audience = "someone-elses-client" },
+		"the wrong issuer":   func(p *fakeIDP) { p.issuer = "https://evil.example" },
+		"a different nonce":  func(p *fakeIDP) { p.tamperNonce = true },
+		"no nonce at all":    func(p *fakeIDP) { p.nonce = "-" },
+		"a token signed by another key": func(p *fakeIDP) {
+			k := newFakeIDP(t)
 			p.signWith = k.key
 		},
-		"an unsigned token (alg none)": func(p *fakeIdP) { p.alg = jwt.SigningMethodNone },
-		"no ID token":                  func(p *fakeIdP) { p.omitIDToken = true },
-		"no subject":                   func(p *fakeIdP) { p.subject = "" },
+		"an unsigned token (alg none)": func(p *fakeIDP) { p.alg = jwt.SigningMethodNone },
+		"no ID token":                  func(p *fakeIDP) { p.omitIDToken = true },
+		"no subject":                   func(p *fakeIDP) { p.subject = "" },
 	} {
-		idp := newFakeIdP(t)
+		idp := newFakeIDP(t)
 		tamper(idp)
 		s := newOIDCSite(t, idp)
 		resp, _ := s.finish(s.begin("/ui/"))
@@ -152,7 +152,7 @@ func TestAnOIDCCallbackThatIsWrongInAnyWayDoesNotSignIn(t *testing.T) {
 		}
 	}
 	// The untampered flow signs in, so each refusal above is its one change.
-	idp := newFakeIdP(t)
+	idp := newFakeIDP(t)
 	s := newOIDCSite(t, idp)
 	if resp, _ := s.finish(s.begin("/ui/")); resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("the untampered flow = %d, want a sign-in", resp.StatusCode)
@@ -161,7 +161,7 @@ func TestAnOIDCCallbackThatIsWrongInAnyWayDoesNotSignIn(t *testing.T) {
 
 // The first answer spends the state, whatever it says. A replay finds nothing.
 func TestAnOIDCStateCanBeUsedOnce(t *testing.T) {
-	idp := newFakeIdP(t)
+	idp := newFakeIDP(t)
 	s := newOIDCSite(t, idp)
 	callback := s.begin("/ui/")
 	if resp, _ := s.finish(callback); resp.StatusCode != http.StatusSeeOther {
@@ -178,7 +178,7 @@ func TestAnOIDCStateCanBeUsedOnce(t *testing.T) {
 }
 
 func TestAnOIDCStateThatWasNeverIssuedIsRefused(t *testing.T) {
-	idp := newFakeIdP(t)
+	idp := newFakeIDP(t)
 	s := newOIDCSite(t, idp)
 	s.begin("/ui/") // so the cookie exists
 	for name, q := range map[string]string{
@@ -195,7 +195,7 @@ func TestAnOIDCStateThatWasNeverIssuedIsRefused(t *testing.T) {
 // Login CSRF. An attacker signs in as themselves and hands a victim the callback
 // URL. The victim's browser did not start that flow and cannot finish it.
 func TestAnOIDCFlowCannotBeFinishedInAnotherBrowser(t *testing.T) {
-	idp := newFakeIdP(t)
+	idp := newFakeIDP(t)
 	s := newOIDCSite(t, idp)
 	callback := s.begin("/ui/") // the attacker's browser started it
 
@@ -222,7 +222,7 @@ func TestAnOIDCFlowCannotBeFinishedInAnotherBrowser(t *testing.T) {
 
 // PKCE binds the code to a verifier only this server knows. A stolen code is no use.
 func TestAnOIDCCodeIsBoundToThisServersPKCEVerifier(t *testing.T) {
-	idp := newFakeIdP(t)
+	idp := newFakeIDP(t)
 	s := newOIDCSite(t, idp)
 	callback := s.begin("/ui/")
 	u, _ := url.Parse(callback)
@@ -241,7 +241,7 @@ func TestAnOIDCCodeIsBoundToThisServersPKCEVerifier(t *testing.T) {
 }
 
 func TestAnAuthorizationRequestCarriesPKCEAndANonce(t *testing.T) {
-	idp := newFakeIdP(t)
+	idp := newFakeIDP(t)
 	s := newOIDCSite(t, idp)
 	resp, err := s.c.Get(s.ts.URL + "/auth/oidc/login")
 	if err != nil {
@@ -276,7 +276,7 @@ func TestAnAuthorizationRequestCarriesPKCEAndANonce(t *testing.T) {
 
 // The provider refusing the sign-in is not a sign-in.
 func TestAnErrorFromTheProviderIsNotASignIn(t *testing.T) {
-	idp := newFakeIdP(t)
+	idp := newFakeIDP(t)
 	s := newOIDCSite(t, idp)
 	cb := s.begin("/ui/")
 	u, _ := url.Parse(cb)
@@ -295,7 +295,7 @@ func TestAnErrorFromTheProviderIsNotASignIn(t *testing.T) {
 
 // What the person is told does not carry the reason.
 func TestAnOIDCRefusalDoesNotShowTheReason(t *testing.T) {
-	idp := newFakeIdP(t)
+	idp := newFakeIDP(t)
 	idp.audience = "wrong"
 	s := newOIDCSite(t, idp)
 	_, body := s.finish(s.begin("/ui/"))
@@ -387,7 +387,7 @@ func TestDiscoveryThatFailsStopsStartUp(t *testing.T) {
 // An error answer from the provider is final. The server does not go on to ask
 // for a token with it, so the token endpoint is never reached.
 func TestAnErrorAnswerNeverReachesTheTokenEndpoint(t *testing.T) {
-	idp := newFakeIdP(t)
+	idp := newFakeIDP(t)
 	s := newOIDCSite(t, idp)
 	cb := s.begin("/ui/")
 	u, _ := url.Parse(cb)
@@ -407,7 +407,7 @@ func TestAnErrorAnswerNeverReachesTheTokenEndpoint(t *testing.T) {
 }
 
 func TestACallbackWithNoCodeNeverReachesTheTokenEndpoint(t *testing.T) {
-	idp := newFakeIdP(t)
+	idp := newFakeIDP(t)
 	s := newOIDCSite(t, idp)
 	cb := s.begin("/ui/")
 	u, _ := url.Parse(cb)
@@ -423,7 +423,7 @@ func TestACallbackWithNoCodeNeverReachesTheTokenEndpoint(t *testing.T) {
 // A token response with no ID token is not a sign-in, and is not read as one even
 // though the access token is fine.
 func TestATokenResponseWithoutAnIDTokenIsRefusedByName(t *testing.T) {
-	idp := newFakeIdP(t)
+	idp := newFakeIDP(t)
 	idp.omitIDToken = true
 	var buf strings.Builder
 	s := newOIDCSite(t, idp)
@@ -441,7 +441,7 @@ func TestATokenResponseWithoutAnIDTokenIsRefusedByName(t *testing.T) {
 // the provider returns no ID token and the flow is not OpenID Connect.
 func TestTheOpenIDScopeIsAlwaysRequested(t *testing.T) {
 	for _, scopes := range [][]string{nil, {"profile"}, {"email", "groups"}, {"openid"}} {
-		idp := newFakeIdP(t)
+		idp := newFakeIDP(t)
 		o, err := NewOIDC(context.Background(), OIDCConfig{
 			Issuer: idp.srv.URL, ClientID: "c", RedirectURL: "https://x/cb", Scopes: scopes, HTTPClient: idp.srv.Client(),
 		}, nil)
@@ -471,7 +471,7 @@ func TestTheOpenIDScopeIsAlwaysRequested(t *testing.T) {
 
 // Config that would only fail at a person's first sign-in fails at start-up.
 func TestOIDCConfigThatCouldNotWorkIsRefusedAtStartUp(t *testing.T) {
-	idp := newFakeIdP(t)
+	idp := newFakeIDP(t)
 	for name, cfg := range map[string]OIDCConfig{
 		"no client id":    {Issuer: idp.srv.URL, RedirectURL: "https://x/cb"},
 		"no redirect url": {Issuer: idp.srv.URL, ClientID: "c"},
@@ -487,7 +487,7 @@ func TestOIDCConfigThatCouldNotWorkIsRefusedAtStartUp(t *testing.T) {
 // cannot finish a flow another browser started. This is the case that matters:
 // the attacker's victim is a person with a cookie, not one with none.
 func TestABrowserWithADifferentBindingCookieCannotFinishAFlow(t *testing.T) {
-	idp := newFakeIdP(t)
+	idp := newFakeIDP(t)
 	s := newOIDCSite(t, idp)
 	attacker := s.begin("/ui/") // the attacker's browser starts a flow and keeps the callback
 

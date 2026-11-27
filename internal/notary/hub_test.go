@@ -120,8 +120,7 @@ func bearer(secret string) map[string]string {
 func (h *hub) signIn(user string, groups ...string) {
 	h.t.Helper()
 	_, page := h.do("GET", "/auth/login", nil, "")
-	i := strings.Index(page, `name="csrf_token" value="`) + len(`name="csrf_token" value="`)
-	token := page[i : i+strings.Index(page[i:], `"`)]
+	token := between(h.t, page, `name="csrf_token" value="`, `"`)
 	form := url.Values{"user": {user}, "groups": {strings.Join(groups, " ")}, "csrf_token": {token}}
 	resp, body := h.do("POST", "/auth/test/login", map[string]string{"Content-Type": "application/x-www-form-urlencoded"}, form.Encode())
 	if resp.StatusCode != http.StatusSeeOther {
@@ -519,8 +518,7 @@ func TestTheListPageLinksToTheNextPage(t *testing.T) {
 	if i < 0 || !strings.Contains(page, "Older records") {
 		t.Fatalf("a 60-record store has no link to the next page:\n%s", page)
 	}
-	href := page[i+len("href=\""):]
-	href = strings.ReplaceAll(href[:strings.Index(href, `"`)], "&amp;", "&")
+	href := strings.ReplaceAll(between(t, page[i:], `href="`, `"`), "&amp;", "&")
 	if !strings.Contains(href, "model=z-ai%2Fglm") || !strings.Contains(href, "cursor=") {
 		t.Errorf("the next link %q drops the filter or has no cursor", href)
 	}
@@ -680,4 +678,20 @@ func TestASecretInARecordIsRedactedOnEveryPageAndKeptInTheRecord(t *testing.T) {
 	if !strings.Contains(stored.Answers["req#0"], aws) || stored.Model != rec.Model {
 		t.Error("the page's scrubbing changed the stored record, which replay needs as it was given")
 	}
+}
+
+// between returns the text after start and before the next end, and fails the test
+// when either is missing, so a changed page is a failure and not a slice at -1.
+func between(tb testing.TB, s, start, end string) string {
+	tb.Helper()
+	i := strings.Index(s, start)
+	if i < 0 {
+		tb.Fatalf("%q is not in:\n%s", start, s)
+	}
+	rest := s[i+len(start):]
+	j := strings.Index(rest, end)
+	if j < 0 {
+		tb.Fatalf("%q does not follow %q in:\n%s", end, start, s)
+	}
+	return rest[:j]
 }
