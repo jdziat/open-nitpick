@@ -1,2 +1,6 @@
 *.sh text eol=lf
 *.ps1 text eol=lf
+
+# Signed bytes. A Sigstore bundle covers the exact bytes it signed, so a checkout
+# that rewrites line endings (Windows does, by default) breaks verification.
+internal/upgrade/testdata/* -text

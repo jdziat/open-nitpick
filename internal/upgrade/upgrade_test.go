@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/user"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -234,6 +235,9 @@ func TestAChecksumForAnotherCaseOfTheNameDoesNotStandInForTheAsset(t *testing.T)
 // An unwritable install directory is refused before anything is downloaded, in
 // words that name the directory.
 func TestAnUnwritableInstallDirectoryIsRefusedNamingIt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a directory is not made unwritable by its mode on Windows")
+	}
 	if u, err := user.Current(); err == nil && u.Uid == "0" {
 		t.Skip("root writes anywhere, so the directory cannot be made unwritable")
 	}
