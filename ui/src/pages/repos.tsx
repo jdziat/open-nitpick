@@ -11,10 +11,12 @@ import type { Paged } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import type { RepoRow } from '@/lib/types'
 
+/** The fields the server sorts this list by. */
+const SORTS = ['repo', 'reviews', 'findings', 'errors', 'last']
 const ASC = ['repo']
 
 export default function Repositories() {
-  const list = useListState('findings', 'desc', ASC)
+  const list = useListState('findings', 'desc', ASC, SORTS)
   // This page lists every repository, so a repository filter carried from another page is not sent.
   const api = { ...list.api, repo: undefined }
   const { data, error, loading, reload } = useApi<Paged<RepoRow>>('/v1/insights/repos', api)
@@ -32,10 +34,10 @@ export default function Repositories() {
         </Link>
       ),
     },
-    { id: 'reviews', header: 'Reviews', sort: 'reviews', align: 'right', cell: (r) => formatNumber(r.reviews) },
+    { id: 'reviews', header: 'Reviews', sort: 'reviews', align: 'right', className: 'hidden sm:table-cell', cell: (r) => formatNumber(r.reviews) },
     { id: 'findings', header: 'Findings', sort: 'findings', align: 'right', cell: (r) => formatNumber(r.findings) },
     { id: 'errors', header: 'Error or critical', sort: 'errors', align: 'right', cell: (r) => formatNumber(r.errors) },
-    { id: 'last', header: 'Last review', sort: 'last', cell: (r) => <When at={r.last} /> },
+    { id: 'last', header: 'Last review', sort: 'last', className: 'hidden sm:table-cell', cell: (r) => <When at={r.last} /> },
   ]
 
   return (

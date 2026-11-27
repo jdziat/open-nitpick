@@ -4,19 +4,30 @@ import { DEFAULT_DAYS } from '@/components/layout/insights-controls'
 
 type Order = 'asc' | 'desc'
 
+/** The most rows a request may ask for, which the server enforces. */
+export const MAX_PAGE_SIZE = 100
+
 /**
  * The state of a table of the insights data, kept in the address: the period and
  * repository every page shares, and this table's page, size, sort and search. Anything
  * else a page filters by goes through get and set.
+ *
+ * A link can be edited or can outlive a release, so a sort the table does not have,
+ * an order that is neither direction and a page size outside what the server
+ * accepts fall back to the defaults here, and the table shows rows and not the
+ * server's complaint.
  */
-export function useListState(defaultSort: string, defaultOrder: Order, ascFirst: string[] = []) {
+export function useListState(defaultSort: string, defaultOrder: Order, ascFirst: string[] = [], allowedSorts?: string[]) {
   const defaults = useMemo(() => ({ days: DEFAULT_DAYS, sort: defaultSort, order: defaultOrder, page_size: '20' }), [defaultSort, defaultOrder])
   const { get, set, params } = useSearchState(defaults)
 
-  const sort = get('sort')
-  const order = get('order') as Order
-  const page = Math.max(1, Number(get('page')) || 1)
-  const pageSize = Number(get('page_size')) || 20
+  const rawSort = get('sort')
+  const sort = allowedSorts && !allowedSorts.includes(rawSort) ? defaultSort : rawSort
+  const rawOrder = get('order')
+  const order: Order = rawOrder === 'asc' || rawOrder === 'desc' ? rawOrder : defaultOrder
+  const page = Math.max(1, Math.floor(Number(get('page'))) || 1)
+  const size = Math.floor(Number(get('page_size')))
+  const pageSize = size >= 1 && size <= MAX_PAGE_SIZE ? size : 20
 
   // Pressing the sorted column reverses it. Pressing another starts it the way a
   // reader expects: text from A, numbers and dates from the largest.

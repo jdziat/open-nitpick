@@ -8,7 +8,7 @@ function setup(url = '/insights/findings') {
   const wrapper = ({ children }: { children: ReactNode }) => <MemoryRouter initialEntries={[url]}>{children}</MemoryRouter>
   return renderHook(
     () => {
-      const list = useListState('at', 'desc', ['path'])
+      const list = useListState('at', 'desc', ['path'], ['at', 'path', 'repo'])
       return { list, search: useLocation().search }
     },
     { wrapper },
@@ -41,6 +41,14 @@ describe('useListState', () => {
       expect(result.current.list.page, `page=${bad}`).toBe(1)
       expect(result.current.list.api.page, `page=${bad}`).toBe(1)
     }
+  })
+
+  it('falls back to the defaults for a sort, an order or a page size the server would refuse', () => {
+    const { result } = setup('/x?sort=files&order=sideways&page_size=500')
+    expect(result.current.list).toMatchObject({ sort: 'at', order: 'desc', pageSize: 20 })
+    expect(result.current.list.api).toMatchObject({ sort: 'at', order: 'desc', page_size: 20 })
+    expect(setup('/x?page_size=0').result.current.list.pageSize).toBe(20)
+    expect(setup('/x?page_size=100&sort=repo&order=asc').result.current.list).toMatchObject({ pageSize: 100, sort: 'repo', order: 'asc' })
   })
 
   it('keeps the page it was told to go to', () => {

@@ -11,10 +11,12 @@ import type { Paged } from '@/lib/api'
 import { carry } from '@/lib/scope'
 import type { ReviewRow } from '@/lib/types'
 
+/** The fields the server sorts this list by. */
+const SORTS = ['at', 'repo', 'findings', 'errors', 'result']
 const ASC = ['repo', 'result']
 
 export default function Reviews() {
-  const list = useListState('at', 'desc', ASC)
+  const list = useListState('at', 'desc', ASC, SORTS)
   const { search } = useLocation()
   const complete = list.get('complete')
   const { data, error, loading, reload } = useApi<Paged<ReviewRow>>('/v1/reviews', { ...list.api, complete })
@@ -36,7 +38,7 @@ export default function Reviews() {
         caption="Reviews"
         toolbar={
           <>
-            <SearchInput value={list.q} onChange={list.onSearch} placeholder="Search repository, ref or commit" label="Search reviews" />
+            <SearchInput value={list.q} onChange={list.onSearch} placeholder="Search reviews" label="Search reviews" />
             <FilterSelect
               label="Outcome"
               any="Any outcome"

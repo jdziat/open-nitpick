@@ -19,12 +19,14 @@ import { carry } from '@/lib/scope'
 import { SEVERITIES } from '@/lib/severity'
 import type { Facets, FindingRow } from '@/lib/types'
 
+/** The fields the server sorts this list by. */
+const SORTS = ['at', 'severity', 'path', 'repo', 'class', 'title']
 const ASC = ['path', 'repo', 'class', 'title']
 
 const where = (f: FindingRow) => `${f.path}${f.line ? `:${f.line}` : ''}`
 
 export default function Findings() {
-  const list = useListState('at', 'desc', ASC)
+  const list = useListState('at', 'desc', ASC, SORTS)
   const { search } = useLocation()
   const [open, setOpen] = useState<FindingRow | null>(null)
   const path = list.get('path')
@@ -84,7 +86,7 @@ export default function Findings() {
         caption="Findings"
         toolbar={
           <>
-            <SearchInput value={list.q} onChange={list.onSearch} placeholder="Search title, file or reason" label="Search findings" />
+            <SearchInput value={list.q} onChange={list.onSearch} placeholder="Search findings" label="Search findings" />
             <FilterSelect label="Severity" any="Any severity" value={floor} onChange={(v) => list.set({ min_severity: v })} options={[...SEVERITIES].reverse().map((s) => ({ value: s, label: `${s[0].toUpperCase()}${s.slice(1)} or worse` }))} className="w-44" />
             <FilterSelect label="Class" any="Any class" value={cls} onChange={(v) => list.set({ class: v })} options={(facets.data?.classes ?? []).map((c) => ({ value: c, label: c }))} className="w-36" />
             {path && (

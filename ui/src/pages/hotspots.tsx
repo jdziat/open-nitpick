@@ -10,6 +10,8 @@ import type { Paged } from '@/lib/api'
 import { SEVERITIES } from '@/lib/severity'
 import type { Hotspot } from '@/lib/types'
 
+/** The fields the server sorts this list by. */
+const SORTS = ['score', 'findings', 'path', 'repo', 'delta', 'worst', 'last']
 const ASC = ['path']
 const trends = [
   { value: 'up', label: 'Getting worse' },
@@ -18,7 +20,7 @@ const trends = [
 ]
 
 export default function Hotspots() {
-  const list = useListState('score', 'desc', ASC)
+  const list = useListState('score', 'desc', ASC, SORTS)
   const trend = list.get('trend')
   const floor = list.get('min_severity')
   const { data, error, loading, reload } = useApi<Paged<Hotspot>>('/v1/insights/hotspots', { ...list.api, trend, min_severity: floor })
