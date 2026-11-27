@@ -567,3 +567,37 @@ func TestARoleNoComponentDeclaresIsRefusedAtStartUp(t *testing.T) {
 		t.Errorf("with nothing declaring roles a rule was refused: %v", err)
 	}
 }
+
+// The login body is executed with the View as its root, so its $.CSRF and $.Data
+// are the view's and not the layout's. A page that failed to execute, or rendered
+// an empty token, would make every sign-in unreachable. This reads the rendered
+// form and holds each of its fields to a real value.
+func TestTheLoginPageRendersItsFormWithARealTokenAndTheRequestedPage(t *testing.T) {
+	e := standard(t, "x")
+	resp, page := e.do("GET", "/auth/login?next="+url.QueryEscape("/ui/stub/item/7"), nil, nil)
+	if resp.StatusCode != 200 {
+		t.Fatalf("the login page = %d:\n%s", resp.StatusCode, page)
+	}
+	token := between(t, page, `name="csrf_token" value="`, `"`)
+	if len(token) < 40 {
+		t.Errorf("the form's token is %q, want a real token", token)
+	}
+	if got := between(t, page, `name="next" value="`, `"`); got != "/ui/stub/item/7" {
+		t.Errorf("the form's next = %q, want the page that was asked for", got)
+	}
+	if got := between(t, page, `action="/auth/`, `"`); got != "fake/login" {
+		t.Errorf("the form posts to /auth/%s, want /auth/fake/login", got)
+	}
+	// The token the page shows is the one the server accepts: sign in with it.
+	post, body := e.do("POST", "/auth/fake/login", url.Values{"username": {"alice"}, "csrf_token": {token}, "next": {"/ui/"}}, nil)
+	if post.StatusCode != 303 {
+		t.Errorf("signing in with the token the page showed = %d: %s", post.StatusCode, body)
+	}
+	// Rule 10: a page with no provider is not a login page, so the form above
+	// came from the provider and not from a template that always prints one.
+	bare := newEnv(t, Config{Components: []Component{&stubComponent{name: "stub"}}, Providers: []Provider{redirectProvider{}}, Assets: builtAssets()})
+	_, other := bare.do("GET", "/auth/login", nil, nil)
+	if strings.Contains(other, `name="csrf_token"`) {
+		t.Errorf("a redirect-only login page carries a credentials form:\n%s", other)
+	}
+}
