@@ -279,14 +279,17 @@ func build(ctx context.Context, o *options, log *slog.Logger) (http.Handler, fun
 		// A notary no machine can write to and no person can open is not a
 		// notary that was meant to be started.
 		if len(o.tokens) == 0 && o.oidcAudience == "" && len(providers) == 0 {
+			closeStore()
 			return nil, nil, errors.New("give at least one -token or an -oidc-audience with -oidc-allow, or configure a sign-in")
 		}
 		store, err := wire.NewFileStore(o.dir)
 		if err != nil {
+			closeStore()
 			return nil, nil, err
 		}
 		// One server per directory: see FileStore.Lock.
 		if err := store.Lock(); err != nil {
+			closeStore()
 			return nil, nil, fmt.Errorf("%w (run one server per data directory)", err)
 		}
 		prev := closeStore

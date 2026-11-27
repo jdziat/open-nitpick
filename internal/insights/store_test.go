@@ -1,6 +1,7 @@
 package insights
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -233,4 +234,26 @@ func TestASecondStoreOnTheSameDirectoryIsRefused(t *testing.T) {
 		t.Fatalf("the directory was not released on Close: %v", err)
 	}
 	_ = again.Close()
+}
+
+func TestATailThatParsesButHasNoNewlineIsEndedBeforeTheNextReview(t *testing.T) {
+	dir := t.TempDir()
+	s, _ := OpenStore(dir)
+	first, _ := s.Add(context.Background(), review("acme/api", t0, finding("a.go", "error")))
+	_ = s.Close()
+	p := filepath.Join(dir, "reviews.jsonl")
+	b, _ := os.ReadFile(p)
+	if err := os.WriteFile(p, bytes.TrimRight(b, "\n"), 0o600); err != nil { // a whole object, its newline lost
+		t.Fatal(err)
+	}
+	s, _ = OpenStore(dir)
+	if _, err := s.Add(context.Background(), review("acme/web", t0.Add(time.Hour), finding("b.go", "nit"))); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	again, _ := OpenStore(dir)
+	defer func() { _ = again.Close() }()
+	if n := len(again.Reviews(Filter{})); n != 2 || again.Skipped() != 0 {
+		t.Fatalf("%d reviews and %d skipped lines: the new line was glued to %s", n, again.Skipped(), first.ID[:8])
+	}
 }

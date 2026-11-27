@@ -288,3 +288,19 @@ span.sev-critical::before { background: var(--sev-critical); }
   .chart-scroll .chart { min-width: 34rem; }
 }
 .filters select { min-width: 9rem; }
+
+/* Phone: the chart opens at its newest end, text stays readable, cards are short. */
+@media (max-width: 48rem) {
+  .chart-scroll { direction: rtl; -webkit-mask-image: linear-gradient(to right, transparent, #000 1.5rem); mask-image: linear-gradient(to right, transparent, #000 1.5rem); }
+  .chart-scroll .chart { direction: ltr; min-width: 45rem; }
+  .chart .axis { font-size: 13px; }
+}
+@media (max-width: 40rem) {
+  .bar nav { flex-wrap: nowrap; justify-content: space-between; gap: 0; font-size: 0.875rem; }
+  .bar nav a { padding-inline: 0.1rem; }
+  .records td[data-label="Rank"] { display: none; }
+  .records td[data-label="File"]::before, .records td[data-label="Finding"]::before, .records td[data-label="Severity"]::before { display: none; }
+  .records tr { padding: 0.5rem 0; }
+  .filters label, .filters select, .filters input:not([type="hidden"]) { width: 100%; }
+  .filters label { flex: 1 1 100%; }
+}

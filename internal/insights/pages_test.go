@@ -306,3 +306,36 @@ func TestTheHotspotTablesBusiestBucketSetsEveryRowsSparklineScale(t *testing.T) 
 		t.Fatalf("a row given the table's scale must sit lower than one scaled to itself: %v vs %v", shared, alone)
 	}
 }
+
+func TestAWindowWithNoEarlierReviewsSaysSoOnceInsteadOfOnEveryRow(t *testing.T) {
+	u := newUI(t)
+	u.seed()
+	u.signIn("eng")
+	for _, p := range []string{"/ui/insights/hotspots?days=90", "/ui/insights/?days=90"} {
+		_, body := u.get(p)
+		if n := strings.Count(body, "No earlier data: no reviews came before this period"); n != 1 {
+			t.Errorf("%s: the note appears %d times, want once", p, n)
+		}
+		if strings.Contains(body, `data-label="Trend"`) || strings.Contains(body, "no earlier data</span>") {
+			t.Errorf("%s: a Trend column was drawn with nothing to compare", p)
+		}
+	}
+	_, with := u.get("/ui/insights/hotspots?days=30")
+	if !strings.Contains(with, `data-label="Trend"`) || strings.Contains(with, "No earlier data:") {
+		t.Errorf("the 30 day view has a baseline and must show its trend column")
+	}
+}
+
+func TestAListShowsOneStatusForAReviewThatDidNotFinish(t *testing.T) {
+	u := newUI(t)
+	r := review("acme/api", t0.Add(-time.Hour), finding("a.go", "error"))
+	r.Complete, r.Result = false, "findings"
+	_, _ = u.co.store.Add(context.Background(), r)
+	u.signIn("eng")
+	for _, p := range []string{"/ui/insights/reviews", "/ui/insights/"} {
+		_, body := u.get(p)
+		if !strings.Contains(body, `<td data-label="Result"><span class="tag">did not finish</span></td>`) {
+			t.Errorf("%s: the chip must replace the result word, not follow it", p)
+		}
+	}
+}

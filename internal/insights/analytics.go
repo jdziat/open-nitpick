@@ -76,13 +76,13 @@ func (s *Store) Hotspots(q Query) []Hotspot {
 	defer s.mu.Unlock()
 	byFile := map[fileKey]*Hotspot{}
 	prior := map[fileKey]int{}
-	baseline := false
+	baseline := map[string]bool{} // by repository: another repository's history is no baseline
 	for _, r := range s.reviews {
 		if q.Repo != "" && r.Repo != q.Repo || r.At.After(q.Now) || r.At.Before(priorFrom) {
 			continue
 		}
 		if r.At.Before(from) {
-			baseline = true
+			baseline[r.Repo] = true
 		}
 		for _, f := range r.Findings {
 			k := fileKey{r.Repo, f.Path}
@@ -110,7 +110,7 @@ func (s *Store) Hotspots(q Query) []Hotspot {
 	out := make([]Hotspot, 0, len(byFile))
 	for k, h := range byFile {
 		h.Prior = prior[k]
-		h.Baseline = baseline
+		h.Baseline = baseline[h.Repo]
 		switch {
 		case h.Recent > h.Prior:
 			h.Trend = TrendUp

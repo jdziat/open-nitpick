@@ -118,7 +118,6 @@ func OpenStore(dir string) (*Store, error) {
 	s.write = f.Write
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 0, 64<<10), 16<<20)
-	var torn bool
 	for sc.Scan() {
 		line := bytes.TrimSpace(sc.Bytes())
 		if len(line) == 0 {
@@ -127,7 +126,6 @@ func OpenStore(dir string) (*Store, error) {
 		var r Review
 		if err := json.Unmarshal(line, &r); err != nil || r.ID == "" {
 			s.skipped++
-			torn = true
 			continue
 		}
 		s.index(r)
@@ -137,8 +135,10 @@ func OpenStore(dir string) (*Store, error) {
 		_ = l.Unlock()
 		return nil, fmt.Errorf("read the reviews file: %w", err)
 	}
-	if torn {
-		// A torn tail has no newline; end it so the next append starts a line.
+	// A crash can lose the newline of a line that is otherwise whole, which parses,
+	// so a parse failure is not the test. Look at the last byte: the next append
+	// must start a line.
+	if endsMidLine(f) {
 		if _, err := f.WriteString("\n"); err != nil {
 			_ = f.Close()
 			_ = l.Unlock()
@@ -151,6 +151,19 @@ func OpenStore(dir string) (*Store, error) {
 // log reports a fault that has no caller to return it to. It writes to stderr
 // through the standard logger, as the notary's store faults do.
 func (s *Store) log(msg string, err error) { stdlog.Printf("insights: %s: %v", msg, err) }
+
+// endsMidLine reports whether the file is non-empty and does not end in a newline.
+func endsMidLine(f *os.File) bool {
+	info, err := f.Stat()
+	if err != nil || info.Size() == 0 {
+		return false
+	}
+	last := make([]byte, 1)
+	if _, err := f.ReadAt(last, info.Size()-1); err != nil {
+		return false
+	}
+	return last[0] != '\n'
+}
 
 func (s *Store) index(r Review) {
 	if _, dup := s.byID[r.ID]; dup {

@@ -207,9 +207,29 @@ func TestThePriorWindowIsExactlyOnePeriodLong(t *testing.T) {
 	day := 24 * time.Hour
 	_, _ = s.Add(context.Background(), review("r", t0.Add(-59*day), finding("f.go", "error")))                                                                                   // in the prior 30 days
 	_, _ = s.Add(context.Background(), Review{Repo: "r", Commit: "z", At: t0.Add(-61 * day), Result: "findings", Complete: true, Findings: []Finding{finding("f.go", "error")}}) // before it
+	_, _ = s.Add(context.Background(), review("r", t0.Add(-59*day-12*time.Hour), finding("g.go", "error")))                                                                      // just inside the far edge
 	_, _ = s.Add(context.Background(), review("r", t0.Add(-day), finding("f.go", "error")))
 	hs := s.Hotspots(Query{Now: t0, Days: 30})
 	if len(hs) != 1 || hs[0].Prior != 1 {
 		t.Fatalf("prior = %+v, want only the finding 59 days back: the one 61 days back is outside the window before", hs)
+	}
+	_, _ = s.Add(context.Background(), review("r", t0.Add(-2*day), finding("g.go", "error")))
+	for _, h := range s.Hotspots(Query{Now: t0, Days: 30}) {
+		if h.Path == "g.go" && h.Prior != 1 {
+			t.Fatalf("g.go = %+v: a finding 59.5 days back is inside the window before and must count", h)
+		}
+	}
+}
+
+func TestAFileIsComparedWithItsOwnRepositorysEarlierReviewsNotAnothers(t *testing.T) {
+	s, _ := OpenStore(t.TempDir())
+	defer func() { _ = s.Close() }()
+	day := 24 * time.Hour
+	_, _ = s.Add(context.Background(), review("b", t0.Add(-40*day), finding("x.go", "nit")))
+	_, _ = s.Add(context.Background(), review("a", t0.Add(-day), finding("new.go", "error")))
+	for _, h := range s.Hotspots(Query{Now: t0, Days: 30}) {
+		if h.Repo == "a" && h.Baseline {
+			t.Fatalf("repo a had no review before the window, but a review in repo b gave it a baseline: %+v", h)
+		}
 	}
 }

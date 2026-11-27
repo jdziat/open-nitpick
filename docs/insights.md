@@ -62,7 +62,8 @@ maximum 500 findings is about 1 to 2 MB, and a typical one is a few kilobytes.
 Plan on memory near the size of the file, and a start-up time that grows with it
 (reading the file once). To trim, stop the server, move the file aside or cut its
 oldest lines, and start it again. One process may hold the directory: a second
-refuses to start, as with the notary.
+refuses to start, as with the notary. The lock is a file lock, so keep the data
+directory on a local disk: some network file systems do not honour it.
 
 A write token may post up to 8 MiB per request and there is no rate limit. Give
 write tokens only to CI jobs you trust. A review dated more than five minutes

@@ -114,6 +114,7 @@ type overviewView struct {
 	Severities []bar
 	Classes    []bar
 	Hotspots   []hotspotRow
+	NoTrend    bool
 	Recent     []reviewRow
 	Incomplete int
 	Empties    empty
@@ -186,6 +187,7 @@ func (c *Component) overviewPage(r *http.Request) (any, error) {
 	for i, h := range hs {
 		v.Hotspots = append(v.Hotspots, c.hotspotRow(i+1, h, sparkScale(hs)))
 	}
+	v.NoTrend = len(hs) > 0 && !hs[0].Baseline
 	for i, rv := range c.store.Reviews(Filter{Repo: q.Repo}) {
 		if i == 5 {
 			break
@@ -228,14 +230,15 @@ const overviewBody = shared + `{{template "scope" .Data.Scope}}
 </div>
 
 <section class="panel" aria-labelledby="hot"><h2 id="hot">Where findings concentrate</h2>
-{{if .Data.Hotspots}}<table class="records"><thead><tr><th>File</th><th class="num">Findings</th><th>Worst</th><th>Trend</th><th>Over the period</th></tr></thead><tbody>
-{{range .Data.Hotspots}}<tr><td data-label="File"><a href="{{.FindingsHref}}"><code>{{.Path}}</code></a>{{if .Repo}}<div class="muted">{{.Repo}}</div>{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td><td data-label="Worst">{{template "sev" .Worst}}</td><td data-label="Trend"><span class="trend trend-{{.Trend}}">{{.TrendText}}</span></td><td data-label="Over the period">{{template "spark" .Spark}}</td></tr>{{end}}</tbody></table>
+{{if .Data.Hotspots}}<table class="records"><thead><tr><th>File</th><th class="num">Findings</th><th>Worst</th>{{if not .Data.NoTrend}}<th>Trend</th>{{end}}<th>Over the period</th></tr></thead><tbody>
+{{range .Data.Hotspots}}<tr><td data-label="File"><a href="{{.FindingsHref}}"><code>{{.Path}}</code></a>{{if .Repo}}<div class="muted">{{.Repo}}</div>{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td><td data-label="Worst">{{template "sev" .Worst}}</td>{{if not $.Data.NoTrend}}<td data-label="Trend"><span class="trend trend-{{.Trend}}">{{.TrendText}}</span></td>{{end}}<td data-label="Over the period">{{template "spark" .Spark}}</td></tr>{{end}}</tbody></table>
+{{if .Data.NoTrend}}<p class="muted">No earlier data: no reviews came before this period, so trends are not shown.</p>{{end}}
 <p><a href="/ui/insights/hotspots?days={{.Data.Scope.Days}}{{if .Data.Scope.Repo}}&amp;repo={{.Data.Scope.Repo}}{{end}}">All hotspots</a></p>
 {{else}}<p class="muted">No findings in this period.</p>{{end}}</section>
 
 <section class="panel" aria-labelledby="rec"><h2 id="rec">Latest reviews</h2>
 <table class="records"><thead><tr><th>When</th><th>Repository</th><th>Commit</th><th>Result</th><th class="num">Findings</th></tr></thead><tbody>
-{{range .Data.Recent}}<tr><td data-label="When"><a href="{{.Href}}"><time datetime="{{.At}}">{{.At}}</time></a></td><td data-label="Repository">{{.Repo}}</td><td data-label="Commit"><code>{{.Short}}</code></td><td data-label="Result">{{.Result}}{{if not .Complete}} <span class="tag">did not finish</span>{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td></tr>{{end}}</tbody></table>
+{{range .Data.Recent}}<tr><td data-label="When"><a href="{{.Href}}"><time datetime="{{.At}}">{{.At}}</time></a></td><td data-label="Repository">{{.Repo}}</td><td data-label="Commit"><code>{{.Short}}</code></td><td data-label="Result">{{if .Complete}}{{.Result}}{{else}}<span class="tag">did not finish</span>{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td></tr>{{end}}</tbody></table>
 <p><a href="/ui/insights/reviews?days={{.Data.Scope.Days}}{{if .Data.Scope.Repo}}&amp;repo={{.Data.Scope.Repo}}{{end}}">All reviews</a></p></section>
 {{end}}`
 
@@ -290,6 +293,7 @@ func sparkScale(hs []Hotspot) int {
 }
 
 type hotspotsView struct {
+	NoTrend bool
 	Scope   scope
 	Rows    []hotspotRow
 	Total   int
@@ -303,7 +307,7 @@ func (c *Component) hotspotsPage(r *http.Request) (any, error) {
 		return nil, err
 	}
 	hs := c.store.Hotspots(q)
-	v := hotspotsView{Scope: c.scope(r, "/ui/insights/hotspots", q), Total: len(hs), Empties: noReviews(), Empty: c.store.Overview(q).Empty}
+	v := hotspotsView{NoTrend: len(hs) > 0 && !hs[0].Baseline, Scope: c.scope(r, "/ui/insights/hotspots", q), Total: len(hs), Empties: noReviews(), Empty: c.store.Overview(q).Empty}
 	shown := hs[:min(len(hs), 100)]
 	for i, h := range shown {
 		v.Rows = append(v.Rows, c.hotspotRow(i+1, h, sparkScale(shown)))
@@ -313,11 +317,12 @@ func (c *Component) hotspotsPage(r *http.Request) (any, error) {
 
 const hotspotsBody = shared + `{{template "scope" .Data.Scope}}
 {{if .Data.Empty}}{{template "none" .Data.Empties}}{{else}}
-<p class="lede">Files ranked by what they have produced in the last {{.Data.Scope.Days}} days. Trend compares that period with the {{.Data.Scope.Days}} days before it.</p>
+<p class="lede">Files ranked by the findings that reviews reported in the last {{.Data.Scope.Days}} days. Each review counts, so a finding left unfixed through several pushes counts each time. Trend compares the period with the {{.Data.Scope.Days}} days before it.</p>
 <details class="data"><summary>How the score works</summary>
 <p>Each finding adds a weight by severity (nit 0.25, info 0.5, warning 1, error 3, critical 8), halved for every 21 days since it was reported. A file with many old findings ranks below one with a few recent severe ones.</p></details>
-{{if .Data.Rows}}<table class="records"><thead><tr><th class="num">#</th><th>File</th><th class="num">Score</th><th class="num">Findings</th><th>Worst</th><th>Trend</th><th>Over the period</th></tr></thead><tbody>
-{{range .Data.Rows}}<tr><td data-label="Rank" class="num">{{.Rank}}</td><td data-label="File"><a href="{{.FindingsHref}}"><code>{{.Path}}</code></a><div class="muted">{{.Repo}}</div></td><td data-label="Score" class="num">{{.Score}}</td><td data-label="Findings" class="num">{{.Findings}}</td><td data-label="Worst">{{template "sev" .Worst}}</td><td data-label="Trend"><span class="trend trend-{{.Trend}}">{{.TrendText}}</span></td><td data-label="Over the period">{{template "spark" .Spark}}</td></tr>{{end}}</tbody></table>
+{{if .Data.Rows}}<table class="records"><thead><tr><th class="num">#</th><th>File</th><th class="num">Score</th><th class="num">Findings</th><th>Worst</th>{{if not .Data.NoTrend}}<th>Trend</th>{{end}}<th>Over the period</th></tr></thead><tbody>
+{{range .Data.Rows}}<tr><td data-label="Rank" class="num">{{.Rank}}</td><td data-label="File"><a href="{{.FindingsHref}}"><code>{{.Path}}</code></a><div class="muted">{{.Repo}}</div></td><td data-label="Score" class="num">{{.Score}}</td><td data-label="Findings" class="num">{{.Findings}}</td><td data-label="Worst">{{template "sev" .Worst}}</td>{{if not $.Data.NoTrend}}<td data-label="Trend"><span class="trend trend-{{.Trend}}">{{.TrendText}}</span></td>{{end}}<td data-label="Over the period">{{template "spark" .Spark}}</td></tr>{{end}}</tbody></table>
+{{if .Data.NoTrend}}<p class="muted">No earlier data: no reviews came before this period, so trends are not shown.</p>{{end}}
 {{if gt .Data.Total (len .Data.Rows)}}<p class="muted">Showing the top {{len .Data.Rows}} of {{.Data.Total}} files.</p>{{end}}
 {{else}}<p>Reviews ran in this period and reported no findings.</p>{{end}}{{end}}`
 
@@ -477,7 +482,7 @@ func (c *Component) reviewsPage(r *http.Request) (any, error) {
 
 const reviewsBody = shared + `{{template "scope" .Data.Scope}}
 {{if .Data.Rows}}<table class="records"><thead><tr><th>When</th><th>Repository</th><th>Ref</th><th>Commit</th><th>Result</th><th class="num">Findings</th></tr></thead><tbody>
-{{range .Data.Rows}}<tr><td data-label="When"><a href="{{.Href}}"><time datetime="{{.At}}">{{.At}}</time></a></td><td data-label="Repository">{{.Repo}}</td><td data-label="Ref">{{.Ref}}</td><td data-label="Commit"><code>{{.Short}}</code></td><td data-label="Result">{{.Result}}{{if not .Complete}} <span class="tag">did not finish</span>{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td></tr>{{end}}</tbody></table>
+{{range .Data.Rows}}<tr><td data-label="When"><a href="{{.Href}}"><time datetime="{{.At}}">{{.At}}</time></a></td><td data-label="Repository">{{.Repo}}</td><td data-label="Ref">{{.Ref}}</td><td data-label="Commit"><code>{{.Short}}</code></td><td data-label="Result">{{if .Complete}}{{.Result}}{{else}}<span class="tag">did not finish</span>{{end}}</td><td data-label="Findings" class="num">{{.Findings}}</td></tr>{{end}}</tbody></table>
 {{if gt .Data.Total (len .Data.Rows)}}<p class="muted">Showing the newest {{len .Data.Rows}} of {{.Data.Total}} reviews.</p>{{end}}
 {{else}}{{template "none" .Data.Empties}}{{end}}`
 
