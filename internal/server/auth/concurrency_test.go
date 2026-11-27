@@ -243,7 +243,10 @@ func TestConcurrentHashesAreBounded(t *testing.T) {
 	_ = resp.Body.Close()
 	i := strings.Index(string(page), `name="csrf_token" value="`) + len(`name="csrf_token" value="`)
 	token := string(page)[i : i+strings.Index(string(page)[i:], `"`)]
-	_, err = s.c.PostForm(s.ts.URL+"/auth/password/login", url.Values{"username": {"alice"}, "password": {"correct horse"}, "csrf_token": {token}})
+	slow, err := s.c.PostForm(s.ts.URL+"/auth/password/login", url.Values{"username": {"alice"}, "password": {"correct horse"}, "csrf_token": {token}})
+	if slow != nil {
+		_ = slow.Body.Close()
+	}
 	if err == nil {
 		t.Error("a sign-in went ahead while every hashing slot was held")
 	}
@@ -296,7 +299,9 @@ func TestARefusedOrAbandonedSignInLeavesNoChargeBehind(t *testing.T) {
 	i := strings.Index(string(page), `name="csrf_token" value="`) + len(`name="csrf_token" value="`)
 	token := string(page)[i : i+strings.Index(string(page)[i:], `"`)]
 	for n := 0; n < 3; n++ {
-		_, _ = s2.c.PostForm(s2.ts.URL+"/auth/password/login", url.Values{"username": {"bob"}, "password": {"x"}, "csrf_token": {token}})
+		if r, err := s2.c.PostForm(s2.ts.URL+"/auth/password/login", url.Values{"username": {"bob"}, "password": {"x"}, "csrf_token": {token}}); err == nil {
+			_ = r.Body.Close()
+		}
 	}
 	time.Sleep(300 * time.Millisecond) // the abandoned handlers finish
 	if got := inFlight(pw2.ByAccount, "account:bob"); got != 0 {
