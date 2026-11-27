@@ -32,6 +32,12 @@ export function ResultBadge({ complete, result }: { complete: boolean; result: s
   )
 }
 
+/*
+ * On a phone a table keeps the columns a reader sorts and scans by (the name, the count,
+ * the result) and the rest come back at the sm breakpoint. A column hidden by width is
+ * still in the Columns menu, and turning it on there has no effect until the screen is
+ * wider.
+ */
 export function reviewColumns(search: string): Column<ReviewRow>[] {
   return [
     {
@@ -45,7 +51,7 @@ export function reviewColumns(search: string): Column<ReviewRow>[] {
         </Link>
       ),
     },
-    { id: 'repo', header: 'Repository', sort: 'repo', cell: (r) => <RepoName repo={r.repo} /> },
+    { id: 'repo', header: 'Repository', sort: 'repo', className: 'hidden sm:table-cell', cell: (r) => <RepoName repo={r.repo} /> },
     { id: 'ref', header: 'Ref', className: 'hidden md:table-cell', cell: (r) => r.ref ?? <span className="text-muted-foreground">–</span> },
     { id: 'commit', header: 'Commit', className: 'hidden lg:table-cell', cell: (r) => <code className="text-xs">{shortCommit(r.commit)}</code> },
     { id: 'result', header: 'Result', sort: 'result', cell: (r) => <ResultBadge complete={r.complete} result={r.result} /> },
@@ -65,10 +71,12 @@ export function hotspotColumns(scale: number, findingsSearch: (h: Hotspot) => st
       header: 'File',
       sort: 'path',
       required: true,
+      // The table's cells do not wrap, so the path is allowed to, within a width a phone has.
+      className: 'whitespace-normal max-sm:max-w-44',
       cell: (h) => (
         <div className="min-w-0">
-          <Link to={{ pathname: '/insights/findings', search: findingsSearch(h) }} className="font-mono text-[0.8rem] break-all hover:underline">
-            {h.path}
+          <Link to={{ pathname: '/insights/findings', search: findingsSearch(h) }} className="font-mono text-[0.8rem] break-words hover:underline">
+            {h.path.split('/').flatMap((part, i, all) => (i < all.length - 1 ? [part, '/', <wbr key={i} />] : [part]))}
           </Link>
           <div className="text-muted-foreground text-xs">{h.repo}</div>
         </div>
@@ -76,8 +84,8 @@ export function hotspotColumns(scale: number, findingsSearch: (h: Hotspot) => st
     },
     { id: 'score', header: 'Score', sort: 'score', align: 'right', cell: (h) => h.score.toFixed(1) },
     { id: 'findings', header: 'Findings', sort: 'findings', align: 'right', cell: (h) => formatNumber(h.findings) },
-    { id: 'worst', header: 'Worst', sort: 'worst', cell: (h) => <SeverityBadge severity={h.worst} /> },
-    { id: 'trend', header: 'Trend', sort: 'delta', cell: (h) => <Trend trend={h.trend} baseline={h.baseline} delta={h.delta} prior={h.prior} /> },
+    { id: 'worst', header: 'Worst', sort: 'worst', className: 'hidden sm:table-cell', cell: (h) => <SeverityBadge severity={h.worst} /> },
+    { id: 'trend', header: 'Trend', sort: 'delta', className: 'hidden sm:table-cell', cell: (h) => <Trend trend={h.trend} baseline={h.baseline} delta={h.delta} prior={h.prior} /> },
     { id: 'spark', header: 'Over the period', className: 'hidden md:table-cell', cell: (h) => <Sparkline values={h.spark} scale={scale} /> },
     { id: 'last', header: 'Last seen', sort: 'last', className: 'hidden lg:table-cell', cell: (h) => <When at={h.last} /> },
   ]

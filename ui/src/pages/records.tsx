@@ -2,13 +2,12 @@ import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { DataTable, type Column } from '@/components/data-table/data-table'
-import { ClearFilters } from '@/components/data-table/toolbar'
+import { ClearFilters, SearchInput } from '@/components/data-table/toolbar'
 import { When } from '@/components/columns'
 import { PageHeader } from '@/components/page-header'
 import { EmptyState } from '@/components/state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { useApi } from '@/hooks/use-api'
 import { useSearchState } from '@/hooks/use-search-state'
 import { formatNumber } from '@/lib/format'
@@ -24,6 +23,11 @@ const keys: Record<string, (r: RecordSummary) => string | number> = {
   status: (r) => Number(r.complete),
   answers: (r) => r.answers,
   source: (r) => r.source,
+}
+
+/** A model name with a break allowed after each slash, so a phone wraps it where a person would. */
+function breakable(name: string) {
+  return name.split(/(?<=[/])/).flatMap((part, i) => (i === 0 ? [part] : [<wbr key={i} />, part]))
 }
 
 // The notary lists records newest first by cursor, so a page of them is all it can
@@ -58,13 +62,13 @@ export default function Records() {
         </Link>
       ),
     },
-    { id: 'model', header: 'Model', sort: 'model', cell: (r) => <span className="font-mono text-[0.8rem]">{r.model}</span> },
+    { id: 'model', header: 'Model', sort: 'model', className: 'whitespace-normal max-sm:max-w-32', cell: (r) => <span className="font-mono text-[0.8rem]">{breakable(r.model)}</span> },
     { id: 'tool', header: 'Version', sort: 'tool', className: 'hidden md:table-cell', cell: (r) => <code className="text-xs">{r.tool}</code> },
     {
       id: 'status',
       header: 'Status',
       sort: 'status',
-      cell: (r) => (r.complete ? <Badge variant="secondary" className="font-normal">Replays</Badge> : <Badge variant="outline" className="font-normal">Resumes</Badge>),
+      cell: (r) => (r.complete ? <Badge variant="secondary" className="font-normal">Replays</Badge> : <Badge variant="outline" className="bg-sev-warning-bg text-sev-warning border-transparent font-normal">Resumes</Badge>),
     },
     { id: 'answers', header: 'Answers', sort: 'answers', align: 'right', cell: (r) => `${formatNumber(r.answers)} of ${formatNumber(r.batches)}` },
     { id: 'source', header: 'Written by', sort: 'source', className: 'hidden lg:table-cell', cell: (r) => r.source },
@@ -111,8 +115,8 @@ export default function Records() {
         caption="Notary records"
         toolbar={
           <>
-            <Input aria-label="Model" placeholder="Model, exactly" defaultValue={model} onBlur={(e) => e.target.value !== model && (setTrail([]), set({ model: e.target.value.trim(), cursor: '' }))} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} className="h-8 w-48" />
-            <Input aria-label="Version" placeholder="Version, exactly" defaultValue={version} onBlur={(e) => e.target.value !== version && (setTrail([]), set({ version: e.target.value.trim(), cursor: '' }))} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} className="h-8 w-40" />
+            <SearchInput value={model} onChange={(v) => { setTrail([]); set({ model: v, cursor: '' }) }} placeholder="Model (exact)" label="Filter by model, exactly" />
+            <SearchInput value={version} onChange={(v) => { setTrail([]); set({ version: v, cursor: '' }) }} placeholder="Version (exact)" label="Filter by version, exactly" />
             <ClearFilters show={filtered} onClear={reset} />
           </>
         }

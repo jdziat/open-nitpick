@@ -206,3 +206,14 @@
 .base-ui-disable-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* A table wider than its card scrolls inside the card. The two shadows show on the side
+   that has more to read, which matters on a phone where the scroll itself is not visible.
+   The covers scroll with the content (local) and hide the shadows at the ends. */
+.scroll-shadow {
+  background:
+    linear-gradient(to right, var(--card) 30%, transparent) left center / 24px 100% no-repeat local,
+    linear-gradient(to left, var(--card) 30%, transparent) right center / 24px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, color-mix(in oklab, var(--foreground) 22%, transparent), transparent) left center / 14px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, color-mix(in oklab, var(--foreground) 22%, transparent), transparent) right center / 14px 100% no-repeat scroll;
+}

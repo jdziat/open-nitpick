@@ -64,7 +64,7 @@ export function DataTable<T>({ columns, rows, rowKey, loading, error, onRetry, s
         </div>
       )}
       <div className={cn(!bare && "bg-card overflow-hidden rounded-xl border")}>
-        <div className={cn('overflow-x-auto transition-opacity', loading && rows.length > 0 && 'opacity-60')} aria-busy={loading}>
+        <div className={cn('scroll-shadow overflow-x-auto transition-opacity', loading && rows.length > 0 && 'opacity-60')} aria-busy={loading}>
           <Table className="[&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
             <caption className="sr-only">{caption}</caption>
             <TableHeader>
