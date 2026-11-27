@@ -3,6 +3,7 @@ package notary
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -15,6 +16,21 @@ import (
 // JSON object, so the two cannot be mistaken. internal/review keeps the same
 // constant, and a test holds the two together.
 const unusableMark = "!"
+
+// requestKeyShape is what the review engine names a request: "jev:" and the
+// SHA-256 of the model and the state. It is a hash and not a secret, and the
+// high-entropy scrub would blank every one of them, which hides the only thing
+// that tells two answers apart. Any other key is still scrubbed, since a key is
+// text a caller chose.
+var requestKeyShape = regexp.MustCompile(`^jev:[0-9a-f]{64}$`)
+
+// viewRequestKey scrubs a request key unless it has the shape of a request hash.
+func viewRequestKey(k string) string {
+	if requestKeyShape.MatchString(k) {
+		return k
+	}
+	return redact.Secrets(k)
+}
 
 // AnswerView is one stored answer as the web app shows it.
 type AnswerView struct {
@@ -85,7 +101,7 @@ func (c *Component) viewRecord(w http.ResponseWriter, r *http.Request) {
 	for _, k := range keys {
 		text, unusable := strings.CutPrefix(rec.Answers[k], unusableMark)
 		request, slot, _ := strings.Cut(k, "#")
-		view.Answers = append(view.Answers, AnswerView{Request: redact.Secrets(request), Slot: redact.Secrets(slot), Text: redact.Secrets(text), Unusable: unusable})
+		view.Answers = append(view.Answers, AnswerView{Request: viewRequestKey(request), Slot: redact.Secrets(slot), Text: redact.Secrets(text), Unusable: unusable})
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")

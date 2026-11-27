@@ -2,6 +2,8 @@ package notary
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -593,6 +595,33 @@ func TestASecretInARecordIsScrubbedFromTheViewsAndKeptInTheRecordAndTheMachineLi
 	}
 	if !strings.Contains(stored.Answers["req#0"], aws) || stored.Model != rec.Model {
 		t.Error("the scrubbing changed the stored record, which replay needs as it was given")
+	}
+}
+
+// The review engine's request keys are "jev:" and 64 hex characters. The
+// high-entropy scrub reads that as a token, so a record page showed every answer
+// as "jev:REDACTED" and a reader could not tell two answers apart.
+func TestARequestHashIsShownInFullWhileOtherKeysAreStillScrubbed(t *testing.T) {
+	sum := sha256.Sum256([]byte("model\x00state"))
+	key := "jev:" + hex.EncodeToString(sum[:])
+	secret := "ghp_" + strings.Repeat("a1B2", 8)
+	// A hash with a secret after it is not a request hash, whatever it starts with.
+	trailing := key + "-" + secret
+	fs := fileStore(t)
+	rec := putRecord(t, fs, 1, func(r *wire.Record) {
+		r.Answers = map[string]string{key + "#0": `{"content":"ok"}`, secret + "#1": `{"content":"ok"}`, trailing + "#2": `{"content":"ok"}`}
+	})
+	h := newHub(t, fs)
+	h.signIn("kay", "keepers")
+	resp, body := h.do("GET", "/v1/records/view/"+rec.Hash, nil, "")
+	if resp.StatusCode != 200 {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+	if !strings.Contains(body, key) {
+		t.Errorf("the request hash was scrubbed: %s", body)
+	}
+	if strings.Contains(body, secret) {
+		t.Errorf("a key that is not a request hash was shown: %s", body)
 	}
 }
 
