@@ -213,12 +213,6 @@ func TestThePriorWindowIsExactlyOnePeriodLong(t *testing.T) {
 	if len(hs) != 1 || hs[0].Prior != 1 {
 		t.Fatalf("prior = %+v, want only the finding 59 days back: the one 61 days back is outside the window before", hs)
 	}
-	_, _ = s.Add(context.Background(), review("r", t0.Add(-2*day), finding("g.go", "error")))
-	for _, h := range s.Hotspots(Query{Now: t0, Days: 30}) {
-		if h.Path == "g.go" && h.Prior != 1 {
-			t.Fatalf("g.go = %+v: a finding 59.5 days back is inside the window before and must count", h)
-		}
-	}
 }
 
 func TestAFileIsComparedWithItsOwnRepositorysEarlierReviewsNotAnothers(t *testing.T) {
@@ -231,5 +225,25 @@ func TestAFileIsComparedWithItsOwnRepositorysEarlierReviewsNotAnothers(t *testin
 		if h.Repo == "a" && h.Baseline {
 			t.Fatalf("repo a had no review before the window, but a review in repo b gave it a baseline: %+v", h)
 		}
+	}
+}
+
+func TestTheEdgeOfThePriorWindowIsDrawnToTheMinute(t *testing.T) {
+	s, _ := OpenStore(t.TempDir())
+	defer func() { _ = s.Close() }()
+	day, near := 24*time.Hour, 10*time.Minute
+	// The window before a 30 day period starts 60 days back.
+	_, _ = s.Add(context.Background(), review("r", t0.Add(-60*day+near), finding("in.go", "error")))
+	_, _ = s.Add(context.Background(), review("r", t0.Add(-60*day-near), finding("out.go", "error")))
+	_, _ = s.Add(context.Background(), review("r", t0.Add(-day), finding("in.go", "error"), finding("out.go", "error")))
+	prior := map[string]int{}
+	for _, h := range s.Hotspots(Query{Now: t0, Days: 30}) {
+		prior[h.Path] = h.Prior
+	}
+	if len(prior) != 2 {
+		t.Fatalf("both files have a finding in the window and must be listed: %v", prior)
+	}
+	if prior["in.go"] != 1 || prior["out.go"] != 0 {
+		t.Fatalf("prior = %v: a finding ten minutes inside the edge counts and one ten minutes outside does not", prior)
 	}
 }

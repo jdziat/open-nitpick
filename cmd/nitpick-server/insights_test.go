@@ -131,3 +131,43 @@ func TestAnInsightsServerDoesNotLeaveItsDataDirectoryLockedAfterAFailedStartUp(t
 	}
 	closeStore()
 }
+
+// A build that fails after the insights store opened must give its directory back,
+// whichever step failed, or the next start in the same process is refused.
+func TestABuildThatFailsAfterInsightsOpenedReleasesItsDirectory(t *testing.T) {
+	t.Run("notary has no way in", func(t *testing.T) {
+		o := insightsOpts(t)
+		o.config = writeFile(t, o.dir, "both.yaml", "components: [insights, notary]\n", 0o600)
+		if _, _, err := build(context.Background(), o, quiet); err == nil || !strings.Contains(err.Error(), "-token") {
+			t.Fatalf("err = %v, want the notary's missing credentials", err)
+		}
+		o.config = writeFile(t, o.dir, "ok.yaml", "components: [insights]\n", 0o600)
+		_, closeStore, err := build(context.Background(), o, quiet)
+		if err != nil {
+			t.Fatalf("the failed build left the insights directory locked: %v", err)
+		}
+		closeStore()
+	})
+	t.Run("notary directory already in use", func(t *testing.T) {
+		o := insightsOpts(t)
+		if err := o.tokens.Set("ci:authoritative:nsecret"); err != nil {
+			t.Fatal(err)
+		}
+		o.config = writeFile(t, o.dir, "n.yaml", "components: [notary]\n", 0o600)
+		_, holdNotary, err := build(context.Background(), o, quiet)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer holdNotary()
+		o.config = writeFile(t, o.dir, "both.yaml", "components: [insights, notary]\n", 0o600)
+		if _, _, err := build(context.Background(), o, quiet); err == nil {
+			t.Fatal("a second notary on a held directory was accepted")
+		}
+		o.config = writeFile(t, o.dir, "ins.yaml", "components: [insights]\n", 0o600)
+		_, closeStore, err := build(context.Background(), o, quiet)
+		if err != nil {
+			t.Fatalf("the failed build left the insights directory locked: %v", err)
+		}
+		closeStore()
+	})
+}
