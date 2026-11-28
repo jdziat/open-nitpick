@@ -519,7 +519,7 @@ type Review struct {
 	// MaxFilesPerRequest caps how many files are batched into one call.
 	MaxFilesPerRequest int `yaml:"max_files_per_request"`
 
-	// MaxDesignTasks caps how many design tasks a review runs. Zero is no cap.
+	// MaxDesignTasks caps how many design tasks a review runs, 24 by default. Zero is no cap.
 	// A change with more tasks runs the highest ranked and lists the rest as left
 	// out, which is a limit the review states and not a stage that failed.
 	MaxDesignTasks int `yaml:"max_design_tasks"`

@@ -93,7 +93,10 @@ func Defaults() *Config {
 			MaxFiles:              60,
 			TokenBudgetPerRequest: 60000,
 			MaxFilesPerRequest:    6,
-			Concurrency:           4,
+			// 24 design tasks lose no planted defect in a pull request of up to 48 and
+			// bound the work of a larger one. docs/findings.md has the measurement.
+			MaxDesignTasks: 24,
+			Concurrency:    4,
 			// Advisory by default. A reviewer that blocks merges on its first
 			// false positive is a reviewer the team switches off, and this
 			// one has not yet earned that trust. Opt in with fail_on.
