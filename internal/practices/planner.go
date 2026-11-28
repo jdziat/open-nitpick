@@ -21,6 +21,18 @@ type DesignPlan struct {
 	Tasks       []DesignTask `json:"tasks"`
 	Limitations []string     `json:"limitations"`
 	Errors      []string     `json:"errors,omitempty"`
+	// Deferred are the tasks review.max_design_tasks left out. They are not in
+	// Tasks, so no check plans them and none is marked unfinished for lacking them.
+	Deferred []DeferredTask `json:"deferred,omitempty"`
+}
+
+// DeferredTask is a design task the cap left out, with where it ranked.
+type DeferredTask struct {
+	ID     string `json:"id"`
+	Source Target `json:"source"`
+	// Rank is the task's place among Of ranked tasks, 1 being the first to run.
+	Rank int `json:"rank"`
+	Of   int `json:"of"`
 }
 
 // PlanDesign groups package sources with their direct dependencies and callers.

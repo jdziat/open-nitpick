@@ -279,6 +279,9 @@ func (r Review) validate() []error {
 	if r.MaxFilesPerRequest <= 0 {
 		errs = append(errs, fmt.Errorf("review.max_files_per_request must be positive, got %d", r.MaxFilesPerRequest))
 	}
+	if r.MaxDesignTasks < 0 {
+		errs = append(errs, fmt.Errorf("review.max_design_tasks must not be negative, got %d", r.MaxDesignTasks))
+	}
 	if r.Concurrency <= 0 {
 		errs = append(errs, fmt.Errorf("review.concurrency must be positive, got %d", r.Concurrency))
 	}

@@ -35,6 +35,7 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 		out.Design.Errors = append(out.Design.Errors, "design packing requires positive file and token limits and a nonnegative framing reserve")
 		return out
 	}
+	capDesignTasks(&out, cfg.Review.MaxDesignTasks, changes)
 	out.Plan.BudgetPerBatch = max(0, cfg.Review.TokenBudgetPerRequest-reserve.Tokens)
 	out.Plan.FramingReserved = reserve.Tokens
 	sources := map[string][]byte{}
@@ -231,4 +232,84 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 		out.Plan.Batches = append(out.Plan.Batches, batch)
 	}
 	return out
+}
+
+// capDesignTasks keeps the highest ranked design tasks when a change has more than
+// review.max_design_tasks, and moves the rest to Deferred with a limitation that
+// names them. Slop-only tasks are not design units and are not counted or cut.
+//
+// A task is kept or left out whole. The order is what the change does to the task:
+// the caller obligations it carries first, then the lines added to its sources, then
+// the fewer sources the sooner, then the ID so the same input keeps the same tasks.
+func capDesignTasks(out *DesignPacking, limit int, changes diff.Files) {
+	if limit <= 0 {
+		return
+	}
+	var ranked []int
+	for i, task := range out.Design.Tasks {
+		if !task.SlopOnly {
+			ranked = append(ranked, i)
+		}
+	}
+	if len(ranked) <= limit {
+		return
+	}
+	added := map[string]int{}
+	for _, file := range changes {
+		for _, hunk := range file.Hunks {
+			for _, line := range hunk.Lines {
+				if line.Kind == diff.LineAdded {
+					added[file.Path]++
+				}
+			}
+		}
+	}
+	churn := func(task DesignTask) int {
+		total := 0
+		for _, source := range task.Sources {
+			total += added[source.ID]
+		}
+		return total
+	}
+	tasks := out.Design.Tasks
+	slices.SortStableFunc(ranked, func(a, b int) int {
+		x, y := tasks[a], tasks[b]
+		if c := len(y.Interactions) - len(x.Interactions); c != 0 {
+			return c
+		}
+		if c := churn(y) - churn(x); c != 0 {
+			return c
+		}
+		if c := len(x.Sources) - len(y.Sources); c != 0 {
+			return c
+		}
+		return strings.Compare(x.ID, y.ID)
+	})
+	drop := map[int]bool{}
+	var names []string
+	for place, index := range ranked {
+		if place < limit {
+			continue
+		}
+		task := tasks[index]
+		drop[index] = true
+		out.Design.Deferred = append(out.Design.Deferred, DeferredTask{ID: task.ID, Source: task.Source, Rank: place + 1, Of: len(ranked)})
+		out.Plan.Skipped = append(out.Plan.Skipped, bundle.Skip{Path: task.Source.ID,
+			Reason: fmt.Sprintf("%s: left out by review.max_design_tasks (rank %d of %d)", task.ID, place+1, len(ranked))})
+		names = append(names, task.ID)
+	}
+	kept := make([]DesignTask, 0, len(tasks)-len(drop))
+	for i, task := range tasks {
+		if !drop[i] {
+			kept = append(kept, task)
+		}
+	}
+	out.Design.Tasks = kept
+	shown := names
+	if len(shown) > 8 {
+		shown = append(slices.Clone(names[:8]), fmt.Sprintf("and %d more", len(names)-8))
+	}
+	out.Design.Limitations = append(out.Design.Limitations, fmt.Sprintf(
+		"review.max_design_tasks=%d: %d of %d design tasks were not run, lowest ranked last: %s",
+		limit, len(names), len(ranked), strings.Join(shown, ", ")))
 }
