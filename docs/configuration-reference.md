@@ -1562,8 +1562,8 @@ Repository is the operator-authorized repository identity bound to each referenc
 
 ### `review.max_design_tasks`
 
-integer, default `0`.
-MaxDesignTasks caps how many design tasks a review runs. Zero is no cap.
+integer, default `24`.
+MaxDesignTasks caps how many design tasks a review runs, 24 by default. Zero is no cap.
 
 ### `review.max_file_bytes`
 

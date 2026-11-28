@@ -3187,3 +3187,68 @@ opposed to a killed process, can lose one. `deep-review` is not tested: its
 agents make tool calls the fixture cannot. The authorization scheme must be
 written `Bearer`. One pre-existing test, `TestCancellationKeepsEveryFinding`,
 failed once under load and passed 30 of 30 when run alone.
+
+## Ranking design tasks when a change has too many (2026-11-27)
+
+`review.max_design_tasks` keeps the highest ranked design tasks when a change has more
+than the cap. The question was how to rank them and what the cap should be. No model
+was called: a design task's request does not depend on the other tasks, so what a
+model finds in a kept task is the same with or without the cap, and the cap changes
+only which tasks are kept.
+
+Method. 150 wide pull requests were built by merging 6, 10 or 14 of 33 planted-defect
+Go fixtures (23 with defects, held-out corpus excluded) into one module, 50 of each
+size. The real planner and `PackDesign` ran over each. A planted defect counts as
+reviewed when a kept design task's declaration span, widened by the harness's 4-line
+anchor tolerance, contains its line. Retention is that count over the count with no
+cap. Each pull request had 10 to 51 design tasks (median 17, 29 and 40 by size) and
+was run at caps from 5 to 32, 724 trials in all. `TestCapStudy` repeats it:
+`NITPICK_CAP_STUDY=1 go test -run TestCapStudy ./internal/evals/`.
+
+Rankers, mean share of planted defects still reviewed, pull requests of 10 fixtures:
+
+| ranker | cap 5 | cap 8 | cap 12 | cap 16 | cap 24 | cap 32 |
+|---|---|---|---|---|---|---|
+| oracle, knows the defects | 0.58 | 0.84 | 1.00 | 1.00 | 1.00 | 1.00 |
+| lines changed inside the task's span (shipped) | 0.56 | 0.80 | 0.97 | 1.00 | 1.00 | 1.00 |
+| random, 20 draws | 0.21 | 0.33 | 0.48 | 0.62 | 0.82 | 0.94 |
+| caller obligations first (first version) | 0.16 | 0.30 | 0.50 | 0.66 | 0.80 | 0.90 |
+
+Over all sizes and caps the shipped ranking minus the first version is +0.383 (95%
+bootstrap interval +0.369 to +0.397), minus random +0.373 (+0.362 to +0.384), and minus
+the oracle -0.012 (-0.020 to -0.005). Ranking by lines changed in the whole file is
+0.29 to 0.31 worse than by lines in the task's span, whether it counts added lines
+only, added and removed, or puts modified files first as Mira does. Fewest sources
+first and obligations alone are 0.50 and 0.53 worse. The shipped cap keeps the same
+tasks as the study's own ranking in 724 of 724 trials.
+
+The first version put caller obligations first and was no better than random (-0.005,
+interval -0.014 to +0.005). A declaration task is about one declaration, and counting
+the file's churn gave every declaration of a busy file the same weight, including the
+ones the change never reached.
+
+The cap as a share of the tasks, pooled over sizes:
+
+| tasks kept | defects reviewed | tokens saved |
+|---|---|---|
+| 30% | 0.845 | 0.505 |
+| 40% | 0.945 | 0.389 |
+| 50% | 0.995 | 0.277 |
+| 60% or more | 1.000 | 0.218 or less |
+
+The default is 24: a pull request of up to 48 tasks keeps at least half of them and
+loses no planted defect here, and a larger one is bounded. Larger than 48 tasks the
+share kept falls below half and the table says what that costs.
+
+An error caught on the way. The first version of the study counted a defect as reviewed
+when its file was a source of any kept task, which included the slop-only tasks the cap
+never cuts. Every ranker read 1.00, random included. The count now uses design tasks
+and the declaration span.
+
+Not measured. A fixture's defect is planted on a changed line inside a changed
+declaration, which is where this ranking looks, so the corpus favours it. A defect in
+a declaration the change did not touch, which a caller obligation exists to reach, is
+rare here, and the ranking puts such a task last unless its churn ties. Real pull
+requests have not been replayed. The token saving counts the design tasks' requests
+only.
+
