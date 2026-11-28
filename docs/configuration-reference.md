@@ -1560,6 +1560,11 @@ MaxTokens caps the complete rendered section. Zero selects the built-in cap of 2
 string, default `none`.
 Repository is the operator-authorized repository identity bound to each reference.
 
+### `review.max_design_tasks`
+
+integer, default `0`.
+MaxDesignTasks caps how many design tasks a review runs. Zero is no cap.
+
 ### `review.max_file_bytes`
 
 integer, default `262144`.
