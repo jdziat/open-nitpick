@@ -9,14 +9,14 @@ and a client built into `nitpick review`, `fast-review` and `deep-review`.
 
 `nitpick-server` replaces the `nitpick-notary` command, and the notary is now a
 component of it. Nothing about records changes: the routes, the roles, the machine
-authentication, the record format and its hashing, and the data directory are the
-same, and a data directory written by `nitpick-notary` is read by `nitpick-server`
-unchanged (a test holds a fixture from the last release of the old command to
-that). A deployment changes its binary name and nothing else.
+authentication and the record format and its hashing are the same. Records are
+kept in a database now and not in a directory, so a deployment gives the server a
+database (see [Where records are kept](#where-records-are-kept)) and copies the
+records it has with `nitpick-server import`.
 
 | Before | Now |
 | --- | --- |
-| `nitpick-notary -addr … -data … -token …` | `nitpick-server -addr … -data … -token …` |
+| `nitpick-notary -addr … -data … -token …` | `nitpick-server -addr … -database-url … -token …` |
 | `NITPICK_NOTARY_TOKENS` | the same variable |
 | image `ghcr.io/nitpick-oss/nitpick-notary` | `ghcr.io/nitpick-oss/nitpick-server` |
 | chart `oci://ghcr.io/nitpick-oss/charts/nitpick-notary` | `oci://ghcr.io/nitpick-oss/charts/nitpick-server` |
@@ -64,10 +64,48 @@ only if it finished (not truncated, not empty) and, when JSON was requested,
 only if it is JSON: otherwise a reply that failed to parse would be replayed
 forever.
 
+## Where records are kept
+
+Records are kept in a SQL database, Postgres or MySQL, named by `-database-url` or
+`NITPICK_DATABASE_URL`:
+
+```
+postgres://user:password@host:5432/nitpick?sslmode=require
+mysql://user:password@host:3306/nitpick?tls=true
+```
+
+The server creates and updates its own tables when it starts. Several servers may
+start at once and share one database: the migration runs under a lock, and every
+rule below is kept by the database and not by the process, so it holds whichever
+server a request reaches. A server with no database URL does not start.
+
+### Moving records from a data directory
+
+An earlier server kept records as files in a directory. Copy them once, with that
+server stopped:
+
+```sh
+nitpick-server import -data-dir /var/lib/notary -database-url "$NITPICK_DATABASE_URL"
+```
+
+It prints what it did, for the records, their history and the insights reviews
+beside them:
+
+```
+notary records copied: 412, history copied: 9, already in the database: 0, skipped: 1
+  skipped notes.json
+insights reviews copied: 1830, already in the database: 0, skipped: 0
+```
+
+A record the database already holds is left as it is, so running it again, or
+after the new server has taken records, never puts an older copy over a newer one.
+A file that is not a record is skipped and named. The directory is only read, and
+an import of a directory that a server still has open is refused.
+
 ## Running one
 
 ```sh
-nitpick-server -addr 127.0.0.1:8484 -data /var/lib/notary \
+nitpick-server -addr 127.0.0.1:8484 -database-url "$NITPICK_DATABASE_URL" \
   -token ci:authoritative:$CI_SECRET \
   -token dev:provisional:$DEV_SECRET \
   -token viewer:read:$VIEW_SECRET
@@ -126,39 +164,54 @@ docker compose up -d --build
 curl -s localhost:8484/healthz
 ```
 
-The image holds the server and the hub UI, runs as an unprivileged user on a read-only root filesystem,
-and keeps records on the `notary-data` volume. The compose file binds loopback
-only.
+The image holds the server and the hub UI and runs as an unprivileged user on a
+read-only root filesystem. The compose file starts a Postgres beside it, for which
+`.env` needs a password, and binds loopback only. The records are on the `database`
+volume.
 
 ### Kubernetes
 
 ```sh
-helm install nitpick oci://ghcr.io/nitpick-oss/charts/nitpick-server \
-  --set 'tokens[0].name=ci' --set 'tokens[0].role=authoritative' --set 'tokens[0].hash=<64 hex>'
+helm install nitpick oci://ghcr.io/nitpick-oss/charts/nitpick-server
 ```
 
-The chart refuses a hash that is not 64 lowercase hex characters (a secret put
-there by mistake), an unknown role, and a configuration with no way to
-authenticate. It runs one replica on a `ReadWriteOnce` volume and replaces the pod
-rather than rolling it, because the record files are owned by one process. The
-volume claim is kept when the release is deleted, and installing again under the
-same release name picks it up with its records. Set `existingSecret` to supply
-the `tokens` entry from a Secret you manage, and `oidc.*` for GitHub Actions
-identity tokens. The image and chart are published to `ghcr.io` when a release
-tag is pushed by the `Server image` workflow.
+With no values the chart starts the server and a Postgres of its own (the official
+`postgres` image, one pod in a StatefulSet), with a database password it generates
+and keeps in the Secret `<release>-nitpick-server-db`, and a notary token it
+generates and prints how to read. Values choose the rest:
+
+| To | Set |
+| --- | --- |
+| run more servers | `replicaCount: 3` |
+| use MySQL | `database.bundled: mysql` |
+| use a database you run | `database.bundled: none` and `externalDatabase.url`, or `externalDatabase.existingSecret` holding the URL |
+| use your own tokens | `tokens`, or `existingSecret`; `oidc.*` for GitHub Actions identity tokens |
+
+The servers hold nothing a restart loses, so a rolling update or a larger
+`replicaCount` never moves a record. The chart refuses a hash that is not 64
+lowercase hex characters (a secret put there by mistake), an unknown role, an
+unknown `database.bundled`, an external database beside a bundled one, a
+`database.bundled: none` with no URL, and a `replicaCount` the database's
+`maxConnections` cannot serve (each server holds up to 20 connections).
+
+The database password and its volume claim are kept when the release is deleted,
+and installing again under the same release name picks both up with the records.
+The image and chart are published to `ghcr.io` when a release tag is pushed by the
+`Server image` workflow.
 
 ## Limits
 
-One server may run on a data directory: it takes an exclusive lock, and a second
-exits with a message saying so, because the rule that a partial record never
-replaces a complete one is kept by a lock inside the process. The server closes
+Any number of servers may share a database. A write locks the record's row, so a
+partial record never replaces a complete one and a clear keeps its history, however
+many servers write at once (a test runs concurrent writers against both engines and
+fails if the lock is removed). The server closes
 a connection that is idle for 60 seconds or that takes two minutes to send a
 request, which bounds an outage from connections held open and does not stop a
 client that reconnects: put a proxy in front of it, or limit connections per
 address.
 
-A record file that cannot be decoded is set aside in `history/` by the next
-write or clear, and reading it is an error. A store error is logged on the
+A record that cannot be decoded is copied to the history table by the next write
+or clear, and reading it is an error. A store error is logged on the
 server and the client is told only that the store could not be used.
 
 A review gives the notary up after three failed writes in a row, and is then

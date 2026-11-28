@@ -15,9 +15,39 @@ routes and flags as the notary command it replaced, with no sign-in and no
 UI.
 
 ```sh
-nitpick-server -addr 127.0.0.1:8484 -data /var/lib/nitpick \
+nitpick-server -addr 127.0.0.1:8484 -database-url "$NITPICK_DATABASE_URL" \
   -token ci:authoritative:$CI_SECRET
 ```
+
+## The database
+
+The server keeps all of its state in a SQL database, Postgres or MySQL, and does not
+start without one: give it `-database-url`, or set `NITPICK_DATABASE_URL`, to a
+`postgres://` or `mysql://` URL. Nothing is written to disk. It creates and updates
+its own tables at start-up, under a lock, so any number of servers may start together
+against one database, and a server that has to wait for the lock waits up to two
+minutes. Both engines are tested in CI against real servers, not stand-ins.
+
+What is in it:
+
+| Table | Holds | Used by |
+|---|---|---|
+| `notary_records`, `notary_history` | records, and what a clear or a repair took out | the [notary](notary.md) |
+| `insights_reviews` | reviews | [insights](insights.md) |
+| `server_state` | sessions, sign-in in progress, the SAML replay guard, the sign-in limits, the CSRF key | the server |
+
+Because none of it is in a process, a person who signed in through one server is
+signed in on every other, a sign-in started on one may finish on another, an
+assertion replayed against a second server is refused, and the sign-in limits count
+across all of them. A server that cannot reach the database fails closed: it refuses
+the sign-in or the request and logs why, and does not let one through.
+
+Each server holds a pool of up to 20 connections, so the database's connection
+limit must be above 20 times the number of servers.
+
+To move from the file-backed server this one replaced, copy its data directory in
+once: [`nitpick-server import`](notary.md#moving-records-from-a-data-directory).
+Sessions are not copied: everyone signs in again.
 
 ## Turning on the hub
 
@@ -106,8 +136,8 @@ lift a lock. Every refusal reads the same, whether the account does not exist, t
 password is wrong or the account is locked, and an account that does not exist costs
 the same time to refuse as one that does. The address is the connection's, unless
 `auth.trust_forwarded_for: true`, which reads the last `X-Forwarded-For` entry and
-is for a deployment behind a proxy that sets it. The limits are held in memory and a
-restart clears them.
+is for a deployment behind a proxy that sets it. The limits are counted in the database, so they hold across
+servers and a restart.
 
 ### OpenID Connect
 
@@ -193,9 +223,9 @@ session.
 
 A session is a random 256-bit identifier in a cookie named `__Host-nitpick_session`:
 `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/` and no `Domain`, which the `__Host-`
-prefix makes a browser enforce. The server keeps sessions in memory, keyed by a hash
-of the identifier, so a restart signs everyone out and a dump of the table holds
-nothing that works as a cookie. A session ends at the first of: it has been idle for
+prefix makes a browser enforce. The server keeps sessions in the database, keyed by a hash
+of the identifier, so every server accepts a session any server issued, a restart
+signs no one out, and a dump of the table holds nothing that works as a cookie. A session ends at the first of: it has been idle for
 `session.idle`, it is `session.absolute` old, or the person signs out. Signing in
 always issues a new identifier.
 
@@ -266,7 +296,28 @@ The Secret is mounted read-only under `/etc/nitpick/`, so the configuration refe
 uncomment the two lines under `volumes` in `deploy/docker-compose.yml` and set
 `NITPICK_SERVER_CONFIG`.
 
-The server takes an exclusive lock on its data directory, so it runs as one replica.
+The chart starts a database of its own unless you point it at one, and runs as many
+servers as `replicaCount` says: see [the notary's Kubernetes
+section](notary.md#kubernetes). With Docker Compose, `deploy/docker-compose.yml`
+starts a Postgres beside the server. For MySQL, swap the `database` service for:
+
+```yaml
+  database:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: nitpick
+      MYSQL_USER: nitpick
+      MYSQL_PASSWORD: ${NITPICK_DB_PASSWORD:?set it in .env}
+      MYSQL_ROOT_PASSWORD: ${NITPICK_DB_PASSWORD}
+    volumes: [database:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -unitpick -p$$MYSQL_PASSWORD"]
+      interval: 5s
+      retries: 20
+```
+
+and set the server's `NITPICK_DATABASE_URL` to
+`mysql://nitpick:${NITPICK_DB_PASSWORD}@database:3306/nitpick`.
 
 ## Writing a component
 
