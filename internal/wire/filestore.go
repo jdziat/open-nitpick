@@ -17,6 +17,9 @@ import (
 
 var hashRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
+// ValidHash reports whether h is a record hash: 64 lowercase hexadecimal characters.
+func ValidHash(h string) bool { return hashRE.MatchString(h) }
+
 // FileStore keeps one JSON file per record under a directory.
 type FileStore struct {
 	dir string
