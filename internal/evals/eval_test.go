@@ -18,11 +18,24 @@ import (
 	"testing"
 
 	llms "github.com/nocturnium/llm-go-sdk/v6"
+	"github.com/zalando/go-keyring"
+
+	"github.com/nitpick-oss/nitpick/internal/llm"
 )
 
 // evalConcurrency bounds in-flight reviews. Held well below any provider rate
 // limit: the matrix is wide, and a 429 storm would read as model weakness.
 const evalConcurrency = 6
+
+// keystoreHasOpenRouter reports whether the operating system's keystore holds an
+// openrouter credential under the name the shipped provider looks it up by. It asks
+// only whether the entry exists; the provider reads the value itself, so the key is
+// never put in the environment. The message below still names the variables, since
+// a keystore entry is the quieter of the ways to supply one.
+func keystoreHasOpenRouter() bool {
+	key, err := keyring.Get(llm.KeyringService, "openrouter")
+	return err == nil && strings.TrimSpace(key) != ""
+}
 
 // TestMain loads .env so the credential does not have to be exported by hand.
 func TestMain(m *testing.M) {
@@ -33,7 +46,7 @@ func TestMain(m *testing.M) {
 	// shipped openrouter provider and that provider accepts both. Demanding
 	// only OPENROUTER_API_KEY here would refuse to start for an operator whose
 	// review runs work fine.
-	if strings.TrimSpace(os.Getenv(EnvAPIKey)) == "" && strings.TrimSpace(os.Getenv(llms.EnvLLMAPIKey)) == "" {
+	if strings.TrimSpace(os.Getenv(EnvAPIKey)) == "" && strings.TrimSpace(os.Getenv(llms.EnvLLMAPIKey)) == "" && !keystoreHasOpenRouter() {
 		fmt.Fprintf(os.Stderr, "evals: neither %s nor %s is set; put one in .env or export it\n",
 			EnvAPIKey, llms.EnvLLMAPIKey)
 		os.Exit(1)
