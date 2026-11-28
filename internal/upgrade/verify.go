@@ -1,12 +1,18 @@
 package upgrade
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"time"
 
 	"github.com/sigstore/sigstore-go/pkg/bundle"
 	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/tuf"
 	"github.com/sigstore/sigstore-go/pkg/verify"
+	"github.com/theupdateframework/go-tuf/v2/metadata"
 )
 
 // The identity a release is signed under: this repository's release workflow,
@@ -38,13 +44,56 @@ func NewSigstoreVerifier(trusted root.TrustedMaterial) *SigstoreVerifier {
 
 // FetchTrustedRoot downloads Sigstore's public-good trusted root through its
 // TUF repository, which is signed and rolled forward from a root embedded in
-// the library. It needs the network; the upgrade has just used it.
-func FetchTrustedRoot() (root.TrustedMaterial, error) {
-	tr, err := root.FetchTrustedRoot()
+// the library. It needs the network; the upgrade has just used it. It stops when
+// ctx is cancelled: the library's own fetch takes no context, so Ctrl-C would
+// otherwise wait on the network.
+func FetchTrustedRoot(ctx context.Context) (root.TrustedMaterial, error) {
+	opts := tuf.DefaultOptions()
+	opts.Fetcher = &ctxFetcher{ctx: ctx, client: &http.Client{Timeout: time.Minute}}
+	tr, err := fetchRoot(opts)
 	if err != nil {
 		return nil, fmt.Errorf("fetch the Sigstore trusted root: %w", err)
 	}
 	return tr, nil
+}
+
+// fetchRoot is the library's fetch, a variable so a test can see the options it is
+// given without reaching Sigstore.
+var fetchRoot = root.FetchTrustedRootWithOptions
+
+// ctxFetcher is a TUF fetcher whose requests carry a context. It answers as the
+// library's default fetcher does, with the same error types: the TUF client reads
+// a 404 from a missing root.json to learn there is no newer one.
+type ctxFetcher struct {
+	ctx    context.Context
+	client *http.Client
+}
+
+// DownloadFile implements fetcher.Fetcher. The timeout argument is deprecated by
+// the interface and unused; the client's own timeout and the context bound it.
+func (f *ctxFetcher) DownloadFile(urlPath string, maxLength int64, _ time.Duration) ([]byte, error) {
+	req, err := http.NewRequestWithContext(f.ctx, http.MethodGet, urlPath, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := f.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		return nil, &metadata.ErrDownloadHTTP{StatusCode: res.StatusCode, URL: urlPath}
+	}
+	// Read one byte past the limit so a longer body is seen as longer, whatever
+	// Content-Length claimed.
+	data, err := io.ReadAll(io.LimitReader(res.Body, maxLength+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxLength {
+		return nil, &metadata.ErrDownloadLengthMismatch{Msg: fmt.Sprintf("download failed for %s, length is larger than expected %d", urlPath, maxLength)}
+	}
+	return data, nil
 }
 
 // Verify implements Verifier.

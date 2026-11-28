@@ -30,6 +30,10 @@ type OIDCConfig struct {
 	Label string
 	// HTTPClient reaches the provider. Nil is the default client.
 	HTTPClient *http.Client
+	// TrustForwardedFor reads a client's address from X-Forwarded-For, for the limit
+	// on how fast one address may start a sign-in. Only behind a proxy that
+	// overwrites the header.
+	TrustForwardedFor bool
 }
 
 // OIDC signs people in with an OpenID Connect provider using the authorization
@@ -39,6 +43,7 @@ type OIDC struct {
 	oauth    *oauth2.Config
 	verifier *oidc.IDTokenVerifier
 	flows    *flows
+	trust    bool
 	log      *slog.Logger
 	label    string
 }
@@ -84,6 +89,7 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig, log *slog.Logger) (*OIDC, erro
 		},
 		verifier: provider.Verifier(&oidc.Config{ClientID: cfg.ClientID}),
 		flows:    newFlows(10_000),
+		trust:    cfg.TrustForwardedFor,
 		log:      log,
 		label:    label,
 	}, nil
@@ -118,6 +124,10 @@ func (o *OIDC) Mount(mux *http.ServeMux, host server.Host) {
 }
 
 func (o *OIDC) login(w http.ResponseWriter, r *http.Request) {
+	if !o.flows.admit(clientAddress(r, o.trust)) {
+		tooManyStarts(w)
+		return
+	}
 	nonce, err := randomToken()
 	if err != nil {
 		http.Error(w, "could not start the sign-in", http.StatusInternalServerError)

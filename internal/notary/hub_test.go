@@ -60,8 +60,8 @@ type hub struct {
 func newHub(t *testing.T, store wire.Store) *hub {
 	t.Helper()
 	roles, err := server.NewRoleMap([]server.RoleRule{
-		{Roles: []server.Role{server.Role(RoleAuthoritative)}, Group: "keepers"},
-		{Roles: []server.Role{server.Role(RoleRead)}, Group: "readers"},
+		{Roles: []server.Role{server.Role(RoleAuthoritative)}, Provider: "test", Group: "keepers"},
+		{Roles: []server.Role{server.Role(RoleRead)}, Provider: "test", Group: "readers"},
 	})
 	if err != nil {
 		t.Fatal(err)

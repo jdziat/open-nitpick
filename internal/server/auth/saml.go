@@ -41,6 +41,11 @@ type SAMLConfig struct {
 	GroupsAttribute string
 	Label           string
 
+	// TrustForwardedFor reads a client's address from X-Forwarded-For, for the limit
+	// on how fast one address may start a sign-in. Only behind a proxy that
+	// overwrites the header.
+	TrustForwardedFor bool
+
 	// Clock is for tests. Nil is the wall clock.
 	Clock *dsig.Clock
 }
@@ -58,11 +63,16 @@ type SAML struct {
 	sp    *saml.ServiceProvider
 	flows *flows
 	seen  *seenAssertions
+	trust bool
 	log   *slog.Logger
 	label string
 }
 
-const samlCookie = "__Host-nitpick_saml"
+// samlCookie has no __Host- prefix on purpose. That prefix requires Path=/, and
+// this cookie is SameSite=None so the provider's cross-site POST carries it, which
+// is reason to keep it to /auth/saml/ and not send it on every request. A browser
+// drops a __Host- cookie on any other path, and every sign-in would then fail.
+const samlCookie = "nitpick_saml"
 
 // NewSAML builds the service provider. It fetches nothing. The provider's
 // metadata is given, so start-up needs no network and no metadata URL can swap in
@@ -101,7 +111,7 @@ func NewSAML(cfg SAMLConfig, log *slog.Logger) (*SAML, error) {
 		// made, so it carries an InResponseTo that is in the table.
 		AllowIDPInitiated: false,
 	}
-	return &SAML{cfg: cfg, sp: sp, flows: newFlows(10_000), seen: newSeenAssertions(), log: log, label: label}, nil
+	return &SAML{cfg: cfg, sp: sp, flows: newFlows(10_000), seen: newSeenAssertions(), trust: cfg.TrustForwardedFor, log: log, label: label}, nil
 }
 
 // ID implements server.Provider.
@@ -136,6 +146,10 @@ func (s *SAML) metadata(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SAML) login(w http.ResponseWriter, r *http.Request) {
+	if !s.flows.admit(clientAddress(r, s.trust)) {
+		tooManyStarts(w)
+		return
+	}
 	sso := s.sp.GetSSOBindingLocation(saml.HTTPRedirectBinding)
 	if sso == "" {
 		http.Error(w, "the provider offers no redirect binding", http.StatusInternalServerError)

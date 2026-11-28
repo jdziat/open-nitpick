@@ -66,7 +66,7 @@ func TestWithNoConfigurationTheServerIsTheNotaryAlone(t *testing.T) {
 func TestAPasswordProviderTurnsTheUIOnForAPersonWithAUsersFile(t *testing.T) {
 	dir := t.TempDir()
 	users := writeFile(t, dir, "users", quickUser, 0o600)
-	cfg := writeFile(t, dir, "server.yaml", "auth:\n  password:\n    users_file: "+users+"\nroles:\n  - {role: authoritative, user: alice}\n", 0o600)
+	cfg := writeFile(t, dir, "server.yaml", "auth:\n  password:\n    users_file: "+users+"\nroles:\n  - {role: authoritative, provider: password, user: alice}\n", 0o600)
 	o := opts(t)
 	o.config = cfg
 	h, closeStore, err := build(context.Background(), o, quiet)
@@ -118,8 +118,8 @@ func TestStartUpRefusesWhatCouldNotWork(t *testing.T) {
 		"a repeated component":               {"components: [notary, notary]\n", "twice", nil},
 		"a negative timeout":                 {"session: {idle: -1m}\n", "negative", nil},
 		"a role for no provider":             {"roles:\n  - {role: read, provider: oidc, group: g}\n", "not configured", nil},
-		"a role with two selectors":          {"auth:\n  password: {users_file: " + users + "}\nroles:\n  - {role: read, user: a, group: g}\n", "exactly one", nil},
-		"a role with no selector":            {"auth:\n  password: {users_file: " + users + "}\nroles:\n  - {role: read}\n", "exactly one", nil},
+		"a role with two selectors":          {"auth:\n  password: {users_file: " + users + "}\nroles:\n  - {role: read, provider: password, user: a, group: g}\n", "exactly one", nil},
+		"a role with no selector":            {"auth:\n  password: {users_file: " + users + "}\nroles:\n  - {role: read, provider: password}\n", "exactly one", nil},
 		"a missing users file":               {"auth:\n  password: {users_file: /no/such/file}\n", "no such file", nil},
 		"no users file named":                {"auth:\n  password: {}\n", "users_file is required", nil},
 		"a users file with a plain password": {"auth:\n  password: {users_file: " + badUsers + "}\n", "argon2id", nil},
@@ -180,9 +180,15 @@ func TestASecondServerOnTheSameDirectoryIsRefused(t *testing.T) {
 // by the first one's leftovers.
 func TestAFailedStartUpReleasesTheDataDirectory(t *testing.T) {
 	o := opts(t)
-	o.config = writeFile(t, t.TempDir(), "server.yaml", "components: [notary]\nroles:\n  - {role: ' ', user: a}\n", 0o600)
-	if _, _, err := build(context.Background(), o, quiet); err == nil {
-		t.Fatal("a rule granting a blank role was accepted")
+	dir := t.TempDir()
+	users := writeFile(t, dir, "users", quickUser, 0o600)
+	// The provider is configured, so config loading passes and the notary's store is
+	// opened and locked. The role is one no component declares, which server.New
+	// refuses afterwards: the failure that has to give the directory back.
+	o.config = writeFile(t, dir, "server.yaml", "components: [notary]\nauth:\n  password: {users_file: "+users+"}\nroles:\n  - {role: nonsense, provider: password, user: a}\n", 0o600)
+	_, _, err := build(context.Background(), o, quiet)
+	if err == nil || !strings.Contains(err.Error(), "no component knows the role") {
+		t.Fatalf("err = %v, want the refusal that comes after the store was locked", err)
 	}
 	o.config = ""
 	_, closeStore, err := build(context.Background(), o, quiet)
@@ -280,7 +286,7 @@ func TestARoleNoComponentKnowsIsRefused(t *testing.T) {
 	for _, role := range []string{"author" + "ative", "admin", "Authoritative", "read "} {
 		o := opts(t)
 		o.config = writeFile(t, t.TempDir(), "server.yaml",
-			"auth:\n  password: {users_file: "+users+"}\nroles:\n  - {role: '"+role+"', user: alice}\n", 0o600)
+			"auth:\n  password: {users_file: "+users+"}\nroles:\n  - {role: '"+role+"', provider: password, user: alice}\n", 0o600)
 		_, closeStore, err := build(context.Background(), o, quiet)
 		if err == nil {
 			closeStore()
@@ -295,7 +301,7 @@ func TestARoleNoComponentKnowsIsRefused(t *testing.T) {
 	for _, role := range []string{"authoritative", "provisional", "read"} {
 		o := opts(t)
 		o.config = writeFile(t, t.TempDir(), "server.yaml",
-			"auth:\n  password: {users_file: "+users+"}\nroles:\n  - {role: "+role+", user: alice}\n", 0o600)
+			"auth:\n  password: {users_file: "+users+"}\nroles:\n  - {role: "+role+", provider: password, user: alice}\n", 0o600)
 		_, closeStore, err := build(context.Background(), o, quiet)
 		if err != nil {
 			t.Errorf("the role %q was refused: %v", role, err)

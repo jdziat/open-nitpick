@@ -51,10 +51,10 @@ Flags:
 		ReleaseBase: os.Getenv(upgrade.EnvReleaseBase),
 		LatestBase:  os.Getenv(upgrade.EnvLatestBase),
 		Client:      &http.Client{Timeout: 10 * time.Minute},
-		NewVerifier: func(context.Context) (upgrade.Verifier, error) {
+		NewVerifier: func(ctx context.Context) (upgrade.Verifier, error) {
 			// Fetched here, after a download whose checksum matched, so a check
 			// or an early refusal never needs the Sigstore trusted root.
-			trusted, err := upgrade.FetchTrustedRoot()
+			trusted, err := upgrade.FetchTrustedRoot(ctx)
 			if err != nil {
 				return nil, err
 			}

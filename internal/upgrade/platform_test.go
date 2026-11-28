@@ -161,3 +161,23 @@ func TestAnUpgradeWithNoVerifierIsRefused(t *testing.T) {
 		t.Error("the install directory changed")
 	}
 }
+
+func TestTheVerifierIsBuiltWithTheContextTheUpgradeWasRunWith(t *testing.T) {
+	rel := newFakeRelease(t)
+	rel.publish("v2.0.0", script("v2.0.0"))
+	rel.setLatest("v2.0.0")
+	in := newInstall(t, rel, "v1.0.0")
+	type key struct{}
+	ctx := context.WithValue(context.Background(), key{}, "this command")
+	var seen context.Context
+	in.cfg.NewVerifier = func(c context.Context) (Verifier, error) {
+		seen = c
+		return in.verifier, nil
+	}
+	if _, err := Run(ctx, in.cfg); err != nil {
+		t.Fatal(err)
+	}
+	if seen == nil || seen.Value(key{}) != "this command" {
+		t.Fatal("NewVerifier was given a context that is not the upgrade's own, so cancelling the command cannot reach the trusted-root fetch")
+	}
+}

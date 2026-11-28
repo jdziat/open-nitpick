@@ -108,7 +108,7 @@ func (s *oidcSite) whoami() (int, string) {
 func TestAnOIDCSignInSucceedsAndMapsGroupsToRoles(t *testing.T) {
 	idp := newFakeIDP(t)
 	idp.groups = []any{"staff", "ops"}
-	s := newOIDCSite(t, idp, server.RoleRule{Roles: []server.Role{"admin"}, Group: "ops"})
+	s := newOIDCSite(t, idp, server.RoleRule{Roles: []server.Role{"admin"}, Provider: "oidc", Group: "ops"})
 
 	resp, body := s.finish(s.begin("/ui/somewhere"))
 	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/ui/somewhere" {

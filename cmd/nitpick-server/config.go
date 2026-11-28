@@ -203,6 +203,7 @@ func (c *fileConfig) providers(ctx context.Context, log *slog.Logger) ([]server.
 		p, err := auth.NewOIDC(ctx, auth.OIDCConfig{
 			Issuer: o.Issuer, ClientID: o.ClientID, ClientSecret: secret, RedirectURL: o.RedirectURL,
 			Scopes: o.Scopes, GroupsClaim: o.GroupsClaim, Label: o.Label,
+			TrustForwardedFor: c.Auth.TrustForwardedFor,
 		}, log)
 		if err != nil {
 			return nil, fmt.Errorf("auth.oidc: %w", err)
@@ -211,7 +212,7 @@ func (c *fileConfig) providers(ctx context.Context, log *slog.Logger) ([]server.
 	}
 
 	if s := c.Auth.SAML; s != nil {
-		p, err := buildSAML(s.IDPMetadataFile, s.EntityID, s.ACSURL, s.KeyFile, s.CertFile, s.GroupsAttribute, s.Label, log)
+		p, err := buildSAML(s.IDPMetadataFile, s.EntityID, s.ACSURL, s.KeyFile, s.CertFile, s.GroupsAttribute, s.Label, c.Auth.TrustForwardedFor, log)
 		if err != nil {
 			return nil, fmt.Errorf("auth.saml: %w", err)
 		}
@@ -220,7 +221,7 @@ func (c *fileConfig) providers(ctx context.Context, log *slog.Logger) ([]server.
 	return out, nil
 }
 
-func buildSAML(metadataFile, entityID, acs, keyFile, certFile, groups, label string, log *slog.Logger) (*auth.SAML, error) {
+func buildSAML(metadataFile, entityID, acs, keyFile, certFile, groups, label string, trustForwardedFor bool, log *slog.Logger) (*auth.SAML, error) {
 	if metadataFile == "" || entityID == "" || acs == "" || keyFile == "" || certFile == "" {
 		return nil, errors.New("idp_metadata_file, entity_id, acs_url, key_file and cert_file are all required")
 	}
@@ -250,7 +251,7 @@ func buildSAML(metadataFile, entityID, acs, keyFile, certFile, groups, label str
 	}
 	return auth.NewSAML(auth.SAMLConfig{
 		IDPMetadata: meta, EntityID: entityID, ACSURL: acsURL, Key: signer, Certificate: cert,
-		GroupsAttribute: groups, Label: label,
+		GroupsAttribute: groups, Label: label, TrustForwardedFor: trustForwardedFor,
 	}, log)
 }
 

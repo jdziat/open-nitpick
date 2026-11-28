@@ -519,6 +519,13 @@ non-zero. The trusted root is fetched over TUF when an install reaches the
 signature check, so an install needs network access to Sigstore as well as
 GitHub.
 
+The signature is the trust anchor, and `checksums.txt` is not. The binary and its
+`checksums.txt` come from the same GitHub release, so anyone who could replace one
+could replace the other, and the two would still agree. The Sigstore bundle is the
+check that one origin cannot forge: it proves the binary was built by this
+repository's release workflow. The checksum catches a damaged download, not a
+substituted one.
+
 The new binary is written beside the old one and renamed over it. On Windows a
 running `nitpick.exe` cannot be replaced, so it is renamed to `nitpick.exe.old`
 and removed the next time nitpick starts.
