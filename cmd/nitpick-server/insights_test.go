@@ -2,25 +2,25 @@ package main
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/nitpick-oss/nitpick/internal/database/databasetest"
 	"github.com/nitpick-oss/nitpick/internal/notary"
 )
 
 func insightsOpts(t *testing.T) *options {
 	t.Helper()
-	o := &options{addr: "127.0.0.1:0", dir: t.TempDir(), oidcIssuer: notary.GitHubIssuer}
+	o := &options{addr: "127.0.0.1:0", databaseURL: databasetest.URL(t), oidcIssuer: notary.GitHubIssuer}
 	for _, tok := range []string{"ci:write:wsecret", "agent:read:rsecret"} {
 		if err := o.insightsTokens.Set(tok); err != nil {
 			t.Fatal(err)
 		}
 	}
-	o.config = writeFile(t, o.dir, "server.yaml", "components: [insights]\n", 0o600)
+	o.config = writeFile(t, t.TempDir(), "server.yaml", "components: [insights]\n", 0o600)
 	return o
 }
 
@@ -56,12 +56,21 @@ func TestInsightsAloneAcceptsAReviewFromAWriteTokenAndKeepsItOnDisk(t *testing.T
 	if got := status(t, "GET", ts.URL+"/v1/records/"+strings.Repeat("a", 64), "wsecret", ""); got != 404 {
 		t.Fatalf("the notary is not configured, so its routes must not exist: %d", got)
 	}
+	// The review is in the database, not in this process: the server answers for it
+	// from there, and would after a restart.
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/v1/reviews", nil)
+	req.Header.Set("Authorization", "Bearer rsecret")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(b), `"repo":"acme/api"`) {
+		t.Fatalf("the review is not in the database: %d %q", resp.StatusCode, b)
+	}
 	ts.Close()
 	closeStore()
-	b, err := os.ReadFile(filepath.Join(o.dir, "insights", "reviews.jsonl"))
-	if err != nil || !strings.Contains(string(b), `"repo":"acme/api"`) {
-		t.Fatalf("the review is not on disk: %v %q", err, b)
-	}
 }
 
 func TestInsightsAndTheNotaryRunSideBySideInOneServer(t *testing.T) {
@@ -69,7 +78,7 @@ func TestInsightsAndTheNotaryRunSideBySideInOneServer(t *testing.T) {
 	if err := o.tokens.Set("ci:authoritative:nsecret"); err != nil {
 		t.Fatal(err)
 	}
-	o.config = writeFile(t, o.dir, "both.yaml", "components: [notary, insights]\n", 0o600)
+	o.config = writeFile(t, t.TempDir(), "both.yaml", "components: [notary, insights]\n", 0o600)
 	h, closeStore, err := build(context.Background(), o, quiet)
 	if err != nil {
 		t.Fatal(err)
@@ -93,8 +102,8 @@ func TestInsightsAndTheNotaryRunSideBySideInOneServer(t *testing.T) {
 }
 
 func TestInsightsWithNoWayInIsRefusedAtStartUp(t *testing.T) {
-	o := &options{addr: "x", dir: t.TempDir(), oidcIssuer: notary.GitHubIssuer}
-	o.config = writeFile(t, o.dir, "server.yaml", "components: [insights]\n", 0o600)
+	o := &options{addr: "x", databaseURL: databasetest.URL(t), oidcIssuer: notary.GitHubIssuer}
+	o.config = writeFile(t, t.TempDir(), "server.yaml", "components: [insights]\n", 0o600)
 	if _, _, err := build(context.Background(), o, quiet); err == nil || !strings.Contains(err.Error(), "-insights-token") {
 		t.Fatalf("err = %v, want the missing credentials named", err)
 	}
@@ -120,14 +129,14 @@ func TestAnInsightsServerDoesNotLeaveItsDataDirectoryLockedAfterAFailedStartUp(t
 	if err := o.tokens.Set("ci:authoritative:nsecret"); err != nil {
 		t.Fatal(err)
 	}
-	users := writeFile(t, o.dir, "users", quickUser, 0o600)
+	users := writeFile(t, t.TempDir(), "users", quickUser, 0o600)
 	// A configured provider, so config loading passes and both stores are opened and
 	// locked before the unknown role is refused.
-	o.config = writeFile(t, o.dir, "both.yaml", "components: [notary, insights]\nauth:\n  password: {users_file: "+users+"}\nroles:\n  - {role: nonsense, provider: password, user: bob}\n", 0o600)
+	o.config = writeFile(t, t.TempDir(), "both.yaml", "components: [notary, insights]\nauth:\n  password: {users_file: "+users+"}\nroles:\n  - {role: nonsense, provider: password, user: bob}\n", 0o600)
 	if _, _, err := build(context.Background(), o, quiet); err == nil || !strings.Contains(err.Error(), "no component knows the role") {
 		t.Fatalf("err = %v, want the refusal that comes after the stores were locked", err)
 	}
-	o.config = writeFile(t, o.dir, "ok.yaml", "components: [notary, insights]\n", 0o600)
+	o.config = writeFile(t, t.TempDir(), "ok.yaml", "components: [notary, insights]\n", 0o600)
 	_, closeStore, err := build(context.Background(), o, quiet)
 	if err != nil {
 		t.Fatalf("the failed start-up left the directory locked: %v", err)
@@ -137,41 +146,36 @@ func TestAnInsightsServerDoesNotLeaveItsDataDirectoryLockedAfterAFailedStartUp(t
 
 // A build that fails after the insights store opened must give its directory back,
 // whichever step failed, or the next start in the same process is refused.
-func TestABuildThatFailsAfterInsightsOpenedReleasesItsDirectory(t *testing.T) {
+func TestABuildThatFailsAfterInsightsWasBuiltLeavesTheDatabaseUsable(t *testing.T) {
 	t.Run("notary has no way in", func(t *testing.T) {
 		o := insightsOpts(t)
-		o.config = writeFile(t, o.dir, "both.yaml", "components: [insights, notary]\n", 0o600)
+		o.config = writeFile(t, t.TempDir(), "both.yaml", "components: [insights, notary]\n", 0o600)
 		if _, _, err := build(context.Background(), o, quiet); err == nil || !strings.Contains(err.Error(), "-token") {
 			t.Fatalf("err = %v, want the notary's missing credentials", err)
 		}
-		o.config = writeFile(t, o.dir, "ok.yaml", "components: [insights]\n", 0o600)
+		o.config = writeFile(t, t.TempDir(), "ok.yaml", "components: [insights]\n", 0o600)
 		_, closeStore, err := build(context.Background(), o, quiet)
 		if err != nil {
-			t.Fatalf("the failed build left the insights directory locked: %v", err)
+			t.Fatalf("the failed build left the database unusable: %v", err)
 		}
 		closeStore()
 	})
-	t.Run("notary directory already in use", func(t *testing.T) {
+	t.Run("a second server on the same database is accepted", func(t *testing.T) {
 		o := insightsOpts(t)
 		if err := o.tokens.Set("ci:authoritative:nsecret"); err != nil {
 			t.Fatal(err)
 		}
-		o.config = writeFile(t, o.dir, "n.yaml", "components: [notary]\n", 0o600)
-		_, holdNotary, err := build(context.Background(), o, quiet)
+		o.config = writeFile(t, t.TempDir(), "both.yaml", "components: [insights, notary]\n", 0o600)
+		_, first, err := build(context.Background(), o, quiet)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer holdNotary()
-		o.config = writeFile(t, o.dir, "both.yaml", "components: [insights, notary]\n", 0o600)
-		if _, _, err := build(context.Background(), o, quiet); err == nil {
-			t.Fatal("a second notary on a held directory was accepted")
-		}
-		o.config = writeFile(t, o.dir, "ins.yaml", "components: [insights]\n", 0o600)
-		_, closeStore, err := build(context.Background(), o, quiet)
+		defer first()
+		_, second, err := build(context.Background(), o, quiet)
 		if err != nil {
-			t.Fatalf("the failed build left the insights directory locked: %v", err)
+			t.Fatalf("a second server on a shared database was refused: %v", err)
 		}
-		closeStore()
+		second()
 	})
 }
 
@@ -187,12 +191,12 @@ func TestInsightsWithASignInButNoRoleThatGrantsItIsRefusedAtStartUp(t *testing.T
 		"a rule that grants insights":  {"roles:\n  - {role: insights, provider: password, user: alice}\n", false},
 		"a rule for a group":           {"roles:\n  - {role: insights, provider: password, group: eng}\n", false},
 	} {
-		o := &options{addr: "x", dir: t.TempDir(), oidcIssuer: notary.GitHubIssuer}
+		o := &options{addr: "x", databaseURL: databasetest.URL(t), oidcIssuer: notary.GitHubIssuer}
 		if err := o.tokens.Set("ci:authoritative:nsecret"); err != nil {
 			t.Fatal(err)
 		}
-		users := writeFile(t, o.dir, "users", quickUser, 0o600)
-		o.config = writeFile(t, o.dir, "server.yaml", "components: [notary, insights]\nauth:\n  password:\n    users_file: "+users+"\n"+tc.roles, 0o600)
+		users := writeFile(t, t.TempDir(), "users", quickUser, 0o600)
+		o.config = writeFile(t, t.TempDir(), "server.yaml", "components: [notary, insights]\nauth:\n  password:\n    users_file: "+users+"\n"+tc.roles, 0o600)
 		_, closeStore, err := build(context.Background(), o, quiet)
 		switch {
 		case tc.wantErr && (err == nil || !strings.Contains(err.Error(), "grants the insights role")):
@@ -207,8 +211,8 @@ func TestInsightsWithASignInButNoRoleThatGrantsItIsRefusedAtStartUp(t *testing.T
 }
 
 func TestInsightsWithARoleRuleButNoWayToSignInIsRefusedAtStartUp(t *testing.T) {
-	o := &options{addr: "x", dir: t.TempDir(), oidcIssuer: notary.GitHubIssuer}
-	o.config = writeFile(t, o.dir, "server.yaml", "components: [insights]\nroles:\n  - {role: insights, user: alice}\n", 0o600)
+	o := &options{addr: "x", databaseURL: databasetest.URL(t), oidcIssuer: notary.GitHubIssuer}
+	o.config = writeFile(t, t.TempDir(), "server.yaml", "components: [insights]\nroles:\n  - {role: insights, user: alice}\n", 0o600)
 	_, closeStore, err := build(context.Background(), o, quiet)
 	if err == nil {
 		closeStore()

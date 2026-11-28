@@ -60,9 +60,75 @@ func Each(t *testing.T, models []any, fn func(t *testing.T, db *database.DB)) {
 	}
 }
 
+// One returns a fresh database on one engine, for a test that is about something
+// other than the engines. NITPICK_TEST_ENGINE picks it (postgres or mysql, default
+// postgres), so CI runs the whole suite once on each. A test that is about how the
+// engines differ uses Each.
+func One(t *testing.T, models []any) *database.DB {
+	t.Helper()
+	want := strings.ToLower(strings.TrimSpace(os.Getenv("NITPICK_TEST_ENGINE")))
+	if want == "" {
+		want = string(database.Postgres)
+	}
+	for _, e := range engines {
+		if string(e.name) != want {
+			continue
+		}
+		raw := strings.TrimSpace(os.Getenv(e.env))
+		if raw == "" {
+			if os.Getenv("NITPICK_REQUIRE_DATABASES") == "1" {
+				t.Fatalf("NITPICK_REQUIRE_DATABASES=1 and %s is not set", e.env)
+			}
+			t.Skipf("no test database: set %s", e.env)
+		}
+		db := fresh(t, e.name, raw)
+		if len(models) > 0 {
+			if err := db.Migrate(context.Background(), models...); err != nil {
+				t.Fatalf("migrate: %v", err)
+			}
+		}
+		return db
+	}
+	t.Fatalf("NITPICK_TEST_ENGINE=%q is not postgres or mysql", want)
+	return nil
+}
+
+// URL returns the URL of a fresh, empty database on one engine, chosen as One
+// chooses, for a test that starts a server and hands it a URL. The database is
+// dropped when the test ends; nothing is migrated.
+func URL(t *testing.T) string {
+	t.Helper()
+	want := strings.ToLower(strings.TrimSpace(os.Getenv("NITPICK_TEST_ENGINE")))
+	if want == "" {
+		want = string(database.Postgres)
+	}
+	for _, e := range engines {
+		if string(e.name) != want {
+			continue
+		}
+		raw := strings.TrimSpace(os.Getenv(e.env))
+		if raw == "" {
+			if os.Getenv("NITPICK_REQUIRE_DATABASES") == "1" {
+				t.Fatalf("NITPICK_REQUIRE_DATABASES=1 and %s is not set", e.env)
+			}
+			t.Skipf("no test database: set %s", e.env)
+		}
+		_, u := freshURL(t, e.name, raw)
+		return u
+	}
+	t.Fatalf("NITPICK_TEST_ENGINE=%q is not postgres or mysql", want)
+	return ""
+}
+
 // fresh creates a database with a random name on the server raw points at, opens
 // it, and drops it when the test ends.
 func fresh(t *testing.T, engine database.Dialect, raw string) *database.DB {
+	t.Helper()
+	db, _ := freshURL(t, engine, raw)
+	return db
+}
+
+func freshURL(t *testing.T, engine database.Dialect, raw string) (*database.DB, string) {
 	t.Helper()
 	ctx := context.Background()
 	admin, err := database.Open(ctx, raw)
@@ -97,5 +163,5 @@ func fresh(t *testing.T, engine database.Dialect, raw string) *database.DB {
 		_ = admin.Exec(drop).Error
 		_ = admin.Close()
 	})
-	return db
+	return db, u.String()
 }

@@ -17,16 +17,15 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/nitpick-oss/nitpick/internal/database"
 	"github.com/nitpick-oss/nitpick/internal/insights"
 	"github.com/nitpick-oss/nitpick/internal/notary"
 	"github.com/nitpick-oss/nitpick/internal/server"
 	"github.com/nitpick-oss/nitpick/internal/server/auth"
-	"github.com/nitpick-oss/nitpick/internal/wire"
 )
 
 type tokenFlags []notary.Token
@@ -108,11 +107,11 @@ func main() {
 // options are the flags. They are a struct so a test can build a server from them
 // without a process.
 type options struct {
-	addr, dir, config, oidcAudience, oidcIssuer, oidcJWKS string
-	allowClear                                            bool
-	tokens                                                tokenFlags
-	insightsTokens                                        insightsTokens
-	rules                                                 oidcRules
+	addr, databaseURL, config, oidcAudience, oidcIssuer, oidcJWKS string
+	allowClear                                                    bool
+	tokens                                                        tokenFlags
+	insightsTokens                                                insightsTokens
+	rules                                                         oidcRules
 }
 
 // parseFlags reads the command line. The notary's flags are the ones its old command
@@ -122,7 +121,7 @@ func parseFlags(args []string, stderr io.Writer) (*options, *flag.FlagSet, error
 	fs := flag.NewFlagSet("nitpick-server", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.StringVar(&o.addr, "addr", "127.0.0.1:8484", "listen address")
-	fs.StringVar(&o.dir, "data", "notary-data", "directory for records")
+	fs.StringVar(&o.databaseURL, "database-url", os.Getenv("NITPICK_DATABASE_URL"), "the database the server keeps its state in, postgres:// or mysql:// (default $NITPICK_DATABASE_URL)")
 	fs.BoolVar(&o.allowClear, "author-clear", false, "let provisional tokens clear records")
 	fs.Var(&o.tokens, "token", "name:role:secret (repeatable); the secret is hashed on load and never stored")
 	fs.Var(&o.insightsTokens, "insights-token", "name:write|read:secret for the insights component (repeatable; also NITPICK_INSIGHTS_TOKENS)")
@@ -210,7 +209,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	srv := newServer(o.addr, h, defaultLimits)
 	errc := make(chan error, 1)
 	go func() { errc <- srv.ListenAndServe() }()
-	log.Info("nitpick-server listening", "addr", o.addr, "data", o.dir)
+	log.Info("nitpick-server listening", "addr", o.addr)
 	select {
 	case err := <-errc:
 		_, _ = fmt.Fprintln(stderr, "nitpick-server:", err)
@@ -243,8 +242,9 @@ func healthcheck(args []string, stderr io.Writer) int {
 }
 
 // build assembles the server from the options and the configuration file, and
-// returns what to call to release the data directory. Every check that can fail
-// before the first request does so here.
+// returns what to call to close the database. Every check that can fail before the
+// first request does so here, including reaching the database and migrating its
+// schema, which runs once however many servers start together.
 func build(ctx context.Context, o *options, log *slog.Logger) (http.Handler, func(), error) {
 	cfg, err := loadConfig(o.config)
 	if err != nil {
@@ -258,18 +258,28 @@ func build(ctx context.Context, o *options, log *slog.Logger) (http.Handler, fun
 	if (o.oidcAudience == "") != (len(o.rules) == 0) {
 		return nil, nil, errors.New("-oidc-audience and -oidc-allow go together; a token no rule matches is refused")
 	}
+	db, err := database.Open(ctx, o.databaseURL)
+	if err != nil {
+		return nil, nil, err
+	}
+	var models []any
+	models = append(models, notary.Models()...)
+	models = append(models, insights.Models()...)
+	if err := db.Migrate(ctx, models...); err != nil {
+		_ = db.Close()
+		return nil, nil, err
+	}
+	log.Info("database ready", "engine", string(db.Dialect))
 	var components []server.Component
-	closeStore := func() {}
+	closeStore := func() { _ = db.Close() }
 	for _, name := range cfg.components() {
 		// knownComponents refuses any other name before this point.
 		if name == "insights" {
-			c, closeInsights, err := buildInsights(o, cfg.grantsRole(string(insights.RoleView)) && len(providers) > 0, log)
+			c, err := buildInsights(o, db, cfg.grantsRole(string(insights.RoleView)) && len(providers) > 0, log)
 			if err != nil {
 				closeStore()
 				return nil, nil, err
 			}
-			prev := closeStore
-			closeStore = func() { closeInsights(); prev() }
 			components = append(components, c)
 			continue
 		}
@@ -282,18 +292,7 @@ func build(ctx context.Context, o *options, log *slog.Logger) (http.Handler, fun
 			closeStore()
 			return nil, nil, errors.New("give at least one -token or an -oidc-audience with -oidc-allow, or configure a sign-in")
 		}
-		store, err := wire.NewFileStore(o.dir)
-		if err != nil {
-			closeStore()
-			return nil, nil, err
-		}
-		// One server per directory: see FileStore.Lock.
-		if err := store.Lock(); err != nil {
-			closeStore()
-			return nil, nil, fmt.Errorf("%w (run one server per data directory)", err)
-		}
-		prev := closeStore
-		closeStore = func() { _ = store.Unlock(); prev() }
+		store := notary.NewDBStore(db)
 		c := notary.NewComponent(store, o.tokens, o.allowClear)
 		if o.oidcAudience != "" {
 			c.WithOIDC(&notary.OIDC{Issuer: o.oidcIssuer, Audience: o.oidcAudience, Allow: o.rules, JWKSURL: o.oidcJWKS})
@@ -318,24 +317,14 @@ func build(ctx context.Context, o *options, log *slog.Logger) (http.Handler, fun
 	return srv, closeStore, nil
 }
 
-// buildInsights opens the insights store under the data directory. One server per
-// directory holds for it as for the notary: the reviews file is appended to by
-// one process.
-func buildInsights(o *options, roleGrantsView bool, log *slog.Logger) (*insights.Component, func(), error) {
-	// A component no machine can write to and no person can open is not one that
-	// was meant to be started. A sign-in alone grants nothing, so a person can open
-	// it only when a role rule gives them the insights role.
+// buildInsights builds the insights component over the database. It is refused
+// unless something can reach it: an insights token, or a role rule that gives the
+// insights role to someone who can sign in.
+func buildInsights(o *options, db *database.DB, roleGrantsView bool, log *slog.Logger) (*insights.Component, error) {
 	if len(o.insightsTokens) == 0 && !roleGrantsView {
-		return nil, nil, errors.New("insights: give at least one -insights-token, or a role rule that grants the insights role to someone who can sign in")
+		return nil, errors.New("insights: give at least one -insights-token, or a role rule that grants the insights role to someone who can sign in")
 	}
-	store, err := insights.OpenStore(filepath.Join(o.dir, "insights"))
-	if err != nil {
-		return nil, nil, err
-	}
-	if n := store.Skipped(); n > 0 {
-		log.Warn("insights: lines of the reviews file could not be read and were skipped", "lines", n)
-	}
-	return insights.NewComponent(store, o.insightsTokens, log), func() { _ = store.Close() }, nil
+	return insights.NewComponent(insights.NewStore(db), o.insightsTokens, log), nil
 }
 
 // connLimits bound how long one connection may hold a goroutine and a file

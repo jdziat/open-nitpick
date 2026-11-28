@@ -9,11 +9,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/nitpick-oss/nitpick/internal/database/databasetest"
 	"github.com/nitpick-oss/nitpick/internal/notary"
 	"github.com/nitpick-oss/nitpick/internal/server/auth"
+	"github.com/nitpick-oss/nitpick/internal/wire"
 )
 
 var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -30,7 +33,7 @@ func writeFile(t *testing.T, dir, name, body string, mode os.FileMode) string {
 // opts is a notary with one machine token and nothing else.
 func opts(t *testing.T) *options {
 	t.Helper()
-	o := &options{addr: "127.0.0.1:0", dir: t.TempDir(), oidcIssuer: notary.GitHubIssuer}
+	o := &options{addr: "127.0.0.1:0", databaseURL: databasetest.URL(t), oidcIssuer: notary.GitHubIssuer}
 	if err := o.tokens.Set("ci:authoritative:secret"); err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +152,7 @@ func TestStartUpRefusesWhatCouldNotWork(t *testing.T) {
 // A notary no machine can write to and no person can sign in to was not meant
 // to be started.
 func TestANotaryWithNoWayInIsRefused(t *testing.T) {
-	o := &options{addr: "x", dir: t.TempDir(), oidcIssuer: notary.GitHubIssuer}
+	o := &options{addr: "x", databaseURL: databasetest.URL(t), oidcIssuer: notary.GitHubIssuer}
 	if _, _, err := build(context.Background(), o, quiet); err == nil || !strings.Contains(err.Error(), "-token") {
 		t.Errorf("err = %v, want the missing credentials named", err)
 	}
@@ -161,39 +164,85 @@ func TestANotaryWithNoWayInIsRefused(t *testing.T) {
 	}
 }
 
-// One server per data directory: a second is refused and says why.
-func TestASecondServerOnTheSameDirectoryIsRefused(t *testing.T) {
+// A server with no database to keep its state in is refused before it listens,
+// and says what to set.
+func TestAServerWithNoDatabaseIsRefusedAndSaysWhatToSet(t *testing.T) {
 	o := opts(t)
-	_, closeStore, err := build(context.Background(), o, quiet)
-	if err != nil {
-		t.Fatal(err)
+	o.databaseURL = ""
+	_, _, err := build(context.Background(), o, quiet)
+	if err == nil || !strings.Contains(err.Error(), "-database-url") || !strings.Contains(err.Error(), "NITPICK_DATABASE_URL") {
+		t.Errorf("err = %v, want the refusal to name the flag and the variable", err)
 	}
-	defer closeStore()
-	o2 := opts(t)
-	o2.dir = o.dir
-	if _, _, err := build(context.Background(), o2, quiet); err == nil || !strings.Contains(err.Error(), "one server per data directory") {
-		t.Errorf("err = %v, want the lock refused with its reason", err)
+	o.databaseURL = "sqlite:///tmp/x.db"
+	if _, _, err := build(context.Background(), o, quiet); err == nil || !strings.Contains(err.Error(), "postgres or mysql") {
+		t.Errorf("a sqlite URL: err = %v, want it refused", err)
 	}
 }
 
-// A failed start-up releases the directory, so a second attempt is not locked out
-// by the first one's leftovers.
-func TestAFailedStartUpReleasesTheDataDirectory(t *testing.T) {
+// Any number of servers may share one database. The second does not refuse, and
+// what one writes the other reads: that is what lets the chart run more than one
+// replica.
+func TestTwoServersOnOneDatabaseBothStartAndShareTheirRecords(t *testing.T) {
+	a := opts(t)
+	b := opts(t)
+	b.databaseURL = a.databaseURL
+	ha, closeA, err := build(context.Background(), a, quiet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeA()
+	hb, closeB, err := build(context.Background(), b, quiet)
+	if err != nil {
+		t.Fatalf("a second server on the same database was refused: %v", err)
+	}
+	defer closeB()
+	tsA, tsB := httptest.NewServer(ha), httptest.NewServer(hb)
+	defer tsA.Close()
+	defer tsB.Close()
+
+	hash := strings.Repeat("c", 64)
+	body := `{"schema":` + strconv.Itoa(wire.Schema) + `,"hash":"` + hash + `","complete":true,"batches":1,"answers":{"r#0":"x"},"model":"m"}`
+	put, _ := http.NewRequestWithContext(context.Background(), http.MethodPut, tsA.URL+"/v1/records/"+hash, strings.NewReader(body))
+	put.Header.Set("Authorization", "Bearer secret")
+	resp, err := http.DefaultClient.Do(put)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		t.Fatalf("PUT through the first server = %d", resp.StatusCode)
+	}
+	get, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, tsB.URL+"/v1/records/"+hash, nil)
+	get.Header.Set("Authorization", "Bearer secret")
+	resp, err = http.DefaultClient.Do(get)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(got), hash) {
+		t.Errorf("GET through the second server = %d %s, want the record the first wrote", resp.StatusCode, got)
+	}
+}
+
+// A failed start-up gives the database back: a second attempt is not left to
+// contend with the first one's connections or its half-run migration.
+func TestAFailedStartUpLeavesTheDatabaseUsableForTheNextAttempt(t *testing.T) {
 	o := opts(t)
 	dir := t.TempDir()
 	users := writeFile(t, dir, "users", quickUser, 0o600)
-	// The provider is configured, so config loading passes and the notary's store is
-	// opened and locked. The role is one no component declares, which server.New
-	// refuses afterwards: the failure that has to give the directory back.
+	// The provider is configured, so config loading passes and the database is
+	// opened and migrated. The role is one no component declares, which server.New
+	// refuses afterwards: the failure that has to leave the database as it found it.
 	o.config = writeFile(t, dir, "server.yaml", "components: [notary]\nauth:\n  password: {users_file: "+users+"}\nroles:\n  - {role: nonsense, provider: password, user: a}\n", 0o600)
 	_, _, err := build(context.Background(), o, quiet)
 	if err == nil || !strings.Contains(err.Error(), "no component knows the role") {
-		t.Fatalf("err = %v, want the refusal that comes after the store was locked", err)
+		t.Fatalf("err = %v, want the refusal that comes after the database was migrated", err)
 	}
 	o.config = ""
 	_, closeStore, err := build(context.Background(), o, quiet)
 	if err != nil {
-		t.Fatalf("the directory was left locked by the failed start-up: %v", err)
+		t.Fatalf("the database was left unusable by the failed start-up: %v", err)
 	}
 	closeStore()
 }

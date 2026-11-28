@@ -97,10 +97,8 @@ func rank(sev string) int {
 
 // Hotspots ranks files by score. Only findings inside the window score and are
 // listed; the window before it only decides the trend.
-func (s *Store) Hotspots(q Query) []Hotspot {
+func (s *View) Hotspots(q Query) []Hotspot {
 	from, priorFrom := q.window()
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	byFile := map[fileKey]*Hotspot{}
 	prior := map[fileKey]int{}
 	baseline := map[string]bool{} // by repository: another repository's history is no baseline
@@ -167,15 +165,13 @@ type Point struct {
 
 // Series has one point per day for the window, quiet days included as zeros, so
 // a chart is not drawn across a gap that means "nothing happened".
-func (s *Store) Series(q Query) []Point {
+func (s *View) Series(q Query) []Point {
 	days := max(q.Days, 1)
 	end := q.Now.UTC().Truncate(24 * time.Hour)
 	pts := make([]Point, days)
 	for i := range pts {
 		pts[i].Day = end.AddDate(0, 0, -(days - 1 - i))
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	for _, r := range s.reviews {
 		if q.Repo != "" && r.Repo != q.Repo || r.At.After(q.Now) {
 			continue
@@ -219,23 +215,21 @@ type Count struct {
 }
 
 // Overview summarises the window.
-func (s *Store) Overview(q Query) Overview {
+func (s *View) Overview(q Query) Overview {
 	from, _ := q.window()
 	return s.overviewBetween(q.Repo, from, q.Now)
 }
 
 // PriorOverview summarises the window before the period, the same one the
 // hotspot trends compare with, so a card and a trend never disagree about it.
-func (s *Store) PriorOverview(q Query) Overview {
+func (s *View) PriorOverview(q Query) Overview {
 	from, priorFrom := q.window()
 	return s.overviewBetween(q.Repo, priorFrom, from.Add(-time.Nanosecond))
 }
 
 // overviewBetween counts reviews dated from the first time to the second, both
 // inclusive.
-func (s *Store) overviewBetween(repo string, from, until time.Time) Overview {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *View) overviewBetween(repo string, from, until time.Time) Overview {
 	o := Overview{BySeverity: map[string]int{}}
 	repos, files := map[string]bool{}, map[fileKey]bool{}
 	classes := map[string]int{}
@@ -281,10 +275,8 @@ type RepoRow struct {
 }
 
 // Repos summarises each repo in the window, busiest first.
-func (s *Store) Repos(q Query) []RepoRow {
+func (s *View) Repos(q Query) []RepoRow {
 	from, _ := q.window()
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	by := map[string]*RepoRow{}
 	for _, r := range s.reviews {
 		if q.Repo != "" && r.Repo != q.Repo || r.At.Before(from) || r.At.After(q.Now) {
@@ -343,11 +335,9 @@ type FindingRow struct {
 // AllFindings returns every matching finding, newest first and, within one
 // review, most severe first. It is what a page is cut from, so the whole set is
 // sorted before any of it is shown.
-func (s *Store) AllFindings(q FindingQuery) []FindingRow {
+func (s *View) AllFindings(q FindingQuery) []FindingRow {
 	from, _ := q.window()
 	floor := rank(q.MinSeverity)
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	var rows []FindingRow
 	for _, r := range s.reviews {
 		if q.Repo != "" && r.Repo != q.Repo || r.At.Before(from) || r.At.After(q.Now) {
@@ -377,7 +367,7 @@ func (s *Store) AllFindings(q FindingQuery) []FindingRow {
 
 // Findings returns the newest matching findings, at most Limit, and how many
 // matched, so a caller that was cut short can say so.
-func (s *Store) Findings(q FindingQuery) (rows []FindingRow, total int) {
+func (s *View) Findings(q FindingQuery) (rows []FindingRow, total int) {
 	rows = s.AllFindings(q)
 	total = len(rows)
 	if q.Limit > 0 && len(rows) > q.Limit {
@@ -395,10 +385,8 @@ type Facets struct {
 
 // Facets lists the repositories and classes seen in the period, sorted. The
 // severities are the fixed scale, least severe first, whether or not each was seen.
-func (s *Store) Facets(q Query) Facets {
+func (s *View) Facets(q Query) Facets {
 	from, _ := q.window()
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	repos, classes := map[string]bool{}, map[string]bool{}
 	for _, r := range s.reviews {
 		if r.At.Before(from) || r.At.After(q.Now) {

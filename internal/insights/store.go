@@ -3,31 +3,25 @@
 // and which files keep producing them.
 //
 // It is a component of the nitpick server. Reviews are posted by `nitpick
-// review -insights`, held in an append-only file and indexed in memory.
+// review -insights`, kept in a SQL database, and analysed in memory over the window a
+// request asks about (see View).
 package insights
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	stdlog "log"
-	"os"
 	"path"
-	"path/filepath"
-	"sort"
 	"strings"
-	"sync"
 	"time"
 	"unicode/utf8"
 
-	"github.com/gofrs/flock"
+	"gorm.io/gorm/clause"
 
+	"github.com/nitpick-oss/nitpick/internal/database"
 	"github.com/nitpick-oss/nitpick/internal/redact"
 )
 
@@ -103,153 +97,30 @@ type Filter struct {
 	Until time.Time
 }
 
-// Store holds reviews. Add appends to the file and the index under one lock, so
-// the index never holds a review the file lost.
-type Store struct {
-	mu      sync.Mutex
-	f       *os.File
-	lock    *flock.Flock
-	write   func([]byte) (int, error) // f.Write; a test replaces it to fail a write
-	byID    map[string]int
-	reviews []Review
-	skipped int
-	// peakLine is the most bytes load held for one line, for a test of the limit.
-	peakLine int
+// storedReview is one stored review. The body is the review as JSON and is the source
+// of truth; the other columns are copies a query narrows by.
+type storedReview struct {
+	ID       string    `gorm:"primaryKey;size:64"`
+	Repo     string    `gorm:"size:200;not null;index:idx_insights_repo_at,priority:1"`
+	At       time.Time `gorm:"precision:6;not null;index:idx_insights_repo_at,priority:2;index:idx_insights_at"`
+	Complete bool      `gorm:"not null"`
+	Body     []byte
 }
 
-// OpenStore opens the reviews file in dir, creating it. A line that does not
-// parse, such as the tail a crash left, is skipped and counted, so one bad line
-// does not keep the server from starting and is not dropped silently.
-func OpenStore(dir string) (*Store, error) {
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return nil, fmt.Errorf("create the insights directory: %w", err)
-	}
-	// One process appends to the file. A second would interleave its lines with
-	// the first's, and neither would see the other's reviews until a restart.
-	l := flock.New(filepath.Join(dir, ".lock"))
-	if ok, err := l.TryLock(); err != nil {
-		return nil, fmt.Errorf("lock %s: %w", dir, err)
-	} else if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrInUse, dir)
-	}
-	p := filepath.Join(dir, "reviews.jsonl")
-	f, err := os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o600)
-	if err != nil {
-		_ = l.Unlock()
-		return nil, fmt.Errorf("open the reviews file: %w", err)
-	}
-	s := &Store{f: f, lock: l, byID: map[string]int{}}
-	s.write = f.Write
-	if err := s.load(f); err != nil {
-		_ = f.Close()
-		_ = l.Unlock()
-		return nil, fmt.Errorf("read the reviews file: %w", err)
-	}
-	// A crash can lose the newline of a line that is otherwise whole, which parses,
-	// so a parse failure is not the test. Look at the last byte: the next append
-	// must start a line.
-	if endsMidLine(f) {
-		if _, err := f.WriteString("\n"); err != nil {
-			_ = f.Close()
-			_ = l.Unlock()
-			return nil, fmt.Errorf("repair the reviews file: %w", err)
-		}
-	}
-	return s, nil
-}
+func (storedReview) TableName() string { return "insights_reviews" }
 
-// log reports a fault that has no caller to return it to. It writes to stderr
-// through the standard logger, as the notary's store faults do.
-func (s *Store) log(msg string, err error) { stdlog.Printf("insights: %s: %v", msg, err) }
+// Models are the tables the insights component keeps, for the migration.
+func Models() []any { return []any{&storedReview{}} }
 
-// endsMidLine reports whether the file is non-empty and does not end in a newline.
-func endsMidLine(f *os.File) bool {
-	info, err := f.Stat()
-	if err != nil || info.Size() == 0 {
-		return false
-	}
-	last := make([]byte, 1)
-	if _, err := f.ReadAt(last, info.Size()-1); err != nil {
-		return false
-	}
-	return last[0] != '\n'
-}
+// Store holds reviews in a SQL database that any number of servers may write.
+type Store struct{ db *database.DB }
 
-// maxLine is the longest line load keeps. A review is at most MaxFindings
-// findings of bounded text, well under this, so a longer line is damage.
-const maxLine = 16 << 20
-
-// load reads every line, skipping and counting what does not parse and what is
-// too long to be a review, so no single bad line keeps the server from starting.
-func (s *Store) load(f *os.File) error {
-	return s.loadFrom(f, maxLine)
-}
-
-// loadFrom is load with the line limit given, so a test can use a small one.
-func (s *Store) loadFrom(f io.Reader, limit int) error {
-	r := bufio.NewReaderSize(f, 64<<10)
-	var line []byte
-	defer func() { s.peakLine = max(s.peakLine, cap(line)) }()
-	tooLong := false
-	for {
-		chunk, isPrefix, err := r.ReadLine()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return nil
-			}
-			return err
-		}
-		// Decide before appending, so a line over the limit never holds more than
-		// the limit plus nothing: its remaining chunks are read and dropped.
-		if !tooLong && len(line)+len(chunk) > limit {
-			tooLong = true
-		}
-		if !tooLong {
-			line = append(line, chunk...)
-		}
-		if isPrefix {
-			continue
-		}
-		switch {
-		case tooLong:
-			s.skipped++
-		case len(bytes.TrimSpace(line)) > 0:
-			var rv Review
-			if json.Unmarshal(bytes.TrimSpace(line), &rv) != nil || rv.ID == "" {
-				s.skipped++
-			} else {
-				s.index(rv)
-			}
-		}
-		line, tooLong = line[:0], false
-	}
-}
-
-func (s *Store) index(r Review) {
-	if _, dup := s.byID[r.ID]; dup {
-		return
-	}
-	s.byID[r.ID] = len(s.reviews)
-	s.reviews = append(s.reviews, r)
-}
-
-// ErrInUse is returned when another process holds the directory.
-var ErrInUse = errors.New("insights directory is in use by another process")
-
-// Close releases the file and the directory.
-func (s *Store) Close() error {
-	err := s.f.Close()
-	if uerr := s.lock.Unlock(); err == nil {
-		err = uerr
-	}
-	return err
-}
-
-// Skipped is how many lines of the file could not be read at start-up.
-func (s *Store) Skipped() int { return s.skipped }
+// NewStore returns a store over db. The tables must have been migrated with Models.
+func NewStore(db *database.DB) *Store { return &Store{db: db} }
 
 // Add validates and keeps a review, and returns it as kept. The same review sent
-// twice is kept once: a CI job that retries must not double a repo's findings.
+// twice is kept once, by any server: a CI job that retries must not double a
+// repo's findings, and which replica it reached must not matter.
 func (s *Store) Add(ctx context.Context, r Review) (Review, error) {
 	if err := ctx.Err(); err != nil {
 		return Review{}, err
@@ -258,29 +129,74 @@ func (s *Store) Add(ctx context.Context, r Review) (Review, error) {
 	if err != nil {
 		return Review{}, err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if i, dup := s.byID[r.ID]; dup {
-		return s.reviews[i], nil
-	}
-	line, err := json.Marshal(r)
+	body, err := json.Marshal(r)
 	if err != nil {
 		return Review{}, fmt.Errorf("encode the review: %w", err)
 	}
-	info, err := s.f.Stat()
-	if err != nil {
-		return Review{}, fmt.Errorf("stat the reviews file: %w", err)
+	row := storedReview{ID: r.ID, Repo: r.Repo, At: r.At, Complete: r.Complete, Body: body}
+	res := s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&row)
+	if res.Error != nil {
+		return Review{}, fmt.Errorf("store the review: %w", res.Error)
 	}
-	if _, err := s.write(append(line, '\n')); err != nil {
-		// A partial line would be joined by the next review's, and both would be
-		// skipped at the next start. Cut the file back to where this write began.
-		if terr := s.f.Truncate(info.Size()); terr != nil {
-			s.log("could not remove a partial line after a failed write", terr)
+	if res.RowsAffected == 0 {
+		kept, ok, err := s.Review(ctx, r.ID)
+		if err != nil {
+			return Review{}, err
 		}
-		return Review{}, fmt.Errorf("write the review: %w", err)
+		if !ok {
+			return Review{}, errors.New("store the review: a duplicate was reported and none was found")
+		}
+		return kept, nil
 	}
-	s.index(r)
 	return r, nil
+}
+
+// Review returns one review by its id.
+func (s *Store) Review(ctx context.Context, id string) (Review, bool, error) {
+	var row storedReview
+	res := s.db.WithContext(ctx).Where("id = ?", id).Limit(1).Find(&row)
+	if res.Error != nil {
+		return Review{}, false, fmt.Errorf("read the review: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return Review{}, false, nil
+	}
+	r, err := decodeReview(row)
+	return r, err == nil, err
+}
+
+func decodeReview(row storedReview) (Review, error) {
+	var r Review
+	if err := json.Unmarshal(row.Body, &r); err != nil || r.ID != row.ID {
+		return Review{}, fmt.Errorf("the stored review %s cannot be decoded", row.ID)
+	}
+	return r, nil
+}
+
+// load reads the reviews dated within a filter's Since and Until, newest first. A review that cannot be
+// decoded fails the read: dropping it would show a smaller dashboard with no word
+// that something is missing.
+func (s *Store) load(ctx context.Context, f Filter) ([]Review, error) {
+	tx := s.db.WithContext(ctx).Model(&storedReview{})
+	if !f.Since.IsZero() {
+		tx = tx.Where("at >= ?", f.Since.UTC())
+	}
+	if !f.Until.IsZero() {
+		tx = tx.Where("at <= ?", f.Until.UTC())
+	}
+	var rows []storedReview
+	if err := tx.Order("at DESC, id DESC").Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("read the reviews: %w", err)
+	}
+	out := make([]Review, 0, len(rows))
+	for _, row := range rows {
+		r, err := decodeReview(row)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, nil
 }
 
 // ErrInvalid wraps every refusal of a review's content, so a handler can answer
@@ -364,30 +280,4 @@ func limit(s string, n int) string {
 		n--
 	}
 	return s[:n]
-}
-
-// Reviews lists reviews newest first.
-func (s *Store) Reviews(f Filter) []Review {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	var out []Review
-	for _, r := range s.reviews {
-		if f.Repo != "" && r.Repo != f.Repo || r.At.Before(f.Since) || !f.Until.IsZero() && r.At.After(f.Until) {
-			continue
-		}
-		out = append(out, r)
-	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].At.After(out[j].At) })
-	return out
-}
-
-// Review returns one review by its id.
-func (s *Store) Review(id string) (Review, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	i, ok := s.byID[id]
-	if !ok {
-		return Review{}, false
-	}
-	return s.reviews[i], true
 }
