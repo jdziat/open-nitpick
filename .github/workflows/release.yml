@@ -38,7 +38,7 @@ jobs:
           cd dist
           [ -f checksums.txt ] || sha256sum -- * > checksums.txt
 
-      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v3.10.1
+      - uses: sigstore/cosign-installer@881c63bd87e38389154debd8331404ce7ca8a3ab # v3.10.1
 
       # One Sigstore bundle per asset, checksums included, so a verifier
       # needs the asset, its bundle, and the identity below, nothing else:
