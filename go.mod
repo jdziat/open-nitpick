@@ -7,7 +7,7 @@ require (
 	github.com/beevik/etree v1.8.1
 	github.com/bmatcuk/doublestar/v4 v4.10.7
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
-	github.com/coreos/go-oidc/v3 v3.17.0
+	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/crewjam/saml v0.6.3
 	github.com/gofrs/flock v0.13.2
 	github.com/golang-jwt/jwt/v4 v4.5.2
