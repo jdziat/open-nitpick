@@ -15,6 +15,9 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/nitpick-oss/nitpick/internal/database"
+	"github.com/nitpick-oss/nitpick/internal/database/databasetest"
 )
 
 // builtAssets is a UI that was built: a manifest and the two files it names.
@@ -105,10 +108,19 @@ type env struct {
 	c   *http.Client
 }
 
+// testDB is a fresh database with the server's tables, on the engine this run is for.
+func testDB(t *testing.T) *database.DB {
+	t.Helper()
+	return databasetest.One(t, Models())
+}
+
 func newEnv(t *testing.T, cfg Config) *env {
 	t.Helper()
 	if cfg.Logger == nil {
 		cfg.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	if cfg.State == nil && cfg.DB == nil {
+		cfg.DB = testDB(t)
 	}
 	s, err := New(cfg)
 	if err != nil {

@@ -10,13 +10,15 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/nitpick-oss/nitpick/internal/server/state"
 )
 
 // The limiter is hit by every failed sign-in. Concurrent failures against one
 // key must lock it exactly when the limit is reached and never let more through,
 // and concurrent keys must not interfere.
 func TestTheLimiterLocksExactlyAtTheLimitUnderConcurrentFailures(t *testing.T) {
-	l := &Limiter{Max: 5, Window: time.Hour, Lockout: time.Hour, Keys: 1000}
+	l := testLimiter(t, nil, 5, time.Hour, time.Hour, 1000)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	locked := 0
@@ -24,7 +26,7 @@ func TestTheLimiterLocksExactlyAtTheLimitUnderConcurrentFailures(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if l.Fail("shared") {
+			if l.Fail(bg, "shared") {
 				mu.Lock()
 				locked++
 				mu.Unlock()
@@ -38,11 +40,11 @@ func TestTheLimiterLocksExactlyAtTheLimitUnderConcurrentFailures(t *testing.T) {
 	if locked != 10 {
 		t.Errorf("fifty concurrent failures at a limit of five locked %d times, want 10", locked)
 	}
-	if ok, _ := l.Allowed("shared"); ok {
+	if ok, _ := l.Allowed(bg, "shared"); ok {
 		t.Error("a key that failed fifty times is allowed")
 	}
 	for i := 0; i < 20; i++ {
-		if ok, _ := l.Allowed(fmt.Sprintf("other-%d", i)); !ok {
+		if ok, _ := l.Allowed(bg, fmt.Sprintf("other-%d", i)); !ok {
 			t.Error("an unrelated key was locked by another's failures")
 		}
 	}
@@ -50,7 +52,7 @@ func TestTheLimiterLocksExactlyAtTheLimitUnderConcurrentFailures(t *testing.T) {
 
 // Started sign-ins are recorded, taken and expired from many requests at once.
 func TestFlowsSurviveConcurrentStartsAndAnswers(t *testing.T) {
-	f := newFlows(500)
+	f := testFlows(t, nil, 500)
 	var wg sync.WaitGroup
 	taken := make(chan string, 400)
 	for i := 0; i < 20; i++ {
@@ -58,17 +60,17 @@ func TestFlowsSurviveConcurrentStartsAndAnswers(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 20; j++ {
-				key, err := f.put(&flow{secret: "n"})
+				key, err := f.put(bg, &flow{secret: "n"})
 				if err != nil {
 					t.Error(err)
 					return
 				}
-				if _, ok := f.take(key); !ok {
+				if _, ok := f.take(bg, key); !ok {
 					t.Error("a flow just stored was not found")
 					return
 				}
 				// A second take must find nothing: a state is good once.
-				if _, ok := f.take(key); ok {
+				if _, ok := f.take(bg, key); ok {
 					taken <- key
 				}
 			}
@@ -83,9 +85,9 @@ func TestFlowsSurviveConcurrentStartsAndAnswers(t *testing.T) {
 
 // Two answers racing for one state: exactly one wins.
 func TestRacingAnswersForOneStateHaveOneWinner(t *testing.T) {
+	f := testFlows(t, nil, 10_000)
 	for round := 0; round < 200; round++ {
-		f := newFlows(10)
-		key, err := f.put(&flow{secret: "n"})
+		key, err := f.put(bg, &flow{secret: "n"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -96,7 +98,7 @@ func TestRacingAnswersForOneStateHaveOneWinner(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				if _, ok := f.take(key); ok {
+				if _, ok := f.take(bg, key); ok {
 					mu.Lock()
 					wins++
 					mu.Unlock()
@@ -113,8 +115,9 @@ func TestRacingAnswersForOneStateHaveOneWinner(t *testing.T) {
 // The assertion table: the same ID presented at once from many requests is accepted
 // by one.
 func TestRacingAssertionsWithOneIDHaveOneWinner(t *testing.T) {
+	s := testSeen(t, nil)
 	for round := 0; round < 100; round++ {
-		s := newSeenAssertions()
+		id := fmt.Sprintf("_one-id-%d", round)
 		var wg sync.WaitGroup
 		var mu sync.Mutex
 		wins := 0
@@ -122,7 +125,7 @@ func TestRacingAssertionsWithOneIDHaveOneWinner(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				if s.firstTime("_one-id", time.Now().Add(time.Hour)) {
+				if s.firstTime(bg, id, time.Now().Add(time.Hour)) {
 					mu.Lock()
 					wins++
 					mu.Unlock()
@@ -141,7 +144,7 @@ func TestRacingAssertionsWithOneIDHaveOneWinner(t *testing.T) {
 // nearly the whole burst through; the attempt is now charged before it is hashed.
 func TestAParallelBurstOfGuessesIsHeldToTheLimit(t *testing.T) {
 	pw := newPassword(t)
-	pw.ByAddress = &Limiter{Max: 1000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
+	pw.ByAddress = &Limiter{Name: "t", Max: 1000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
 	s := newSite(t, pw)
 	resp, err := s.c.Get(s.ts.URL + "/auth/login")
 	if err != nil {
@@ -186,8 +189,9 @@ func TestAParallelBurstOfGuessesIsHeldToTheLimit(t *testing.T) {
 // Take is the check and the charge in one step: of many callers at once, exactly
 // Max are allowed.
 func TestTakeAllowsExactlyMaxCallersUnderConcurrency(t *testing.T) {
+	l := testLimiter(t, nil, 5, time.Hour, time.Hour, 10_000)
 	for round := 0; round < 50; round++ {
-		l := &Limiter{Max: 5, Window: time.Hour, Lockout: time.Hour, Keys: 10}
+		key := fmt.Sprintf("k%d", round)
 		var wg sync.WaitGroup
 		var mu sync.Mutex
 		allowed := 0
@@ -195,7 +199,7 @@ func TestTakeAllowsExactlyMaxCallersUnderConcurrency(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				if ok, _ := l.Take("k"); ok {
+				if ok, _ := l.Take(bg, key); ok {
 					mu.Lock()
 					allowed++
 					mu.Unlock()
@@ -212,7 +216,7 @@ func TestTakeAllowsExactlyMaxCallersUnderConcurrency(t *testing.T) {
 // A correct password clears what its own attempt was charged.
 func TestACorrectPasswordGivesBackItsCharge(t *testing.T) {
 	pw := newPassword(t)
-	pw.ByAddress = &Limiter{Max: 1000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
+	pw.ByAddress = &Limiter{Name: "t", Max: 1000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
 	s := newSite(t, pw)
 	for round := 0; round < 3; round++ {
 		jar, _ := cookiejar.New(nil)
@@ -240,7 +244,7 @@ func TestConcurrentHashesAreBounded(t *testing.T) {
 	for i := 0; i < maxConcurrentHashes; i++ {
 		pw.hashing <- struct{}{}
 	}
-	pw.ByAddress = &Limiter{Max: 1000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
+	pw.ByAddress = &Limiter{Name: "t", Max: 1000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
 	s := newSite(t, pw)
 	client := *s.c
 	client.Timeout = 300 * time.Millisecond
@@ -274,12 +278,12 @@ func TestConcurrentHashesAreBounded(t *testing.T) {
 // charged. A leak would lock an account with no failed guess ever made.
 func TestARefusedOrAbandonedSignInLeavesNoChargeBehind(t *testing.T) {
 	pw := newPassword(t)
-	pw.ByAddress = &Limiter{Max: 1000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
+	pw.ByAddress = &Limiter{Name: "t", Max: 1000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
 	s := newSite(t, pw)
 
 	// An account that is locked refuses a request that the address limiter let in.
 	for i := 0; i < pw.ByAccount.Max; i++ {
-		pw.ByAccount.Fail("account:alice")
+		pw.ByAccount.Fail(bg, "account:alice")
 	}
 	before := inFlight(pw.ByAddress, "address:127.0.0.1")
 	for i := 0; i < 20; i++ {
@@ -291,7 +295,7 @@ func TestARefusedOrAbandonedSignInLeavesNoChargeBehind(t *testing.T) {
 
 	// A request that gives up while every hashing slot is held leaves nothing either.
 	pw2 := newPassword(t)
-	pw2.ByAddress = &Limiter{Max: 1000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
+	pw2.ByAddress = &Limiter{Name: "t", Max: 1000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
 	for i := 0; i < maxConcurrentHashes; i++ {
 		pw2.hashing <- struct{}{}
 	}
@@ -317,23 +321,14 @@ func TestARefusedOrAbandonedSignInLeavesNoChargeBehind(t *testing.T) {
 	}
 }
 
-func inFlight(l *Limiter, key string) int {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if e := l.entries[key]; e != nil {
-		return e.inFlight
-	}
-	return 0
-}
-
 // Measured, not read from the constant: under a burst of sign-ins no more than
 // four argon2id hashes are ever in flight.
 func TestNoMoreThanFourHashesRunAtOnceUnderABurst(t *testing.T) {
 	var running, peak atomic.Int64
 	hold := make(chan struct{})
 	pw := newPassword(t)
-	pw.ByAddress = &Limiter{Max: 10000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
-	pw.ByAccount = &Limiter{Max: 10000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
+	pw.ByAddress = &Limiter{Name: "t", Max: 10000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
+	pw.ByAccount = &Limiter{Name: "t", Max: 10000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
 	pw.Users.observe = func() func() {
 		n := running.Add(1)
 		for {
@@ -381,28 +376,53 @@ func TestNoMoreThanFourHashesRunAtOnceUnderABurst(t *testing.T) {
 // charge from a lock today.
 func TestTakeIgnoresFailuresOlderThanTheWindow(t *testing.T) {
 	now := time.Now()
-	l := &Limiter{Max: 5, Window: 10 * time.Minute, Lockout: time.Hour, Keys: 10, now: func() time.Time { return now }}
+	l := testLimiter(t, func() time.Time { return now }, 5, 10*time.Minute, time.Hour, 10)
 	for i := 0; i < 4; i++ {
-		l.Fail("k")
+		l.Fail(bg, "k")
 	}
 	// Inside the window, four failures leave room for one attempt and no more.
-	if ok, _ := l.Take("k"); !ok {
+	if ok, _ := l.Take(bg, "k"); !ok {
 		t.Fatal("the fifth attempt was refused with four failures in the window")
 	}
-	if ok, _ := l.Take("k"); ok {
+	if ok, _ := l.Take(bg, "k"); ok {
 		t.Fatal("a sixth attempt was allowed while the fifth was still unresolved")
 	}
-	l.Refund("k")
+	l.Refund(bg, "k")
 
 	// After the window the four failures no longer count: five attempts are owed again.
 	now = now.Add(11 * time.Minute)
 	allowed := 0
 	for i := 0; i < 8; i++ {
-		if ok, _ := l.Take("k"); ok {
+		if ok, _ := l.Take(bg, "k"); ok {
 			allowed++
 		}
 	}
 	if allowed != 5 {
 		t.Errorf("after the window, %d of 8 attempts were allowed, want 5", allowed)
+	}
+}
+
+// A limiter that cannot read its counts cannot say an attempt is allowed. If it
+// answered yes, taking the database down would lift every limit, for as long as the
+// outage lasted, on any path that does not also need the database to finish.
+func TestALimiterThatCannotReachItsDatabaseAllowsNothing(t *testing.T) {
+	db := testDB(t)
+	l := &Limiter{Name: "t", Max: 5, Window: time.Hour, Lockout: time.Hour, Keys: 10}
+	var told []string
+	l.Use(state.New(db), func(op string, _ error) { told = append(told, op) })
+	if ok, _ := l.Take(bg, "k"); !ok {
+		t.Fatal("a fresh key was refused with the database up")
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if ok, wait := l.Take(bg, "k"); ok || wait != l.Lockout {
+		t.Errorf("Take = %v, %v with the database gone, want a refusal for the lockout", ok, wait)
+	}
+	if ok, _ := l.Allowed(bg, "k"); ok {
+		t.Error("Allowed said yes with the database gone")
+	}
+	if len(told) < 2 {
+		t.Errorf("the failures were reported %d times, want each one logged: %v", len(told), told)
 	}
 }

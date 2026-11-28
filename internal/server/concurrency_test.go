@@ -1,19 +1,22 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/nitpick-oss/nitpick/internal/server/state"
 )
 
 // Sessions are shared by every request. Many sign-ins, lookups and sign-outs at
 // once must neither race nor lose or invent a session; run under -race this is
 // the check that the lock covers every access.
 func TestSessionsSurviveConcurrentUse(t *testing.T) {
-	s := NewSessions(SessionConfig{Idle: time.Hour, Absolute: time.Hour})
+	s := NewSessions(state.New(testDB(t)), SessionConfig{Idle: time.Hour, Absolute: time.Hour})
 	const workers, rounds = 16, 40
 	var wg sync.WaitGroup
 	errs := make(chan string, workers*rounds)
@@ -24,7 +27,7 @@ func TestSessionsSurviveConcurrentUse(t *testing.T) {
 			for i := 0; i < rounds; i++ {
 				rec := httptest.NewRecorder()
 				who := fmt.Sprintf("user-%d-%d", w, i)
-				if err := s.Start(rec, Identity{Subject: who}); err != nil {
+				if err := s.Start(context.Background(), rec, Identity{Subject: who}); err != nil {
 					errs <- err.Error()
 					return
 				}
@@ -50,8 +53,8 @@ func TestSessionsSurviveConcurrentUse(t *testing.T) {
 	for e := range errs {
 		t.Error(e)
 	}
-	if s.Len() != 0 {
-		t.Errorf("%d sessions remain after every one signed out", s.Len())
+	if n, err := s.Len(context.Background()); err != nil || n != 0 {
+		t.Errorf("%d sessions remain after every one signed out (%v)", n, err)
 	}
 }
 

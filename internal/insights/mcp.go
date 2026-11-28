@@ -65,15 +65,19 @@ func (c *Component) mcpServer(who caller) *mcp.Server {
 		Instructions: "Findings that nitpick reviews reported, by repository and file. Use list_hotspots to find where bugs keep appearing, list_findings to read them, and get_review for one run.",
 	})
 	mcp.AddTool(s, &mcp.Tool{Name: "get_overview", Description: "Counts of reviews, findings and repositories in a window, and how many reviews did not finish."},
-		func(_ context.Context, _ *mcp.CallToolRequest, in Window) (*mcp.CallToolResult, any, error) {
+		func(ctx context.Context, _ *mcp.CallToolRequest, in Window) (*mcp.CallToolResult, any, error) {
 			q, err := c.window(in)
 			if err != nil {
 				return nil, nil, err
 			}
-			return jsonResult(map[string]any{"overview": c.store.Overview(q), "series": c.store.Series(q)})
+			v, err := c.store.View(ctx, q)
+			if err != nil {
+				return nil, nil, err
+			}
+			return jsonResult(map[string]any{"overview": v.Overview(q), "series": v.Series(q)})
 		})
 	mcp.AddTool(s, &mcp.Tool{Name: "list_hotspots", Description: "Files ranked by how many findings, how severe and how recent. Trend compares the window with the one before it."},
-		func(_ context.Context, _ *mcp.CallToolRequest, in HotspotsInput) (*mcp.CallToolResult, any, error) {
+		func(ctx context.Context, _ *mcp.CallToolRequest, in HotspotsInput) (*mcp.CallToolResult, any, error) {
 			q, err := c.window(in.Window)
 			if err != nil {
 				return nil, nil, err
@@ -82,7 +86,11 @@ func (c *Component) mcpServer(who caller) *mcp.Server {
 			if err != nil {
 				return nil, nil, err
 			}
-			hs := c.store.Hotspots(q)
+			v, err := c.store.View(ctx, q)
+			if err != nil {
+				return nil, nil, err
+			}
+			hs := v.Hotspots(q)
 			total := len(hs)
 			if len(hs) > n {
 				hs = hs[:n]
@@ -90,7 +98,7 @@ func (c *Component) mcpServer(who caller) *mcp.Server {
 			return jsonResult(map[string]any{"hotspots": hs, "total": total})
 		})
 	mcp.AddTool(s, &mcp.Tool{Name: "list_findings", Description: "Findings from reviews, newest first. total says how many matched, so a cut-short list is not mistaken for all of them."},
-		func(_ context.Context, _ *mcp.CallToolRequest, in FindingsInput) (*mcp.CallToolResult, any, error) {
+		func(ctx context.Context, _ *mcp.CallToolRequest, in FindingsInput) (*mcp.CallToolResult, any, error) {
 			q, err := c.window(in.Window)
 			if err != nil {
 				return nil, nil, err
@@ -102,12 +110,19 @@ func (c *Component) mcpServer(who caller) *mcp.Server {
 			if in.MinSeverity != "" && rank(in.MinSeverity) < 0 {
 				return nil, nil, fmt.Errorf("min_severity must be one of %s", strings.Join(Severities, ", "))
 			}
-			rows, total := c.store.Findings(FindingQuery{Query: q, Path: in.Path, Class: in.Class, MinSeverity: in.MinSeverity, Limit: n})
+			v, err := c.store.View(ctx, q)
+			if err != nil {
+				return nil, nil, err
+			}
+			rows, total := v.Findings(FindingQuery{Query: q, Path: in.Path, Class: in.Class, MinSeverity: in.MinSeverity, Limit: n})
 			return jsonResult(map[string]any{"findings": rows, "total": total})
 		})
 	mcp.AddTool(s, &mcp.Tool{Name: "get_review", Description: "One review with all its findings."},
-		func(_ context.Context, _ *mcp.CallToolRequest, in ReviewInput) (*mcp.CallToolResult, any, error) {
-			rv, ok := c.store.Review(in.ID)
+		func(ctx context.Context, _ *mcp.CallToolRequest, in ReviewInput) (*mcp.CallToolResult, any, error) {
+			rv, ok, err := c.store.Review(ctx, in.ID)
+			if err != nil {
+				return nil, nil, err
+			}
 			if !ok {
 				return nil, nil, errors.New("no such review")
 			}

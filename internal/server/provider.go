@@ -1,6 +1,10 @@
 package server
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/nitpick-oss/nitpick/internal/server/state"
+)
 
 // Provider is one way to sign in: a password, an OIDC identity provider, a SAML
 // one. The server knows only this interface, so adding a vendor does not touch
@@ -45,6 +49,10 @@ type Host interface {
 
 	// CSRF is the protector for the provider's own forms.
 	CSRF() *CSRF
+
+	// State is the memory every server shares. A provider keeps what must survive a
+	// redirect, and what must be counted across servers, there and not in a variable.
+	State() *state.Store
 
 	// LoginFailed answers a failed sign-in with the login page and a message. The
 	// message is shown to the person, so it names no account and no internal.

@@ -105,7 +105,7 @@ func FuzzPutNeverFailsWithAServerError(f *testing.F) {
 	if err != nil {
 		f.Fatal(err)
 	}
-	srv := httptest.NewServer(New(fs, []Token{NewToken("ci", RoleAuthoritative, "s")}, false))
+	srv := httptest.NewServer(New(testDB(f), fs, []Token{NewToken("ci", RoleAuthoritative, "s")}, false))
 	f.Cleanup(srv.Close)
 	f.Fuzz(func(t *testing.T, body string) {
 		req, _ := http.NewRequest(http.MethodPut, srv.URL+"/v1/records/"+h, bytes.NewReader([]byte(body)))

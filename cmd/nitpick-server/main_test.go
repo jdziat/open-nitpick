@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"errors"
 	"io"
 	"net"
@@ -11,21 +10,21 @@ import (
 	"net/http/httptest"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/nitpick-oss/nitpick/internal/database/databasetest"
 	"github.com/nitpick-oss/nitpick/internal/notary"
+	"github.com/nitpick-oss/nitpick/internal/server"
 	"github.com/nitpick-oss/nitpick/internal/wire"
 )
 
 func notaryOn(t *testing.T, limits connLimits) (addr string, token string) {
 	t.Helper()
-	store, err := wire.NewFileStore(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	h := notary.New(store, []notary.Token{notary.NewToken("ci", notary.RoleAuthoritative, "s3cret")}, false)
+	db := databasetest.One(t, append(notary.Models(), server.Models()...))
+	h := notary.New(db, notary.NewDBStore(db), []notary.Token{notary.NewToken("ci", notary.RoleAuthoritative, "s3cret")}, false)
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -125,9 +124,10 @@ func FuzzTokenFlagAcceptsOnlyUsableTokens(f *testing.F) {
 	})
 }
 
-// A second server on the same data directory must refuse to start. Run as a
-// real process: the lock is the operating system's, not a variable.
-func TestASecondServerOnTheSameDirectoryRefusesToStart(t *testing.T) {
+// Two server processes on one database both serve, and a record one writes the
+// other reads. Run as real processes, since the point is that nothing in either
+// process, a lock or a cache, stands between them.
+func TestTwoServerProcessesOnOneDatabaseShareTheirRecords(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds and starts the server binary")
 	}
@@ -135,38 +135,61 @@ func TestASecondServerOnTheSameDirectoryRefusesToStart(t *testing.T) {
 	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}
-	data := t.TempDir()
-	start := func(addr string) *exec.Cmd {
-		c := exec.Command(bin, "-addr", addr, "-data", data, "-token", "ci:authoritative:s")
+	url := databasetest.URL(t)
+	free := func() string {
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = ln.Close() }()
+		return ln.Addr().String()
+	}
+	start := func(addr string) {
+		c := exec.Command(bin, "-addr", addr, "-database-url", url, "-token", "ci:authoritative:s")
 		var stderr bytes.Buffer
 		c.Stderr = &stderr
-		return c
+		if err := c.Start(); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = c.Process.Kill(); _ = c.Wait() })
+		deadline := time.Now().Add(20 * time.Second)
+		for time.Now().Before(deadline) {
+			if resp, err := http.Get("http://" + addr + "/healthz"); err == nil {
+				_ = resp.Body.Close()
+				if resp.StatusCode == http.StatusOK {
+					return
+				}
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		t.Fatalf("the server on %s did not become healthy; stderr: %s", addr, stderr.String())
 	}
-	first := start("127.0.0.1:0")
-	if err := first.Start(); err != nil {
+	first, second := free(), free()
+	start(first)
+	start(second)
+
+	hash := strings.Repeat("d", 64)
+	body := `{"schema":` + strconv.Itoa(wire.Schema) + `,"hash":"` + hash + `","complete":true,"batches":1,"answers":{"r#0":"x"}}`
+	put, _ := http.NewRequest(http.MethodPut, "http://"+first+"/v1/records/"+hash, strings.NewReader(body))
+	put.Header.Set("Authorization", "Bearer s")
+	resp, err := http.DefaultClient.Do(put)
+	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = first.Process.Kill(); _ = first.Wait() }()
-	time.Sleep(700 * time.Millisecond)
-
-	// Bounded: a server that wrongly starts would serve for ever, and a guard
-	// test that hangs when its guard is broken is a poor way to find out.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	second := exec.CommandContext(ctx, bin, "-addr", "127.0.0.1:0", "-data", data, "-token", "ci:authoritative:s")
-	var buf bytes.Buffer
-	second.Stderr = &buf
-	err := second.Run()
-	out := buf.String()
-	if ctx.Err() != nil {
-		t.Fatal("the second server was still running after 5s: it started on a directory another server holds")
+	_ = resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		t.Fatalf("PUT to the first process = %d", resp.StatusCode)
 	}
-	var exit *exec.ExitError
-	if !errors.As(err, &exit) || exit.ExitCode() == 0 {
-		t.Fatalf("the second server started on a held directory: err=%v output=%q", err, out)
+	get, _ := http.NewRequest(http.MethodGet, "http://"+second+"/v1/records/"+hash, nil)
+	get.Header.Set("Authorization", "Bearer s")
+	resp, err = http.DefaultClient.Do(get)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(out, "in use") {
-		t.Errorf("the refusal does not say why: %q", out)
+	got, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(got), hash) {
+		t.Errorf("GET from the second process = %d %s", resp.StatusCode, got)
 	}
 }
 

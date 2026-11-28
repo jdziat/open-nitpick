@@ -50,7 +50,7 @@ func TestARecordWrittenByTheLastReleaseIsReadBackByteForByte(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(New(store, []Token{NewToken("ci", RoleAuthoritative, "fixture-secret")}, false))
+	srv := httptest.NewServer(New(testDB(t), store, []Token{NewToken("ci", RoleAuthoritative, "fixture-secret")}, false))
 	defer srv.Close()
 
 	matches, err := filepath.Glob(filepath.Join("testdata", "v2.10.0", "responses", "*.json"))
@@ -94,7 +94,7 @@ func TestARecordTheLastReleaseNeverHadIsStillNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(New(store, []Token{NewToken("ci", RoleAuthoritative, "fixture-secret")}, false))
+	srv := httptest.NewServer(New(testDB(t), store, []Token{NewToken("ci", RoleAuthoritative, "fixture-secret")}, false))
 	defer srv.Close()
 	req, _ := http.NewRequest("GET", srv.URL+"/v1/records/"+strings.Repeat("0", 63)+"5", nil)
 	req.Header.Set("Authorization", "Bearer fixture-secret")

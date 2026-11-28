@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -10,6 +11,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/nitpick-oss/nitpick/internal/database"
+	"github.com/nitpick-oss/nitpick/internal/server/state"
 )
 
 // Config is everything a server is built from.
@@ -31,7 +35,16 @@ type Config struct {
 	// Assets is the built UI. Nil uses the assets embedded in the binary, which
 	// are present only when the UI was built.
 	Assets fs.FS
+
+	// State is the memory the server's replicas share: sessions, the CSRF key, and what
+	// sign-in providers keep between a redirect and its answer. A server with none has no
+	// way to hold a login, and New refuses it. Nil builds one over DB.
+	State *state.Store
+	DB    *database.DB
 }
+
+// Models are the tables the server keeps, for the migration.
+func Models() []any { return state.Models() }
 
 // Server is the composed handler.
 type Server struct {
@@ -39,6 +52,7 @@ type Server struct {
 	providers  []Provider
 	roles      *RoleMap
 	sessions   *Sessions
+	state      *state.Store
 	csrf       *CSRF
 	log        *slog.Logger
 	mux        *http.ServeMux
@@ -57,15 +71,22 @@ func New(cfg Config) (*Server, error) {
 	if cfg.Roles == nil {
 		cfg.Roles = &RoleMap{}
 	}
-	csrf, err := NewCSRF()
+	if cfg.State == nil {
+		if cfg.DB == nil {
+			return nil, errors.New("a server needs a database to keep its sessions in")
+		}
+		cfg.State = state.New(cfg.DB)
+	}
+	csrf, err := NewCSRF(context.Background(), cfg.State)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("the CSRF key: %w", err)
 	}
 	s := &Server{
 		components: cfg.Components,
 		providers:  cfg.Providers,
 		roles:      cfg.Roles,
-		sessions:   NewSessions(cfg.Sessions),
+		sessions:   NewSessions(cfg.State, cfg.Sessions),
+		state:      cfg.State,
 		csrf:       csrf,
 		log:        cfg.Logger,
 		mux:        http.NewServeMux(),
@@ -80,6 +101,7 @@ func New(cfg Config) (*Server, error) {
 	if err := cfg.Roles.Check(declared); err != nil {
 		return nil, err
 	}
+	s.sessions.OnError = func(op string, err error) { s.log.Error("sessions: "+op, "error", err) }
 	s.assets = loadAssets(cfg.Assets)
 	if err := s.mount(); err != nil {
 		return nil, err
@@ -89,6 +111,9 @@ func New(cfg Config) (*Server, error) {
 
 // Sessions is the session store, for a test or an operator tool to inspect.
 func (s *Server) Sessions() *Sessions { return s.sessions }
+
+// State is the shared memory sign-in providers keep their in-progress sign-ins in.
+func (s *Server) State() *state.Store { return s.state }
 
 // ServeHTTP implements http.Handler.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

@@ -9,7 +9,9 @@ import (
 	"testing"
 
 	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/database/databasetest"
 	"github.com/nitpick-oss/nitpick/internal/notary"
+	"github.com/nitpick-oss/nitpick/internal/server"
 	"github.com/nitpick-oss/nitpick/internal/vcs"
 	"github.com/nitpick-oss/nitpick/internal/wire"
 )
@@ -32,7 +34,7 @@ func stressNotary(t *testing.T) (*wire.HTTPStore, *wire.FileStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(notary.New(fs, []notary.Token{notary.NewToken("ci", notary.RoleAuthoritative, "s")}, false))
+	srv := httptest.NewServer(notary.New(databasetest.One(t, append(notary.Models(), server.Models()...)), fs, []notary.Token{notary.NewToken("ci", notary.RoleAuthoritative, "s")}, false))
 	t.Cleanup(srv.Close)
 	client, err := wire.NewHTTPStore(srv.URL, "s")
 	if err != nil {

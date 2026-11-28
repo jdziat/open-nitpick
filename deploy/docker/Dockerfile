@@ -26,19 +26,17 @@ COPY . .
 COPY --from=ui /src/ui/dist ui/dist
 RUN go run ./internal/server/uibuild
 # A static binary, so the final image needs no libc.
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/nitpick-server ./cmd/nitpick-server \
- && mkdir -p /out/data
+RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /out/nitpick-server ./cmd/nitpick-server
 
 # distroless/static carries CA certificates, which the server needs to fetch an
 # OIDC issuer's keys over HTTPS, and no shell, which a record server does not.
 FROM gcr.io/distroless/static:nonroot
 COPY --from=build /out/nitpick-server /nitpick-server
-# Owned by the unprivileged user, so a fresh volume mounted here is writable.
-COPY --from=build --chown=65532:65532 /out/data /data
-VOLUME /data
+# The server keeps nothing on disk: its state is in the database named by
+# NITPICK_DATABASE_URL, so the image has no volume.
 USER 65532:65532
 EXPOSE 8484
 HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
   CMD ["/nitpick-server", "-healthcheck", "-addr=:8484"]
 ENTRYPOINT ["/nitpick-server"]
-CMD ["-addr=:8484", "-data=/data"]
+CMD ["-addr=:8484"]

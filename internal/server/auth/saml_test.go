@@ -45,7 +45,7 @@ func newSAMLSite(t *testing.T, idp *samlIDP, rules ...server.RoleRule) *samlSite
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv, err := server.New(server.Config{
+	srv, err := server.New(server.Config{DB: testDB(t),
 		Components: []server.Component{echo{}}, Providers: []server.Provider{s}, Roles: roles, Assets: builtUI(),
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
@@ -489,20 +489,19 @@ func TestSAMLConfigThatCouldNotWorkIsRefused(t *testing.T) {
 
 func TestTheAssertionIDTableForgetsExpiredIDsAndRemembersLiveOnes(t *testing.T) {
 	now := time.Now()
-	s := newSeenAssertions()
-	s.now = func() time.Time { return now }
-	if !s.firstTime("a", now.Add(time.Hour)) {
+	s := testSeen(t, func() time.Time { return now })
+	if !s.firstTime(bg, "a", now.Add(time.Hour)) {
 		t.Fatal("a new ID was refused")
 	}
-	if s.firstTime("a", now.Add(time.Hour)) {
+	if s.firstTime(bg, "a", now.Add(time.Hour)) {
 		t.Error("a repeated ID was accepted")
 	}
 	now = now.Add(2 * time.Hour)
-	if !s.firstTime("b", now.Add(time.Hour)) {
+	if !s.firstTime(bg, "b", now.Add(time.Hour)) {
 		t.Error("an unrelated ID was refused")
 	}
-	if s.len() != 1 {
-		t.Errorf("the table holds %d IDs after the first expired, want 1", s.len())
+	if s.len(bg) != 1 {
+		t.Errorf("the table holds %d IDs after the first expired, want 1", s.len(bg))
 	}
 }
 
@@ -566,13 +565,7 @@ func TestTheSAMLBindingCookieIsOneABrowserKeepsAndSendsOnlyToTheSAMLRoutes(t *te
 func TestAFloodOfSAMLSignInStartsIsRefusedAndKeepsTheFlowInProgress(t *testing.T) {
 	s := newSAMLSite(t, newSAMLIDP(t))
 	s.s.flows.max = 40
-	s.start("/ui/")
-	s.s.flows.mu.Lock()
-	var real string
-	for k := range s.s.flows.items {
-		real = k
-	}
-	s.s.flows.mu.Unlock()
+	_, real := s.start("/ui/")
 	refused := 0
 	for i := 0; i < 200; i++ {
 		resp, err := s.c.Get(s.ts.URL + "/auth/saml/login")
@@ -584,9 +577,7 @@ func TestAFloodOfSAMLSignInStartsIsRefusedAndKeepsTheFlowInProgress(t *testing.T
 			refused++
 		}
 	}
-	s.s.flows.mu.Lock()
-	_, alive := s.s.flows.items[real]
-	s.s.flows.mu.Unlock()
+	_, alive := s.s.flows.take(bg, real)
 	if !alive || refused == 0 {
 		t.Fatalf("alive=%v refused=%d: a flood of SAML starts must be refused and must not evict a sign-in in progress", alive, refused)
 	}

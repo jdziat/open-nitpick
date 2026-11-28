@@ -17,12 +17,17 @@ import (
 
 var hashRE = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
-// FileStore keeps one JSON file per record under a directory.
+// ValidHash reports whether h is a record hash: 64 lowercase hexadecimal characters.
+func ValidHash(h string) bool { return hashRE.MatchString(h) }
+
+// FileStore keeps one JSON file per record under a directory. The server no longer
+// uses it: records are in the database. It stays as the reference the store suite
+// is checked against, and as a convenient store for tests of what sits on a
+// wire.Store.
 type FileStore struct {
 	dir string
 	mu  sync.Mutex
-	// lock is held for as long as this process owns the directory. Nil until
-	// Lock is called.
+	// lock is the directory lock this process holds, nil before Lock.
 	lock *flock.Flock
 }
 

@@ -1,16 +1,18 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/nitpick-oss/nitpick/internal/server"
+	"github.com/nitpick-oss/nitpick/internal/server/state"
 )
 
 // flowTTL is how long a sign-in may take between the redirect out and the
@@ -30,19 +32,25 @@ type flow struct {
 	expires  time.Time
 }
 
-// flows is a bounded, expiring table of started sign-ins. A table nobody drains
-// would let anyone fill it by starting sign-ins and never finishing, so it is
-// capped and drops the oldest.
+// flows is a bounded, expiring table of started sign-ins, in the shared state so the
+// replica that gets the answer need not be the one that sent the person away. A table
+// nobody drains would let anyone fill it by starting sign-ins and never finishing, so
+// it is capped and drops the oldest.
 type flows struct {
-	mu     sync.Mutex
-	max    int
-	now    func() time.Time
-	items  map[string]*flow
-	starts map[string][]time.Time // by client address, the starts in the last startWindow
+	max   int
+	st    *state.Store
+	onErr func(op string, err error)
 }
 
-func newFlows(max int) *flows {
-	return &flows{max: max, items: map[string]*flow{}, starts: map[string][]time.Time{}}
+func newFlows(max int) *flows { return &flows{max: max} }
+
+// use gives the table the shared state to keep flows in.
+func (f *flows) use(st *state.Store, onErr func(op string, err error)) { f.st, f.onErr = st, onErr }
+
+func (f *flows) fail(op string, err error) {
+	if f.onErr != nil {
+		f.onErr(op, err)
+	}
 }
 
 // A client address may start startMax sign-ins in startWindow. The table drops its
@@ -50,99 +58,116 @@ func newFlows(max int) *flows {
 // push real sign-ins out. The limit is far above what a person or an office behind
 // one address does, and far below the table's size.
 const (
-	startMax      = 20
-	startWindow   = time.Minute
-	maxStartAddrs = 100_000
+	startMax    = 20
+	startWindow = time.Minute
 )
+
+// maxStartAddrs bounds the addresses tracked at once. It is a variable only so a
+// test can bound it at something a database can be filled to.
+var maxStartAddrs = 100_000
 
 // admit reports whether addr may start a sign-in now, and counts it if so. When
 // the table of addresses is full of recent ones, it refuses: a flood from many
-// addresses is then a refusal to start, not an eviction of sign-ins in progress.
-func (f *flows) admit(addr string) bool {
-	now := f.clock()
-	cutoff := now.Add(-startWindow)
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	recent := f.starts[addr][:0]
-	for _, t := range f.starts[addr] {
-		if t.After(cutoff) {
-			recent = append(recent, t)
-		}
-	}
-	if len(recent) >= startMax {
-		f.starts[addr] = recent
-		return false
-	}
-	if _, known := f.starts[addr]; !known && len(f.starts) >= maxStartAddrs {
-		for a, ts := range f.starts {
-			if len(ts) == 0 || !ts[len(ts)-1].After(cutoff) {
-				delete(f.starts, a)
+// addresses is then a refusal to start, not an eviction of sign-ins in progress. A
+// store that cannot be reached refuses too.
+func (f *flows) admit(ctx context.Context, addr string) bool {
+	key := state.Key("start", addr)
+	if n, err := f.st.Count(ctx, "start:"); err == nil && n >= maxStartAddrs {
+		_ = f.st.Sweep(ctx)
+		if _, known, _ := f.st.Get(ctx, key); !known {
+			if n, _ := f.st.Count(ctx, "start:"); n >= maxStartAddrs {
+				return false
 			}
 		}
-		if len(f.starts) >= maxStartAddrs {
-			return false
+	}
+	allowed := false
+	err := f.st.Update(ctx, key, func(cur *state.Entry) (*state.Entry, error) {
+		allowed = false
+		now := f.st.Now()
+		cutoff := now.Add(-startWindow).UnixNano()
+		var times []int64
+		if cur != nil {
+			_ = json.Unmarshal(cur.Value, &times)
 		}
+		recent := times[:0]
+		for _, t := range times {
+			if t > cutoff {
+				recent = append(recent, t)
+			}
+		}
+		if len(recent) >= startMax {
+			b, _ := json.Marshal(recent)
+			return &state.Entry{Value: b, Expires: now.Add(startWindow)}, nil
+		}
+		recent = append(recent, now.UnixNano())
+		b, err := json.Marshal(recent)
+		if err != nil {
+			return nil, err
+		}
+		allowed = true
+		return &state.Entry{Value: b, Expires: now.Add(startWindow)}, nil
+	})
+	if err != nil {
+		f.fail("count sign-in starts", err)
+		return false
 	}
-	f.starts[addr] = append(recent, now)
-	return true
+	return allowed
 }
 
-func (f *flows) clock() time.Time {
-	if f.now != nil {
-		return f.now()
-	}
-	return time.Now()
+// flowFields is a flow as it is kept.
+type flowFields struct {
+	Binding  [32]byte `json:"b"`
+	Secret   string   `json:"s"`
+	Verifier string   `json:"v,omitempty"`
+	Next     string   `json:"n,omitempty"`
 }
 
-// put stores a flow under a fresh random key and returns the key.
-func (f *flows) put(fl *flow) (string, error) {
+// put stores a flow under a fresh random key and returns the key. The table holds
+// the key's hash, so a copy of it holds nothing that completes a sign-in.
+func (f *flows) put(ctx context.Context, fl *flow) (string, error) {
 	key, err := randomToken()
 	if err != nil {
 		return "", err
 	}
-	now := f.clock()
-	fl.expires = now.Add(flowTTL)
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	for k, v := range f.items {
-		if now.After(v.expires) {
-			delete(f.items, k)
+	if f.max > 0 {
+		if n, err := f.st.Count(ctx, "flow:"); err == nil && n >= f.max {
+			_, _ = f.st.DeleteOldest(ctx, "flow:")
 		}
 	}
-	if f.max > 0 && len(f.items) >= f.max {
-		var oldest string
-		var at time.Time
-		for k, v := range f.items {
-			if oldest == "" || v.expires.Before(at) {
-				oldest, at = k, v.expires
-			}
-		}
-		delete(f.items, oldest)
+	b, err := json.Marshal(flowFields{Binding: fl.binding, Secret: fl.secret, Verifier: fl.verifier, Next: fl.next})
+	if err != nil {
+		return "", err
 	}
-	f.items[key] = fl
+	fl.expires = f.st.Now().Add(flowTTL)
+	if err := f.st.Put(ctx, state.Key("flow", key), state.Entry{Value: b, Expires: fl.expires}); err != nil {
+		return "", err
+	}
 	return key, nil
 }
 
 // take removes and returns a flow. A key is good for one answer: taking it first
-// and checking it after means a replayed or raced answer finds nothing.
-func (f *flows) take(key string) (*flow, bool) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	fl, ok := f.items[key]
+// and checking it after means a replayed or raced answer finds nothing, on whichever
+// replica it arrives.
+func (f *flows) take(ctx context.Context, key string) (*flow, bool) {
+	e, ok, err := f.st.Take(ctx, state.Key("flow", key))
+	if err != nil {
+		f.fail("take a sign-in", err)
+		return nil, false
+	}
 	if !ok {
 		return nil, false
 	}
-	delete(f.items, key)
-	if f.clock().After(fl.expires) {
+	var ff flowFields
+	if err := json.Unmarshal(e.Value, &ff); err != nil {
+		f.fail("decode a sign-in", err)
 		return nil, false
 	}
-	return fl, true
+	return &flow{binding: ff.Binding, secret: ff.Secret, verifier: ff.Verifier, next: ff.Next, expires: e.Expires}, true
 }
 
-func (f *flows) len() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return len(f.items)
+func (f *flows) len(ctx context.Context) int {
+	n, _ := f.st.Count(ctx, "flow:")
+	return n
 }
 
 func randomToken() (string, error) {

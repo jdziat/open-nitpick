@@ -19,6 +19,7 @@ import (
 
 	"golang.org/x/crypto/argon2"
 
+	"github.com/nitpick-oss/nitpick/internal/database"
 	"github.com/nitpick-oss/nitpick/internal/server"
 )
 
@@ -79,6 +80,7 @@ type site struct {
 	c   *http.Client
 	pw  *Password
 	srv *server.Server
+	db  *database.DB
 }
 
 func builtUI() fstest.MapFS {
@@ -95,7 +97,8 @@ func newSite(t *testing.T, pw *Password, rules ...server.RoleRule) *site {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv, err := server.New(server.Config{
+	db := testDB(t)
+	srv, err := server.New(server.Config{DB: db,
 		Components: []server.Component{echo{}},
 		Providers:  []server.Provider{pw},
 		Roles:      roles,
@@ -111,7 +114,7 @@ func newSite(t *testing.T, pw *Password, rules ...server.RoleRule) *site {
 	c := ts.Client()
 	c.Jar = jar
 	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	return &site{t: t, ts: ts, c: c, pw: pw, srv: srv}
+	return &site{t: t, ts: ts, c: c, pw: pw, srv: srv, db: db}
 }
 
 // login posts the form the way a browser would: it reads the page for its
@@ -230,7 +233,7 @@ func TestRepeatedFailuresLockTheAccount(t *testing.T) {
 
 func TestAnAddressThatKeepsFailingIsLockedWhateverTheAccount(t *testing.T) {
 	pw := newPassword(t)
-	pw.ByAddress = &Limiter{Max: 3, Window: time.Hour, Lockout: time.Hour, Keys: 100}
+	pw.ByAddress = &Limiter{Name: "t", Max: 3, Window: time.Hour, Lockout: time.Hour, Keys: 100}
 	s := newSite(t, pw)
 	for i := 0; i < 3; i++ {
 		s.login(fmt.Sprintf("nobody%d", i), "x") // a different account each time
@@ -243,52 +246,52 @@ func TestAnAddressThatKeepsFailingIsLockedWhateverTheAccount(t *testing.T) {
 // A lockout ends, and a success clears the count.
 func TestALockoutEndsAndASuccessClearsTheCount(t *testing.T) {
 	now := time.Now()
-	l := &Limiter{Max: 3, Window: 10 * time.Minute, Lockout: 20 * time.Minute, Keys: 10, now: func() time.Time { return now }}
+	l := testLimiter(t, func() time.Time { return now }, 3, 10*time.Minute, 20*time.Minute, 10)
 	for i := 0; i < 3; i++ {
-		l.Fail("k")
+		l.Fail(bg, "k")
 	}
-	if ok, wait := l.Allowed("k"); ok || wait <= 0 {
+	if ok, wait := l.Allowed(bg, "k"); ok || wait <= 0 {
 		t.Fatalf("a key at the limit = %v %v, want locked", ok, wait)
 	}
 	now = now.Add(19 * time.Minute)
-	if ok, _ := l.Allowed("k"); ok {
+	if ok, _ := l.Allowed(bg, "k"); ok {
 		t.Error("the lockout ended early")
 	}
 	now = now.Add(2 * time.Minute)
-	if ok, _ := l.Allowed("k"); !ok {
+	if ok, _ := l.Allowed(bg, "k"); !ok {
 		t.Error("the lockout did not end")
 	}
 	// Failures older than the window do not count.
-	l.Fail("w")
-	l.Fail("w")
+	l.Fail(bg, "w")
+	l.Fail(bg, "w")
 	now = now.Add(11 * time.Minute)
-	if l.Fail("w") {
+	if l.Fail(bg, "w") {
 		t.Error("failures older than the window still counted toward a lock")
 	}
 	// A success clears the count.
-	l.Fail("s")
-	l.Fail("s")
-	l.Success("s")
-	if l.Fail("s") {
+	l.Fail(bg, "s")
+	l.Fail(bg, "s")
+	l.Success(bg, "s")
+	if l.Fail(bg, "s") {
 		t.Error("a success did not clear the count")
 	}
 	// A correct guess does not lift a lockout that is running.
 	for i := 0; i < 3; i++ {
-		l.Fail("locked")
+		l.Fail(bg, "locked")
 	}
-	l.Success("locked")
-	if ok, _ := l.Allowed("locked"); ok {
+	l.Success(bg, "locked")
+	if ok, _ := l.Allowed(bg, "locked"); ok {
 		t.Error("a success lifted a running lockout")
 	}
 }
 
 func TestTheLimiterTableDoesNotGrowWithoutBound(t *testing.T) {
-	l := &Limiter{Max: 5, Window: time.Hour, Lockout: time.Hour, Keys: 100}
+	l := testLimiter(t, nil, 5, time.Hour, time.Hour, 100)
 	for i := 0; i < 5000; i++ {
-		l.Fail(fmt.Sprintf("name-%d", i))
+		l.Fail(bg, fmt.Sprintf("name-%d", i))
 	}
-	if l.Len() > 100 {
-		t.Errorf("the table holds %d keys, want at most 100", l.Len())
+	if l.Len(bg) > 100 {
+		t.Errorf("the table holds %d keys, want at most 100", l.Len(bg))
 	}
 }
 
@@ -306,7 +309,7 @@ func TestALoginPostWithoutTheFormsTokenIsRefusedBeforeCountingAFailure(t *testin
 			t.Errorf("%s = %d, want 403", name, r.StatusCode)
 		}
 	}
-	if pw.ByAccount.Len() != 0 || pw.ByAddress.Len() != 0 {
+	if pw.ByAccount.Len(bg) != 0 || pw.ByAddress.Len(bg) != 0 {
 		t.Error("a request with no valid token counted as a failed sign-in")
 	}
 	// A token for another browser's cookie does not work: the form served to one
@@ -343,8 +346,8 @@ func TestOversizedCredentialsAreRefusedWithoutHashing(t *testing.T) {
 	}
 	// None of these counted against an account: the account name tracked is the
 	// one a real guess would carry.
-	if pw.ByAccount.Len() != 0 {
-		t.Errorf("malformed requests were counted as failures: %d keys", pw.ByAccount.Len())
+	if pw.ByAccount.Len(bg) != 0 {
+		t.Errorf("malformed requests were counted as failures: %d keys", pw.ByAccount.Len(bg))
 	}
 }
 
@@ -353,7 +356,7 @@ func TestTheForwardedHeaderIsIgnoredUnlessTrusted(t *testing.T) {
 	for _, trust := range []bool{false, true} {
 		pw := newPassword(t)
 		pw.TrustForwardedFor = trust
-		pw.ByAddress = &Limiter{Max: 2, Window: time.Hour, Lockout: time.Hour, Keys: 100}
+		pw.ByAddress = &Limiter{Name: "t", Max: 2, Window: time.Hour, Lockout: time.Hour, Keys: 100}
 		s := newSite(t, pw)
 		for i := 0; i < 2; i++ {
 			req, _ := http.NewRequest("POST", s.ts.URL+"/auth/password/login", nil)
@@ -371,7 +374,7 @@ func TestTheForwardedHeaderIsIgnoredUnlessTrusted(t *testing.T) {
 				_ = rr.Body.Close()
 			}
 		}
-		allowed, _ := pw.ByAddress.Allowed("address:127.0.0.1")
+		allowed, _ := pw.ByAddress.Allowed(bg, "address:127.0.0.1")
 		if trust && !allowed {
 			t.Error("trusted: the forwarded addresses were all treated as the proxy's")
 		}
@@ -453,7 +456,7 @@ func TestAHashPasswordHashVerifies(t *testing.T) {
 // four times and then got it right is not one miss from a lock.
 func TestASuccessfulSignInClearsEarlierFailures(t *testing.T) {
 	pw := newPassword(t)
-	pw.ByAddress = &Limiter{Max: 1000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
+	pw.ByAddress = &Limiter{Name: "t", Max: 1000, Window: time.Hour, Lockout: time.Hour, Keys: 100}
 	s := newSite(t, pw)
 	for i := 0; i < 4; i++ {
 		s.login("alice", "wrong")
@@ -626,4 +629,32 @@ func (r *recordingTB) Helper() {}
 func (r *recordingTB) Fatalf(string, ...any) {
 	r.failed = true
 	panic("stop")
+}
+
+// A database that cannot be reached must not become a way in. Neither a session
+// issued before it went away nor a correct password is accepted while it is gone:
+// the limits and the sessions are in it, and a server that cannot read them cannot
+// say the request is allowed.
+func TestAServerThatLosesItsDatabaseAdmitsNoOne(t *testing.T) {
+	s := newSite(t, newPassword(t))
+	if resp, _ := s.login("alice", "correct horse"); resp.StatusCode != http.StatusSeeOther || !s.signedIn() {
+		t.Fatalf("the sign-in did not work while the database was up: %d", resp.StatusCode)
+	}
+	if err := s.db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if s.signedIn() {
+		t.Error("a session was honoured with the database gone")
+	}
+	jar, _ := cookiejar.New(nil)
+	fresh := *s.c
+	fresh.Jar = jar
+	s.c = &fresh
+	resp, body := s.login("alice", "correct horse")
+	if resp.StatusCode == http.StatusSeeOther && resp.Header.Get("Location") == "/ui/" {
+		t.Errorf("a correct password signed in with the database gone: %d %q", resp.StatusCode, body)
+	}
+	if s.signedIn() {
+		t.Error("the person is signed in although the database is gone")
+	}
 }

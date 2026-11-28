@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nitpick-oss/nitpick/internal/database/databasetest"
 	"github.com/nitpick-oss/nitpick/internal/insights"
 	"github.com/nitpick-oss/nitpick/internal/server"
 )
@@ -14,13 +15,10 @@ import (
 // write token.
 func insightsServer(t *testing.T) (url string, store *insights.Store) {
 	t.Helper()
-	store, err := insights.OpenStore(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
+	db := databasetest.One(t, append(insights.Models(), server.Models()...))
+	store = insights.NewStore(db)
 	c := insights.NewComponent(store, []insights.Token{insights.NewToken("ci", insights.RoleWrite, "ci-secret")}, slog.New(slog.DiscardHandler))
-	h, err := server.New(server.Config{Components: []server.Component{c}})
+	h, err := server.New(server.Config{DB: db, Components: []server.Component{c}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +37,11 @@ func TestReviewReportsItsFindingsToTheInsightsServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("review: %v", err)
 	}
-	got := store.Reviews(insights.Filter{})
+	view, err := store.View(t.Context(), insights.Query{Now: time.Now().UTC(), Days: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := view.Reviews(insights.Filter{})
 	if len(got) != 1 {
 		t.Fatalf("the server holds %d reviews, want the 1 that ran", len(got))
 	}
@@ -75,7 +77,11 @@ func TestAServerThatRefusesTheTokenDoesNotFailTheReviewEither(t *testing.T) {
 	if _, err := reviewJSON(t, repo, "-insights", url, "-insights-repo", "acme/api"); err != nil {
 		t.Fatalf("a 401 failed the review: %v", err)
 	}
-	if n := len(store.Reviews(insights.Filter{})); n != 0 {
+	view, err := store.View(t.Context(), insights.Query{Now: time.Now().UTC(), Days: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := view.Len(); n != 0 {
 		t.Fatalf("a review with a bad token was kept: %d", n)
 	}
 }

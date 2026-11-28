@@ -1,16 +1,47 @@
 package insights
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
-	"os"
-	"path/filepath"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/nitpick-oss/nitpick/internal/database"
+	"github.com/nitpick-oss/nitpick/internal/database/databasetest"
+	"github.com/nitpick-oss/nitpick/internal/server"
 )
+
+// openStore is a store on a fresh database on the engine this run is for.
+func openStore(t *testing.T) *Store {
+	t.Helper()
+	return NewStore(databasetest.One(t, Models()))
+}
+
+// openServerStore is openStore for a test that also starts a server over the same
+// database, which keeps its sessions there.
+func openServerStore(t *testing.T) (*Store, *database.DB) {
+	t.Helper()
+	db := databasetest.One(t, append(Models(), server.Models()...))
+	return NewStore(db), db
+}
+
+// viewAt loads the window a query asks about, failing the test when it cannot.
+func viewAt(t *testing.T, s *Store, q Query) *View {
+	t.Helper()
+	v, err := s.View(context.Background(), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+// all is every review in the store, as a View over a window wide enough to hold them.
+func all(t *testing.T, s *Store) []Review {
+	t.Helper()
+	return viewAt(t, s, Query{Now: time.Now().UTC().Add(maxSkew), Days: 3650}).Reviews(Filter{})
+}
 
 var t0 = time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
 
@@ -22,71 +53,149 @@ func finding(path, sev string) Finding {
 	return Finding{Path: path, Line: 10, Severity: sev, Class: "bug", Title: "t " + path}
 }
 
-func TestStoreKeepsWhatItWasGivenAcrossARestart(t *testing.T) {
-	dir := t.TempDir()
-	s, err := OpenStore(dir)
-	if err != nil {
-		t.Fatal(err)
+func TestAReviewAddedByOneServerIsReadByAnother(t *testing.T) {
+	databasetest.Each(t, Models(), func(t *databasetest.Sub) {
+		db := t.DB
+		a, b := NewStore(db), NewStore(db)
+		kept, err := a.Add(context.Background(), review("acme/api", t0, finding("a.go", "error")))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, ok, err := b.Review(context.Background(), kept.ID)
+		if err != nil || !ok || got.Repo != "acme/api" || len(got.Findings) != 1 || got.Findings[0].Path != "a.go" {
+			t.Fatalf("the second server read %+v, %v, %v", got, ok, err)
+		}
+		if n := len(all(t.T, b)); n != 1 {
+			t.Errorf("the second server's view holds %d reviews, want 1", n)
+		}
+		if _, ok, err := b.Review(context.Background(), "no-such-id"); err != nil || ok {
+			t.Errorf("a missing review: %v, %v", ok, err)
+		}
+	})
+}
+
+func TestTheSameReviewSentToTwoServersAtOnceIsKeptOnce(t *testing.T) {
+	databasetest.Each(t, Models(), func(t *databasetest.Sub) {
+		db := t.DB
+		r := review("acme/api", t0, finding("a.go", "error"))
+		var wg sync.WaitGroup
+		ids := make(chan string, 16)
+		for i := range 16 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				got, err := NewStore(db).Add(context.Background(), r)
+				if err != nil {
+					t.Errorf("writer %d: %v", i, err)
+					return
+				}
+				ids <- got.ID
+			}()
+		}
+		wg.Wait()
+		close(ids)
+		seen := map[string]bool{}
+		for id := range ids {
+			seen[id] = true
+		}
+		if len(seen) != 1 {
+			t.Errorf("sixteen sends of one review returned %d ids", len(seen))
+		}
+		if n := len(all(t.T, NewStore(db))); n != 1 {
+			t.Errorf("sixteen sends of one review made %d records, a CI retry must not double a repo's findings", n)
+		}
+	})
+}
+
+func TestManyDistinctReviewsWrittenAtOnceAreAllKept(t *testing.T) {
+	databasetest.Each(t, Models(), func(t *databasetest.Sub) {
+		db := t.DB
+		var wg sync.WaitGroup
+		for i := range 40 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				r := review("acme/api", t0.Add(time.Duration(i)*time.Minute), finding(fmt.Sprintf("f%d.go", i), "error"))
+				if _, err := NewStore(db).Add(context.Background(), r); err != nil {
+					t.Errorf("review %d: %v", i, err)
+				}
+			}()
+		}
+		wg.Wait()
+		if n := len(all(t.T, NewStore(db))); n != 40 {
+			t.Errorf("40 reviews written at once left %d", n)
+		}
+	})
+}
+
+func TestAViewHoldsOnlyTheWindowsAQueryCanAskAboutNewestFirst(t *testing.T) {
+	s := openStore(t)
+	now := time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC)
+	days := func(n int) time.Time { return now.AddDate(0, 0, -n) }
+	for _, r := range []Review{
+		review("acme/api", days(1), finding("a.go", "error")),              // in the window
+		review("acme/web", days(5), finding("b.go", "error")),              // in the window, another repo
+		review("acme/api", days(10), finding("c.go", "error")),             // in the prior window
+		review("acme/api", days(40), finding("d.go", "error")),             // before both
+		review("acme/api", now.Add(time.Minute), finding("e.go", "error")), // after now
+	} {
+		if _, err := s.Add(context.Background(), r); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if _, err := s.Add(context.Background(), review("acme/api", t0, finding("a.go", "error"))); err != nil {
-		t.Fatal(err)
+	got := viewAt(t, s, Query{Now: now, Days: 7}).Reviews(Filter{})
+	var paths []string
+	for _, r := range got {
+		paths = append(paths, r.Findings[0].Path)
 	}
-	if err := s.Close(); err != nil {
-		t.Fatal(err)
-	}
-	again, err := OpenStore(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = again.Close() }()
-	got := again.Reviews(Filter{})
-	if len(got) != 1 || got[0].Repo != "acme/api" || len(got[0].Findings) != 1 {
-		t.Fatalf("after a restart the store holds %+v", got)
+	if strings.Join(paths, ",") != "a.go,b.go,c.go" {
+		t.Errorf("a 7 day view holds %v, want the window and the one before it, newest first, and nothing after now", paths)
 	}
 }
 
-func TestStoreSkipsATornFinalLineAndKeepsEarlierReviews(t *testing.T) {
-	dir := t.TempDir()
-	s, _ := OpenStore(dir)
-	_, _ = s.Add(context.Background(), review("acme/api", t0))
-	_ = s.Close()
-	f, err := os.OpenFile(filepath.Join(dir, "reviews.jsonl"), os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
+func TestAReadThatFailsIsAnErrorAndNotAnEmptyDashboard(t *testing.T) {
+	db := databasetest.One(t, Models())
+	s := NewStore(db)
+	if _, err := s.Add(context.Background(), review("acme/api", t0, finding("a.go", "error"))); err != nil {
 		t.Fatal(err)
 	}
-	_, _ = f.WriteString(`{"repo":"acme/api","at":"2026-1`)
-	_ = f.Close()
-	again, err := OpenStore(dir)
-	if err != nil {
-		t.Fatalf("a torn last line must not stop the server starting: %v", err)
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
 	}
-	defer func() { _ = again.Close() }()
-	if n := len(again.Reviews(Filter{})); n != 1 {
-		t.Fatalf("kept %d reviews, want the 1 that was whole", n)
+	if _, err := s.View(context.Background(), Query{Now: t0, Days: 7}); err == nil {
+		t.Error("a view over a closed database returned no error, so a dashboard would read as empty")
 	}
-	if again.Skipped() != 1 {
-		t.Fatalf("skipped = %d, a dropped line must be counted so it is not silent", again.Skipped())
+	if _, _, err := s.Review(context.Background(), "x"); err == nil {
+		t.Error("a review read from a closed database returned no error")
+	}
+}
+
+func TestAStoredReviewThatCannotBeDecodedFailsTheReadAndIsNotSkipped(t *testing.T) {
+	db := databasetest.One(t, Models())
+	s := NewStore(db)
+	if _, err := s.Add(context.Background(), review("acme/api", t0, finding("a.go", "error"))); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&storedReview{}).Where("1 = 1").Update("body", []byte("{broken")).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.View(context.Background(), Query{Now: t0.Add(time.Hour), Days: 30}); err == nil || !strings.Contains(err.Error(), "cannot be decoded") {
+		t.Errorf("a damaged review was passed over in silence: %v", err)
 	}
 }
 
 func TestStoreIsIdempotentForTheSameReview(t *testing.T) {
-	dir := t.TempDir()
-	s, _ := OpenStore(dir)
-	defer func() { _ = s.Close() }()
+	s := openStore(t)
 	r := review("acme/api", t0, finding("a.go", "error"))
 	a, _ := s.Add(context.Background(), r)
 	b, _ := s.Add(context.Background(), r)
-	if a.ID != b.ID || len(s.Reviews(Filter{})) != 1 {
-		t.Fatalf("resending one review made %d records", len(s.Reviews(Filter{})))
-	}
-	if b, _ := os.ReadFile(filepath.Join(dir, "reviews.jsonl")); strings.Count(string(b), "\n") != 1 {
-		t.Fatalf("a retried review must not grow the file: %q", b)
+	if a.ID != b.ID || len(all(t, s)) != 1 {
+		t.Fatalf("resending one review made %d records", len(all(t, s)))
 	}
 }
 
 func TestStoreRefusesWhatCannotBeARepoOrAPath(t *testing.T) {
-	s, _ := OpenStore(t.TempDir())
-	defer func() { _ = s.Close() }()
+	s := openStore(t)
 	for name, r := range map[string]Review{
 		"no repo":        review("", t0),
 		"repo with ctrl": review("a\nb", t0),
@@ -99,14 +208,13 @@ func TestStoreRefusesWhatCannotBeARepoOrAPath(t *testing.T) {
 			t.Errorf("%s: accepted", name)
 		}
 	}
-	if n := len(s.Reviews(Filter{})); n != 0 {
+	if n := len(all(t, s)); n != 0 {
 		t.Fatalf("a refused review was kept: %d", n)
 	}
 }
 
 func TestStoreScrubsSecretsFromFindingText(t *testing.T) {
-	s, _ := OpenStore(t.TempDir())
-	defer func() { _ = s.Close() }()
+	s := openStore(t)
 	f := finding("a.go", "error")
 	f.Rationale = "the key ghp_abcdefghijklmnopqrstuvwxyz0123456789 is committed"
 	got, err := s.Add(context.Background(), review("acme/api", t0, f))
@@ -116,11 +224,14 @@ func TestStoreScrubsSecretsFromFindingText(t *testing.T) {
 	if strings.Contains(got.Findings[0].Rationale, "ghp_") {
 		t.Fatalf("a token reached the store: %q", got.Findings[0].Rationale)
 	}
+	stored, _, _ := s.Review(context.Background(), got.ID)
+	if strings.Contains(stored.Findings[0].Rationale, "ghp_") {
+		t.Fatalf("a token reached the database: %q", stored.Findings[0].Rationale)
+	}
 }
 
 func TestStoreCapsFindingsPerReviewAndSaysSo(t *testing.T) {
-	s, _ := OpenStore(t.TempDir())
-	defer func() { _ = s.Close() }()
+	s := openStore(t)
 	var fs []Finding
 	for i := 0; i < MaxFindings+5; i++ {
 		fs = append(fs, finding("a.go", "nit"))
@@ -134,72 +245,8 @@ func TestStoreCapsFindingsPerReviewAndSaysSo(t *testing.T) {
 	}
 }
 
-func TestStoreCountsADuplicatedLineInTheFileOnce(t *testing.T) {
-	dir := t.TempDir()
-	s, _ := OpenStore(dir)
-	_, _ = s.Add(context.Background(), review("acme/api", t0, finding("a.go", "error")))
-	_ = s.Close()
-	p := filepath.Join(dir, "reviews.jsonl")
-	b, _ := os.ReadFile(p)
-	if err := os.WriteFile(p, append(b, b...), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	again, _ := OpenStore(dir)
-	defer func() { _ = again.Close() }()
-	if n := len(again.Reviews(Filter{})); n != 1 {
-		t.Fatalf("a duplicated line made %d reviews", n)
-	}
-}
-
-func TestARepairedTornTailLetsTheNextReviewSurviveARestart(t *testing.T) {
-	dir := t.TempDir()
-	s, _ := OpenStore(dir)
-	_, _ = s.Add(context.Background(), review("acme/api", t0, finding("a.go", "error")))
-	_ = s.Close()
-	f, _ := os.OpenFile(filepath.Join(dir, "reviews.jsonl"), os.O_APPEND|os.O_WRONLY, 0o600)
-	_, _ = f.WriteString(`{"repo":"torn`) // a crash mid-write: no newline
-	_ = f.Close()
-	s, _ = OpenStore(dir)
-	if _, err := s.Add(context.Background(), review("acme/web", t0.Add(time.Hour), finding("b.go", "nit"))); err != nil {
-		t.Fatal(err)
-	}
-	_ = s.Close()
-	again, _ := OpenStore(dir)
-	defer func() { _ = again.Close() }()
-	if n := len(again.Reviews(Filter{})); n != 2 {
-		t.Fatalf("%d reviews survived, want the one before the tear and the one after: the new line was glued to the torn one", n)
-	}
-}
-
-func TestAFailedWriteLeavesNoPartialLineForTheNextReviewToJoin(t *testing.T) {
-	dir := t.TempDir()
-	s, _ := OpenStore(dir)
-	real := s.write
-	s.write = func(b []byte) (int, error) {
-		n, _ := real(b[:len(b)/2])
-		return n, errors.New("no space left on device")
-	}
-	if _, err := s.Add(context.Background(), review("acme/api", t0, finding("a.go", "error"))); err == nil {
-		t.Fatal("a failed write was reported as kept")
-	}
-	if n := len(s.Reviews(Filter{})); n != 0 {
-		t.Fatalf("a review whose write failed is in the index: %d", n)
-	}
-	s.write = real
-	if _, err := s.Add(context.Background(), review("acme/web", t0, finding("b.go", "nit"))); err != nil {
-		t.Fatal(err)
-	}
-	_ = s.Close()
-	again, _ := OpenStore(dir)
-	defer func() { _ = again.Close() }()
-	if n, skipped := len(again.Reviews(Filter{})), again.Skipped(); n != 1 || skipped != 0 {
-		t.Fatalf("%d reviews, %d skipped lines: the half line must have been removed", n, skipped)
-	}
-}
-
 func TestAReviewDatedMinutesAheadIsRefusedButSmallClockSkewIsNot(t *testing.T) {
-	s, _ := OpenStore(t.TempDir())
-	defer func() { _ = s.Close() }()
+	s := openStore(t)
 	if _, err := s.Add(context.Background(), review("r", time.Now().Add(time.Minute))); err != nil {
 		t.Fatalf("one minute of skew was refused: %v", err)
 	}
@@ -209,89 +256,47 @@ func TestAReviewDatedMinutesAheadIsRefusedButSmallClockSkewIsNot(t *testing.T) {
 }
 
 func TestAReviewSentWithoutATimeIsKeptOnceWhenSentAgain(t *testing.T) {
-	s, _ := OpenStore(t.TempDir())
-	defer func() { _ = s.Close() }()
+	s := openStore(t)
 	r := Review{Repo: "acme/api", Commit: "abc", Result: "clean", Complete: true}
 	a, _ := s.Add(context.Background(), r)
 	time.Sleep(2 * time.Millisecond)
 	b, _ := s.Add(context.Background(), r)
-	if a.ID != b.ID || len(s.Reviews(Filter{})) != 1 {
-		t.Fatalf("a retry with no at was kept twice: %d reviews", len(s.Reviews(Filter{})))
+	if a.ID != b.ID || len(all(t, s)) != 1 {
+		t.Fatalf("a retry with no at was kept twice: %d reviews", len(all(t, s)))
 	}
 }
 
-func TestASecondStoreOnTheSameDirectoryIsRefused(t *testing.T) {
-	dir := t.TempDir()
-	s, err := OpenStore(dir)
+func TestAResentReviewReturnsTheOneThatWasKeptNotTheOneJustSent(t *testing.T) {
+	s := openStore(t)
+	r := review("acme/api", t0, finding("a.go", "error"))
+	r.Source = "first-sender"
+	first, err := s.Add(context.Background(), r)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := OpenStore(dir); !errors.Is(err, ErrInUse) {
-		t.Fatalf("err = %v, want ErrInUse: two writers would interleave their lines", err)
-	}
-	_ = s.Close()
-	again, err := OpenStore(dir)
+	r.Source = "second-sender" // the id ignores who sent it, so this is the same review
+	again, err := s.Add(context.Background(), r)
 	if err != nil {
-		t.Fatalf("the directory was not released on Close: %v", err)
-	}
-	_ = again.Close()
-}
-
-func TestATailThatParsesButHasNoNewlineIsEndedBeforeTheNextReview(t *testing.T) {
-	dir := t.TempDir()
-	s, _ := OpenStore(dir)
-	first, _ := s.Add(context.Background(), review("acme/api", t0, finding("a.go", "error")))
-	_ = s.Close()
-	p := filepath.Join(dir, "reviews.jsonl")
-	b, _ := os.ReadFile(p)
-	if err := os.WriteFile(p, bytes.TrimRight(b, "\n"), 0o600); err != nil { // a whole object, its newline lost
 		t.Fatal(err)
 	}
-	s, _ = OpenStore(dir)
-	if _, err := s.Add(context.Background(), review("acme/web", t0.Add(time.Hour), finding("b.go", "nit"))); err != nil {
-		t.Fatal(err)
-	}
-	_ = s.Close()
-	again, _ := OpenStore(dir)
-	defer func() { _ = again.Close() }()
-	if n := len(again.Reviews(Filter{})); n != 2 || again.Skipped() != 0 {
-		t.Fatalf("%d reviews and %d skipped lines: the new line was glued to %s", n, again.Skipped(), first.ID[:8])
+	if again.ID != first.ID || again.Source != "first-sender" {
+		t.Errorf("a resend returned source %q, want the kept review's %q", again.Source, "first-sender")
 	}
 }
 
-func TestALineTooLongToReadIsSkippedAndCountedNotFatal(t *testing.T) {
-	dir := t.TempDir()
-	s, _ := OpenStore(dir)
-	_, _ = s.Add(context.Background(), review("acme/api", t0, finding("a.go", "error")))
-	_ = s.Close()
-	f, _ := os.OpenFile(filepath.Join(dir, "reviews.jsonl"), os.O_APPEND|os.O_WRONLY, 0o600)
-	_, _ = f.Write(bytes.Repeat([]byte("x"), 20<<20)) // longer than any review can be
-	_, _ = f.WriteString("\n")
-	_ = f.Close()
-	s, _ = OpenStore(dir)
-	_, _ = s.Add(context.Background(), review("acme/web", t0.Add(time.Hour), finding("b.go", "nit")))
-	_ = s.Close()
-	again, err := OpenStore(dir)
-	if err != nil {
-		t.Fatalf("one over-long line stopped the server starting: %v", err)
-	}
-	defer func() { _ = again.Close() }()
-	if n, skipped := len(again.Reviews(Filter{})), again.Skipped(); n != 2 || skipped != 1 {
-		t.Fatalf("%d reviews and %d skipped: the two whole reviews must load and the long line be counted", n, skipped)
-	}
-}
-
-func TestALineOverTheLimitIsDroppedWithoutBeingKept(t *testing.T) {
-	good, _ := json.Marshal(Review{ID: "abc", Repo: "r", At: t0})
-	input := string(good) + "\n" + strings.Repeat("y", 5000) + "\n" + string(good[:len(good)-1]) + "7}\n"
-	s := &Store{byID: map[string]int{}}
-	if err := s.loadFrom(strings.NewReader(input), 1000); err != nil {
+func TestAStoredBodyThatBelongsToAnotherReviewFailsTheRead(t *testing.T) {
+	db := databasetest.One(t, Models())
+	s := NewStore(db)
+	a, _ := s.Add(context.Background(), review("acme/api", t0, finding("a.go", "error")))
+	b, _ := s.Add(context.Background(), review("acme/web", t0.Add(time.Hour), finding("b.go", "error")))
+	var other storedReview
+	if err := db.Where("id = ?", b.ID).First(&other).Error; err != nil {
 		t.Fatal(err)
 	}
-	if s.peakLine > 4*1000 {
-		t.Fatalf("held %d bytes for one line with a limit of 1000: an over-long line must be dropped as it is read, not kept", s.peakLine)
+	if err := db.Model(&storedReview{}).Where("id = ?", a.ID).Update("body", other.Body).Error; err != nil {
+		t.Fatal(err)
 	}
-	if s.skipped != 2 || len(s.reviews) != 1 {
-		t.Fatalf("skipped %d, kept %d: the 5000 byte line is over the 1000 limit and is counted, the bad JSON too, the first review is kept", s.skipped, len(s.reviews))
+	if _, _, err := s.Review(context.Background(), a.ID); err == nil {
+		t.Error("a row whose body is another review's was read as that review")
 	}
 }

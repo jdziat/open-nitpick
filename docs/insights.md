@@ -18,15 +18,17 @@ roles:
 ```
 
 ```sh
-nitpick-server -config nitpick-server.yaml -data /var/lib/nitpick \
+nitpick-server -config nitpick-server.yaml -database-url "$NITPICK_DATABASE_URL" \
   -insights-token ci:write:$CI_SECRET \
   -insights-token agent:read:$AGENT_SECRET
 ```
 
-Reviews are kept in `<data>/insights/reviews.jsonl`. The server holds an index of
-them in memory and rebuilds it at start-up. A line that cannot be read, such as
-the tail a crash left, is skipped and logged with its count, and the server
-starts.
+Reviews are kept in the server's database, Postgres or MySQL (see
+[the notary](notary.md#where-records-are-kept) for the URL), in the table
+`insights_reviews`. Any number of servers may share it: a review is kept under an
+id taken from what it says, so a CI job that retries, or reaches another server,
+is kept once. Reviews an earlier, file-backed server kept are copied in with
+`nitpick-server import`, which counts what it copied.
 
 | Token role | May |
 |---|---|
@@ -58,19 +60,19 @@ repository is refused.
 
 ## Size and retention
 
-There is no retention yet. Every review stays in `reviews.jsonl`, and the server
-holds all of them in memory and scans them for each page. A review with the
-maximum 500 findings is about 1 to 2 MB, and a typical one is a few kilobytes.
-Plan on memory near the size of the file, and a start-up time that grows with it
-(reading the file once). To trim, stop the server, move the file aside or cut its
-oldest lines, and start it again. One process may hold the directory: a second
-refuses to start, as with the notary. The lock is a file lock, so keep the data
-directory on a local disk: some network file systems do not honour it.
+There is no retention yet: every review stays in the table. A request reads the
+window it asks for, and the one before it for the change against the period, and
+no more (`days` is at most 365), so the cost of a page follows the window and not
+the history. A review with the maximum 500 findings is about 1 to 2 MB, and a
+typical one is a few kilobytes. If the database cannot be read, a page is a 500
+and says so; it is never an empty dashboard, and a stored review that cannot be
+decoded fails the read for the same reason. To trim, delete rows from
+`insights_reviews` older than you want to keep.
 
 A write token may post up to 8 MiB per request and there is no rate limit. Give
 write tokens only to CI jobs you trust. A review dated more than five minutes
 ahead of the server's clock is refused with 400, since no page would show it. If
-the disk fills during a post, the partial line is removed and the post fails.
+the database cannot take a post, the post fails with 500 and nothing is kept.
 
 Text in a finding (title and rationale) is scrubbed of credential-shaped strings.
 Repository, ref, commit, path and result are not, so do not put a secret there.

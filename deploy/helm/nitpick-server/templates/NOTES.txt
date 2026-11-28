@@ -1,10 +1,22 @@
-The notary is installed as {{ include "notary.fullname" . }}, one replica.
+The server is installed as {{ include "notary.fullname" . }}: {{ .Values.replicaCount }} replica{{ if ne (int .Values.replicaCount) 1 }}s{{ end }}, {{ if eq .Values.database.bundled "none" }}on the database you gave in externalDatabase{{ else }}on a bundled {{ .Values.database.bundled }} ({{ include "notary.dbHost" . }}){{ end }}.
 
 Point a review at it from inside the cluster:
   nitpick review -notary http://{{ include "notary.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.service.port }}
 
-with NITPICK_NOTARY_TOKEN set to the secret whose hash you gave the chart.
-{{- if not .Values.persistence.enabled }}
+{{- if include "notary.generateToken" . }}
 
-persistence.enabled is false: records are lost when the pod restarts.
+You gave no tokens, so the chart made one. Read it with:
+  kubectl get secret {{ include "notary.fullname" . }} -n {{ .Release.Namespace }} -o jsonpath='{.data.token}' | base64 -d
+and set it as NITPICK_NOTARY_TOKEN.
+{{- else }}
+
+with NITPICK_NOTARY_TOKEN set to the secret whose hash you gave the chart.
+{{- end }}
+{{- if and (ne .Values.database.bundled "none") (not .Values.database.existingSecret) }}
+
+The database password was generated and is in the Secret {{ include "notary.dbSecretName" . }}. It is kept when the release is deleted, with the data it belongs to.
+{{- end }}
+{{- if and (ne .Values.database.bundled "none") (not .Values.database.persistence.enabled) }}
+
+database.persistence.enabled is false: everything the server keeps is lost when the database pod restarts.
 {{- end }}

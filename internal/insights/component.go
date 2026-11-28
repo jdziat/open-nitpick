@@ -258,10 +258,10 @@ var reviewSorts = sortSpec{allowed: []string{"at", "repo", "findings", "errors",
 
 // Reviews lists the reviews of a window, filtered, searched, sorted and paged.
 // complete is "", "true" or "false".
-func (c *Component) reviewList(q Query, p ListParams, complete string) Paged[ReviewRow] {
+func (c *Component) reviewList(v *View, q Query, p ListParams, complete string) Paged[ReviewRow] {
 	from, _ := q.window()
 	var rows []ReviewRow
-	for _, rv := range c.store.Reviews(Filter{Repo: q.Repo, Since: from, Until: q.Now}) {
+	for _, rv := range v.Reviews(Filter{Repo: q.Repo, Since: from, Until: q.Now}) {
 		row := reviewRow(rv)
 		if complete != "" && strconv.FormatBool(row.Complete) != complete {
 			continue
@@ -279,6 +279,20 @@ func (c *Component) reviewList(q Query, p ListParams, complete string) Paged[Rev
 		"result":   func(a, b ReviewRow) int { return strings.Compare(a.Result, b.Result) },
 	})
 	return paginate(rows, p)
+}
+
+// view loads the window a query asks about, or answers 500 and says why in the
+// log. ok is false when it has answered. A read that fails is an error and not an
+// empty page: a dashboard that quietly shows nothing looks like a team with no
+// findings.
+func (c *Component) view(w http.ResponseWriter, r *http.Request, q Query) (*View, bool) {
+	v, err := c.store.View(r.Context(), q)
+	if err != nil {
+		c.log.Error("insights: read reviews", "error", err)
+		http.Error(w, "the reviews could not be read", http.StatusInternalServerError)
+		return nil, false
+	}
+	return v, true
 }
 
 // listRequest authenticates a read route and reads the window and the list
@@ -309,14 +323,23 @@ func (c *Component) list(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "complete must be true or false", http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, http.StatusOK, c.reviewList(q, p, complete))
+	v, ok := c.view(w, r, q)
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusOK, c.reviewList(v, q, p, complete))
 }
 
 func (c *Component) one(w http.ResponseWriter, r *http.Request) {
 	if _, ok := c.need(w, r, false); !ok {
 		return
 	}
-	rv, ok := c.store.Review(r.PathValue("id"))
+	rv, ok, err := c.store.Review(r.Context(), r.PathValue("id"))
+	if err != nil {
+		c.log.Error("insights: read a review", "error", err)
+		http.Error(w, "the review could not be read", http.StatusInternalServerError)
+		return
+	}
 	if !ok {
 		http.Error(w, "no such review", http.StatusNotFound)
 		return
@@ -333,10 +356,14 @@ func (c *Component) overview(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	v, ok := c.view(w, r, q)
+	if !ok {
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"overview": c.store.Overview(q),
-		"prior":    c.store.PriorOverview(q),
-		"series":   c.store.Series(q),
+		"overview": v.Overview(q),
+		"prior":    v.PriorOverview(q),
+		"series":   v.Series(q),
 	})
 }
 
@@ -349,7 +376,11 @@ func (c *Component) facets(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, http.StatusOK, c.store.Facets(q))
+	v, ok := c.view(w, r, q)
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusOK, v.Facets(q))
 }
 
 var repoSorts = sortSpec{allowed: []string{"repo", "reviews", "findings", "errors", "last"}, def: "findings", defDesc: true}
@@ -359,8 +390,12 @@ func (c *Component) repos(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	v, ok := c.view(w, r, q)
+	if !ok {
+		return
+	}
 	var rows []RepoRow
-	for _, row := range c.store.Repos(q) {
+	for _, row := range v.Repos(q) {
 		if contains(p.Q, row.Repo) {
 			rows = append(rows, row)
 		}
@@ -392,8 +427,12 @@ func (c *Component) hotspots(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "min_severity must be one of "+strings.Join(Severities, ", "), http.StatusBadRequest)
 		return
 	}
+	v, ok := c.view(w, r, q)
+	if !ok {
+		return
+	}
 	var rows []Hotspot
-	for _, h := range c.store.Hotspots(q) {
+	for _, h := range v.Hotspots(q) {
 		if trend != "" && h.Trend != trend || rank(h.Worst) < rank(floor) || !contains(p.Q, h.Path, h.Repo) {
 			continue
 		}
@@ -424,7 +463,11 @@ func (c *Component) findings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "min_severity must be one of "+strings.Join(Severities, ", "), http.StatusBadRequest)
 		return
 	}
-	rows := c.store.AllFindings(fq)
+	view, ok := c.view(w, r, q)
+	if !ok {
+		return
+	}
+	rows := view.AllFindings(fq)
 	sortRows(rows, p, map[string]func(a, b FindingRow) int{
 		"at":       func(a, b FindingRow) int { return a.At.Compare(b.At) },
 		"severity": func(a, b FindingRow) int { return rank(a.Severity) - rank(b.Severity) },
