@@ -953,3 +953,34 @@ func TestAFlakyNotaryThatNeverFailsThreeInARowIsNotGivenUpOn(t *testing.T) {
 		t.Errorf("%d of 30 writes landed, want the 10 that the store accepted: the breaker opened on failures that were not consecutive", st.Recorded)
 	}
 }
+
+// An engine can review more than one pull request. The route decisions and the
+// notary session are set only when a review gets that far, so a review whose plan
+// holds no batch read the previous review's values and published them as its own.
+func TestAReviewThatPlansNothingDoesNotPublishTheLastReviewsRoutesOrNotary(t *testing.T) {
+	empty := &stubProvider{diff: "diff --git a/x.png b/x.png\nBinary files a/x.png and b/x.png differ\n"}
+	e := newEngine(t, notaryModel(t), empty, nil)
+	e.Notary = fileStore(t)
+	e.routeDecisions = []RouteDecision{{Files: []string{"left/over.go"}, Reviewer: "last-reviews-model"}}
+	e.assessedDesignTasks = []string{"left-over-task"}
+	sess, _ := armedSession(t, fileStore(t), notaryModel(t))
+	sess.status.Hash = "last-reviews-hash"
+	e.notarySess = sess
+
+	report, err := e.Review(context.Background(), vcs.Ref{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Plan.Batches) != 0 {
+		t.Fatalf("setup: the plan must pack nothing, got %d batches", len(report.Plan.Batches))
+	}
+	if len(report.Routes) != 0 {
+		t.Errorf("the report carries routes from an earlier review: %+v", report.Routes)
+	}
+	if len(e.assessedDesignTasks) != 0 {
+		t.Errorf("the engine still holds design tasks from an earlier review: %v", e.assessedDesignTasks)
+	}
+	if report.Notary.Hash == "last-reviews-hash" {
+		t.Errorf("the report carries the earlier review's notary session: %+v", report.Notary)
+	}
+}

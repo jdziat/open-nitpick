@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/nitpick-oss/nitpick/internal/redact"
 	"github.com/nitpick-oss/nitpick/internal/server"
 	"github.com/nitpick-oss/nitpick/internal/wire"
 )
@@ -25,8 +26,16 @@ func (c *Component) authoritative(r *http.Request) (allowed, known bool) {
 	return false, false
 }
 
-// list serves GET /v1/records.
-func (c *Component) list(w http.ResponseWriter, r *http.Request) {
+// list serves GET /v1/records: the summaries as stored, for machines.
+func (c *Component) list(w http.ResponseWriter, r *http.Request) { c.listRecords(w, r, false) }
+
+// viewList serves GET /v1/records/view: the same listing with each summary run
+// through the scrubber the reviewer applies to what it prints, for the web app. A
+// credential that ended up in a model name or a source label is then not shown to
+// whoever opens the page.
+func (c *Component) viewList(w http.ResponseWriter, r *http.Request) { c.listRecords(w, r, true) }
+
+func (c *Component) listRecords(w http.ResponseWriter, r *http.Request, scrub bool) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -61,6 +70,13 @@ func (c *Component) list(w http.ResponseWriter, r *http.Request) {
 	}
 	if page == nil {
 		page = []wire.Summary{} // an empty store is "records": [], not null
+	}
+	if scrub {
+		for i := range page {
+			page[i].Model, page[i].Tool = redact.Secrets(page[i].Model), redact.Secrets(page[i].Tool)
+			page[i].Provider, page[i].Source = redact.Secrets(page[i].Provider), redact.Secrets(page[i].Source)
+			page[i].Effort = redact.Secrets(page[i].Effort)
+		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")

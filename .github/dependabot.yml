@@ -28,3 +28,18 @@ updates:
     directory: /
     schedule:
       interval: weekly
+
+  # The web app's dependencies. The lockfile is committed and installs run with
+  # install scripts off, so a bump arrives as a pull request that has to build and
+  # pass the UI tests.
+  - package-ecosystem: npm
+    directory: /ui
+    schedule:
+      interval: weekly
+
+  # The release image's base images. The Dockerfile names them by tag, so this is
+  # what moves them: a bump arrives as a pull request that builds the image.
+  - package-ecosystem: docker
+    directory: /deploy/docker
+    schedule:
+      interval: weekly

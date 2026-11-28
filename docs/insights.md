@@ -77,12 +77,15 @@ Repository, ref, commit, path and result are not, so do not put a secret there.
 
 ## The pages
 
+The web app is at `/ui/`. Every table in it pages, sorts, searches and filters, and
+the choices are in the address, so a reload or a shared link shows the same rows.
+
 | Page | Question it answers |
 |---|---|
 | Overview | How many reviews and findings, up or down against the period before, by day, severity and class |
 | Repositories | Which repositories are being reviewed, and which have the most findings |
 | Hotspots | Which files keep producing findings, and whether that is getting worse |
-| Findings | The findings themselves, filtered by file, class and severity |
+| Findings | The findings themselves, searched and filtered by file, class and severity |
 | Reviews | Each run, and whether it finished |
 
 A review that did not finish is marked everywhere it appears. Its zero findings are
@@ -133,11 +136,36 @@ an earlier request.
 |---|---|
 | `POST /v1/reviews` | write |
 | `GET /v1/reviews`, `GET /v1/reviews/{id}` | read |
-| `GET /v1/insights/overview`, `/hotspots`, `/findings` | read |
+| `GET /v1/insights/overview`, `/hotspots`, `/findings`, `/repos`, `/facets` | read |
 
-The read routes take `days` (1 to 365, default 30) and `repo`. `findings` also
-takes `path` (a file, or a directory ending in `/`), `class`, `min_severity` and
-`limit`. A bad value is a 400, not a default.
+The read routes take `days` (1 to 365, default 30) and `repo`. A bad value is a
+400, not a default.
+
+Every list route (`/v1/reviews`, `/hotspots`, `/findings`, `/repos`) pages, sorts
+and searches the same way and answers in one envelope:
+
+```json
+{ "items": [], "total": 134, "page": 1, "page_size": 20, "pages": 7 }
+```
+
+| Parameter | Meaning |
+|---|---|
+| `page` | A whole number from 1. A page past the end is empty, with the true `total`. |
+| `page_size` | 1 to 100, default 20. |
+| `sort`, `order` | A field the route allows, and `asc` or `desc`. A field it does not allow is a 400. |
+| `q` | Text to find, ignoring case, in the fields the route searches. At most 200 characters. |
+
+Each route also has its own filters and sort fields:
+
+| Route | Sort by | Filters |
+|---|---|---|
+| `/v1/reviews` | `at`, `repo`, `findings`, `errors`, `result` | `complete` (`true` or `false`) |
+| `/v1/insights/hotspots` | `score`, `findings`, `path`, `repo`, `delta`, `worst`, `last` | `trend` (`up`, `down`, `flat`), `min_severity` |
+| `/v1/insights/findings` | `at`, `severity`, `path`, `repo`, `class`, `title` | `path` (a file, or a directory ending in `/`), `class`, `min_severity` |
+| `/v1/insights/repos` | `repo`, `reviews`, `findings`, `errors`, `last` | none |
+
+`/v1/insights/facets` lists the repositories and classes that exist in the
+period, so a filter menu offers only values that match something.
 
 ## What this does not have
 

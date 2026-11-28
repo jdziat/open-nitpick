@@ -169,7 +169,7 @@ func BuildStandards(ctx context.Context, cfg *config.Config, checkout, base stri
 // follow its conventions, which is a question nobody has.
 func standardsSkipDir(name string) bool {
 	switch name {
-	case "website", "dist", "public", ".website", "testdata":
+	case "website", "dist", "ui_dist", "public", ".website", "testdata":
 		return true
 	}
 	return false

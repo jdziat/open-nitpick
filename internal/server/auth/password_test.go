@@ -511,7 +511,6 @@ type echo struct{}
 
 func (echo) Name() string                 { return "echo" }
 func (echo) Prefixes() []string           { return []string{"/v1/echo/"} }
-func (echo) Pages() []server.Page         { return nil }
 func (echo) Health(context.Context) error { return nil }
 func (echo) Routes() []server.Route {
 	return []server.Route{{Pattern: "GET /v1/echo/who", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

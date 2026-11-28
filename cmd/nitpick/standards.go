@@ -283,13 +283,14 @@ func writeAgents(path string, rep standards.Report) error {
 
 // skipStandardsDir names directories a measurement should not walk.
 //
-// testdata is the one worth arguing: Go's convention is that it holds code
+// ui_dist is the UI build the server embeds: minified output, not code anyone
+// wrote. testdata is the one worth arguing: Go's convention is that it holds code
 // written to be wrong. The review engine keeps its own copy, since internal
 // packages do not import cmd, and the two are pinned together by
 // TestTheCommandAndTheReviewerSkipTheSameDirectories.
 func skipStandardsDir(name string) bool {
 	switch name {
-	case "website", "dist", "public", ".website", "testdata":
+	case "website", "dist", "ui_dist", "public", ".website", "testdata":
 		return true
 	}
 	return false

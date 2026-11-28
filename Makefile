@@ -15,11 +15,13 @@ build:
 install:
 	go install -ldflags '$(LDFLAGS)' $(PKG)
 
-# The hub UI, written to the directory the server embeds. A go build without it
-# produces a server whose UI pages say the UI was not built; the release image
-# runs this first.
+# The hub UI: the web app under ui/ is built with Node, then copied into the
+# directory the server embeds. A go build without it produces a server whose UI
+# pages say the UI was not built; the release image runs both steps. Dependencies
+# install from the lockfile with install scripts off.
 .PHONY: ui
 ui:
+	cd ui && npm ci --ignore-scripts --no-audit --no-fund && npm run build
 	go run ./internal/server/uibuild
 
 # nitpick-server with the UI in it.

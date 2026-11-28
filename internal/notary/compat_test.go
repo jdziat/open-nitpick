@@ -159,7 +159,7 @@ func TestAnOldDataDirectoryKeepsWorkingForWritesAndClears(t *testing.T) {
 	}
 }
 
-// The new pages show a record the old server wrote, including the answer it
+// The new view shows a record the old server wrote, including the answer it
 // marked unusable and the reasoning level.
 func TestTheHubShowsARecordWrittenByTheLastRelease(t *testing.T) {
 	store, err := wire.NewFileStore(oldData(t))
@@ -168,10 +168,19 @@ func TestTheHubShowsARecordWrittenByTheLastRelease(t *testing.T) {
 	}
 	h := newHub(t, store)
 	h.signIn("kay", "keepers")
-	_, body := h.do("GET", "/ui/notary/records/"+strings.Repeat("0", 63)+"3", nil, "")
-	for _, want := range []string{"medium", "rejected vote", `class="tag">unusable`, "z-ai/glm-5.3-flash", "v2.10.0"} {
-		if !strings.Contains(body, want) {
-			t.Errorf("the page lacks %q:\n%s", want, body)
-		}
+	code, v := getView(t, h, "/v1/records/view/"+strings.Repeat("0", 63)+"3", nil)
+	if code != 200 {
+		t.Fatalf("the view of an old record = %d", code)
+	}
+	if v.Effort != "medium" || v.Model != "z-ai/glm-5.3-flash" || v.Tool != "v2.10.0" {
+		t.Errorf("the view lacks what the old record held: %+v", v)
+	}
+	var sawVote, sawUnusable bool
+	for _, a := range v.Answers {
+		sawVote = sawVote || strings.Contains(a.Text, "rejected vote")
+		sawUnusable = sawUnusable || a.Unusable
+	}
+	if !sawVote || !sawUnusable {
+		t.Errorf("the answer the old server marked unusable is not shown as one: %+v", v.Answers)
 	}
 }

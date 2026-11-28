@@ -30,7 +30,7 @@ func TestABinaryWithoutTheBuiltUIServesTheStubPage(t *testing.T) {
 	}
 	// Rule 10: the stub is the UI being unbuilt. With the UI built the same URL
 	// is the login redirect, so the stub above is not a page that is always shown.
-	built := standard(t, "x")
+	built := standard(t)
 	if resp, _ := built.do("GET", "/ui/", nil, nil); resp.StatusCode != 303 {
 		t.Errorf("a built UI at /ui/ = %d, want the login redirect", resp.StatusCode)
 	}
@@ -67,7 +67,7 @@ func TestAManifestThatIsBrokenMeansTheUIWasNotBuilt(t *testing.T) {
 // Assets are served by their hashed name, only if the manifest lists them, with
 // the headers a content-hashed file wants.
 func TestAssetsAreServedOnlyByTheNamesTheManifestLists(t *testing.T) {
-	e := standard(t, "x")
+	e := standard(t)
 	resp, body := e.do("GET", "/ui/assets/app.0123456789ab.css", nil, nil)
 	if resp.StatusCode != 200 || body != "body{}" {
 		t.Fatalf("a listed asset = %d %q", resp.StatusCode, body)

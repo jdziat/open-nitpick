@@ -65,6 +65,52 @@ jobs:
       - name: Build
         run: go build ./...
 
+  # The hub UI under ui/. The Go tests skip the embedded-build path when ui/dist
+  # does not exist, so this job builds it and runs that path: without it, a
+  # change that breaks the build output the server serves would pass every
+  # other job.
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+      # --ignore-scripts: no package's install script runs on the runner.
+      - name: Install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: ui
+      # What ships to the browser. .npmrc turns the audit off for a plain install,
+      # which would otherwise add a network call to every build.
+      - name: Audit what the browser runs
+        run: npm audit --omit=dev --audit-level=high
+        working-directory: ui
+      - name: Lint
+        run: npm run lint
+        working-directory: ui
+      - name: Type check
+        run: npx tsc -b
+        working-directory: ui
+      - name: Test
+        run: npx vitest run
+        working-directory: ui
+      - name: Build
+        run: npm run build
+        working-directory: ui
+      - name: Embed the build and serve it
+        run: |
+          go run ./internal/server/uibuild
+          go test -race -run 'TestTheBuiltUI' ./internal/server/ -v | tee "$RUNNER_TEMP/ui-test.log"
+          if grep -q -- '--- SKIP' "$RUNNER_TEMP/ui-test.log"; then
+            echo "a UI test skipped although the build exists" >&2
+            exit 1
+          fi
+
   # Binaries for every push and pull request, built by the same target the
   # release uses, so a change can be tried on a runner before it is tagged.
   build:

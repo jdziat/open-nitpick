@@ -905,6 +905,10 @@ func (e *Engine) Review(ctx context.Context, ref vcs.Ref) (*Report, error) {
 		return nil, err
 	}
 	e = next
+	// withPolicy returns the engine itself when it has no model factory, so a second
+	// review on it would read what the first left here. These are set only when a
+	// review plans and routes, and one that plans nothing never overwrites them.
+	e.routeDecisions, e.assessedDesignTasks, e.notarySess = nil, nil, nil
 
 	report := &Report{Policy: policy, Incomplete: unrenderable, Head: pr.HeadSHA, PullRequest: pr, FastReview: e.FastReview, FastLimit: e.FastLimit}
 	e.executions = &executionRun{enabled: e.Config.Execution.Enabled}

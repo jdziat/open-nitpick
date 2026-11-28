@@ -2,6 +2,8 @@ package notary
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -350,212 +352,6 @@ func TestTheCollectionAcceptsOnlyGET(t *testing.T) {
 	}
 }
 
-// A record whose model output (and every field a person or a model can influence)
-// contains markup renders as text on the pages, in both the list and the record.
-func TestMarkupInARecordIsShownAsTextOnEveryPage(t *testing.T) {
-	const evil = `<script>alert(1)</script><img src=x onerror=alert(2)>"'&`
-	fs := fileStore(t)
-	putRecord(t, fs, 1, func(r *wire.Record) {
-		r.Model = evil
-		r.Provider = evil
-		r.Tool = evil
-		r.Source = evil
-		r.Effort = evil
-		r.ClearedBy = []string{evil}
-		r.Clears = 1
-		r.Answers = map[string]string{
-			"abc#0": `{"content":"` + evil + `"}`,
-			"abc#1": "!" + evil,
-			evil:    evil, // even a key
-		}
-	})
-	h := newHub(t, fs)
-	h.signIn("kay", "keepers")
-
-	for _, path := range []string{"/ui/notary/", "/ui/notary/records/" + hashOf(1)} {
-		resp, body := h.do("GET", path, nil, "")
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("%s = %d", path, resp.StatusCode)
-		}
-		for _, bad := range []string{"<script>alert", "<img src=x", "onerror=alert(2)>"} {
-			if strings.Contains(body, bad) {
-				t.Errorf("%s: markup reached the page: found %q", path, bad)
-			}
-		}
-		if !strings.Contains(body, "&lt;script&gt;alert(1)&lt;/script&gt;") {
-			t.Errorf("%s: the text is not shown, escaped", path)
-		}
-	}
-}
-
-func TestTheRecordPagesAreRefusedWithoutTheAuthoritativeRole(t *testing.T) {
-	fs := fileStore(t)
-	putRecord(t, fs, 1, nil)
-
-	anon := newHub(t, fs)
-	for _, path := range []string{"/ui/notary/", "/ui/notary/records/" + hashOf(1)} {
-		if resp, _ := anon.do("GET", path, nil, ""); resp.StatusCode != http.StatusSeeOther {
-			t.Errorf("%s anonymous = %d, want a redirect to sign in", path, resp.StatusCode)
-		}
-	}
-	for name, groups := range map[string][]string{"a read-only session": {"readers"}, "a session with no role": {"interns"}} {
-		h := newHub(t, fs)
-		h.signIn("rae", groups...)
-		for _, path := range []string{"/ui/notary/", "/ui/notary/records/" + hashOf(1)} {
-			resp, body := h.do("GET", path, nil, "")
-			if resp.StatusCode != http.StatusForbidden {
-				t.Errorf("%s: %s = %d, want 403", name, path, resp.StatusCode)
-			}
-			if strings.Contains(body, hashOf(1)) || strings.Contains(body, "glm") {
-				t.Errorf("%s: %s shows a record to an account that may not see them", name, path)
-			}
-		}
-	}
-	// An authoritative session sees them.
-	ok := newHub(t, fs)
-	ok.signIn("kay", "keepers")
-	if resp, body := ok.do("GET", "/ui/notary/records/"+hashOf(1), nil, ""); resp.StatusCode != http.StatusOK || !strings.Contains(body, hashOf(1)) {
-		t.Errorf("an authoritative session = %d", resp.StatusCode)
-	}
-}
-
-func TestTheRecordPageSaysWhetherARecordReplaysOrResumes(t *testing.T) {
-	fs := fileStore(t)
-	putRecord(t, fs, 1, nil) // complete
-	putRecord(t, fs, 2, func(r *wire.Record) { r.Complete = false; r.Batches = 3 })
-	h := newHub(t, fs)
-	h.signIn("kay", "keepers")
-
-	_, complete := h.do("GET", "/ui/notary/records/"+hashOf(1), nil, "")
-	_, partial := h.do("GET", "/ui/notary/records/"+hashOf(2), nil, "")
-	if !strings.Contains(complete, "is replayed from it") || strings.Contains(complete, "resumes") {
-		t.Errorf("a complete record does not say it replays:\n%s", complete)
-	}
-	if !strings.Contains(partial, "resumes") || strings.Contains(partial, "is replayed from it") {
-		t.Errorf("an incomplete record does not say it resumes:\n%s", partial)
-	}
-	_, list := h.do("GET", "/ui/notary/", nil, "")
-	if !strings.Contains(list, "replays") || !strings.Contains(list, "resumes") {
-		t.Errorf("the list does not show both states:\n%s", list)
-	}
-}
-
-func TestTheRecordPageMarksUnusableAnswersAndShowsTheReasoningLevel(t *testing.T) {
-	fs := fileStore(t)
-	putRecord(t, fs, 1, func(r *wire.Record) {
-		r.Effort = "medium"
-		r.Answers = map[string]string{"req1#0": `{"content":"good"}`, "req1#1": "!" + `{"content":"rejected"}`}
-	})
-	h := newHub(t, fs)
-	h.signIn("kay", "keepers")
-	_, body := h.do("GET", "/ui/notary/records/"+hashOf(1), nil, "")
-	if strings.Count(body, `class="tag">unusable`) != 1 {
-		t.Errorf("exactly one answer is unusable:\n%s", body)
-	}
-	if !strings.Contains(body, "Reasoning level") || !strings.Contains(body, "medium") {
-		t.Errorf("the reasoning level is not shown:\n%s", body)
-	}
-	if strings.Contains(body, "!{") {
-		t.Errorf("the unusable mark was left on the text:\n%s", body)
-	}
-	if !strings.Contains(body, "answer 0") || !strings.Contains(body, "answer 1") {
-		t.Errorf("identical requests are not shown as separate answers:\n%s", body)
-	}
-	// With no effort recorded, the page says so.
-	putRecord(t, fs, 2, func(r *wire.Record) { r.Effort = "" })
-	if _, other := h.do("GET", "/ui/notary/records/"+hashOf(2), nil, ""); !strings.Contains(other, "not recorded") {
-		t.Errorf("a record with no effort does not say so:\n%s", other)
-	}
-}
-
-func TestARecordPageForAnUnknownOrMalformedHashIsNotFound(t *testing.T) {
-	h := newHub(t, fileStore(t))
-	h.signIn("kay", "keepers")
-	for _, path := range []string{"/ui/notary/records/" + hashOf(99), "/ui/notary/records/short", "/ui/notary/records/" + strings.ToUpper(hashOf(255)), "/ui/notary/records/..%2f..%2fetc"} {
-		if resp, _ := h.do("GET", path, nil, ""); resp.StatusCode != http.StatusNotFound {
-			t.Errorf("%s = %d, want 404", path, resp.StatusCode)
-		}
-	}
-}
-
-func TestTheListPageFiltersAndSaysWhyItIsEmpty(t *testing.T) {
-	fs := fileStore(t)
-	h := newHub(t, fs)
-	h.signIn("kay", "keepers")
-	_, none := h.do("GET", "/ui/notary/", nil, "")
-	if !strings.Contains(none, "The notary holds no records.") {
-		t.Errorf("an empty store does not say so:\n%s", none)
-	}
-	putRecord(t, fs, 1, nil)
-	_, one := h.do("GET", "/ui/notary/", nil, "")
-	if strings.Contains(one, "holds no records") || !strings.Contains(one, hashOf(1)[:12]) {
-		t.Errorf("a store with a record shows as empty:\n%s", one)
-	}
-	_, filtered := h.do("GET", "/ui/notary/?model=nothing-matches", nil, "")
-	if !strings.Contains(filtered, "No record matches this filter.") || strings.Contains(filtered, "holds no records") {
-		t.Errorf("a filter that matches nothing is not told apart from an empty store:\n%s", filtered)
-	}
-	// A filter value typed wrong is reported on the page and is not a 500.
-	resp, bad := h.do("GET", "/ui/notary/?since=yesterday", nil, "")
-	if resp.StatusCode != http.StatusOK || !strings.Contains(bad, "RFC 3339") {
-		t.Errorf("a bad since = %d, and the page says: %s", resp.StatusCode, bad)
-	}
-}
-
-func TestTheListPageLinksToTheNextPage(t *testing.T) {
-	fs := fileStore(t)
-	for i := 1; i <= 60; i++ {
-		putRecord(t, fs, i, nil)
-		at := time.Now().Add(-time.Duration(100-i) * time.Minute)
-		if err := os.Chtimes(filepath.Join(storeDirOf(fs), hashOf(i)+".json"), at, at); err != nil {
-			t.Fatal(err)
-		}
-	}
-	h := newHub(t, fs)
-	h.signIn("kay", "keepers")
-	_, page := h.do("GET", "/ui/notary/?model=z-ai/glm", nil, "")
-	i := strings.Index(page, `href="/ui/notary/?`)
-	if i < 0 || !strings.Contains(page, "Older records") {
-		t.Fatalf("a 60-record store has no link to the next page:\n%s", page)
-	}
-	href := strings.ReplaceAll(between(t, page[i:], `href="`, `"`), "&amp;", "&")
-	if !strings.Contains(href, "model=z-ai%2Fglm") || !strings.Contains(href, "cursor=") {
-		t.Errorf("the next link %q drops the filter or has no cursor", href)
-	}
-	resp, next := h.do("GET", href, nil, "")
-	if resp.StatusCode != http.StatusOK || strings.Contains(next, "Older records") && strings.Count(next, "/ui/notary/records/") == 0 {
-		t.Errorf("the next page = %d", resp.StatusCode)
-	}
-	if strings.Count(next, "/ui/notary/records/") != 10 {
-		t.Errorf("the second page shows %d records, want the remaining 10", strings.Count(next, "/ui/notary/records/"))
-	}
-}
-
-// The pages never write: a request to them with any method but GET is refused,
-// and a GET leaves the store exactly as it was.
-func TestThePagesAreReadOnly(t *testing.T) {
-	fs := fileStore(t)
-	putRecord(t, fs, 1, nil)
-	h := newHub(t, fs)
-	h.signIn("kay", "keepers")
-	before, _, _ := fs.List(context.Background(), wire.ListQuery{})
-	for _, path := range []string{"/ui/notary/", "/ui/notary/records/" + hashOf(1)} {
-		h.do("GET", path, nil, "")
-		for _, m := range []string{"POST", "PUT", "DELETE"} {
-			if resp, _ := h.do(m, path, nil, ""); resp.StatusCode != http.StatusMethodNotAllowed && resp.StatusCode != http.StatusForbidden {
-				t.Errorf("%s %s = %d, want it refused", m, path, resp.StatusCode)
-			}
-		}
-	}
-	after, _, _ := fs.List(context.Background(), wire.ListQuery{})
-	if len(before) != 1 || len(after) != 1 || after[0] != before[0] {
-		t.Errorf("the store changed: %v -> %v", before, after)
-	}
-	if rec, ok, _ := fs.Get(context.Background(), hashOf(1)); !ok || rec.Clears != 0 {
-		t.Error("a page request cleared or removed a record")
-	}
-}
-
 // The machine routes are the same ones as before: a token still writes, reads and
 // clears a record by its hash, and a session alone does not stand in for one.
 func TestTheRecordRoutesStillWantAToken(t *testing.T) {
@@ -624,16 +420,134 @@ type stubOther struct{}
 
 func (stubOther) Name() string                 { return "other" }
 func (stubOther) Prefixes() []string           { return []string{"/v1/other/"} }
-func (stubOther) Pages() []server.Page         { return nil }
 func (stubOther) Health(context.Context) error { return nil }
 func (stubOther) Routes() []server.Route {
 	return []server.Route{{Pattern: "GET /v1/other/x", Handler: http.NotFoundHandler()}}
 }
 
-// A credential a model echoed back out of the diff is not shown to whoever opens
-// the page, in any field the page prints, and the record is stored as it was
-// given, since replay needs the answer unchanged.
-func TestASecretInARecordIsRedactedOnEveryPageAndKeptInTheRecord(t *testing.T) {
+// between returns the text after start and before the next end, and fails the test
+// when either is missing, so a changed page is a failure and not a slice at -1.
+func between(tb testing.TB, s, start, end string) string {
+	tb.Helper()
+	i := strings.Index(s, start)
+	if i < 0 {
+		tb.Fatalf("%q is not in:\n%s", start, s)
+	}
+	rest := s[i+len(start):]
+	j := strings.Index(rest, end)
+	if j < 0 {
+		tb.Fatalf("%q does not follow %q in:\n%s", end, start, s)
+	}
+	return rest[:j]
+}
+
+func getView(t *testing.T, h *hub, path string, hdr map[string]string) (int, RecordView) {
+	t.Helper()
+	resp, body := h.do("GET", path, hdr, "")
+	var v RecordView
+	if resp.StatusCode == http.StatusOK {
+		if err := json.Unmarshal([]byte(body), &v); err != nil {
+			t.Fatalf("%s: %v\n%s", path, err, body)
+		}
+	}
+	return resp.StatusCode, v
+}
+
+func TestTheViewRoutesAreForTheAuthoritativeRoleOnly(t *testing.T) {
+	fs := fileStore(t)
+	putRecord(t, fs, 1, nil)
+	h := newHub(t, fs)
+	for _, path := range []string{"/v1/records/view", "/v1/records/view/" + hashOf(1)} {
+		if resp, _ := h.do("GET", path, nil, ""); resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("%s with no credential = %d, want 401", path, resp.StatusCode)
+		}
+		for name, secret := range map[string]string{"provisional": "prov-secret", "read": "read-secret"} {
+			if resp, _ := h.do("GET", path, bearer(secret), ""); resp.StatusCode != http.StatusForbidden {
+				t.Errorf("%s with a %s token = %d, want 403", path, name, resp.StatusCode)
+			}
+		}
+		if resp, _ := h.do("GET", path, bearer("auth-secret"), ""); resp.StatusCode != http.StatusOK {
+			t.Errorf("%s with an authoritative token = %d", path, resp.StatusCode)
+		}
+	}
+	// A person is held to the same rule: signed in is not enough.
+	reader := newHub(t, fs)
+	reader.signIn("rae", "readers")
+	for _, path := range []string{"/v1/records/view", "/v1/records/view/" + hashOf(1)} {
+		if resp, _ := reader.do("GET", path, nil, ""); resp.StatusCode != http.StatusForbidden {
+			t.Errorf("%s for a read-only person = %d, want 403", path, resp.StatusCode)
+		}
+	}
+	keeper := newHub(t, fs)
+	keeper.signIn("kay", "keepers")
+	for _, path := range []string{"/v1/records/view", "/v1/records/view/" + hashOf(1)} {
+		if resp, _ := keeper.do("GET", path, nil, ""); resp.StatusCode != http.StatusOK {
+			t.Errorf("%s for a keeper = %d", path, resp.StatusCode)
+		}
+	}
+}
+
+func TestTheViewOfARecordSaysWhetherItReplaysAndMarksUnusableAnswers(t *testing.T) {
+	fs := fileStore(t)
+	putRecord(t, fs, 1, func(r *wire.Record) {
+		r.Effort = "medium"
+		r.Answers = map[string]string{"req1#0": `{"content":"good"}`, "req1#1": "!" + `{"content":"rejected"}`}
+	})
+	putRecord(t, fs, 2, func(r *wire.Record) { r.Complete = false; r.Batches = 3; r.Effort = "" })
+	h := newHub(t, fs)
+	h.signIn("kay", "keepers")
+
+	code, v := getView(t, h, "/v1/records/view/"+hashOf(1), nil)
+	if code != 200 || !v.Complete || v.Effort != "medium" || len(v.Answers) != 2 {
+		t.Fatalf("view = %d %+v", code, v)
+	}
+	var unusable int
+	for _, a := range v.Answers {
+		if a.Unusable {
+			unusable++
+			if strings.HasPrefix(a.Text, "!") {
+				t.Errorf("the unusable mark was left on the text: %q", a.Text)
+			}
+		}
+		if a.Request != "req1" || (a.Slot != "0" && a.Slot != "1") {
+			t.Errorf("identical requests must show as separate answers by slot: %+v", a)
+		}
+	}
+	if unusable != 1 {
+		t.Errorf("%d answers marked unusable, want exactly one", unusable)
+	}
+	if _, partial := getView(t, h, "/v1/records/view/"+hashOf(2), nil); partial.Complete || partial.Effort != "" {
+		t.Errorf("an incomplete record without an effort = %+v", partial)
+	}
+}
+
+func TestTheViewOfAnUnknownOrMalformedRecordIsNotFound(t *testing.T) {
+	h := newHub(t, fileStore(t))
+	h.signIn("kay", "keepers")
+	for _, hash := range []string{hashOf(99), "short", strings.ToUpper(hashOf(255)), "..%2f..%2fetc", hashOf(1) + "0"} {
+		if code, _ := getView(t, h, "/v1/records/view/"+hash, nil); code != http.StatusNotFound {
+			t.Errorf("/v1/records/view/%s = %d, want 404", hash, code)
+		}
+	}
+}
+
+func TestTheViewRoutesOnlyRead(t *testing.T) {
+	fs := fileStore(t)
+	putRecord(t, fs, 1, nil)
+	h := newHub(t, fs)
+	for _, path := range []string{"/v1/records/view", "/v1/records/view/" + hashOf(1)} {
+		for _, method := range []string{"POST", "PUT", "DELETE", "PATCH"} {
+			if resp, _ := h.do(method, path, bearer("auth-secret"), "{}"); resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusCreated {
+				t.Errorf("%s %s = %d: a view route must not change a record", method, path, resp.StatusCode)
+			}
+		}
+	}
+	if _, found, _ := fs.Get(context.Background(), hashOf(1)); !found {
+		t.Fatal("a view request deleted a record")
+	}
+}
+
+func TestASecretInARecordIsScrubbedFromTheViewsAndKeptInTheRecordAndTheMachineList(t *testing.T) {
 	aws := strings.ToUpper("akia") + strings.Repeat("7", 16)
 	vendor := "ghp_" + strings.Repeat("a1B2", 8)
 	labeled := "api_key=" + "hunter2hunter2hunter2"
@@ -655,7 +569,7 @@ func TestASecretInARecordIsRedactedOnEveryPageAndKeptInTheRecord(t *testing.T) {
 	h := newHub(t, fs)
 	h.signIn("kay", "keepers")
 	secrets := []string{aws, vendor, "hunter2hunter2hunter2"}
-	for _, path := range []string{"/ui/notary/", "/ui/notary/records/" + rec.Hash} {
+	for _, path := range []string{"/v1/records/view", "/v1/records/view/" + rec.Hash} {
 		resp, body := h.do("GET", path, nil, "")
 		if resp.StatusCode != 200 {
 			t.Fatalf("%s = %d", path, resp.StatusCode)
@@ -669,29 +583,77 @@ func TestASecretInARecordIsRedactedOnEveryPageAndKeptInTheRecord(t *testing.T) {
 			t.Errorf("%s shows no redaction at all, so the secrets may be absent for another reason", path)
 		}
 	}
-	// The listing API is for the authoritative role and returns the record's own
-	// summary fields. It is data, not a page, and is left as stored.
+	// The machine listing is the record's own summary, as stored: a client may
+	// compare it with what it wrote.
+	_, raw := h.do("GET", "/v1/records", nil, "")
+	if !strings.Contains(raw, vendor) {
+		t.Error("the machine listing was scrubbed; it is data and is left as stored")
+	}
 	stored, ok, err := fs.Get(context.Background(), rec.Hash)
 	if err != nil || !ok {
 		t.Fatal(err)
 	}
 	if !strings.Contains(stored.Answers["req#0"], aws) || stored.Model != rec.Model {
-		t.Error("the page's scrubbing changed the stored record, which replay needs as it was given")
+		t.Error("the scrubbing changed the stored record, which replay needs as it was given")
 	}
 }
 
-// between returns the text after start and before the next end, and fails the test
-// when either is missing, so a changed page is a failure and not a slice at -1.
-func between(tb testing.TB, s, start, end string) string {
-	tb.Helper()
-	i := strings.Index(s, start)
-	if i < 0 {
-		tb.Fatalf("%q is not in:\n%s", start, s)
+// The review engine's request keys are "jev:" and 64 hex characters. The
+// high-entropy scrub reads that as a token, so a record page showed every answer
+// as "jev:REDACTED" and a reader could not tell two answers apart.
+func TestARequestHashIsShownInFullWhileOtherKeysAreStillScrubbed(t *testing.T) {
+	sum := sha256.Sum256([]byte("model\x00state"))
+	key := "jev:" + hex.EncodeToString(sum[:])
+	secret := "ghp_" + strings.Repeat("a1B2", 8)
+	// A hash with a secret after it is not a request hash, whatever it starts with.
+	trailing := key + "-" + secret
+	fs := fileStore(t)
+	rec := putRecord(t, fs, 1, func(r *wire.Record) {
+		r.Answers = map[string]string{key + "#0": `{"content":"ok"}`, secret + "#1": `{"content":"ok"}`, trailing + "#2": `{"content":"ok"}`}
+	})
+	h := newHub(t, fs)
+	h.signIn("kay", "keepers")
+	resp, body := h.do("GET", "/v1/records/view/"+rec.Hash, nil, "")
+	if resp.StatusCode != 200 {
+		t.Fatalf("status %d", resp.StatusCode)
 	}
-	rest := s[i+len(start):]
-	j := strings.Index(rest, end)
-	if j < 0 {
-		tb.Fatalf("%q does not follow %q in:\n%s", end, start, s)
+	if !strings.Contains(body, key) {
+		t.Errorf("the request hash was scrubbed: %s", body)
 	}
-	return rest[:j]
+	if strings.Contains(body, secret) {
+		t.Errorf("a key that is not a request hash was shown: %s", body)
+	}
+}
+
+func TestTheViewListTakesTheSameFiltersAndCursorAsTheMachineList(t *testing.T) {
+	fs := fileStore(t)
+	for n := 1; n <= 12; n++ {
+		putRecord(t, fs, n, func(r *wire.Record) {
+			r.Model = "m-a"
+			if n%2 == 0 {
+				r.Model = "m-b"
+			}
+		})
+	}
+	h := newHub(t, fs)
+	h.signIn("kay", "keepers")
+	var out struct {
+		Records []struct{ Model string } `json:"records"`
+		Next    string                   `json:"next_cursor"`
+	}
+	_, body := h.do("GET", "/v1/records/view?model=m-b&limit=4", nil, "")
+	if err := json.Unmarshal([]byte(body), &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Records) != 4 || out.Next == "" {
+		t.Fatalf("a filtered, limited listing = %d records, next %q", len(out.Records), out.Next)
+	}
+	for _, r := range out.Records {
+		if r.Model != "m-b" {
+			t.Errorf("the model filter let %q through", r.Model)
+		}
+	}
+	if resp, _ := h.do("GET", "/v1/records/view?since=yesterday", nil, ""); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("a bad time = %d, want 400", resp.StatusCode)
+	}
 }

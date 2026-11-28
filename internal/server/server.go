@@ -44,8 +44,7 @@ type Server struct {
 	mux        *http.ServeMux
 	assets     *assets
 	crossSite  map[string]bool
-	layout     *template.Template
-	pages      []pageRoute
+	tmpl       *template.Template
 }
 
 // New validates the configuration and builds the handler. It refuses what would
@@ -248,7 +247,7 @@ func setSecurityHeaders(w http.ResponseWriter) {
 // ContentSecurityPolicy allows nothing but this site's own scripts and styles,
 // and no frame, base tag or form target elsewhere. There is no inline script and
 // no external request, so text that gets into a page unescaped still cannot run.
-const ContentSecurityPolicy = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; " +
+const ContentSecurityPolicy = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; " +
 	"connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
 
 // health reports every enabled component. The detail of a failure goes to the

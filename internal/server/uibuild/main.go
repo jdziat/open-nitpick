@@ -1,30 +1,27 @@
-// Command uibuild writes the nitpick server's UI into the directory the server
-// embeds: each source file under a name that carries a hash of its content, and a
-// manifest saying which is which. It has no dependencies and needs no Node.
+// Command uibuild takes the output of the UI's Vite build and puts it where the
+// nitpick server embeds it: every file under its own name, which already carries
+// a hash of its content, and a manifest saying which is which.
 //
+//	cd ui && npm ci && npm run build
 //	go run ./internal/server/uibuild
 //
 // A plain go build does not run it, and the server it produces says the UI was
-// not built. The release image does.
+// not built. The release image does both steps.
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
-// assets are the sources the UI is made of, by their logical names.
-var assets = []string{"app.css", "app.js"}
-
 func main() {
-	src := flag.String("src", "internal/server/ui_src", "directory holding the UI sources")
+	src := flag.String("src", "ui/dist", "directory the Vite build wrote")
 	dst := flag.String("dst", "internal/server/ui_dist", "directory the server embeds")
 	flag.Parse()
 	if err := build(*src, *dst); err != nil {
@@ -33,33 +30,71 @@ func main() {
 	}
 }
 
-// build writes the hashed assets and the manifest into dst. Hashed files from an
-// earlier build are removed, so the directory holds one build and nothing else.
-// The manifest is written last: a build that fails partway leaves no manifest,
-// and the server then reports the UI as not built instead of serving half of it.
+// entries are the files the server's page loads by their logical names. The page
+// is rendered by the server, not by Vite, so it needs to know which hashed file
+// each one is.
+var entries = []struct {
+	logical  string
+	re       *regexp.Regexp
+	optional bool
+}{
+	{"app.js", regexp.MustCompile(`^app\.[A-Za-z0-9_-]+\.js$`), false},
+	{"app.css", regexp.MustCompile(`^app\.[A-Za-z0-9_-]+\.css$`), false},
+	{"theme.js", regexp.MustCompile(`^theme\.[A-Za-z0-9_-]+\.js$`), true},
+}
+
+// safeName is a name the server may serve from one flat directory: no path, no
+// leading dot.
+var safeName = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]*$`)
+
+// keep is what stays in the embed directory across builds: the placeholders that
+// keep it in the repository.
+var keep = map[string]bool{".gitignore": true, "README.md": true}
+
+// build copies the Vite output into dst and writes the manifest last, so a build
+// that fails partway leaves no manifest and the server reports the UI as not
+// built instead of serving half of it.
 func build(src, dst string) error {
+	files, err := readOutput(src)
+	if err != nil {
+		return err
+	}
+	manifest := map[string]string{}
+	for _, e := range entries {
+		var found []string
+		for name := range files {
+			if e.re.MatchString(name) {
+				found = append(found, name)
+			}
+		}
+		switch {
+		case len(found) == 1:
+			manifest[e.logical] = found[0]
+		case len(found) == 0 && e.optional:
+		default:
+			return fmt.Errorf("%s: want exactly one file for %s, found %d", src, e.logical, len(found))
+		}
+	}
+	for name, body := range files {
+		if strings.HasSuffix(name, ".css") {
+			if err := checkCSS(name, body); err != nil {
+				return err
+			}
+		}
+		if _, isEntry := entryOf(manifest, name); !isEntry {
+			manifest[name] = name
+		}
+	}
 	if err := os.MkdirAll(dst, 0o755); err != nil {
 		return err
 	}
 	if err := removeOldBuild(dst); err != nil {
 		return err
 	}
-	manifest := map[string]string{}
-	for _, name := range assets {
-		body, err := os.ReadFile(filepath.Join(src, name))
-		if err != nil {
+	for name, body := range files {
+		if err := os.WriteFile(filepath.Join(dst, name), body, 0o644); err != nil {
 			return err
 		}
-		if len(body) == 0 {
-			return fmt.Errorf("%s is empty", name)
-		}
-		sum := sha256.Sum256(body)
-		ext := filepath.Ext(name)
-		hashed := strings.TrimSuffix(name, ext) + "." + hex.EncodeToString(sum[:6]) + ext
-		if err := os.WriteFile(filepath.Join(dst, hashed), body, 0o644); err != nil {
-			return err
-		}
-		manifest[name] = hashed
 	}
 	raw, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
@@ -68,42 +103,81 @@ func build(src, dst string) error {
 	return os.WriteFile(filepath.Join(dst, "manifest.json"), append(raw, '\n'), 0o644)
 }
 
-// removeOldBuild deletes what a build writes and nothing else: the manifest and
-// files named like a hashed asset. The placeholder that keeps the directory in
-// the repository stays.
-func removeOldBuild(dst string) error {
-	entries, err := os.ReadDir(dst)
-	if err != nil {
-		return err
+func entryOf(manifest map[string]string, name string) (string, bool) {
+	for logical, file := range manifest {
+		if file == name && logical != name {
+			return logical, true
+		}
 	}
-	for _, e := range entries {
+	return "", false
+}
+
+// readOutput reads the Vite output. index.html is Vite's page, which the server
+// does not use, so it is left out. Anything that is not a plain file with a plain
+// name is refused: the server serves one flat directory.
+func readOutput(src string) (map[string][]byte, error) {
+	list, err := os.ReadDir(src)
+	if err != nil {
+		return nil, err
+	}
+	files := map[string][]byte{}
+	for _, e := range list {
 		name := e.Name()
 		if e.IsDir() {
-			return errors.New(dst + " holds a directory, which a build does not make")
+			return nil, fmt.Errorf("%s holds a directory %s: the build is expected to be flat", src, name)
 		}
-		if name == "manifest.json" || isHashedAsset(name) {
-			if err := os.Remove(filepath.Join(dst, name)); err != nil {
-				return err
-			}
+		if name == "index.html" {
+			continue
 		}
+		if !safeName.MatchString(name) || name == "manifest.json" {
+			return nil, fmt.Errorf("%s: %q is not a name the server can serve", src, name)
+		}
+		body, err := os.ReadFile(filepath.Join(src, name))
+		if err != nil {
+			return nil, err
+		}
+		if len(body) == 0 {
+			return nil, fmt.Errorf("%s is empty", name)
+		}
+		files[name] = body
+	}
+	return files, nil
+}
+
+var (
+	dataURL   = regexp.MustCompile(`(?i)url\(\s*["']?data:`)
+	remoteURL = regexp.MustCompile(`(?i)(@import\s+(url\()?\s*["']?(https?:)?//|url\(\s*["']?(https?:)?//)`)
+)
+
+// checkCSS refuses what the page's Content-Security-Policy would block in the
+// browser: a data: URL or a remote one. The build would otherwise pass and the
+// page would show a missing image or font with nothing to say why.
+func checkCSS(name string, body []byte) error {
+	switch {
+	case dataURL.Match(body):
+		return fmt.Errorf("%s has a data: URL, which the page's policy does not allow; set assetsInlineLimit to 0", name)
+	case remoteURL.Match(body):
+		return fmt.Errorf("%s loads something from another origin, which the page's policy does not allow", name)
 	}
 	return nil
 }
 
-func isHashedAsset(name string) bool {
-	for _, logical := range assets {
-		ext := filepath.Ext(logical)
-		base := strings.TrimSuffix(logical, ext)
-		if rest, ok := strings.CutPrefix(name, base+"."); ok {
-			if hash, ok := strings.CutSuffix(rest, ext); ok && len(hash) == 12 && isHex(hash) {
-				return true
-			}
+// removeOldBuild deletes the files of an earlier build and nothing else.
+func removeOldBuild(dst string) error {
+	list, err := os.ReadDir(dst)
+	if err != nil {
+		return err
+	}
+	for _, e := range list {
+		if e.IsDir() {
+			return errors.New(dst + " holds a directory, which a build does not make")
+		}
+		if keep[e.Name()] {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dst, e.Name())); err != nil {
+			return err
 		}
 	}
-	return false
-}
-
-func isHex(s string) bool {
-	_, err := hex.DecodeString(s)
-	return err == nil
+	return nil
 }

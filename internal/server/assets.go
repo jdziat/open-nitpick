@@ -23,6 +23,7 @@ type assets struct {
 	built bool
 	css   string // the hashed file name, or ""
 	js    string
+	theme string          // the script that sets dark mode before the page paints; optional
 	files map[string]bool // every name the manifest lists, and only those are served
 }
 
@@ -59,6 +60,8 @@ func loadAssets(override fs.FS) *assets {
 			a.css = hashed
 		case "app.js":
 			a.js = hashed
+		case "theme.js":
+			a.theme = hashed
 		}
 	}
 	a.built = a.css != "" && a.js != ""
