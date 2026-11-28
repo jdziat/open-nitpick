@@ -1,5 +1,6 @@
 ---
-# A nitpick server, with the notary, on this machine. From this directory:
+# A nitpick server, with the notary, on this machine, and the Postgres it keeps its
+# state in. From this directory:
 #
 #   cp .env.example .env     # then put token hashes in it (see the file)
 #   docker compose up -d --build
@@ -7,29 +8,49 @@
 #
 # Point a review at it with -notary http://localhost:8484 and
 # NITPICK_NOTARY_TOKEN set to the secret whose hash is in .env.
+#
+# To run on MySQL instead, replace the `database` service with the mysql:8.4 one
+# in docs/server.md and give the server a mysql:// URL.
 services:
+  database:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nitpick
+      POSTGRES_USER: nitpick
+      POSTGRES_PASSWORD: ${NITPICK_DB_PASSWORD:?set it in .env}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nitpick -d nitpick"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    # Not published: only the server reaches it.
+
   notary:
     image: ${SERVER_IMAGE:-ghcr.io/nitpick-oss/nitpick-server:latest}
     build:
       context: ..
       dockerfile: deploy/docker/Dockerfile
     restart: unless-stopped
+    depends_on:
+      database: {condition: service_healthy}
     # Loopback only: a record server that anyone on the network can reach is an
     # authentication boundary, and this is the local setup.
     ports:
       - "127.0.0.1:${NOTARY_PORT:-8484}:8484"
     environment:
+      NITPICK_DATABASE_URL: postgres://nitpick:${NITPICK_DB_PASSWORD}@database:5432/nitpick?sslmode=disable
       NITPICK_NOTARY_TOKENS: ${NITPICK_NOTARY_TOKENS:?set it in .env}
       # NITPICK_SERVER_CONFIG: /etc/nitpick/server.yaml
-    volumes:
-      - notary-data:/data
-      # Optional: sign-in for the hub. Create server.yaml next to this file (see
-      # docs/server.md) and uncomment the next two lines.
-      # - ./server.yaml:/etc/nitpick/server.yaml:ro
-      # - ./users:/etc/nitpick/users:ro
+    # Optional: sign-in for the hub. Create server.yaml next to this file (see
+    # docs/server.md) and add, under `volumes:`:
+    #   - ./server.yaml:/etc/nitpick/server.yaml:ro
+    #   - ./users:/etc/nitpick/users:ro
     read_only: true
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
 
 volumes:
-  notary-data:
+  database:

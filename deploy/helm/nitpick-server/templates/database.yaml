@@ -1,0 +1,109 @@
+# yamllint disable-file
+# A Go template: not valid YAML until Helm renders it.
+{{- if ne .Values.database.bundled "none" }}
+{{- $pg := eq .Values.database.bundled "postgres" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "notary.dbHost" . }}
+  labels: {{- include "notary.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector: {{- include "notary.dbSelector" . | nindent 4 }}
+  ports:
+    - {name: db, port: {{ include "notary.dbPort" . }}, targetPort: db}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "notary.dbHost" . }}
+  labels: {{- include "notary.labels" . | nindent 4 }}
+spec:
+  # One database process owns its data directory. Everything that scales is the server.
+  replicas: 1
+  serviceName: {{ include "notary.dbHost" . }}
+  selector:
+    matchLabels: {{- include "notary.dbSelector" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "notary.dbSelector" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        # The official images run their server as uid 999. Starting as that user, and not
+        # as root to drop to it, lets the pod run with no added capabilities.
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: database
+          image: {{ index .Values.database.image .Values.database.bundled | quote }}
+          imagePullPolicy: {{ .Values.database.pullPolicy }}
+          {{- if $pg }}
+          args: [-c, "max_connections={{ .Values.database.maxConnections }}"]
+          {{- else }}
+          args: ["--max-connections={{ .Values.database.maxConnections }}"]
+          {{- end }}
+          env:
+            {{- if $pg }}
+            - {name: POSTGRES_DB, value: {{ .Values.database.name | quote }}}
+            - {name: POSTGRES_USER, value: {{ .Values.database.username | quote }}}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ include "notary.dbSecretName" . }}, key: password}}
+            # A subdirectory, because the volume's own root holds lost+found.
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+            {{- else }}
+            - {name: MYSQL_DATABASE, value: {{ .Values.database.name | quote }}}
+            - {name: MYSQL_USER, value: {{ .Values.database.username | quote }}}
+            - name: MYSQL_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ include "notary.dbSecretName" . }}, key: password}}
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom: {secretKeyRef: {name: {{ include "notary.dbSecretName" . }}, key: root-password}}
+            {{- end }}
+          ports:
+            - {name: db, containerPort: {{ include "notary.dbPort" . }}}
+          readinessProbe:
+            exec:
+              {{- if $pg }}
+              command: [sh, -c, "pg_isready -U {{ .Values.database.username }} -d {{ .Values.database.name }}"]
+              {{- else }}
+              command: [sh, -c, "mysqladmin ping --silent"]
+              {{- end }}
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              {{- if $pg }}
+              command: [sh, -c, "pg_isready -U {{ .Values.database.username }} -d {{ .Values.database.name }}"]
+              {{- else }}
+              command: [sh, -c, "mysqladmin ping --silent"]
+              {{- end }}
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources: {{- toYaml .Values.database.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: data, mountPath: {{ if $pg }}/var/lib/postgresql/data{{ else }}/var/lib/mysql{{ end }}}
+      {{- if not .Values.database.persistence.enabled }}
+      volumes:
+        - {name: data, emptyDir: {}}
+      {{- end }}
+  {{- if .Values.database.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- if .Values.database.persistence.storageClass }}
+        storageClassName: {{ .Values.database.persistence.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.database.persistence.size }}
+  {{- end }}
+{{- end }}

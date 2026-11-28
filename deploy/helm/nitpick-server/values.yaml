@@ -1,7 +1,8 @@
 ---
-# The notary keeps its records in files that one process owns, so this chart
-# runs exactly one replica on a ReadWriteOnce volume, and replaces it rather
-# than rolling it. There is deliberately no replicaCount.
+# The server keeps everything in a SQL database, Postgres or MySQL, so any number of
+# replicas may run against it. Sessions, sign-in state and the notary's and insights'
+# records are all there; a pod holds nothing that another cannot answer for.
+replicaCount: 1
 
 image:
   repository: ghcr.io/nitpick-oss/nitpick-server
@@ -53,11 +54,43 @@ config:
   # under /etc/nitpick/.
   file: server.yaml
 
-persistence:
-  enabled: true
-  size: 1Gi
-  storageClass: ""
-  existingClaim: ""
+# The database. By default the chart runs one of its own, from the official image of
+# the engine, with a password it generates once and keeps in a Secret.
+database:
+  # postgres | mysql | none. With none, set externalDatabase.
+  bundled: postgres
+  name: nitpick
+  username: nitpick
+  # A Secret you manage, instead of the one the chart generates. Keys: `password`,
+  # and for mysql `root-password`.
+  existingSecret: ""
+  # Total connections the engine accepts. Each server pod holds up to 20, so this
+  # must stay above 20 times replicaCount.
+  maxConnections: 200
+  image:
+    postgres: postgres:16
+    mysql: mysql:8.4
+  # Separate from image.pullPolicy: a cluster that loads the server image by hand and
+  # sets that to Never still has to pull the database's.
+  pullPolicy: IfNotPresent
+  persistence:
+    # Off, the data is lost when the database pod restarts.
+    enabled: true
+    size: 5Gi
+    storageClass: ""
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 512Mi}
+
+# A database you run, when database.bundled is none. The URL carries the password, so
+# keep it in a Secret: either name one, with the URL under `existingSecretKey`, or
+# give the URL here and the chart makes the Secret.
+#   postgres://user:password@host:5432/nitpick?sslmode=require
+#   mysql://user:password@host:3306/nitpick?tls=true
+externalDatabase:
+  url: ""
+  existingSecret: ""
+  existingSecretKey: url
 
 service:
   type: ClusterIP
