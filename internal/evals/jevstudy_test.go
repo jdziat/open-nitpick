@@ -34,7 +34,7 @@ package evals
 // findings with 1000-draw bootstrap intervals; a difference counts only when its
 // interval excludes zero.
 //
-// WHAT EACH OUTCOME CHANGES. review.jev.threshold is off by default because Jev
+// What each outcome changes. review.jev.threshold is off by default because Jev
 // sends source to a third party, and no result here turns it on. A method that
 // beats jev on W95 with an interval excluding zero is reported as a candidate and
 // not shipped by this study. A part of the state whose removal moves W95 by less
@@ -132,8 +132,8 @@ type studyObservation struct {
 	Confidence     float64
 	Severity       float64
 	State          string
-	Jev            map[string]float64 // method name -> bug plus error probability
-	Support        map[string]float64 // method name -> 1 minus the noise probability
+	Jev            map[string]float64 // bug plus error probability, by method name
+	Support        map[string]float64 // 1 minus the noise probability, by method name
 	Verify         string             // "", "kept" or "refuted" by the repository check
 	Arm            string
 }

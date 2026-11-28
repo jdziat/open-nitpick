@@ -135,8 +135,8 @@ func TestTheStudyJoinsAFindingToItsStateAndItsLabel(t *testing.T) {
 // a finding has a label and a verdict and no Jev score. Dropping it would leave only
 // the findings the check kept, and the check would look as if it had withheld none.
 func TestTheStudyKeepsAFindingTheRepositoryCheckWithheld(t *testing.T) {
-	// The word the engine writes, which TestTheRepositoryCheckIsNamedByTheWordTheEvalStudyReads pins on
-	// its side. Built from the constant below, the fixture could not tell this copy had moved.
+	// The word the engine writes. The review package pins its side of it in verify_test.go.
+	// Built from the constant below, the fixture could not tell this copy had moved.
 	if verifyExpertName != "a repository check" {
 		t.Fatalf("verifyExpertName = %q, want the word the engine attributes the check's withheld findings to", verifyExpertName)
 	}
