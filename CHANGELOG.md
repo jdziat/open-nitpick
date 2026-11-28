@@ -1,5 +1,29 @@
 # Changelog
 
+## [3.0.0](https://github.com/nitpick-oss/nitpick/compare/v2.10.0...v3.0.0) (2026-11-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **server:** nitpick-server replaces the nitpick-notary command. The flags, NITPICK_NOTARY_TOKENS, the routes and the data directory are unchanged, so a deployment changes its binary name and nothing else. The container image and the helm chart are renamed to nitpick-server. The old image and chart tags stay on the registry and get no new versions. See docs/notary.md for the migration.
+
+### Features
+
+* **insights:** add the insights hub, hotspot tracking and an MCP endpoint ([#261](https://github.com/nitpick-oss/nitpick/issues/261)) ([873dd0c](https://github.com/nitpick-oss/nitpick/commit/873dd0c2e95a535cc4e0d9a073ebd5f02afdfc97)), closes [#260](https://github.com/nitpick-oss/nitpick/issues/260)
+* **install:** host install scripts on GitHub Pages ([#252](https://github.com/nitpick-oss/nitpick/issues/252)) ([4070bc6](https://github.com/nitpick-oss/nitpick/commit/4070bc6381f948e2ef9624ca5339abbdd96d4337))
+* **respond:** add /nitpick as a trigger beside the mention ([#256](https://github.com/nitpick-oss/nitpick/issues/256)) ([fff16bb](https://github.com/nitpick-oss/nitpick/commit/fff16bb3a68896c33946474cbb3821b5d31c70c4)), closes [#241](https://github.com/nitpick-oss/nitpick/issues/241)
+* **respond:** make [@nitpick-review](https://github.com/nitpick-review) the default mention ([2329fc5](https://github.com/nitpick-oss/nitpick/commit/2329fc5ce045c0641145cf2e7afe0e1a056fa9c4))
+* **review:** cap design tasks by rank and say which were left out ([#273](https://github.com/nitpick-oss/nitpick/issues/273)) ([b7bd770](https://github.com/nitpick-oss/nitpick/commit/b7bd770d53ad8d814f0bfbd5b08d6036b292c32a)), closes [#272](https://github.com/nitpick-oss/nitpick/issues/272)
+* **server:** add nitpick-server, a component host with the hub UI and sign-in ([#258](https://github.com/nitpick-oss/nitpick/issues/258)) ([f49be1a](https://github.com/nitpick-oss/nitpick/commit/f49be1ae3a711f9c864f8249db31f8d61efd02ec))
+* **server:** rebuild the hub UI on React, Tailwind and shadcn/ui ([#264](https://github.com/nitpick-oss/nitpick/issues/264)) ([7f10680](https://github.com/nitpick-oss/nitpick/commit/7f106804ecff463c668eee2f652c3eb821e99e71)), closes [#263](https://github.com/nitpick-oss/nitpick/issues/263)
+* **upgrade:** add nitpick upgrade, verified against checksums and Sigstore ([#257](https://github.com/nitpick-oss/nitpick/issues/257)) ([6e62b20](https://github.com/nitpick-oss/nitpick/commit/6e62b20fbd7acd20a0abbc28b631f11893b0507e)), closes [#246](https://github.com/nitpick-oss/nitpick/issues/246)
+
+
+### Fixes
+
+* **llm:** retry a must-reason model at low effort with a larger cap ([#254](https://github.com/nitpick-oss/nitpick/issues/254)) ([f764af0](https://github.com/nitpick-oss/nitpick/commit/f764af0b3b7c376888c9f10c99e44275dfee929d))
+* **server:** keep the SAML cookie and harden sign-in and upgrade ([#262](https://github.com/nitpick-oss/nitpick/issues/262)) ([9c2d5f5](https://github.com/nitpick-oss/nitpick/commit/9c2d5f541c8d8c8404b41851ead38f7efac96033)), closes [#259](https://github.com/nitpick-oss/nitpick/issues/259)
+
 ## [2.10.0](https://github.com/nitpick-oss/nitpick/compare/v2.9.0...v2.10.0) (2026-11-26)
 
 
