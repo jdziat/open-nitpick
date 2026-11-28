@@ -119,12 +119,13 @@ func (o *OIDC) CrossSitePosts() []string { return nil }
 
 // Mount implements server.Provider.
 func (o *OIDC) Mount(mux *http.ServeMux, host server.Host) {
+	o.flows.use(host.State(), o.stateError)
 	mux.HandleFunc("GET /auth/oidc/login", o.login)
 	mux.HandleFunc("GET /auth/oidc/callback", func(w http.ResponseWriter, r *http.Request) { o.callback(w, r, host) })
 }
 
 func (o *OIDC) login(w http.ResponseWriter, r *http.Request) {
-	if !o.flows.admit(clientAddress(r, o.trust)) {
+	if !o.flows.admit(r.Context(), clientAddress(r, o.trust)) {
 		tooManyStarts(w)
 		return
 	}
@@ -139,7 +140,7 @@ func (o *OIDC) login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not start the sign-in", http.StatusInternalServerError)
 		return
 	}
-	state, err := o.flows.put(&flow{binding: binding, secret: nonce, verifier: verifier, next: r.URL.Query().Get("next")})
+	state, err := o.flows.put(r.Context(), &flow{binding: binding, secret: nonce, verifier: verifier, next: r.URL.Query().Get("next")})
 	if err != nil {
 		http.Error(w, "could not start the sign-in", http.StatusInternalServerError)
 		return
@@ -152,7 +153,7 @@ func (o *OIDC) callback(w http.ResponseWriter, r *http.Request, host server.Host
 	q := r.URL.Query()
 	// The flow is taken before anything is checked: whatever happens next, this
 	// state is spent, so an answer cannot be tried twice.
-	fl, ok := o.flows.take(q.Get("state"))
+	fl, ok := o.flows.take(r.Context(), q.Get("state"))
 	if !ok {
 		o.fail(w, r, host, "unknown or expired state")
 		return
@@ -243,4 +244,12 @@ func stringList(v any) []string {
 		}
 	}
 	return nil
+}
+
+// stateError reports a failure to reach the shared state. A sign-in that cannot be
+// started or finished is refused, which is right and, without this, silent.
+func (o *OIDC) stateError(op string, err error) {
+	if o.log != nil {
+		o.log.Error("oidc: "+op, "error", err)
+	}
 }

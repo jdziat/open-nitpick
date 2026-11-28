@@ -4,16 +4,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nitpick-oss/nitpick/internal/database"
 	"github.com/nitpick-oss/nitpick/internal/database/databasetest"
 	"github.com/nitpick-oss/nitpick/internal/wire"
 	"github.com/nitpick-oss/nitpick/internal/wire/storetest"
 )
 
 func TestTheDatabaseStoreMeetsTheSuiteOnEachEngine(t *testing.T) {
-	databasetest.Each(t, Models(), func(t *testing.T, db *database.DB) {
+	databasetest.Each(t, Models(), func(t *databasetest.Sub) {
+		db := t.DB
 		fresh := map[*testing.T]bool{}
-		storetest.Run(t, func(t *testing.T) wire.Store {
+		storetest.Run(t.T, func(t *testing.T) wire.Store {
+			t.Helper()
 			// The first store a behaviour asks for starts from an empty database; a
 			// second one, standing for another server, shares it.
 			if !fresh[t] {
@@ -30,7 +31,8 @@ func TestTheDatabaseStoreMeetsTheSuiteOnEachEngine(t *testing.T) {
 }
 
 func TestAClearKeepsTheRecordInHistoryWithItsCount(t *testing.T) {
-	databasetest.Each(t, Models(), func(t *testing.T, db *database.DB) {
+	databasetest.Each(t, Models(), func(t *databasetest.Sub) {
+		db := t.DB
 		s := NewDBStore(db)
 		ctx := t.Context()
 		r := wire.Record{Schema: wire.Schema, Hash: storetest.Hash(1), Complete: true, Batches: 1, Answers: map[string]string{"a#0": "kept"}}
@@ -56,7 +58,8 @@ func TestAClearKeepsTheRecordInHistoryWithItsCount(t *testing.T) {
 }
 
 func TestARecordThatCannotBeDecodedIsAnErrorToReadAndIsSetAsideToWriteOver(t *testing.T) {
-	databasetest.Each(t, Models(), func(t *testing.T, db *database.DB) {
+	databasetest.Each(t, Models(), func(t *databasetest.Sub) {
+		db := t.DB
 		s := NewDBStore(db)
 		ctx := t.Context()
 		good := wire.Record{Schema: wire.Schema, Hash: storetest.Hash(1), Complete: true, Batches: 1, Answers: map[string]string{"a#0": "x"}}
@@ -93,7 +96,8 @@ func TestARecordThatCannotBeDecodedIsAnErrorToReadAndIsSetAsideToWriteOver(t *te
 }
 
 func TestARecordWithAnyTextInItsFieldsRoundTripsOnBothEngines(t *testing.T) {
-	databasetest.Each(t, Models(), func(t *testing.T, db *database.DB) {
+	databasetest.Each(t, Models(), func(t *databasetest.Sub) {
+		db := t.DB
 		s := NewDBStore(db)
 		ctx := t.Context()
 		r := wire.Record{Schema: wire.Schema, Hash: storetest.Hash(7), Complete: true, Batches: 1,

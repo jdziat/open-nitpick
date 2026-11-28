@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto"
 	"crypto/x509"
 	"encoding/xml"
@@ -8,13 +9,13 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"sync"
 	"time"
 
 	"github.com/crewjam/saml"
 	dsig "github.com/russellhaering/goxmldsig"
 
 	"github.com/nitpick-oss/nitpick/internal/server"
+	"github.com/nitpick-oss/nitpick/internal/server/state"
 )
 
 // SAMLConfig is one SAML 2.0 identity provider.
@@ -130,6 +131,8 @@ func (s *SAML) CrossSitePosts() []string { return []string{"/auth/saml/acs"} }
 
 // Mount implements server.Provider.
 func (s *SAML) Mount(mux *http.ServeMux, host server.Host) {
+	s.flows.use(host.State(), s.stateError)
+	s.seen.use(host.State(), s.stateError)
 	mux.HandleFunc("GET /auth/saml/login", s.login)
 	mux.HandleFunc("POST /auth/saml/acs", func(w http.ResponseWriter, r *http.Request) { s.acs(w, r, host) })
 	mux.HandleFunc("GET /auth/saml/metadata", s.metadata)
@@ -146,7 +149,7 @@ func (s *SAML) metadata(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SAML) login(w http.ResponseWriter, r *http.Request) {
-	if !s.flows.admit(clientAddress(r, s.trust)) {
+	if !s.flows.admit(r.Context(), clientAddress(r, s.trust)) {
 		tooManyStarts(w)
 		return
 	}
@@ -169,7 +172,7 @@ func (s *SAML) login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not start the sign-in", http.StatusInternalServerError)
 		return
 	}
-	relay, err := s.flows.put(&flow{binding: binding, secret: req.ID, next: r.URL.Query().Get("next")})
+	relay, err := s.flows.put(r.Context(), &flow{binding: binding, secret: req.ID, next: r.URL.Query().Get("next")})
 	if err != nil {
 		http.Error(w, "could not start the sign-in", http.StatusInternalServerError)
 		return
@@ -190,7 +193,7 @@ func (s *SAML) acs(w http.ResponseWriter, r *http.Request, host server.Host) {
 	}
 	// The relay state names the request this answers. It is taken before any check,
 	// so an answer uses its request up whatever happens next.
-	fl, ok := s.flows.take(r.PostFormValue("RelayState"))
+	fl, ok := s.flows.take(r.Context(), r.PostFormValue("RelayState"))
 	if !ok {
 		s.fail(w, r, host, "unknown or expired relay state: no sign-in of ours is waiting for this answer")
 		return
@@ -213,7 +216,7 @@ func (s *SAML) acs(w http.ResponseWriter, r *http.Request, host server.Host) {
 	}
 	// The signature proves the provider said it. Nothing in it stops someone who
 	// captured the assertion from saying it again, so an ID is good once.
-	if assertion.ID == "" || !s.seen.firstTime(assertion.ID, assertionExpiry(assertion)) {
+	if assertion.ID == "" || !s.seen.firstTime(r.Context(), assertion.ID, assertionExpiry(assertion)) {
 		s.fail(w, r, host, "this assertion was already used or has no ID")
 		return
 	}
@@ -278,44 +281,51 @@ func attributeValues(a *saml.Assertion, name string) []string {
 	return out
 }
 
-// seenAssertions remembers the IDs of assertions that signed someone in, until
-// they would have expired anyway.
+// seenAssertions remembers the IDs of assertions that signed someone in, until they
+// would have expired anyway, in the shared state: an assertion replayed to another
+// replica is as much a replay.
 type seenAssertions struct {
-	mu  sync.Mutex
-	ids map[string]time.Time
-	now func() time.Time
+	st    *state.Store
+	onErr func(op string, err error)
 }
 
-func newSeenAssertions() *seenAssertions { return &seenAssertions{ids: map[string]time.Time{}} }
+func newSeenAssertions() *seenAssertions { return &seenAssertions{} }
 
-func (s *seenAssertions) clock() time.Time {
-	if s.now != nil {
-		return s.now()
-	}
-	return time.Now()
+func (s *seenAssertions) use(st *state.Store, onErr func(op string, err error)) {
+	s.st, s.onErr = st, onErr
 }
 
 // firstTime records an ID and reports whether it had not been seen. An ID that
 // was seen and has expired may be seen again: its assertion cannot validate any
-// more, so the question does not arise.
-func (s *seenAssertions) firstTime(id string, until time.Time) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := s.clock()
-	for k, exp := range s.ids {
-		if now.After(exp) {
-			delete(s.ids, k)
+// more, so the question does not arise. A store that cannot be reached says it was
+// seen: refusing a sign-in is safe and accepting a possible replay is not.
+func (s *seenAssertions) firstTime(ctx context.Context, id string, until time.Time) bool {
+	first := false
+	err := s.st.Update(ctx, state.Key("seen", id), func(cur *state.Entry) (*state.Entry, error) {
+		first = false
+		if cur != nil {
+			return cur, nil
 		}
-	}
-	if _, dup := s.ids[id]; dup {
+		first = true
+		return &state.Entry{Value: []byte("1"), Expires: until}, nil
+	})
+	if err != nil {
+		if s.onErr != nil {
+			s.onErr("record a SAML assertion", err)
+		}
 		return false
 	}
-	s.ids[id] = until
-	return true
+	return first
 }
 
-func (s *seenAssertions) len() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.ids)
+func (s *seenAssertions) len(ctx context.Context) int {
+	n, _ := s.st.Count(ctx, "seen:")
+	return n
+}
+
+// stateError reports a failure to reach the shared state.
+func (s *SAML) stateError(op string, err error) {
+	if s.log != nil {
+		s.log.Error("saml: "+op, "error", err)
+	}
 }

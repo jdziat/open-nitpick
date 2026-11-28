@@ -18,6 +18,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/nitpick-oss/nitpick/internal/database"
 	"github.com/nitpick-oss/nitpick/internal/server"
 	"github.com/nitpick-oss/nitpick/internal/wire"
 )
@@ -108,11 +109,12 @@ type Server struct {
 	handler http.Handler
 }
 
-// New mounts a notary component alone. It panics only if the notary's own routes
-// are invalid, which is a bug in this package and not an input.
-func New(store wire.Store, tokens []Token, allowProvisionalClear bool) *Server {
+// New mounts a notary component alone, over db for the server's own state. It
+// panics only if the notary's own routes are invalid, or db lacks the tables of
+// server.Models, which is a bug in the caller and not an input.
+func New(db *database.DB, store wire.Store, tokens []Token, allowProvisionalClear bool) *Server {
 	c := NewComponent(store, tokens, allowProvisionalClear)
-	h, err := server.New(server.Config{Components: []server.Component{c}})
+	h, err := server.New(server.Config{DB: db, Components: []server.Component{c}})
 	if err != nil {
 		panic("notary: " + err.Error())
 	}

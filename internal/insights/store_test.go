@@ -10,12 +10,21 @@ import (
 
 	"github.com/nitpick-oss/nitpick/internal/database"
 	"github.com/nitpick-oss/nitpick/internal/database/databasetest"
+	"github.com/nitpick-oss/nitpick/internal/server"
 )
 
 // openStore is a store on a fresh database on the engine this run is for.
 func openStore(t *testing.T) *Store {
 	t.Helper()
 	return NewStore(databasetest.One(t, Models()))
+}
+
+// openServerStore is openStore for a test that also starts a server over the same
+// database, which keeps its sessions there.
+func openServerStore(t *testing.T) (*Store, *database.DB) {
+	t.Helper()
+	db := databasetest.One(t, append(Models(), server.Models()...))
+	return NewStore(db), db
 }
 
 // viewAt loads the window a query asks about, failing the test when it cannot.
@@ -45,7 +54,8 @@ func finding(path, sev string) Finding {
 }
 
 func TestAReviewAddedByOneServerIsReadByAnother(t *testing.T) {
-	databasetest.Each(t, Models(), func(t *testing.T, db *database.DB) {
+	databasetest.Each(t, Models(), func(t *databasetest.Sub) {
+		db := t.DB
 		a, b := NewStore(db), NewStore(db)
 		kept, err := a.Add(context.Background(), review("acme/api", t0, finding("a.go", "error")))
 		if err != nil {
@@ -55,7 +65,7 @@ func TestAReviewAddedByOneServerIsReadByAnother(t *testing.T) {
 		if err != nil || !ok || got.Repo != "acme/api" || len(got.Findings) != 1 || got.Findings[0].Path != "a.go" {
 			t.Fatalf("the second server read %+v, %v, %v", got, ok, err)
 		}
-		if n := len(all(t, b)); n != 1 {
+		if n := len(all(t.T, b)); n != 1 {
 			t.Errorf("the second server's view holds %d reviews, want 1", n)
 		}
 		if _, ok, err := b.Review(context.Background(), "no-such-id"); err != nil || ok {
@@ -65,7 +75,8 @@ func TestAReviewAddedByOneServerIsReadByAnother(t *testing.T) {
 }
 
 func TestTheSameReviewSentToTwoServersAtOnceIsKeptOnce(t *testing.T) {
-	databasetest.Each(t, Models(), func(t *testing.T, db *database.DB) {
+	databasetest.Each(t, Models(), func(t *databasetest.Sub) {
+		db := t.DB
 		r := review("acme/api", t0, finding("a.go", "error"))
 		var wg sync.WaitGroup
 		ids := make(chan string, 16)
@@ -90,14 +101,15 @@ func TestTheSameReviewSentToTwoServersAtOnceIsKeptOnce(t *testing.T) {
 		if len(seen) != 1 {
 			t.Errorf("sixteen sends of one review returned %d ids", len(seen))
 		}
-		if n := len(all(t, NewStore(db))); n != 1 {
+		if n := len(all(t.T, NewStore(db))); n != 1 {
 			t.Errorf("sixteen sends of one review made %d records, a CI retry must not double a repo's findings", n)
 		}
 	})
 }
 
 func TestManyDistinctReviewsWrittenAtOnceAreAllKept(t *testing.T) {
-	databasetest.Each(t, Models(), func(t *testing.T, db *database.DB) {
+	databasetest.Each(t, Models(), func(t *databasetest.Sub) {
+		db := t.DB
 		var wg sync.WaitGroup
 		for i := range 40 {
 			wg.Add(1)
@@ -110,7 +122,7 @@ func TestManyDistinctReviewsWrittenAtOnceAreAllKept(t *testing.T) {
 			}()
 		}
 		wg.Wait()
-		if n := len(all(t, NewStore(db))); n != 40 {
+		if n := len(all(t.T, NewStore(db))); n != 40 {
 			t.Errorf("40 reviews written at once left %d", n)
 		}
 	})

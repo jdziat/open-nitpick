@@ -17,16 +17,14 @@ import (
 
 	"github.com/nitpick-oss/nitpick/internal/database/databasetest"
 	"github.com/nitpick-oss/nitpick/internal/notary"
+	"github.com/nitpick-oss/nitpick/internal/server"
 	"github.com/nitpick-oss/nitpick/internal/wire"
 )
 
 func notaryOn(t *testing.T, limits connLimits) (addr string, token string) {
 	t.Helper()
-	store, err := wire.NewFileStore(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	h := notary.New(store, []notary.Token{notary.NewToken("ci", notary.RoleAuthoritative, "s3cret")}, false)
+	db := databasetest.One(t, append(notary.Models(), server.Models()...))
+	h := notary.New(db, notary.NewDBStore(db), []notary.Token{notary.NewToken("ci", notary.RoleAuthoritative, "s3cret")}, false)
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)

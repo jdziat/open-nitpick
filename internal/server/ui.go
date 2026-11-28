@@ -79,7 +79,7 @@ func (s *Server) mountUI() error {
 // SignIn implements Host.
 func (s *Server) SignIn(w http.ResponseWriter, r *http.Request, id Identity, next string) {
 	granted := s.roles.Grant(id)
-	if err := s.sessions.Start(w, granted); err != nil {
+	if err := s.sessions.Start(r.Context(), w, granted); err != nil {
 		s.log.Error("start session", "error", err)
 		http.Error(w, "could not start a session", http.StatusInternalServerError)
 		return

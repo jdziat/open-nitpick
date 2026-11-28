@@ -22,7 +22,7 @@ func setup(t *testing.T, allowClear bool) (string, func(token string) *wire.HTTP
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(New(fs, []Token{
+	srv := httptest.NewServer(New(testDB(t), fs, []Token{
 		NewToken("ci", RoleAuthoritative, "ci-secret"),
 		NewToken("dev", RoleProvisional, "dev-secret"),
 		NewToken("viewer", RoleRead, "view-secret"),
@@ -155,7 +155,7 @@ func TestARecordWithAFieldTheServerDoesNotKnowIsRefusedNotTruncated(t *testing.T
 	_, as := setup(t, false)
 	_ = as
 	fs, _ := wire.NewFileStore(t.TempDir())
-	srv := httptest.NewServer(New(fs, []Token{NewToken("ci", RoleAuthoritative, "s")}, false))
+	srv := httptest.NewServer(New(testDB(t), fs, []Token{NewToken("ci", RoleAuthoritative, "s")}, false))
 	defer srv.Close()
 	body := strings.NewReader(`{"schema":2,"hash":"` + hash + `","answers":{},"future_field":"x"}`)
 	req, _ := http.NewRequest(http.MethodPut, srv.URL+"/v1/records/"+hash, body)
@@ -241,7 +241,7 @@ func (brokenStore) Get(context.Context, string) (wire.Record, bool, error) {
 // it down the hard-failure path instead of the "notary unreachable, carry on"
 // path the sentinel exists for.
 func TestAStoreFaultReadsAsAnUnreachableNotaryNotABadRequest(t *testing.T) {
-	srv := httptest.NewServer(New(brokenStore{}, []Token{NewToken("ci", RoleAuthoritative, "s")}, false))
+	srv := httptest.NewServer(New(testDB(t), brokenStore{}, []Token{NewToken("ci", RoleAuthoritative, "s")}, false))
 	defer srv.Close()
 	client, err := wire.NewHTTPStore(srv.URL, "s")
 	if err != nil {
@@ -288,7 +288,7 @@ func TestAnAuthoritativeWriteDuringAProvisionalWriteIsNotReplacedByIt(t *testing
 		t.Fatal(err)
 	}
 	g := &gatedStore{Store: fs, inGet: make(chan struct{}, 1), release: make(chan struct{}), putSeen: make(chan string, 4)}
-	srv := httptest.NewServer(New(g, []Token{
+	srv := httptest.NewServer(New(testDB(t), g, []Token{
 		NewToken("ci", RoleAuthoritative, "ci-secret"),
 		NewToken("dev", RoleProvisional, "dev-secret"),
 	}, false))

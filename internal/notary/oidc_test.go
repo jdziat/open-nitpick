@@ -217,7 +217,7 @@ func TestAServerWithOIDCStillTakesStaticTokensAndRoutesWorkflowTokensByRole(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(New(fs, []Token{NewToken("ci", RoleAuthoritative, "ci-secret")}, false).
+	srv := httptest.NewServer(New(testDB(t), fs, []Token{NewToken("ci", RoleAuthoritative, "ci-secret")}, false).
 		WithOIDC(p.verifier(newOIDCRule("repo:acme/app:*", RoleRead))))
 	t.Cleanup(srv.Close)
 	ctx := context.Background()
@@ -307,7 +307,7 @@ func TestAHashOnlyTokenAuthenticatesTheSecretAndHoldsNoSecret(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(New(fs, []Token{tok}, false))
+	srv := httptest.NewServer(New(testDB(t), fs, []Token{tok}, false))
 	t.Cleanup(srv.Close)
 	ctx := context.Background()
 
@@ -343,7 +343,7 @@ func TestTheHealthEndpointNeedsNoTokenAndServesNoRecord(t *testing.T) {
 	if err := fs.Put(context.Background(), rec(true)); err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(New(fs, []Token{NewToken("ci", RoleAuthoritative, "s")}, false))
+	srv := httptest.NewServer(New(testDB(t), fs, []Token{NewToken("ci", RoleAuthoritative, "s")}, false))
 	t.Cleanup(srv.Close)
 
 	resp, err := http.Get(srv.URL + "/healthz")

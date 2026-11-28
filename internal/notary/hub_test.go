@@ -20,6 +20,8 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/nitpick-oss/nitpick/internal/database"
+	"github.com/nitpick-oss/nitpick/internal/database/databasetest"
 	"github.com/nitpick-oss/nitpick/internal/server"
 	"github.com/nitpick-oss/nitpick/internal/wire"
 )
@@ -74,7 +76,7 @@ func newHub(t *testing.T, store wire.Store) *hub {
 		NewToken("look", RoleRead, "read-secret"),
 	}, false)
 	srv, err := server.New(server.Config{
-		Components: []server.Component{comp}, Providers: []server.Provider{loginAs{}}, Roles: roles,
+		DB: testDB(t), Components: []server.Component{comp}, Providers: []server.Provider{loginAs{}}, Roles: roles,
 		Assets: builtUI(), Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	if err != nil {
@@ -411,7 +413,7 @@ func TestTheNotaryOwnsOnlyItsOwnPrefix(t *testing.T) {
 		t.Errorf("prefixes = %v, want only /v1/records/", got)
 	}
 	other := stubOther{}
-	if _, err := server.New(server.Config{Components: []server.Component{c, other}}); err != nil {
+	if _, err := server.New(server.Config{DB: testDB(t), Components: []server.Component{c, other}}); err != nil {
 		t.Errorf("the notary and a component under /v1/other/ cannot be mounted together: %v", err)
 	}
 }
@@ -656,4 +658,11 @@ func TestTheViewListTakesTheSameFiltersAndCursorAsTheMachineList(t *testing.T) {
 	if resp, _ := h.do("GET", "/v1/records/view?since=yesterday", nil, ""); resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("a bad time = %d, want 400", resp.StatusCode)
 	}
+}
+
+// testDB is a fresh database with the tables a notary server needs: its own and the
+// server's.
+func testDB(tb testing.TB) *database.DB {
+	tb.Helper()
+	return databasetest.One(tb, append(Models(), server.Models()...))
 }

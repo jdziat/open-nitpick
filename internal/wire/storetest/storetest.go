@@ -50,6 +50,7 @@ type Options struct {
 
 // Run runs every behaviour against stores from open.
 func Run(t *testing.T, open NewStore, opt Options) {
+	t.Helper()
 	ctx := context.Background()
 	t.Run("a missing record is none and not an error", func(t *testing.T) {
 		got, ok, err := open(t).Get(ctx, Hash(1))
@@ -206,6 +207,7 @@ func Run(t *testing.T, open NewStore, opt Options) {
 	})
 
 	lister := func(t *testing.T) (wire.Store, wire.Lister) {
+		t.Helper()
 		s := open(t)
 		l, ok := s.(wire.Lister)
 		if !ok {

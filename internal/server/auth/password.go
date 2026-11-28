@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/nitpick-oss/nitpick/internal/server"
 )
@@ -26,6 +27,7 @@ type Password struct {
 
 	Log *slog.Logger
 
+	bindMu sync.Mutex
 	// hashing bounds the argon2id hashes in flight.
 	hashing chan struct{}
 }
@@ -38,9 +40,9 @@ func NewPassword(users *Users, log *slog.Logger) *Password {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Password{Users: users, ByAccount: DefaultLimiter(), ByAddress: &Limiter{
+	return &Password{Users: users, ByAccount: DefaultLimiter("account"), ByAddress: &Limiter{
 		// An address is allowed more misses than an account: an office shares one.
-		Max: 20, Window: DefaultLimiter().Window, Lockout: DefaultLimiter().Lockout, Keys: 100_000,
+		Name: "address", Max: 20, Window: DefaultLimiter("").Window, Lockout: DefaultLimiter("").Lockout, Keys: 100_000,
 	}, Log: log, hashing: make(chan struct{}, maxConcurrentHashes)}
 }
 
@@ -59,6 +61,7 @@ func (p *Password) CrossSitePosts() []string { return nil }
 
 // Mount implements server.Provider.
 func (p *Password) Mount(mux *http.ServeMux, host server.Host) {
+	p.bind(host)
 	mux.HandleFunc("POST /auth/password/login", func(w http.ResponseWriter, r *http.Request) { p.login(w, r, host) })
 }
 
@@ -67,7 +70,21 @@ func (p *Password) Mount(mux *http.ServeMux, host server.Host) {
 // or which are being guessed at.
 const refused = "That username and password did not match, or sign-in is paused for this account. Try again later."
 
+// bind gives each limiter that has none the shared state to count in. It runs at
+// mount and again on each sign-in, which covers a limiter swapped in after mounting.
+func (p *Password) bind(host server.Host) {
+	p.bindMu.Lock()
+	defer p.bindMu.Unlock()
+	onErr := func(op string, err error) { p.Log.Error("password: "+op, "error", err) }
+	for _, l := range []*Limiter{p.ByAccount, p.ByAddress} {
+		if l.st == nil {
+			l.Use(host.State(), onErr)
+		}
+	}
+}
+
 func (p *Password) login(w http.ResponseWriter, r *http.Request, host server.Host) {
+	p.bind(host)
 	// The form's own CSRF check, before anything about the account is touched:
 	// without it another site could make a visitor's browser guess for it.
 	secret, ok := host.CSRF().PreSessionSecret(r)
@@ -103,11 +120,11 @@ func (p *Password) login(w http.ResponseWriter, r *http.Request, host server.Hos
 			return
 		}
 		for _, c := range limits[:charged] {
-			c.l.Refund(c.key)
+			c.l.Refund(r.Context(), c.key)
 		}
 	}()
 	for _, c := range limits {
-		if allowed, _ := c.l.Take(c.key); !allowed {
+		if allowed, _ := c.l.Take(r.Context(), c.key); !allowed {
 			// Refused before the hash is computed: a locked account costs the
 			// server nothing, which is the point of locking it.
 			p.Log.Warn("sign-in refused while locked", "provider", "password", "key", c.key)
@@ -131,14 +148,14 @@ func (p *Password) login(w http.ResponseWriter, r *http.Request, host server.Hos
 	account, groups, ok := p.Users.Verify(name, password)
 	resolved = true
 	if !ok {
-		p.ByAccount.Fail(acct)
-		p.ByAddress.Fail(src)
+		p.ByAccount.Fail(r.Context(), acct)
+		p.ByAddress.Fail(r.Context(), src)
 		p.Log.Warn("sign-in failed", "provider", "password", "account", strings.ToLower(name), "address", addr)
 		host.LoginFailed(w, r, http.StatusUnauthorized, refused)
 		return
 	}
-	p.ByAccount.Success(acct)
-	p.ByAddress.Success(src)
+	p.ByAccount.Success(r.Context(), acct)
+	p.ByAddress.Success(r.Context(), src)
 	host.SignIn(w, r, server.Identity{Provider: p.ID(), Subject: account, Name: account, Groups: groups}, r.PostFormValue("next"))
 }
 

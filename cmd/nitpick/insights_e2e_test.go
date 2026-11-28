@@ -15,9 +15,10 @@ import (
 // write token.
 func insightsServer(t *testing.T) (url string, store *insights.Store) {
 	t.Helper()
-	store = insights.NewStore(databasetest.One(t, insights.Models()))
+	db := databasetest.One(t, append(insights.Models(), server.Models()...))
+	store = insights.NewStore(db)
 	c := insights.NewComponent(store, []insights.Token{insights.NewToken("ci", insights.RoleWrite, "ci-secret")}, slog.New(slog.DiscardHandler))
-	h, err := server.New(server.Config{Components: []server.Component{c}})
+	h, err := server.New(server.Config{DB: db, Components: []server.Component{c}})
 	if err != nil {
 		t.Fatal(err)
 	}

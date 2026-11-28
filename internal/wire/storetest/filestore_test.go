@@ -13,6 +13,7 @@ import (
 func TestTheFileStoreMeetsTheSuite(t *testing.T) {
 	dirs := map[*testing.T]string{}
 	storetest.Run(t, func(t *testing.T) wire.Store {
+		t.Helper()
 		dir, ok := dirs[t]
 		if !ok {
 			dir = t.TempDir()

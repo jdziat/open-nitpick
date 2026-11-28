@@ -52,7 +52,8 @@ func TestAnErrorNeverRepeatsTheDatabasePassword(t *testing.T) {
 }
 
 func TestMigrateRunsOnceWhenManyServersStartTogether(t *testing.T) {
-	databasetest.Each(t, nil, func(t *testing.T, db *database.DB) {
+	databasetest.Each(t, nil, func(t *databasetest.Sub) {
+		db := t.DB
 		var wg sync.WaitGroup
 		errs := make(chan error, 8)
 		for range 8 {
@@ -85,7 +86,8 @@ func TestMigrateOnlyAddsAndKeepsWhatIsThere(t *testing.T) {
 		Name  string
 		Extra string
 	}
-	databasetest.Each(t, nil, func(t *testing.T, db *database.DB) {
+	databasetest.Each(t, nil, func(t *databasetest.Sub) {
+		db := t.DB
 		if err := db.Table("t").AutoMigrate(&v1{}); err != nil {
 			t.Fatal(err)
 		}
@@ -106,7 +108,8 @@ func TestMigrateOnlyAddsAndKeepsWhatIsThere(t *testing.T) {
 }
 
 func TestTransactRunsAgainAfterADeadlockAndStopsOnAnyOtherError(t *testing.T) {
-	databasetest.Each(t, []any{&thing{}}, func(t *testing.T, db *database.DB) {
+	databasetest.Each(t, []any{&thing{}}, func(t *databasetest.Sub) {
+		db := t.DB
 		ctx := context.Background()
 		if err := db.Create(&thing{Name: "a"}).Error; err != nil {
 			t.Fatal(err)
@@ -158,7 +161,8 @@ func TestTransactRunsAgainAfterADeadlockAndStopsOnAnyOtherError(t *testing.T) {
 }
 
 func TestADuplicateKeyIsRecognisedOnBothEngines(t *testing.T) {
-	databasetest.Each(t, []any{&thing{}}, func(t *testing.T, db *database.DB) {
+	databasetest.Each(t, []any{&thing{}}, func(t *databasetest.Sub) {
+		db := t.DB
 		if err := db.Create(&thing{Name: "x"}).Error; err != nil {
 			t.Fatal(err)
 		}

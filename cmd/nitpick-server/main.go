@@ -140,6 +140,11 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return healthcheck(args, stderr)
 		}
 	}
+	if len(args) > 0 && args[0] == "import" {
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		return runImport(ctx, args[1:], stdout, stderr)
+	}
 	var mode struct{ hash, hashPassword bool }
 	flagsOnly := make([]string, 0, len(args))
 	for _, a := range args {
@@ -265,6 +270,7 @@ func build(ctx context.Context, o *options, log *slog.Logger) (http.Handler, fun
 	var models []any
 	models = append(models, notary.Models()...)
 	models = append(models, insights.Models()...)
+	models = append(models, server.Models()...)
 	if err := db.Migrate(ctx, models...); err != nil {
 		_ = db.Close()
 		return nil, nil, err
@@ -306,6 +312,7 @@ func build(ctx context.Context, o *options, log *slog.Logger) (http.Handler, fun
 		return nil, nil, err
 	}
 	srv, err := server.New(server.Config{
+		DB:         db,
 		Components: components, Providers: providers, Roles: roles,
 		Sessions: server.SessionConfig{Idle: cfg.Session.Idle, Absolute: cfg.Session.Absolute},
 		Logger:   log,

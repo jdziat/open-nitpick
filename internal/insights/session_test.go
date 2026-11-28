@@ -68,7 +68,7 @@ func sessionClient(t *testing.T, baseURL string, tc *http.Client, groups string)
 }
 
 func TestASignedInPersonNeedsTheInsightsRoleToReadAnything(t *testing.T) {
-	store := openStore(t)
+	store, db := openServerStore(t)
 	comp := NewComponent(store, nil, nil)
 	comp.now = func() time.Time { return t0 }
 	roles, err := server.NewRoleMap([]server.RoleRule{{Roles: []server.Role{server.Role(RoleView)}, Provider: "test", Group: "eng"}})
@@ -76,7 +76,7 @@ func TestASignedInPersonNeedsTheInsightsRoleToReadAnything(t *testing.T) {
 		t.Fatal(err)
 	}
 	srv, err := server.New(server.Config{
-		Components: []server.Component{comp}, Providers: []server.Provider{groupLogin{}}, Roles: roles,
+		DB: db, Components: []server.Component{comp}, Providers: []server.Provider{groupLogin{}}, Roles: roles,
 		Assets: fstest.MapFS{"manifest.json": {Data: []byte(`{"app.css":"app.aaaaaaaaaaaa.css","app.js":"app.aaaaaaaaaaaa.js"}`)}, "app.aaaaaaaaaaaa.css": {Data: []byte("x")}, "app.aaaaaaaaaaaa.js": {Data: []byte("x")}},
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})

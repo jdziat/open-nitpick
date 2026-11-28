@@ -41,7 +41,7 @@ func newOIDCSite(t *testing.T, idp *fakeIDP, rules ...server.RoleRule) *oidcSite
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv, err := server.New(server.Config{
+	srv, err := server.New(server.Config{DB: testDB(t),
 		Components: []server.Component{echo{}}, Providers: []server.Provider{o}, Roles: roles, Assets: builtUI(),
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
@@ -339,29 +339,28 @@ func TestGroupsAreReadFromAStringOrAList(t *testing.T) {
 // fill memory.
 func TestStartedFlowsAreBoundedAndExpire(t *testing.T) {
 	now := time.Now()
-	f := newFlows(3)
-	f.now = func() time.Time { return now }
+	f := testFlows(t, func() time.Time { return now }, 3)
 	var keys []string
 	for i := 0; i < 5; i++ {
-		k, err := f.put(&flow{secret: "n"})
+		k, err := f.put(bg, &flow{secret: "n"})
 		if err != nil {
 			t.Fatal(err)
 		}
 		keys = append(keys, k)
 		now = now.Add(time.Second)
 	}
-	if f.len() > 3 {
-		t.Errorf("the table holds %d flows, want at most 3", f.len())
+	if f.len(bg) > 3 {
+		t.Errorf("the table holds %d flows, want at most 3", f.len(bg))
 	}
-	if _, ok := f.take(keys[0]); ok {
+	if _, ok := f.take(bg, keys[0]); ok {
 		t.Error("the oldest flow survived the bound")
 	}
-	if _, ok := f.take(keys[4]); !ok {
+	if _, ok := f.take(bg, keys[4]); !ok {
 		t.Error("the newest flow was dropped")
 	}
-	k, _ := f.put(&flow{})
+	k, _ := f.put(bg, &flow{})
 	now = now.Add(flowTTL + time.Second)
-	if _, ok := f.take(k); ok {
+	if _, ok := f.take(bg, k); ok {
 		t.Error("an expired flow was returned")
 	}
 }

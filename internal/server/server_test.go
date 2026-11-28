@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -10,6 +11,8 @@ import (
 	"testing"
 	"testing/fstest"
 	"time"
+
+	"github.com/nitpick-oss/nitpick/internal/server/state"
 )
 
 // A disabled component mounts nothing. Rule 10: it is 404 because it is not
@@ -145,7 +148,7 @@ func TestAStateChangingRequestWithoutACSRFTokenIsRefused(t *testing.T) {
 	if resp, _ := e.do("POST", "/auth/logout", url.Values{}, nil); resp.StatusCode != 403 {
 		t.Errorf("sign-out with no token = %d, want 403", resp.StatusCode)
 	}
-	if e.srv.Sessions().Len() != 1 {
+	if sessionCount(t, e) != 1 {
 		t.Error("a refused sign-out ended the session")
 	}
 
@@ -212,7 +215,7 @@ func TestSigningOutEndsTheSession(t *testing.T) {
 	if resp, _ := e.do("POST", "/auth/logout", url.Values{"csrf_token": {token}}, nil); resp.StatusCode != 303 {
 		t.Fatalf("sign-out = %d", resp.StatusCode)
 	}
-	if e.srv.Sessions().Len() != 0 {
+	if sessionCount(t, e) != 0 {
 		t.Error("the session is still held after sign-out")
 	}
 	// Replaying the old cookie by hand: it must be dead on the server, not just
@@ -224,15 +227,15 @@ func TestSigningOutEndsTheSession(t *testing.T) {
 
 // Rule 9: a session ends at the idle timeout and at the absolute timeout.
 func TestSessionsEndWhenIdleAndWhenOld(t *testing.T) {
+	now := time.Now()
+	clock := func() time.Time { return now }
 	e := newEnv(t, Config{
 		Components: []Component{&stubComponent{name: "stub"}},
 		Providers:  []Provider{fakeProvider{id: "fake"}},
 		Sessions:   SessionConfig{Idle: 10 * time.Minute, Absolute: time.Hour},
 		Assets:     builtAssets(),
+		State:      state.New(testDB(t)).WithClock(clock),
 	})
-	now := time.Now()
-	clock := func() time.Time { return now }
-	e.srv.Sessions().now = clock
 
 	e.signIn("alice")
 	if resp, _ := e.do("GET", "/ui/", nil, nil); resp.StatusCode != 200 {
@@ -456,7 +459,7 @@ func TestAPrefixOwnsItsCollectionButNotAMereLookalike(t *testing.T) {
 	}
 	for _, pattern := range []string{"GET /v1/stubs", "GET /v1/stu", "GET /v1"} {
 		bad := &stubComponent{name: "stub", extra: []Route{{Pattern: pattern, Handler: http.NotFoundHandler()}}}
-		if _, err := New(Config{Components: []Component{bad}}); err == nil {
+		if _, err := New(Config{DB: testDB(t), Components: []Component{bad}}); err == nil {
 			t.Errorf("%q was accepted as under the prefix /v1/stub/", pattern)
 		}
 	}
@@ -502,18 +505,18 @@ func (declaring) Roles() []Role { return []Role{"admin", "viewer"} }
 func TestARoleNoComponentDeclaresIsRefusedAtStartUp(t *testing.T) {
 	comp := &declaring{stubComponent{name: "stub"}}
 	for _, role := range []Role{"admn", "Admin", "root", "admin "} {
-		_, err := New(Config{Components: []Component{comp}, Roles: newRoles(t, RoleRule{Roles: []Role{role}, Provider: "fake", User: "u"})})
+		_, err := New(Config{DB: testDB(t), Components: []Component{comp}, Roles: newRoles(t, RoleRule{Roles: []Role{role}, Provider: "fake", User: "u"})})
 		if err == nil || !strings.Contains(err.Error(), "admin, viewer") {
 			t.Errorf("role %q: err = %v, want it refused with the real roles named", role, err)
 		}
 	}
 	// Rule 10: the declared roles are accepted, alone and together.
 	for _, roles := range [][]Role{{"admin"}, {"viewer"}, {"admin", "viewer"}} {
-		if _, err := New(Config{Components: []Component{comp}, Roles: newRoles(t, RoleRule{Roles: roles, Provider: "fake", User: "u"})}); err != nil {
+		if _, err := New(Config{DB: testDB(t), Components: []Component{comp}, Roles: newRoles(t, RoleRule{Roles: roles, Provider: "fake", User: "u"})}); err != nil {
 			t.Errorf("roles %v were refused: %v", roles, err)
 		}
 	}
-	if _, err := New(Config{Components: []Component{&stubComponent{name: "stub"}}, Roles: newRoles(t, RoleRule{Roles: []Role{"anything"}, Provider: "fake", User: "u"})}); err != nil {
+	if _, err := New(Config{DB: testDB(t), Components: []Component{&stubComponent{name: "stub"}}, Roles: newRoles(t, RoleRule{Roles: []Role{"anything"}, Provider: "fake", User: "u"})}); err != nil {
 		t.Errorf("with nothing declaring roles a rule was refused: %v", err)
 	}
 }
@@ -635,4 +638,14 @@ func TestADeepLinkSurvivesSigningIn(t *testing.T) {
 	if got := loc.Query().Get("next"); got != "/ui/insights/findings?path=a.go&days=30" {
 		t.Errorf("next = %q, want the page that was asked for", got)
 	}
+}
+
+// sessionCount is how many sessions the server holds.
+func sessionCount(t *testing.T, e *env) int {
+	t.Helper()
+	n, err := e.srv.Sessions().Len(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
 }

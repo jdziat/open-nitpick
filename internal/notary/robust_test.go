@@ -28,7 +28,7 @@ func robustServer(t *testing.T) (srv *httptest.Server, dir string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv = httptest.NewServer(New(fs, []Token{
+	srv = httptest.NewServer(New(testDB(t), fs, []Token{
 		NewToken("ci", RoleAuthoritative, "ci-secret"),
 		NewToken("dev", RoleProvisional, "dev-secret"),
 		NewToken("viewer", RoleRead, "view-secret"),
@@ -328,7 +328,7 @@ func (diskErrorStore) Clear(context.Context, string, string) error {
 }
 
 func TestAStoreFailureIsReportedWithoutNamingTheServersDirectories(t *testing.T) {
-	srv := httptest.NewServer(New(diskErrorStore{}, []Token{NewToken("ci", RoleAuthoritative, "s")}, false))
+	srv := httptest.NewServer(New(testDB(t), diskErrorStore{}, []Token{NewToken("ci", RoleAuthoritative, "s")}, false))
 	t.Cleanup(srv.Close)
 	h := strings.Repeat("a", 64)
 	body := `{"schema":4,"hash":"` + h + `","answers":{"k":"{}"},"batches":1,"complete":true}`

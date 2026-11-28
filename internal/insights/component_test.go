@@ -22,10 +22,10 @@ const (
 
 func newHub(t *testing.T) (*httptest.Server, *Component) {
 	t.Helper()
-	store := openStore(t)
+	store, db := openServerStore(t)
 	c := NewComponent(store, []Token{NewToken("ci", RoleWrite, writeSecret), NewToken("agent", RoleRead, readSecret)}, nil)
 	c.now = func() time.Time { return t0 }
-	h, err := server.New(server.Config{Components: []server.Component{c}})
+	h, err := server.New(server.Config{DB: db, Components: []server.Component{c}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -24,8 +24,10 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/nitpick-oss/nitpick/internal/config"
+	"github.com/nitpick-oss/nitpick/internal/database"
+	"github.com/nitpick-oss/nitpick/internal/database/databasetest"
 	"github.com/nitpick-oss/nitpick/internal/notary"
-	"github.com/nitpick-oss/nitpick/internal/wire"
+	"github.com/nitpick-oss/nitpick/internal/server"
 )
 
 // fakeModel is an OpenAI-compatible endpoint that counts the requests it
@@ -168,13 +170,17 @@ func reviewJSON(t *testing.T, repo string, args ...string) (map[string]any, erro
 	return out, runErr
 }
 
-func notaryServer(t *testing.T) (url string, store *wire.FileStore) {
+// testDB is a fresh database with the notary's tables and the server's.
+func testDB(t *testing.T) *database.DB {
 	t.Helper()
-	store, err := wire.NewFileStore(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	srv := httptest.NewServer(notary.New(store, []notary.Token{
+	return databasetest.One(t, append(notary.Models(), server.Models()...))
+}
+
+func notaryServer(t *testing.T) (url string, store *notary.DBStore) {
+	t.Helper()
+	db := testDB(t)
+	store = notary.NewDBStore(db)
+	srv := httptest.NewServer(notary.New(db, store, []notary.Token{
 		notary.NewToken("ci", notary.RoleAuthoritative, "ci-secret"),
 		notary.NewToken("viewer", notary.RoleRead, "view-secret"),
 	}, false))
@@ -408,11 +414,8 @@ func TestNotaryEndToEndAWorkflowIdentityTokenReplacesAStoredSecret(t *testing.T)
 	repo := gitRepo(t, model)
 	mint, jwks := mintingEndpoint(t, "repo:acme/app:ref:refs/heads/main")
 
-	store, err := wire.NewFileStore(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	srv := httptest.NewServer(notary.New(store, nil, false).WithOIDC(&notary.OIDC{
+	db := testDB(t)
+	srv := httptest.NewServer(notary.New(db, notary.NewDBStore(db), nil, false).WithOIDC(&notary.OIDC{
 		Issuer: "https://issuer.test", Audience: "nitpick-server", JWKSURL: jwks,
 		Allow: []notary.OIDCRule{mustRule(t, "authoritative:repo:acme/app:*")},
 	}))

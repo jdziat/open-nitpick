@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -9,6 +10,9 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
+
+	"github.com/nitpick-oss/nitpick/internal/server/state"
 )
 
 // CSRF protects requests that change state and are authorised by a cookie. The
@@ -27,11 +31,32 @@ const (
 	CSRFHeader    = "X-CSRF-Token"
 )
 
-// NewCSRF returns a protector with a fresh random key. The key lives as long as
-// the process, like the sessions it protects.
-func NewCSRF() (*CSRF, error) {
+// csrfKeyEntry is where the key is kept. It never expires: a key that changed would
+// invalidate every form a person has open, and every session's token with it.
+const csrfKeyEntry = "secret:csrf"
+
+// farFuture is "never" for an entry, within what both engines can store.
+func farFuture(now time.Time) time.Time { return now.AddDate(100, 0, 0) }
+
+// NewCSRF returns a protector keyed by a secret every server shares. The first server
+// to ask makes it and the rest read it, so a form served by one replica is accepted by
+// another.
+func NewCSRF(ctx context.Context, st *state.Store) (*CSRF, error) {
 	c := &CSRF{}
-	if _, err := rand.Read(c.key[:]); err != nil {
+	err := st.Update(ctx, csrfKeyEntry, func(cur *state.Entry) (*state.Entry, error) {
+		if cur != nil && len(cur.Value) == len(c.key) {
+			copy(c.key[:], cur.Value)
+			return cur, nil
+		}
+		// None yet, or one of the wrong size, which is replaced and not trusted.
+		var fresh [32]byte
+		if _, err := rand.Read(fresh[:]); err != nil {
+			return nil, err
+		}
+		c.key = fresh
+		return &state.Entry{Value: fresh[:], Expires: farFuture(st.Now())}, nil
+	})
+	if err != nil {
 		return nil, err
 	}
 	return c, nil
