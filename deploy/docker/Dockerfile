@@ -7,7 +7,7 @@
 # The web app is built first, from the lockfile with install scripts off. It also
 # reads the server's templates (the sign-in page uses the same Tailwind classes), so
 # Tailwind can see which of them are used.
-FROM node:24-alpine AS ui
+FROM node:26-alpine AS ui
 WORKDIR /src/ui
 COPY ui/package.json ui/package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
