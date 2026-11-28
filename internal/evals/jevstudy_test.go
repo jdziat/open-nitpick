@@ -13,13 +13,13 @@ package evals
 // InfoFixtures), held-out fixtures excluded and left unspent. Three reviewers,
 // each run twice per fixture at temperature 0: deepseek/deepseek-v4.1-flash,
 // qwen/qwen3.8-27b, z-ai/glm-5.3-flash. Every finding the engine files is one
-// studyObservation. It is real when ScoreRun matches it to a planted defect and not
+// observation. It is real when ScoreRun matches it to a planted defect and not
 // real otherwise, so every finding on a clean fixture is not real. Findings are
-// studyScored from the Jev state the engine built for them, recorded by a Decider that
+// scored from the Jev state the engine built for them, recorded by a Decider that
 // forwards to the real client.
 //
-// METHODS, all studyScored on the same findings:
-//   confidence   the reviewer's own confidence; a finding without one is studyScored 0.5
+// METHODS, all scored on the same findings:
+//   confidence   the reviewer's own confidence; a finding without one is scored 0.5
 //   severity     the reviewer's severity as 0 to 1
 //   jev          Jev's bug-plus-error probability on the full state
 //   jev-claim    Jev on the claim, severity and cited code only
@@ -47,6 +47,17 @@ package evals
 // reviewers are cheap models. The number of not-real findings bounds every
 // interval and is printed first.
 //
+// NOTE 2026-11-27, after the first collection and before the second. The first
+// arm ran with repository verification off, so every Jev state read "(the check
+// made no lookups)"; the docs say Jev follows that check and is shown what it
+// read. The label "real" is also wider than what Jev's bug-plus-error score
+// measures: it includes planted nits and info observations, which are true and
+// are scored low by design. Both are flaws in this design, not in Jev. The results
+// above are reported as pre-registered. What follows is exploratory and is marked
+// so wherever it is printed: Jev's full probability vector (support = 1 - noise),
+// a second arm with review.verify on, the verification verdict itself as a method,
+// and a stratum of fixtures whose plants are all warning or above.
+//
 // SPEND. One shared OpenRouter key; the test reads its usage before and after and
 // stops a phase that has already passed the cap in NITPICK_JEV_STUDY_CAP_USD.
 
@@ -54,6 +65,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"math/rand/v2"
 	"net/http"
 	"os"
@@ -109,7 +121,7 @@ func keyUsageUSD(ctx context.Context, key string) (float64, error) {
 	return body.Data.Usage, nil
 }
 
-// studyObservation is one filed finding with its label and the state Jev was shown.
+// observation is one filed finding with its label and the state Jev was shown.
 type studyObservation struct {
 	Model, Fixture string
 	Run            int
@@ -120,7 +132,10 @@ type studyObservation struct {
 	Confidence     float64
 	Severity       float64
 	State          string
-	Jev            map[string]float64 // method name -> score
+	Jev            map[string]float64 // method name -> bug plus error probability
+	Support        map[string]float64 // method name -> 1 minus the noise probability
+	Verify         string             // "", "kept" or "refuted" by the repository check
+	Arm            string
 }
 
 // studyRecorder forwards to the real client and keeps every state it saw.
@@ -140,6 +155,28 @@ func (r *studyRecorder) Classify(ctx context.Context, state string) (jev.Scores,
 		r.mu.Unlock()
 	}
 	return scores, err
+}
+
+// studyVerifyDone is the engine's line when the repository check finishes. A review
+// with findings and no such line did not run the check, which is what zero refutations
+// looks like too, so the study counts the lines rather than trusting the setting.
+var studyVerifyDone = regexp.MustCompile(`verification finished\"? confirmed=(\d+) refuted=(\d+) uncertain=(\d+) unchecked=(\d+) withheld=(\d+)`)
+
+type studyVerifyTally struct{ reviews, confirmed, refuted, uncertain, unchecked, withheld int }
+
+func (v *studyVerifyTally) add(log string) bool {
+	m := studyVerifyDone.FindStringSubmatch(log)
+	if m == nil {
+		return false
+	}
+	n := func(i int) int { x, _ := strconv.Atoi(m[i]); return x }
+	v.reviews++
+	v.confirmed += n(1)
+	v.refuted += n(2)
+	v.uncertain += n(3)
+	v.unchecked += n(4)
+	v.withheld += n(5)
+	return true
 }
 
 var studyStateHead = regexp.MustCompile(`(?m)^File: (.+):(\d+)\nTitle: (.*)$`)
@@ -176,6 +213,11 @@ func overruledFindings(r *review.Report) []review.Finding {
 	return out
 }
 
+// verifyExpertName is how the engine attributes a finding the repository check
+// withheld. It is the engine's own constant, restated because it is unexported, and
+// TestTheStudyKeepsAFindingTheRepositoryCheckWithheld fails if the two drift.
+const verifyExpertName = "a repository check"
+
 func studySeverity(s string) float64 {
 	switch strings.ToLower(s) {
 	case "critical":
@@ -204,12 +246,19 @@ func TestJevStudyCollect(t *testing.T) {
 	if v, err := strconv.ParseFloat(os.Getenv("NITPICK_JEV_STUDY_CAP_USD"), 64); err == nil && v > 0 {
 		capUSD = v
 	}
+	// "plain" is the pre-registered arm. "verify" turns review.verify on, so the
+	// decision model is shown what the repository check read.
+	arm := os.Getenv("NITPICK_JEV_STUDY_ARM")
+	if arm == "" {
+		arm = "plain"
+	}
+	verifyOn := arm == "verify"
 	ctx := t.Context()
 	before, err := keyUsageUSD(ctx, key)
 	if err != nil {
 		t.Fatalf("read key usage: %v", err)
 	}
-	t.Logf("key usage before: $%.4f, cap for this phase $%.2f", before, capUSD)
+	t.Logf("arm %s, key usage before: $%.4f, cap for this phase $%.2f", arm, before, capUSD)
 
 	var fixtures []Fixture
 	seen := map[string]bool{}
@@ -245,6 +294,8 @@ func TestJevStudyCollect(t *testing.T) {
 
 	var mu sync.Mutex
 	var obs []studyObservation
+	var tally studyVerifyTally
+	skipped := 0
 	failed := 0
 	sem := make(chan struct{}, 6)
 	var wg sync.WaitGroup
@@ -262,10 +313,8 @@ func TestJevStudyCollect(t *testing.T) {
 				return
 			}
 			rec := &studyRecorder{inner: client}
-			opts := Options{Timeout: 10 * time.Minute, Decider: rec, Tune: func(c *config.Config) {
-				// Enabled, and withholding nothing, so every finding is studyScored and kept.
-				c.Review.Jev.Threshold = 1e-9
-			}}
+			var logged strings.Builder
+			opts := Options{Timeout: 10 * time.Minute, Decider: rec, Log: slog.New(slog.NewTextHandler(&logged, nil)), Tune: studyTune(verifyOn)}
 			result := Run(ctx, j.model, j.f, j.run, opts)
 			if result.Err != nil || result.Report == nil {
 				mu.Lock()
@@ -273,7 +322,13 @@ func TestJevStudyCollect(t *testing.T) {
 				mu.Unlock()
 				return
 			}
-			joined := studyJoin(j.model.ID, j.f, j.run, result, rec)
+			mu.Lock()
+			ran := verifyOn && tally.add(logged.String())
+			if verifyOn && !ran && len(result.Report.Findings)+len(overruledFindings(result.Report)) > 0 {
+				skipped++
+			}
+			mu.Unlock()
+			joined := studyJoin(j.model.ID, j.f, j.run, result, rec, arm, ran)
 			mu.Lock()
 			obs = append(obs, joined...)
 			mu.Unlock()
@@ -296,6 +351,13 @@ func TestJevStudyCollect(t *testing.T) {
 	t.Logf("collected %d findings (%d real, %d not real) from %d reviews, %d failed, stopped early: %v",
 		len(obs), real, len(obs)-real, len(jobs), failed, stop)
 	t.Logf("phase cost: $%.4f", after-before)
+	if verifyOn {
+		t.Logf("repository check ran in %d reviews: confirmed %d, refuted %d, uncertain %d, unchecked %d, withheld %d; %d reviews with findings did not run it",
+			tally.reviews, tally.confirmed, tally.refuted, tally.uncertain, tally.unchecked, tally.withheld, skipped)
+		if skipped > 0 {
+			t.Errorf("%d reviews with findings never ran the repository check, so this arm is not the verify arm for them", skipped)
+		}
+	}
 
 	raw, err := json.Marshal(obs)
 	if err != nil {
@@ -307,13 +369,25 @@ func TestJevStudyCollect(t *testing.T) {
 	t.Logf("wrote %s (%d bytes)", studyFile(), len(raw))
 }
 
+// studyTune is the configuration of an arm. Jev is enabled and withholds nothing, so
+// every finding is scored and kept; the verify arm also turns the repository check on,
+// so the decision model is shown what the check read.
+func studyTune(verifyOn bool) func(*config.Config) {
+	return func(c *config.Config) {
+		c.Review.Jev.Threshold = 1e-9
+		if verifyOn {
+			c.Review.Verify = config.VerifyNotRefuted
+		}
+	}
+}
+
 // studyJoin turns one finished review into observations: every finding the engine
 // filed or withheld that the decision model was asked about, labelled real or not by
 // ScoreRun and carrying the state it was shown. A finding with no recorded state is
 // left out, and the count of such findings is the caller's to check against the
 // recorded states, since a silent drop here would shrink the sample with nothing to
 // say so.
-func studyJoin(model string, f Fixture, run int, result RunResult, rec *studyRecorder) []studyObservation {
+func studyJoin(model string, f Fixture, run int, result RunResult, rec *studyRecorder, arm string, verified bool) []studyObservation {
 	all := append(append([]review.Finding{}, result.Report.Findings...), overruledFindings(result.Report)...)
 	// ScoreRun reads only the findings the report published, so a finding the engine
 	// withheld would never appear among its unmatched ones and would be labelled real.
@@ -336,7 +410,15 @@ func studyJoin(model string, f Fixture, run int, result RunResult, rec *studyRec
 			continue
 		}
 		line, _ := strconv.Atoi(m[2])
-		byState[studyID(m[1], line, m[3])] = studyObservation{State: state, Jev: map[string]float64{"jev": rec.scores[i].Defect()}}
+		byState[studyID(m[1], line, m[3])] = studyObservation{State: state,
+			Jev:     map[string]float64{"jev": rec.scores[i].Defect()},
+			Support: map[string]float64{"jev": 1 - rec.scores[i][jev.Noise]}}
+	}
+	refuted := map[string]bool{}
+	for _, w := range result.Report.Overruled {
+		if w.Expert == verifyExpertName {
+			refuted[studyID(w.Finding.Path, w.Finding.Line, w.Finding.Title)] = true
+		}
 	}
 	var out []studyObservation
 	for _, finding := range all {
@@ -348,10 +430,17 @@ func studyJoin(model string, f Fixture, run int, result RunResult, rec *studyRec
 		}
 		id := studyID(finding.Path, finding.Line, finding.Title)
 		o, found := byState[id]
-		if !found {
+		switch {
+		case found && verified:
+			o.Verify = "kept"
+		case refuted[id]:
+			// The repository check withheld it before the decision model saw it, so it
+			// has no Jev score and still has a label and a verdict.
+			o = studyObservation{Jev: map[string]float64{}, Support: map[string]float64{}, Verify: "refuted"}
+		case !found:
 			continue
 		}
-		o.Model, o.Fixture, o.Run = model, f.Name, run
+		o.Model, o.Fixture, o.Run, o.Arm = model, f.Name, run, arm
 		o.Path, o.Line, o.Title = finding.Path, finding.Line, finding.Title
 		o.Real = !unmatched[id]
 		o.Confidence = 0.5
@@ -445,6 +534,9 @@ func TestJevStudyScore(t *testing.T) {
 			if halted {
 				return
 			}
+			if o.State == "" {
+				return // withheld by the repository check, never shown to the decision model
+			}
 			variants := map[string]string{}
 			if v, ok := studyWithout(o.State, "Whole file at the head commit:\n", ""); ok {
 				variants["jev-nofile"] = v
@@ -474,6 +566,7 @@ func TestJevStudyScore(t *testing.T) {
 				}
 				mu.Lock()
 				o.Jev[name] = scores.Defect()
+				o.Support[name] = 1 - scores[jev.Noise]
 				mu.Unlock()
 			}
 			if spent, err := keyUsageUSD(ctx, key); err == nil && spent-before > capUSD {
@@ -490,7 +583,7 @@ func TestJevStudyScore(t *testing.T) {
 		}
 	}
 
-	// The general model, studyScored on the full state.
+	// The general model, scored on the full state.
 	judged := 0
 	for i := range obs {
 		wg.Add(1)
@@ -502,6 +595,9 @@ func TestJevStudyScore(t *testing.T) {
 			halted := stop
 			mu.Unlock()
 			if halted {
+				return
+			}
+			if o.State == "" {
 				return
 			}
 			msgs := []llms.Message{
@@ -519,7 +615,7 @@ func TestJevStudyScore(t *testing.T) {
 		}(&obs[i])
 	}
 	wg.Wait()
-	t.Logf("judge %s studyScored %d of %d findings", judgeModel, judged, len(obs))
+	t.Logf("judge %s scored %d of %d findings", judgeModel, judged, len(obs))
 
 	after, _ := keyUsageUSD(ctx, key)
 	t.Logf("phase cost: $%.4f, stopped early: %v", after-before, stop)
@@ -605,6 +701,160 @@ func studyWithheldAt(xs []studyScored, threshold float64) (wh, kept float64) {
 	return wh, kept
 }
 
+// studySerious is the set of fixtures whose planted defects are all warning or above:
+// the ones where Jev's bug-plus-error score and the label mean the same thing.
+func studySerious() map[string]bool {
+	out := map[string]bool{}
+	var all []Fixture
+	all = append(append(append(all, Fixtures()...), CallerFixtures()...), InfoFixtures()...)
+	for _, f := range all {
+		serious := len(f.Defects) > 0
+		for _, d := range f.Defects {
+			switch d.WantSeverity {
+			case config.SeverityNit, config.SeverityInfo:
+				serious = false
+			}
+		}
+		// A clean fixture has no plant to be wrong about, so its findings are all not real
+		// and it joins the stratum, which keeps the not-real count from shrinking to nothing.
+		if serious || len(f.Defects) == 0 {
+			out[f.Name] = true
+		}
+	}
+	return out
+}
+
+// studyValue is the score a method gives one observation, and whether it gave one.
+func studyValue(o studyObservation, m string) (float64, bool) {
+	switch m {
+	case "confidence":
+		return o.Confidence, true
+	case "severity":
+		return o.Severity, true
+	case "verify":
+		switch o.Verify {
+		case "kept":
+			return 1, true
+		case "refuted":
+			return 0, true
+		}
+		return 0, false
+	case "jev+conf":
+		v, ok := o.Jev["jev"]
+		return (v + o.Confidence) / 2, ok
+	case "support:jev", "support:jev-claim", "support:jev-nofile", "support:jev-nodiff":
+		v, ok := o.Support[strings.TrimPrefix(m, "support:")]
+		return v, ok
+	case "support+conf":
+		v, ok := o.Support["jev"]
+		return (v + o.Confidence) / 2, ok
+	}
+	v, ok := o.Jev[m]
+	return v, ok
+}
+
+func studyTable(t *testing.T, title string, obs []studyObservation, methods []string, rng *rand.Rand) {
+	t.Helper()
+	real := 0
+	for _, o := range obs {
+		if o.Real {
+			real++
+		}
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "\n%s: %d findings, %d real, %d not real\n", title, len(obs), real, len(obs)-real)
+	if len(obs)-real < 10 {
+		b.WriteString("fewer than 10 not-real findings: every interval here is wider than the effects it could show\n")
+	}
+	b.WriteString("method               n    AUC    [95% interval]    @0.3 withheld/kept   W95 (all findings)\n")
+	for _, m := range methods {
+		var all []studyScored
+		for _, o := range obs {
+			if v, ok := studyValue(o, m); ok {
+				all = append(all, studyScored{o.Real, v, o.Fixture})
+			}
+		}
+		if len(all) == 0 {
+			fmt.Fprintf(&b, "%-18s %4d  (no scores)\n", m, 0)
+			continue
+		}
+		var aucs []float64
+		for i := 0; i < 300; i++ {
+			draw := make([]studyScored, len(all))
+			for j := range draw {
+				draw[j] = all[rng.IntN(len(all))]
+			}
+			aucs = append(aucs, studyAUC(draw))
+		}
+		sort.Float64s(aucs)
+		wh3, kept3 := studyWithheldAt(all, 0.3)
+		wh95, _ := studyWithheldAt(all, studyThreshold95(all))
+		fmt.Fprintf(&b, "%-18s %4d  %.3f  [%.3f, %.3f]     %.3f / %.3f          %.3f\n", m, len(all), studyAUC(all), aucs[7], aucs[292], wh3, kept3, wh95)
+	}
+	t.Log(b.String())
+}
+
+func TestJevStudyAnalyseArms(t *testing.T) {
+	if os.Getenv("NITPICK_JEV_STUDY") != "1" {
+		t.Skip("set NITPICK_JEV_STUDY=1 to run the Jev study")
+	}
+	rng := rand.New(rand.NewPCG(9, 13))
+	serious := studySerious()
+	load := func(arm string) []studyObservation {
+		raw, err := os.ReadFile(fmt.Sprintf("%s/jev-%s.json", os.Getenv("NITPICK_JEV_STUDY_DIR"), arm))
+		if err != nil {
+			t.Logf("arm %s: %v", arm, err)
+			return nil
+		}
+		var obs []studyObservation
+		if err := json.Unmarshal(raw, &obs); err != nil {
+			t.Fatal(err)
+		}
+		return obs
+	}
+	plain, verify := load("plain"), load("verify")
+
+	// A reviewer whose reviews all failed under verification leaves the verify arm with
+	// fewer reviewers than the plain arm, and the arms are only comparable on the ones they
+	// share. The plain arm is also shown restricted to them.
+	shared := map[string]bool{}
+	for _, o := range verify {
+		shared[o.Model] = true
+	}
+	var plainShared []studyObservation
+	for _, o := range plain {
+		if shared[o.Model] {
+			plainShared = append(plainShared, o)
+		}
+	}
+	for _, o := range plain {
+		if !shared[o.Model] {
+			t.Logf("model %s has findings in the plain arm and none in the verify arm", o.Model)
+			break
+		}
+	}
+
+	basic := []string{"confidence", "severity", "jev", "support:jev", "support:jev-claim", "support:jev-nofile", "support:jev-nodiff", "judge", "support+conf", "jev+conf"}
+	for _, set := range []struct {
+		name string
+		obs  []studyObservation
+		with []string
+	}{
+		{"plain arm, three reviewers", plain, basic},
+		{"plain arm, only the reviewers the verify arm kept", plainShared, basic},
+		{"verify arm", verify, append([]string{"verify"}, basic...)},
+	} {
+		studyTable(t, "EXPLORATORY "+set.name+", all fixtures", set.obs, set.with, rng)
+		var strata []studyObservation
+		for _, o := range set.obs {
+			if serious[o.Fixture] {
+				strata = append(strata, o)
+			}
+		}
+		studyTable(t, "EXPLORATORY "+set.name+", fixtures whose plants are all warning or above, and clean ones", strata, set.with, rng)
+	}
+}
+
 func TestJevStudyAnalyse(t *testing.T) {
 	if os.Getenv("NITPICK_JEV_STUDY") != "1" {
 		t.Skip("set NITPICK_JEV_STUDY=1 to run the Jev study")
@@ -680,7 +930,7 @@ func TestJevStudyAnalyse(t *testing.T) {
 	}
 	t.Log(b.String())
 
-	// Paired AUC difference against jev, over findings both methods studyScored.
+	// Paired AUC difference against jev, over findings both methods scored.
 	b.Reset()
 	b.WriteString("\nAUC(jev) minus AUC(method), paired bootstrap over findings\n")
 	for _, m := range methods {

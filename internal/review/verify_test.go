@@ -167,6 +167,16 @@ func TestVerificationWithholdsARefutedFindingAndSaysWhyAfterReadingTheFile(t *te
 	}
 }
 
+// internal/evals reads this word to tell a finding the repository check withheld from
+// one a later stage did, and keeps its own copy because the constant is unexported.
+// Changing it here without changing that copy turns every such finding into a missing
+// observation.
+func TestTheRepositoryCheckIsNamedByTheWordTheEvalStudyReads(t *testing.T) {
+	if verifyExpert != "a repository check" {
+		t.Errorf("verifyExpert = %q; internal/evals/jevstudy_test.go reads \"a repository check\"", verifyExpert)
+	}
+}
+
 // A finding the check could not confirm was not disagreed with, so the summary
 // must not say an expert disagreed; a validation-only report keeps that wording.
 func TestAFindingWithheldByVerificationIsNotBlamedOnADisagreeingExpert(t *testing.T) {
