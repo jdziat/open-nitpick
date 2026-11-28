@@ -3252,3 +3252,151 @@ rare here, and the ranking puts such a task last unless its churn ties. Real pul
 requests have not been replayed. The token saving counts the design tasks' requests
 only.
 
+## Which method tells a real finding from noise, and what Jev is shown (2026-11-28)
+
+The question: when a reviewer files a finding, which method best separates a real
+defect from one that is not, and which part of what the decision model is shown carries
+the signal. The rules were written before the first model call, at the top of
+`internal/evals/jevstudy_test.go`, and the first table below is reported as they
+specified. Everything after it is exploratory and marked so.
+
+Data. 34 fixtures (tuning, caller and info corpora; the held-out corpus is unspent),
+3 reviewers (deepseek-v4.1-flash, qwen3.8-27b, glm-5.3-flash) twice each at temperature
+0, so 204 reviews. A finding is real when `ScoreRun` matches it to a planted defect.
+The first collection gave 173 findings, 118 real and 55 not. The whole study cost about
+$6 of the $75 allowed (key usage $4.59 to $10.54, plus three probes of a few cents).
+
+Pre-registered result, first collection, Jev scored by bug plus error:
+
+| method | AUC | not-real withheld / real kept at 0.3 |
+|---|---|---|
+| reviewer's own confidence | 0.830 | 0.000 / 1.000 |
+| general model (deepseek-v4.1-flash) on the same state | 0.671 | 0.291 / 0.822 |
+| reviewer's severity | 0.640 | 0.382 / 0.729 |
+| Jev, full state | 0.488 | 0.273 / 0.585 |
+| Jev, claim only | 0.366 | 0.364 / 0.407 |
+| Jev, no file | 0.461 | 0.236 / 0.559 |
+| Jev, no diff | 0.533 | 0.418 / 0.585 |
+
+Jev minus confidence is -0.342 (95% bootstrap interval -0.415 to -0.253), minus the
+general model -0.183 (-0.247 to -0.125). Removing the claim's surroundings costs 0.122
+(+0.055 to +0.187); removing only the file or only the diff moves it by 0.027 and -0.045.
+At Jev's documented threshold of 0.3 it kept 58.5% of the real findings. The threshold
+that keeps 95% of the real ones, read off half the fixtures, withheld none of the
+not-real ones on the other half. By the rules written beforehand, Jev's bug-plus-error
+score did not separate real from not real here.
+
+Two flaws in the design, both mine, found after that table.
+
+- The label is wider than the score. A planted nit or info observation is true and
+  counts as real, and bug plus error rates it near zero by design: the first example
+  inspected was a true redundant slice copy scored 0.000. Jev's score measures whether
+  something breaks, not whether the claim is true.
+- Jev was shown no evidence. Every state read "(the check made no lookups)", because
+  verification was off, and the docs say Jev follows that check and is shown what it read.
+
+Exploratory results. A second plain collection kept Jev's full probabilities (175
+findings, 122 real, 53 not), so one minus the noise probability, called support, can be
+read. A verify arm turned `review.verify: not_refuted` on.
+
+| method | plain arm AUC (interval) | verify arm AUC (interval) |
+|---|---|---|
+| reviewer's own confidence | 0.754 (0.686 to 0.817) | 0.832 (0.759 to 0.900) |
+| Jev support, 1 minus noise | 0.666 (0.580 to 0.745) | 0.754 (0.655 to 0.852) |
+| Jev bug plus error | 0.504 (0.425 to 0.595) | 0.530 (0.431 to 0.626) |
+| general model | 0.610 (0.531 to 0.693) | 0.686 (0.586 to 0.777) |
+| support and confidence averaged | 0.728 (0.653 to 0.806) | 0.847 (0.768 to 0.913) |
+| Jev support, claim only | 0.497 (0.404 to 0.585) | 0.445 (0.326 to 0.550) |
+
+The plain arm has three reviewers (175 findings) and the verify arm two (108 findings, 77
+real, 31 not); against the same two reviewers the plain arm reads confidence 0.724,
+support 0.711, support and confidence 0.743. On fixtures whose plants are all warning or
+above, plus the clean ones (verify arm, 66 findings, 43 real), confidence reads 0.929,
+the general model 0.929, support 0.904 and support with confidence 0.961 (0.914 to
+0.995). The intervals overlap throughout. They also treat findings as independent,
+which findings from one fixture and one reviewer are not, so they are narrower than
+they should be.
+
+What the data supports.
+
+- Jev's bug-plus-error score at 0.3 is a poor filter on this corpus: it withheld 27% of
+  the not-real findings and lost 41.5% of the real ones. The corpus plants nits, which that
+  score is built to rate low, so this says the score is severity-weighted and not that Jev
+  misjudges claims.
+- Read as one minus noise, Jev separates better (0.666 against 0.504) but not
+  better than the reviewer's own confidence, and averaging the two is not shown to beat
+  confidence alone.
+- The claim by itself carries no signal (support AUC 0.497 and 0.445). The diff, the file
+  and the evidence together do. Removing the file or the diff alone moved support by
+  0.004 and 0.017 on the plain arm, so neither is shown to matter alone.
+- The repository check withheld nothing. It ran in 88 reviews, with 108 of 108 states
+  carrying its lookups, and returned 93 confirmed, 15 uncertain and 0 refuted. Checking a
+  cheap model's claim with the same cheap model on short fixtures did not discriminate.
+- With the check on, glm-5.3-flash returned no usable findings in any review: every
+  verification request fails because the model cannot turn reasoning off (#274). The
+  verify arm is therefore two reviewers.
+
+Setup errors the run itself exposed, kept because the same traps are in this repository's
+other measurements. The first "verify" arm and its re-run both ran with verification off:
+the arm's configuration was lost in an edit, no test read it, and zero refutations looked
+like a result. Only counting the engine's own "verification finished" line per review
+showed it. `ScoreRun` reads published findings only, so a finding the engine withheld was
+first labelled real; an offline test of the join caught that before any spend.
+
+Defaults. `review.jev.threshold` stays off: Jev sends source to a third party and nothing
+here shows it is worth that. The comment on `JevFilter` still recommends 0.3 from an
+earlier measurement on agent-graded findings; on these fixtures 0.3 kept 58.5% of the
+real findings, and that comment is not changed here. No other default changes.
+
+Not measured. Real pull requests; defects a reviewer would catch and these fixtures do not
+plant; reviewers stronger than three cheap ones; a checker model other than the reviewer's
+own; a repository large enough that the checker has something to look up (the fixtures'
+diffs hold the whole file, so almost no lookups were needed). The general model that
+judged is the same model as one reviewer. Jev's endpoint is an alpha. The first and second
+plain collections are different samples of nondeterministic reviewers and are not pooled.
+
+### Held-out run of the Jev question (2026-11-28)
+
+One run on the held-out corpus, written down before any held-out finding existed
+(`internal/evals/jevstudy_heldout_test.go`, commit f187303). The development data did not
+favour Jev, so the run was there to settle the question on data nothing was tuned on.
+The stratum was findings the reviewer rated warning or above. The thresholds were frozen
+from the development data. The primary test was the AUC of Jev's support (one minus its
+noise probability) minus the reviewer's confidence, with an interval from resampling
+fixtures. The rule: fewer than 15 not-real findings in the stratum is underpowered;
+otherwise confirmed only if the interval lies above zero and support's AUC is at least 0.80.
+
+14 held-out fixtures, 3 reviewers, 4 runs each: 168 reviews, none failed, 153 findings
+(115 real, 38 not real), $0.91. The stratum held 97 findings, 85 real and 12 not real.
+
+| method | AUC | support minus method (95% interval over fixtures) | not-real withheld / real lost at the frozen threshold |
+|---|---|---|---|
+| reviewer's confidence | 0.634 | +0.288 (-0.393 to +0.536) | 1.000 / 0.588 |
+| reviewer's severity | 0.799 | +0.124 (-0.291 to +0.319) | 0.917 / 0.341 |
+| Jev bug plus error | 0.676 | +0.247 (-0.128 to +0.553) | 1.000 / 0.671 |
+| Jev support | 0.923 | | 1.000 / 0.753 |
+
+Verdict by the rules written beforehand: underpowered. 12 not-real findings is under the
+minimum of 15, and nine of the 12 came from one fixture (`retry-no-backoff`), so the sample
+holds about four independent cases. The intervals span zero and the sign of every
+difference is a coin flip. Support's AUC is the highest in the table and is not evidence:
+on the development data the same stratum read 0.672, and the two samples disagree by 0.25.
+
+What follows from it, as written: nothing turns `review.jev` on, the comment on
+`JevFilter` stops recommending 0.3, and the held-out corpus is spent for this question and
+is not run against Jev again. The question is open, not answered against Jev. A run that
+could answer it needs at least 15 not-real findings from at least eight fixtures in the
+stratum, which these reviewers do not produce on 14 fixtures; it would need more fixtures
+or weaker reviewers.
+
+Two earlier measurements lived only in the comment on `JevFilter`, and are kept here
+when that comment was shortened. They are quoted, not re-derived. On 100 findings that agents
+graded, the repository check followed by Jev at 0.3 withheld 29 of 42 not-real findings, against
+25 for the check alone. On deep review's drafts for 30 unseen pull requests Jev lowered F1 by
+0.033 (0.002 to 0.073), so it is not recommended there. Both were measured on findings from
+other corpora than the fixtures above.
+
+Not changed by this: the first study's finding that bug plus error at 0.3 is a poor filter
+on planted-defect fixtures still stands, as does the cost of sending source to a third
+party.
+

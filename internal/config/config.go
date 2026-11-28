@@ -1635,18 +1635,16 @@ const (
 
 // JevFilter configures the optional Jev decision-model filter.
 //
-// Each model finding is sent to Jev with the pull request's description, the
-// claim and its cited code, what the repository check read, and the file. Jev
-// gives a probability for bug, error, warning, info and noise, and a finding
-// whose bug plus error probability is under Threshold is withheld with the
-// reason. Analyzer findings are not sent.
+// Each model finding is sent to Jev with the pull request's description, the claim and
+// its cited code, what the repository check read, and the file. Jev gives a probability
+// for bug, error, warning, info and noise, and a finding whose bug plus error probability
+// is under Threshold is withheld with the reason. Analyzer findings are not sent.
 //
-// This sends source code to OpenRouter, so it is off by default and a
-// repository file cannot turn it on. A request that fails keeps its finding and
-// says so in the stage list. On 100 findings that agents graded, the check
-// followed by Jev at 0.3 withheld 29 of 42 not-real findings against 25 for the
-// check alone. On deep review's drafts for 30 unseen pull requests it lowered
-// F1 by 0.033 (0.002 to 0.073), so it is not recommended there.
+// This sends source code to OpenRouter, so it is off by default and a repository file
+// cannot turn it on. A request that fails keeps its finding and says so in the stage
+// list. It was not shown to beat the reviewer's own confidence, and 0.3 kept 58.5% of
+// real findings on planted-defect fixtures; 0.3 is the value the first measurement used,
+// not a recommendation. docs/findings.md has the measurements.
 type JevFilter struct {
 	// Threshold is the lowest bug plus error probability a finding may have and
 	// be kept, from 0 to 1. Zero, the default, turns the filter off. 0.3 is the
