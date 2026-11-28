@@ -9,8 +9,11 @@
 {{- if and .Values.oidc.allow (not .Values.oidc.audience) }}
 {{- fail "oidc.allow needs oidc.audience" }}
 {{- end }}
-{{- if not (or .Values.tokens .Values.existingSecret .Values.oidc.audience .Values.config.existingSecret) }}
-{{- fail "give the server a way to authenticate: set tokens, existingSecret, config.existingSecret or oidc.audience. With none, every request is refused" }}
+{{- if and .Values.insightsTokens .Values.insightsExistingSecret }}
+{{- fail "set insightsTokens or insightsExistingSecret, not both: the Secret you name wins and the listed tokens would be silently ignored" }}
+{{- end }}
+{{- if not (or .Values.tokens .Values.existingSecret .Values.oidc.audience .Values.config.existingSecret .Values.insightsTokens .Values.insightsExistingSecret) }}
+{{- fail "give the server a way to authenticate: set tokens, existingSecret, insightsTokens, insightsExistingSecret, config.existingSecret or oidc.audience. With none, every request is refused" }}
 {{- end }}
 apiVersion: apps/v1
 kind: Deployment
@@ -31,6 +34,9 @@ spec:
       annotations:
         {{- if and (not .Values.existingSecret) .Values.tokens }}
         checksum/tokens: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if and (not .Values.insightsExistingSecret) .Values.insightsTokens }}
+        checksum/insights-tokens: {{ include (print $.Template.BasePath "/insights-secret.yaml") . | sha256sum }}
         {{- end }}
         {{- with .Values.podAnnotations }}{{ toYaml . | nindent 8 }}{{- end }}
     spec:
@@ -60,13 +66,20 @@ spec:
             - -oidc-allow={{ . }}
             {{- end }}
             {{- end }}
-          {{- if or .Values.tokens .Values.existingSecret .Values.config.existingSecret }}
+          {{- if or .Values.tokens .Values.existingSecret .Values.config.existingSecret .Values.insightsTokens .Values.insightsExistingSecret }}
           env:
             {{- if or .Values.tokens .Values.existingSecret }}
             - name: NITPICK_NOTARY_TOKENS
               valueFrom:
                 secretKeyRef:
                   name: {{ include "notary.secretName" . }}
+                  key: tokens
+            {{- end }}
+            {{- if or .Values.insightsTokens .Values.insightsExistingSecret }}
+            - name: NITPICK_INSIGHTS_TOKENS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "notary.insightsSecretName" . }}
                   key: tokens
             {{- end }}
             {{- if .Values.config.existingSecret }}

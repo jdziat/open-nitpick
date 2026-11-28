@@ -601,3 +601,62 @@ func TestTheLoginPageRendersItsFormWithARealTokenAndTheRequestedPage(t *testing.
 		t.Errorf("a redirect-only login page carries a credentials form:\n%s", other)
 	}
 }
+
+func TestAPageHeadingFromItsDataReplacesTheStaticTitleAndIsEscaped(t *testing.T) {
+	c := &stubComponent{name: "stub"}
+	e := newEnv(t, Config{
+		Components: []Component{&headingComponent{stubComponent: c}},
+		Providers:  []Provider{fakeProvider{id: "fake"}},
+		Roles:      newRoles(t, RoleRule{Roles: []Role{"admin"}, Provider: "fake", Group: "ops"}),
+		Assets:     builtAssets(),
+	})
+	e.signIn("ana", "ops")
+	_, body := e.do("GET", "/ui/stub/named", nil, nil)
+	if !strings.Contains(body, "<h1>acme/api &lt;b&gt; · pull/7</h1>") || !strings.Contains(body, "<title>acme/api &lt;b&gt; · pull/7 · nitpick</title>") {
+		t.Fatalf("the heading did not come from the data, escaped: %.400s", body)
+	}
+	_, plain := e.do("GET", "/ui/stub/", nil, nil)
+	if !strings.Contains(plain, "<h1>Stub home</h1>") {
+		t.Fatalf("a page with no Heading must keep its title")
+	}
+}
+
+type headingComponent struct{ *stubComponent }
+
+func (h *headingComponent) Pages() []Page {
+	return append(h.stubComponent.Pages(), Page{
+		Path: "named", Title: "Named", Body: `<p>x</p>`,
+		Data:    func(*http.Request) (any, error) { return "acme/api <b> · pull/7", nil },
+		Heading: func(data any) string { return data.(string) },
+	})
+}
+
+func TestAPageWithAWildcardPathIsNeverOfferedInTheNavigation(t *testing.T) {
+	e := newEnv(t, Config{
+		Components: []Component{&wildcardNavComponent{stubComponent: &stubComponent{name: "stub"}}},
+		Providers:  []Provider{fakeProvider{id: "fake"}},
+		Roles:      newRoles(t, RoleRule{Roles: []Role{"admin"}, Provider: "fake", Group: "ops"}),
+		Assets:     builtAssets(),
+	})
+	e.signIn("ana", "ops")
+	_, body := e.do("GET", "/ui/stub/", nil, nil)
+	if strings.Contains(body, `<a href="">`) {
+		t.Fatalf("the navigation holds a link with no address: %.500s", body)
+	}
+	if !strings.Contains(body, `>Stub home</a>`) {
+		t.Fatalf("a linkable page must stay in the navigation")
+	}
+	_, home := e.do("GET", "/ui/", nil, nil)
+	if strings.Contains(home, `<a href="">`) {
+		t.Fatalf("the home list links a page with no address: %.500s", home)
+	}
+}
+
+type wildcardNavComponent struct{ *stubComponent }
+
+func (w *wildcardNavComponent) Pages() []Page {
+	return append(w.stubComponent.Pages(), Page{
+		Path: "thing/{id}", Title: "A thing", Nav: true, Body: `<p>x</p>`,
+		Data: func(*http.Request) (any, error) { return nil, nil },
+	})
+}

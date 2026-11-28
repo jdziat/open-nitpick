@@ -99,7 +99,7 @@ func loadConfig(path string) (*fileConfig, error) {
 }
 
 // knownComponents are the components this binary can run.
-var knownComponents = map[string]bool{"notary": true}
+var knownComponents = map[string]bool{"notary": true, "insights": true}
 
 func (c *fileConfig) check() error {
 	seen := map[string]bool{}
@@ -141,6 +141,16 @@ func (c *fileConfig) components() []string {
 		return []string{"notary"}
 	}
 	return c.Components
+}
+
+// grantsRole reports whether any role rule gives the role to someone.
+func (c *fileConfig) grantsRole(role string) bool {
+	for _, r := range c.Roles {
+		if r.Role == role {
+			return true
+		}
+	}
+	return false
 }
 
 // roleRules turns the file's role section into the server's rules.

@@ -236,8 +236,8 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	var entries []indexEntry
 	for _, p := range s.pages {
 		if p.page.Need == "" || id.Has(p.page.Need) {
-			if p.page.Nav {
-				entries = append(entries, indexEntry{Title: p.page.Title, Href: pageHref(p), Component: p.component})
+			if href := pageHref(p); p.page.Nav && href != "" {
+				entries = append(entries, indexEntry{Title: p.page.Title, Href: href, Component: p.component})
 			}
 		}
 	}
@@ -276,7 +276,13 @@ func (s *Server) servePage(w http.ResponseWriter, r *http.Request, route pageRou
 		return
 	}
 	view := View{Data: data, Identity: id}
-	s.write(w, route.tmpl, http.StatusOK, s.frame(r, id, route.page.Title, view), r.URL.Path)
+	title := route.page.Title
+	if route.page.Heading != nil {
+		if h := route.page.Heading(data); h != "" {
+			title = h
+		}
+	}
+	s.write(w, route.tmpl, http.StatusOK, s.frame(r, id, title, view), r.URL.Path)
 }
 
 func (s *Server) simple(w http.ResponseWriter, r *http.Request, id Identity, status int, title, body string) {
@@ -301,6 +307,9 @@ func (s *Server) frame(r *http.Request, id Identity, title string, view View) la
 			continue
 		}
 		href := pageHref(p)
+		if href == "" {
+			continue // a page with a wildcard has no address to link to
+		}
 		nav = append(nav, navItem{Title: p.page.Title, Href: href, Current: href == r.URL.Path})
 	}
 	return layoutData{

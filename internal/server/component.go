@@ -79,6 +79,12 @@ type Page struct {
 	// form of the page puts in a csrf_token field.
 	Body string
 
+	// Heading, when set, names the page from its data, for a page that shows one
+	// thing among many, such as a review. It replaces Title in the heading and the
+	// browser title, and it is escaped like any other text. Title still names the
+	// page in the navigation and in errors.
+	Heading func(data any) string
+
 	// Data builds what Body is executed with. Return ErrNotFound for a page that
 	// does not exist, which is a 404. Any other error is a 500 whose text goes to
 	// the log and not to the page.

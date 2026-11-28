@@ -17,10 +17,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/nitpick-oss/nitpick/internal/insights"
 	"github.com/nitpick-oss/nitpick/internal/notary"
 	"github.com/nitpick-oss/nitpick/internal/server"
 	"github.com/nitpick-oss/nitpick/internal/server/auth"
@@ -58,6 +60,33 @@ func (t *tokenFlags) Set(v string) error {
 	return nil
 }
 
+type insightsTokens []insights.Token
+
+func (t *insightsTokens) String() string { return fmt.Sprint(len(*t)) }
+
+// Set parses name:role:secret, or name:role:sha256:<hex>, with the roles write
+// and read.
+func (t *insightsTokens) Set(v string) error {
+	p := strings.SplitN(v, ":", 3)
+	if len(p) != 3 || p[0] == "" || p[2] == "" {
+		return fmt.Errorf("token must be name:role:secret")
+	}
+	role := insights.Role(p[1])
+	if role != insights.RoleWrite && role != insights.RoleRead {
+		return fmt.Errorf("unknown role %q: use write or read", p[1])
+	}
+	if h, ok := strings.CutPrefix(p[2], hashPrefix); ok {
+		tok, err := insights.TokenFromHash(p[0], role, h)
+		if err != nil {
+			return err
+		}
+		*t = append(*t, tok)
+		return nil
+	}
+	*t = append(*t, insights.NewToken(p[0], role, p[2]))
+	return nil
+}
+
 type oidcRules []notary.OIDCRule
 
 func (o *oidcRules) String() string { return fmt.Sprint(len(*o)) }
@@ -82,6 +111,7 @@ type options struct {
 	addr, dir, config, oidcAudience, oidcIssuer, oidcJWKS string
 	allowClear                                            bool
 	tokens                                                tokenFlags
+	insightsTokens                                        insightsTokens
 	rules                                                 oidcRules
 }
 
@@ -95,6 +125,7 @@ func parseFlags(args []string, stderr io.Writer) (*options, *flag.FlagSet, error
 	fs.StringVar(&o.dir, "data", "notary-data", "directory for records")
 	fs.BoolVar(&o.allowClear, "author-clear", false, "let provisional tokens clear records")
 	fs.Var(&o.tokens, "token", "name:role:secret (repeatable); the secret is hashed on load and never stored")
+	fs.Var(&o.insightsTokens, "insights-token", "name:write|read:secret for the insights component (repeatable; also NITPICK_INSIGHTS_TOKENS)")
 	fs.StringVar(&o.oidcAudience, "oidc-audience", "", "accept GitHub Actions identity tokens minted for this audience")
 	fs.StringVar(&o.oidcIssuer, "oidc-issuer", notary.GitHubIssuer, "issuer the identity tokens must name")
 	fs.StringVar(&o.oidcJWKS, "oidc-jwks-url", "", "where the issuer publishes its keys (default: issuer/.well-known/jwks)")
@@ -154,6 +185,13 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	for _, entry := range strings.Fields(os.Getenv("NITPICK_NOTARY_TOKENS")) {
 		if err := o.tokens.Set(entry); err != nil {
 			_, _ = fmt.Fprintf(stderr, "nitpick-server: NITPICK_NOTARY_TOKENS: %v\n", err)
+			return 2
+		}
+	}
+
+	for _, entry := range strings.Fields(os.Getenv("NITPICK_INSIGHTS_TOKENS")) {
+		if err := o.insightsTokens.Set(entry); err != nil {
+			_, _ = fmt.Fprintf(stderr, "nitpick-server: NITPICK_INSIGHTS_TOKENS: %v\n", err)
 			return 2
 		}
 	}
@@ -223,25 +261,39 @@ func build(ctx context.Context, o *options, log *slog.Logger) (http.Handler, fun
 	var components []server.Component
 	closeStore := func() {}
 	for _, name := range cfg.components() {
-		// notary is the only component this binary has; knownComponents refuses
-		// any other name before this point.
+		// knownComponents refuses any other name before this point.
+		if name == "insights" {
+			c, closeInsights, err := buildInsights(o, cfg.grantsRole(string(insights.RoleView)) && len(providers) > 0, log)
+			if err != nil {
+				closeStore()
+				return nil, nil, err
+			}
+			prev := closeStore
+			closeStore = func() { closeInsights(); prev() }
+			components = append(components, c)
+			continue
+		}
 		if name != "notary" {
 			continue
 		}
 		// A notary no machine can write to and no person can open is not a
 		// notary that was meant to be started.
 		if len(o.tokens) == 0 && o.oidcAudience == "" && len(providers) == 0 {
+			closeStore()
 			return nil, nil, errors.New("give at least one -token or an -oidc-audience with -oidc-allow, or configure a sign-in")
 		}
 		store, err := wire.NewFileStore(o.dir)
 		if err != nil {
+			closeStore()
 			return nil, nil, err
 		}
 		// One server per directory: see FileStore.Lock.
 		if err := store.Lock(); err != nil {
+			closeStore()
 			return nil, nil, fmt.Errorf("%w (run one server per data directory)", err)
 		}
-		closeStore = func() { _ = store.Unlock() }
+		prev := closeStore
+		closeStore = func() { _ = store.Unlock(); prev() }
 		c := notary.NewComponent(store, o.tokens, o.allowClear)
 		if o.oidcAudience != "" {
 			c.WithOIDC(&notary.OIDC{Issuer: o.oidcIssuer, Audience: o.oidcAudience, Allow: o.rules, JWKSURL: o.oidcJWKS})
@@ -264,6 +316,26 @@ func build(ctx context.Context, o *options, log *slog.Logger) (http.Handler, fun
 		return nil, nil, err
 	}
 	return srv, closeStore, nil
+}
+
+// buildInsights opens the insights store under the data directory. One server per
+// directory holds for it as for the notary: the reviews file is appended to by
+// one process.
+func buildInsights(o *options, roleGrantsView bool, log *slog.Logger) (*insights.Component, func(), error) {
+	// A component no machine can write to and no person can open is not one that
+	// was meant to be started. A sign-in alone grants nothing, so a person can open
+	// it only when a role rule gives them the insights role.
+	if len(o.insightsTokens) == 0 && !roleGrantsView {
+		return nil, nil, errors.New("insights: give at least one -insights-token, or a role rule that grants the insights role to someone who can sign in")
+	}
+	store, err := insights.OpenStore(filepath.Join(o.dir, "insights"))
+	if err != nil {
+		return nil, nil, err
+	}
+	if n := store.Skipped(); n > 0 {
+		log.Warn("insights: lines of the reviews file could not be read and were skipped", "lines", n)
+	}
+	return insights.NewComponent(store, o.insightsTokens, log), func() { _ = store.Close() }, nil
 }
 
 // connLimits bound how long one connection may hold a goroutine and a file

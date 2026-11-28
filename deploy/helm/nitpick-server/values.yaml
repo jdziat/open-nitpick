@@ -22,6 +22,15 @@ tokens: []
 # whitespace-separated name:role:sha256:<hash> entries.
 existingSecret: ""
 
+# Who may post to and read the insights component, when the server
+# configuration lists it. Hashes, as above.
+insightsTokens: []
+#  - name: ci
+#    role: write                # write | read
+#    hash: <64 hex characters>
+# Or a Secret you manage yourself, with one key, `tokens`.
+insightsExistingSecret: ""
+
 # Accept GitHub Actions identity tokens instead of, or beside, static tokens.
 oidc:
   audience: ""
