@@ -9,8 +9,38 @@ permissions:
   contents: read
 
 jobs:
+  # The suite runs once on each engine the server supports, against real servers.
+  # NITPICK_REQUIRE_DATABASES turns a database test that cannot find its server into
+  # a failure: skipped, it would be a test that did not run, reported as a pass.
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [postgres, mysql]
+    name: test (${{ matrix.engine }})
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: dev
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: dev
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -pdev"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      NITPICK_REQUIRE_DATABASES: '1'
+      NITPICK_TEST_ENGINE: ${{ matrix.engine }}
+      NITPICK_TEST_POSTGRES_URL: postgres://postgres:dev@127.0.0.1:5432/postgres?sslmode=disable
+      NITPICK_TEST_MYSQL_URL: mysql://root:dev@127.0.0.1:3306/mysql
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -64,6 +94,49 @@ jobs:
 
       - name: Build
         run: go build ./...
+
+  # The chart is rendered for every database it can run on, so a template that
+  # fails for one engine, or lets the two settings contradict each other, fails
+  # here and not on a release.
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # yamllint disable-line rule:line-length
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e  # v5.1.0
+      - name: Lint and render each database
+        run: |
+          chart=deploy/helm/nitpick-server
+          for bundled in postgres mysql; do
+            for replicas in 1 3; do
+              helm lint "$chart" --set "database.bundled=$bundled" --set "replicaCount=$replicas"
+              helm template r "$chart" --set "database.bundled=$bundled" --set "replicaCount=$replicas" > "$RUNNER_TEMP/$bundled-$replicas.yaml"
+              grep -q "replicas: $replicas" "$RUNNER_TEMP/$bundled-$replicas.yaml"
+              grep -q "kind: StatefulSet" "$RUNNER_TEMP/$bundled-$replicas.yaml"
+            done
+          done
+          ext=(--set database.bundled=none --set externalDatabase.url=postgres://u:p@db.example:5432/nitpick)
+          helm lint "$chart" "${ext[@]}"
+          helm template r "$chart" "${ext[@]}" > "$RUNNER_TEMP/none.yaml"
+          if grep -q "kind: StatefulSet" "$RUNNER_TEMP/none.yaml"; then
+            echo "database.bundled=none still renders a database" >&2
+            exit 1
+          fi
+      # Each refusal must be a refusal: a chart that renders for a setting that
+      # cannot work is worse than one that fails.
+      - name: Refuse settings that cannot work
+        run: |
+          chart=deploy/helm/nitpick-server
+          for bad in \
+            "database.bundled=none" \
+            "database.bundled=oracle" \
+            "externalDatabase.url=postgres://x" \
+            "replicaCount=11"; do
+            if helm template r "$chart" --set "$bad" > /dev/null 2>&1; then
+              echo "helm rendered with $bad, which must be refused" >&2
+              exit 1
+            fi
+          done
 
   # The hub UI under ui/. The Go tests skip the embedded-build path when ui/dist
   # does not exist, so this job builds it and runs that path: without it, a
