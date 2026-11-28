@@ -6,7 +6,7 @@ package evals
 // PackDesign run over it, and a defect counts as kept when its file is a source
 // of a task that still has a request.
 //
-//	NITPICK_CAP_STUDY=1 go test -count=1 -run TestCapStudy -v ./internal/evals/
+//	NITPICK_CAP_STUDY=1 go test -count=1 -run TestCapStudyRanksTasksByRetainedDefects -v ./internal/evals/
 //
 // What it cannot say: whether a real defect sits in a busy task. A fixture's own
 // diff size is what makes a task busy here, so the numbers bound how the ranking
@@ -365,7 +365,7 @@ func (w widePR) tasksFor(ids map[string]bool) []practices.DesignTask {
 	return out
 }
 
-func TestCapStudy(t *testing.T) {
+func TestCapStudyRanksTasksByRetainedDefects(t *testing.T) {
 	if os.Getenv("NITPICK_CAP_STUDY") != "1" {
 		t.Skip("set NITPICK_CAP_STUDY=1 to run the design-task cap study")
 	}

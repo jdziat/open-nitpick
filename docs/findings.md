@@ -3202,8 +3202,8 @@ size. The real planner and `PackDesign` ran over each. A planted defect counts a
 reviewed when a kept design task's declaration span, widened by the harness's 4-line
 anchor tolerance, contains its line. Retention is that count over the count with no
 cap. Each pull request had 10 to 51 design tasks (median 17, 29 and 40 by size) and
-was run at caps from 5 to 32, 724 trials in all. `TestCapStudy` repeats it:
-`NITPICK_CAP_STUDY=1 go test -run TestCapStudy ./internal/evals/`.
+was run at caps from 5 to 32, 724 trials in all. `TestCapStudyRanksTasksByRetainedDefects` repeats it:
+`NITPICK_CAP_STUDY=1 go test -run TestCapStudyRanksTasksByRetainedDefects ./internal/evals/`.
 
 Rankers, mean share of planted defects still reviewed, pull requests of 10 fixtures:
 
