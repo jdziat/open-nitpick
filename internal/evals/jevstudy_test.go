@@ -64,8 +64,10 @@ package evals
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"math/rand/v2"
 	"net/http"
 	"os"
@@ -260,18 +262,20 @@ func TestJevStudyCollect(t *testing.T) {
 	}
 	t.Logf("arm %s, key usage before: $%.4f, cap for this phase $%.2f", arm, before, capUSD)
 
-	var fixtures []Fixture
-	seen := map[string]bool{}
-	for _, f := range append(append(Fixtures(), CallerFixtures()...), InfoFixtures()...) {
-		if seen[f.Name] || HeldOut(f.Name) {
-			continue
-		}
-		seen[f.Name] = true
-		fixtures = append(fixtures, f)
+	corpus := os.Getenv("NITPICK_JEV_STUDY_CORPUS")
+	if err := studyGuardHeldOut(corpus, os.Getenv("NITPICK_JEV_STUDY_SPEND_HELDOUT"), os.Getenv("NITPICK_JEV_STUDY_FILE")); err != nil {
+		t.Fatal(err)
+	}
+	fixtures, err := studyCorpus(corpus)
+	if err != nil {
+		t.Fatal(err)
 	}
 	models := []string{"deepseek/deepseek-v4.1-flash", "qwen/qwen3.8-27b", "z-ai/glm-5.3-flash"}
 	runs := 2
-	t.Logf("fixtures=%d models=%v runs=%d", len(fixtures), models, runs)
+	if v, err := strconv.Atoi(os.Getenv("NITPICK_JEV_STUDY_RUNS")); err == nil && v > 0 {
+		runs = v
+	}
+	t.Logf("corpus=%q fixtures=%d models=%v runs=%d", corpus, len(fixtures), models, runs)
 
 	client, err := jev.NewClient("", "", key)
 	if err != nil {
@@ -367,6 +371,48 @@ func TestJevStudyCollect(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("wrote %s (%d bytes)", studyFile(), len(raw))
+}
+
+// studyCorpus names the fixtures a collection reviews. The default is the tuning, caller
+// and info corpora with the held-out corpus left out; "heldout" is the held-out corpus
+// alone, which can be spent once per question.
+func studyCorpus(name string) ([]Fixture, error) {
+	switch name {
+	case "", "tuning":
+		var out []Fixture
+		seen := map[string]bool{}
+		for _, f := range append(append(Fixtures(), CallerFixtures()...), InfoFixtures()...) {
+			if seen[f.Name] {
+				continue
+			}
+			seen[f.Name] = true
+			out = append(out, f)
+		}
+		return out, nil
+	case "heldout":
+		return HeldOutFixtures(), nil
+	}
+	return nil, fmt.Errorf("corpus %q is not tuning or heldout", name)
+}
+
+// studyGuardHeldOut refuses to start a collection on the held-out corpus unless the
+// operator has said they mean to spend it and named a file that does not exist yet.
+// Spent data cannot be un-spent, and a second run over the same fixtures would either
+// overwrite the first or add a second look at data a result was already read from.
+func studyGuardHeldOut(corpus, spend, file string) error {
+	if corpus != "heldout" {
+		return nil
+	}
+	if spend != "1" {
+		return errors.New("the held-out corpus can be spent once: set NITPICK_JEV_STUDY_SPEND_HELDOUT=1 to say so")
+	}
+	if file == "" {
+		return errors.New("a held-out collection needs NITPICK_JEV_STUDY_FILE, so it cannot overwrite the default file")
+	}
+	if _, err := os.Stat(file); err == nil {
+		return fmt.Errorf("%s already exists: the held-out corpus has been spent into it", file)
+	}
+	return nil
 }
 
 // studyTune is the configuration of an arm. Jev is enabled and withholds nothing, so
@@ -724,8 +770,16 @@ func studySerious() map[string]bool {
 	return out
 }
 
-// studyValue is the score a method gives one observation, and whether it gave one.
+// studyValue is the score a method gives one observation, and whether it gave one. The
+// score is rounded to six places: Jev's bug plus error is a sum of two probabilities, so
+// 0.62 and 0.32 give 0.9400000000000001, and a threshold written as 0.94 would otherwise keep
+// some findings scored 0.94 and withhold others.
 func studyValue(o studyObservation, m string) (float64, bool) {
+	v, ok := studyRawValue(o, m)
+	return math.Round(v*1e6) / 1e6, ok
+}
+
+func studyRawValue(o studyObservation, m string) (float64, bool) {
 	switch m {
 	case "confidence":
 		return o.Confidence, true
