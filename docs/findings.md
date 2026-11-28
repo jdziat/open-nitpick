@@ -3355,3 +3355,48 @@ diffs hold the whole file, so almost no lookups were needed). The general model 
 judged is the same model as one reviewer. Jev's endpoint is an alpha. The first and second
 plain collections are different samples of nondeterministic reviewers and are not pooled.
 
+### Held-out run of the Jev question (2026-11-28)
+
+One run on the held-out corpus, written down before any held-out finding existed
+(`internal/evals/jevstudy_heldout_test.go`, commit f187303). The development data did not
+favour Jev, so the run was there to settle the question on data nothing was tuned on.
+The stratum was findings the reviewer rated warning or above. The thresholds were frozen
+from the development data. The primary test was the AUC of Jev's support (one minus its
+noise probability) minus the reviewer's confidence, with an interval from resampling
+fixtures. The rule: fewer than 15 not-real findings in the stratum is underpowered;
+otherwise confirmed only if the interval lies above zero and support's AUC is at least 0.80.
+
+14 held-out fixtures, 3 reviewers, 4 runs each: 168 reviews, none failed, 153 findings
+(115 real, 38 not real), $0.91. The stratum held 97 findings, 85 real and 12 not real.
+
+| method | AUC | support minus method (95% interval over fixtures) | not-real withheld / real lost at the frozen threshold |
+|---|---|---|---|
+| reviewer's confidence | 0.634 | +0.288 (-0.393 to +0.536) | 1.000 / 0.588 |
+| reviewer's severity | 0.799 | +0.124 (-0.291 to +0.319) | 0.917 / 0.341 |
+| Jev bug plus error | 0.676 | +0.247 (-0.128 to +0.553) | 1.000 / 0.671 |
+| Jev support | 0.923 | | 1.000 / 0.753 |
+
+Verdict by the rules written beforehand: underpowered. 12 not-real findings is under the
+minimum of 15, and nine of the 12 came from one fixture (`retry-no-backoff`), so the sample
+holds about four independent cases. The intervals span zero and the sign of every
+difference is a coin flip. Support's AUC is the highest in the table and is not evidence:
+on the development data the same stratum read 0.672, and the two samples disagree by 0.25.
+
+What follows from it, as written: nothing turns `review.jev` on, the comment on
+`JevFilter` stops recommending 0.3, and the held-out corpus is spent for this question and
+is not run against Jev again. The question is open, not answered against Jev. A run that
+could answer it needs at least 15 not-real findings from at least eight fixtures in the
+stratum, which these reviewers do not produce on 14 fixtures; it would need more fixtures
+or weaker reviewers.
+
+Two earlier measurements lived only in the comment on `JevFilter`, and are kept here
+when that comment was shortened. They are quoted, not re-derived. On 100 findings that agents
+graded, the repository check followed by Jev at 0.3 withheld 29 of 42 not-real findings, against
+25 for the check alone. On deep review's drafts for 30 unseen pull requests Jev lowered F1 by
+0.033 (0.002 to 0.073), so it is not recommended there. Both were measured on findings from
+other corpora than the fixtures above.
+
+Not changed by this: the first study's finding that bug plus error at 0.3 is a poor filter
+on planted-defect fixtures still stands, as does the cost of sending source to a third
+party.
+
