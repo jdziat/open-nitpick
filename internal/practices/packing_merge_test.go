@@ -150,6 +150,9 @@ func TestLargeFocusSetKeepsEveryTaskWithinRequestCountLimit(t *testing.T) {
 	inventory, _ := InspectDesign(files, nil)
 	plan := PlanDesignInteractions(t.Context(), inventory, files, []string{"app.go"})
 	cfg := config.Defaults()
+	// This is about the request's task limit, so the cap that would cut 130 tasks to
+	// 24 is off.
+	cfg.Review.MaxDesignTasks = 0
 	packed := PackDesign(t.Context(), cfg, plan, files, nil, bundle.Reserve{})
 	if len(plan.Tasks) != 130 || len(packed.Plan.Batches) != 3 {
 		t.Fatalf("large focus set lost work or ignored task limit: tasks=%d requests=%d", len(plan.Tasks), len(packed.Plan.Batches))

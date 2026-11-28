@@ -35,6 +35,7 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 		out.Design.Errors = append(out.Design.Errors, "design packing requires positive file and token limits and a nonnegative framing reserve")
 		return out
 	}
+	capDesignTasks(&out, cfg.Review.MaxDesignTasks, changes)
 	out.Plan.BudgetPerBatch = max(0, cfg.Review.TokenBudgetPerRequest-reserve.Tokens)
 	out.Plan.FramingReserved = reserve.Tokens
 	sources := map[string][]byte{}
@@ -231,4 +232,125 @@ func PackDesign(ctx context.Context, cfg *config.Config, design DesignPlan, file
 		out.Plan.Batches = append(out.Plan.Batches, batch)
 	}
 	return out
+}
+
+// capDesignTasks keeps the highest ranked design tasks when a change has more than
+// review.max_design_tasks, and moves the rest to Deferred with a limitation that
+// names them. Slop-only tasks are not design units and are not counted or cut.
+//
+// A task is kept or left out whole. The order is what the change does to the task:
+// the lines it touches inside the task's own span first, then the caller obligations
+// it carries, then the fewer sources the sooner, then the ID so the same input keeps
+// the same tasks.
+func capDesignTasks(out *DesignPacking, limit int, changes diff.Files) {
+	if limit <= 0 {
+		return
+	}
+	var ranked []int
+	for i, task := range out.Design.Tasks {
+		if !task.SlopOnly {
+			ranked = append(ranked, i)
+		}
+	}
+	if len(ranked) <= limit {
+		return
+	}
+	touched := make([]int, len(out.Design.Tasks))
+	for _, i := range ranked {
+		touched[i] = taskChurn(out.Design.Tasks[i], changes)
+	}
+	tasks := out.Design.Tasks
+	slices.SortStableFunc(ranked, func(a, b int) int {
+		x, y := tasks[a], tasks[b]
+		if c := touched[b] - touched[a]; c != 0 {
+			return c
+		}
+		if c := len(y.Interactions) - len(x.Interactions); c != 0 {
+			return c
+		}
+		if c := len(x.Sources) - len(y.Sources); c != 0 {
+			return c
+		}
+		return strings.Compare(x.ID, y.ID)
+	})
+	drop := map[int]bool{}
+	var names []string
+	for place, index := range ranked {
+		if place < limit {
+			continue
+		}
+		task := tasks[index]
+		drop[index] = true
+		out.Design.Deferred = append(out.Design.Deferred, DeferredTask{ID: task.ID, Source: task.Source, Rank: place + 1, Of: len(ranked)})
+		out.Plan.Skipped = append(out.Plan.Skipped, bundle.Skip{Path: task.Source.ID,
+			Reason: fmt.Sprintf("%s: left out by review.max_design_tasks (rank %d of %d)", task.ID, place+1, len(ranked))})
+		names = append(names, task.ID)
+	}
+	kept := make([]DesignTask, 0, len(tasks)-len(drop))
+	for i, task := range tasks {
+		if !drop[i] {
+			kept = append(kept, task)
+		}
+	}
+	out.Design.Tasks = kept
+	shown := names
+	if len(shown) > 8 {
+		shown = append(slices.Clone(names[:8]), fmt.Sprintf("and %d more", len(names)-8))
+	}
+	out.Design.Limitations = append(out.Design.Limitations, fmt.Sprintf(
+		"review.max_design_tasks=%d: %d of %d design tasks were not run, lowest ranked last: %s",
+		limit, len(names), len(ranked), strings.Join(shown, ", ")))
+}
+
+// taskChurn counts the lines a change adds or removes inside a task's own focus
+// spans. A declaration task is about one declaration, so the lines that count are the
+// ones inside it: counting the whole file would give every declaration of a busy file
+// the same weight, including the ones the change never reached. A task with no span
+// is about whole files, and counts the lines changed in them.
+//
+// A removed line has no line number in the new file, so it belongs to the span of the
+// next line the hunk keeps or adds.
+func taskChurn(task DesignTask, changes diff.Files) int {
+	byPath := map[string]*diff.File{}
+	for _, file := range changes {
+		byPath[file.Path] = file
+	}
+	within := func(file *diff.File, inSpan func(line int) bool) int {
+		total := 0
+		for _, hunk := range file.Hunks {
+			for i, line := range hunk.Lines {
+				switch line.Kind {
+				case diff.LineAdded:
+					if inSpan(line.NewLine) {
+						total++
+					}
+				case diff.LineRemoved:
+					for _, next := range hunk.Lines[i+1:] {
+						if next.NewLine > 0 {
+							if inSpan(next.NewLine) {
+								total++
+							}
+							break
+						}
+					}
+				}
+			}
+		}
+		return total
+	}
+	total := 0
+	if len(task.Focus) == 0 {
+		for _, source := range task.Sources {
+			if file := byPath[source.ID]; file != nil {
+				total += within(file, func(int) bool { return true })
+			}
+		}
+		return total
+	}
+	for _, span := range task.Focus {
+		if file := byPath[span.Path]; file != nil {
+			total += within(file, func(line int) bool { return line >= span.Start && line <= span.End })
+		}
+	}
+	return total
 }

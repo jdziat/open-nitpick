@@ -298,6 +298,11 @@ type Options struct {
 	// measures two variants of the engine against the same corpus.
 	Tune func(*config.Config)
 
+	// Decider, when set, answers the review.jev stage in place of the real client. It
+	// is how a study records the exact state the decision model was shown for each
+	// finding, and scores it, without the engine knowing.
+	Decider review.Decider
+
 	// buildClient constructs the model client. It is unexported and nil in
 	// every real run, where llm.Build is used.
 	//
@@ -905,6 +910,7 @@ func RunWithPersona(ctx context.Context, model Model, f Fixture, runIndex int, o
 	engine := review.NewEngine(cfg, provider, review.NoPolicy("offline fixtures have no forge base"),
 		func(*config.Config) (*llm.Roles, error) { return roles, nil }, cmpLogger(opts.Log))
 	engine.Roles = roles
+	engine.Decider = opts.Decider
 	if cfg.Review.GenerationLookups {
 		engine.RepoRoot = dir
 	}

@@ -843,3 +843,50 @@ func TestSlopFindingsRetainOnlyAssessedSupportingSourceEvidence(t *testing.T) {
 		})
 	}
 }
+
+// Tasks that review.max_design_tasks left out are not planned, so a review that cut
+// them finishes its design check over the tasks it ran and says what it left. A
+// review that lost a task it chose to run is still partial.
+func TestADesignCheckThatCutTasksByRankCompletesAndSaysSo(t *testing.T) {
+	source := practices.Target{Kind: practices.FileTarget, ID: "kept.go"}
+	kept := practices.DesignTask{ID: "kept", Source: source, Sources: []practices.Target{source}, SourceDigest: strings.Repeat("a", 64), Purpose: "kept declaration"}
+	deferred := practices.DeferredTask{ID: "left", Source: practices.Target{Kind: practices.FileTarget, ID: "left.go"}, Rank: 2, Of: 2}
+	limit := "review.max_design_tasks=1: 1 of 2 design tasks were not run, lowest ranked last: left"
+	entry := bundle.Entry{File: &diff.File{Path: source.ID}, Content: "package fixture\n"}
+	build := func(assessed []string) *review.Report {
+		return &review.Report{
+			DesignExecution: &review.DesignExecution{DesignPacking: practices.DesignPacking{Design: practices.DesignPlan{
+				Tasks: []practices.DesignTask{kept}, Deferred: []practices.DeferredTask{deferred}, Limitations: []string{limit}}}},
+			Plan:                &bundle.Plan{Batches: []bundle.Batch{{DesignTask: "kept", Entries: []bundle.Entry{entry}}}},
+			AssessedDesignTasks: assessed,
+		}
+	}
+
+	check := practices.Check{ID: "design"}
+	applyPackageCoverage(&check, build([]string{"kept"}))
+	if check.State != practices.Completed || len(check.Planned) != 1 || len(check.Omitted) != 0 {
+		t.Fatalf("a review that cut by rank and ran what it kept is not complete: %+v", check)
+	}
+	if text := (practices.Report{Profile: "engineering", Checks: []practices.Check{check}}).Text(); !strings.Contains(text, "Scope limit: "+limit) {
+		t.Errorf("the summary does not say tasks were left out:\n%s", text)
+	}
+
+	// The exit follows from the report: a required check that finished over its scope
+	// leaves no problem, which is what makes the run exit 0 and not 2.
+	check.Version, check.Instrument, check.Required = "1", practices.Model, true
+	done := practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: "r", PolicySource: "p", PolicyDigest: "d", Checks: []practices.Check{check}}
+	if problems := done.Problems(); len(problems) != 0 || done.ExitCode() != 0 {
+		t.Errorf("a review that cut by rank exits %d with problems %v, want 0 and none", done.ExitCode(), problems)
+	}
+
+	lost := practices.Check{ID: "design"}
+	applyPackageCoverage(&lost, build(nil))
+	if lost.State != practices.Partial {
+		t.Errorf("a kept task that did not run left the check %q, want partial", lost.State)
+	}
+	lost.Version, lost.Instrument, lost.Required = "1", practices.Model, true
+	failed := practices.Report{SchemaVersion: practices.SchemaVersion, Profile: "engineering", Revision: "r", PolicySource: "p", PolicyDigest: "d", Checks: []practices.Check{lost}}
+	if failed.ExitCode() != 2 {
+		t.Errorf("a required check that lost a kept task exits %d, want 2", failed.ExitCode())
+	}
+}

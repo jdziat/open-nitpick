@@ -495,6 +495,17 @@ source links when the forge supplies them. Cancellation preserves completed task
 evidence and marks unfinished stages. These are coverage records, not a claim
 that every architectural defect was ruled out.
 
+`review.max_design_tasks` caps how many design tasks a review runs. It is 24 by
+default, and zero turns it off. When a change has more tasks, the review ranks them
+and runs the highest ranked. The order is the lines the change adds or removes inside
+the task's own declaration, then the caller obligations the task carries, then fewer
+source files, then the task ID. A task is kept or left out whole. The tasks left out
+are not planned, so the design check finishes over the tasks that ran and the run does
+not fail for them. The summary lists them under "Scope limit" with their rank, and the
+report lists them in the design plan's `deferred` field. A task that was kept and did
+not complete still leaves the check partial. The cap counts design tasks only, not
+slop-only assessments.
+
 The initial policy requires completion of conventions, linters, commits, slop
 tells, slop assessment and design assessment. Commit and analyzer violations
 block by default. Model findings and prose tells begin advisory. Accepted policy
